@@ -334,19 +334,19 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
   }
 
   istrstream::istrstream(char* s)
-  : basic_ios<char>(), basic_istream<char>(0), _M_buf(s, 0)
+  : basic_istream<char>(0), _M_buf(s, 0)
   { basic_ios<char>::init(&_M_buf); }
 
   istrstream::istrstream(const char* s)
-  : basic_ios<char>(), basic_istream<char>(0), _M_buf(s, 0)
+  : basic_istream<char>(0), _M_buf(s, 0)
   { basic_ios<char>::init(&_M_buf); }
 
   istrstream::istrstream(char* s, streamsize n)
-  : basic_ios<char>(), basic_istream<char>(0), _M_buf(s, n)
+  : basic_istream<char>(0), _M_buf(s, n)
   { basic_ios<char>::init(&_M_buf); }
 
   istrstream::istrstream(const char* s, streamsize n)
-  : basic_ios<char>(), basic_istream<char>(0), _M_buf(s, n)
+  : basic_istream<char>(0), _M_buf(s, n)
   { basic_ios<char>::init(&_M_buf); }
 
   istrstream::~istrstream() { }
@@ -360,11 +360,11 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
   { return _M_buf.str(); }
 
   ostrstream::ostrstream()
-  : basic_ios<char>(), basic_ostream<char>(0), _M_buf()
+  : basic_ostream<char>(0), _M_buf()
   { basic_ios<char>::init(&_M_buf); }
 
   ostrstream::ostrstream(char* s, int n, ios_base::openmode mode)
-  : basic_ios<char>(), basic_ostream<char>(0),
+  : basic_ostream<char>(0),
     _M_buf(s, n, mode & ios_base::app ? s + strlen(s) : s)
   { basic_ios<char>::init(&_M_buf); }
 
@@ -387,11 +387,11 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
   { return _M_buf.pcount(); }
 
   strstream::strstream()
-  : basic_ios<char>(), basic_iostream<char>(0), _M_buf()
+  : basic_iostream<char>(0), _M_buf()
   { basic_ios<char>::init(&_M_buf); }
 
   strstream::strstream(char* s, int n, ios_base::openmode mode)
-  : basic_ios<char>(), basic_iostream<char>(0),
+  : basic_iostream<char>(0),
     _M_buf(s, n, mode & ios_base::app ? s + strlen(s) : s)
   { basic_ios<char>::init(&_M_buf); }
 
