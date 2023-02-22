@@ -1670,9 +1670,11 @@ check_assumed_size_reference (gfc_symbol *sym, gfc_expr *e)
 
   /* FIXME: The comparison "e->ref->u.ar.type == AR_FULL" is wrong.
      What should it be?  */
-  if (e->ref && (e->ref->u.ar.end[e->ref->u.ar.as->rank - 1] == NULL)
-	  && (e->ref->u.ar.as->type == AS_ASSUMED_SIZE)
-	       && (e->ref->u.ar.type == AR_FULL))
+  if (e->ref
+      && e->ref->u.ar.as
+      && (e->ref->u.ar.end[e->ref->u.ar.as->rank - 1] == NULL)
+      && (e->ref->u.ar.as->type == AS_ASSUMED_SIZE)
+      && (e->ref->u.ar.type == AR_FULL))
     {
       gfc_error ("The upper bound in the last dimension must "
 		 "appear in the reference to the assumed size "
@@ -11923,9 +11925,14 @@ gfc_resolve_code (gfc_code *code, gfc_namespace *ns)
 	      break;
 	    case EXEC_OMP_DISTRIBUTE_PARALLEL_DO:
 	    case EXEC_OMP_DISTRIBUTE_PARALLEL_DO_SIMD:
+	    case EXEC_OMP_MASKED_TASKLOOP:
+	    case EXEC_OMP_MASKED_TASKLOOP_SIMD:
+	    case EXEC_OMP_MASTER_TASKLOOP:
+	    case EXEC_OMP_MASTER_TASKLOOP_SIMD:
 	    case EXEC_OMP_PARALLEL:
 	    case EXEC_OMP_PARALLEL_DO:
 	    case EXEC_OMP_PARALLEL_DO_SIMD:
+	    case EXEC_OMP_PARALLEL_LOOP:
 	    case EXEC_OMP_PARALLEL_MASKED:
 	    case EXEC_OMP_PARALLEL_MASKED_TASKLOOP:
 	    case EXEC_OMP_PARALLEL_MASKED_TASKLOOP_SIMD:
@@ -11936,11 +11943,13 @@ gfc_resolve_code (gfc_code *code, gfc_namespace *ns)
 	    case EXEC_OMP_TARGET_PARALLEL:
 	    case EXEC_OMP_TARGET_PARALLEL_DO:
 	    case EXEC_OMP_TARGET_PARALLEL_DO_SIMD:
+	    case EXEC_OMP_TARGET_PARALLEL_LOOP:
 	    case EXEC_OMP_TARGET_TEAMS:
 	    case EXEC_OMP_TARGET_TEAMS_DISTRIBUTE:
 	    case EXEC_OMP_TARGET_TEAMS_DISTRIBUTE_PARALLEL_DO:
 	    case EXEC_OMP_TARGET_TEAMS_DISTRIBUTE_PARALLEL_DO_SIMD:
 	    case EXEC_OMP_TARGET_TEAMS_DISTRIBUTE_SIMD:
+	    case EXEC_OMP_TARGET_TEAMS_LOOP:
 	    case EXEC_OMP_TASK:
 	    case EXEC_OMP_TASKLOOP:
 	    case EXEC_OMP_TASKLOOP_SIMD:
@@ -11949,6 +11958,7 @@ gfc_resolve_code (gfc_code *code, gfc_namespace *ns)
 	    case EXEC_OMP_TEAMS_DISTRIBUTE_PARALLEL_DO:
 	    case EXEC_OMP_TEAMS_DISTRIBUTE_PARALLEL_DO_SIMD:
 	    case EXEC_OMP_TEAMS_DISTRIBUTE_SIMD:
+	    case EXEC_OMP_TEAMS_LOOP:
 	      omp_workshare_save = omp_workshare_flag;
 	      omp_workshare_flag = 0;
 	      gfc_resolve_omp_parallel_blocks (code, ns);
@@ -11957,6 +11967,7 @@ gfc_resolve_code (gfc_code *code, gfc_namespace *ns)
 	    case EXEC_OMP_DISTRIBUTE_SIMD:
 	    case EXEC_OMP_DO:
 	    case EXEC_OMP_DO_SIMD:
+	    case EXEC_OMP_LOOP:
 	    case EXEC_OMP_SIMD:
 	    case EXEC_OMP_TARGET_SIMD:
 	      gfc_resolve_omp_do_blocks (code, ns);
@@ -14881,6 +14892,19 @@ resolve_component (gfc_component *c, gfc_symbol *sym)
                     c->ts.u.cl->length ? &c->ts.u.cl->length->where : &c->loc);
          return false;
        }
+
+     if (c->ts.u.cl->length && c->ts.u.cl->length->ts.type != BT_INTEGER)
+       {
+	 if (!c->ts.u.cl->length->error)
+	   {
+	     gfc_error ("Character length expression of component %qs at %L "
+			"must be of INTEGER type, found %s",
+			c->name, &c->ts.u.cl->length->where,
+			gfc_basic_typename (c->ts.u.cl->length->ts.type));
+	     c->ts.u.cl->length->error = 1;
+	   }
+	 return false;
+       }
     }
 
   if (c->ts.type == BT_CHARACTER && c->ts.deferred
@@ -17408,7 +17432,9 @@ resolve_fntype (gfc_namespace *ns)
 	  }
       }
 
-  if (sym->ts.type == BT_CHARACTER)
+  if (sym->ts.type == BT_CHARACTER
+      && sym->ts.u.cl->length
+      && sym->ts.u.cl->length->ts.type == BT_INTEGER)
     gfc_traverse_expr (sym->ts.u.cl->length, sym, flag_fn_result_spec, 0);
 }
 

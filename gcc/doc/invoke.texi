@@ -343,6 +343,7 @@ Objective-C and Objective-C++ Dialects}.
 -Wcast-align  -Wcast-align=strict  -Wcast-function-type  -Wcast-qual  @gol
 -Wchar-subscripts @gol
 -Wclobbered  -Wcomment @gol
+-Wno-complain-wrong-lang @gol
 -Wconversion  -Wno-coverage-mismatch  -Wno-cpp @gol
 -Wdangling-else  -Wdangling-pointer  -Wdangling-pointer=@var{n}  @gol
 -Wdate-time @gol
@@ -428,6 +429,7 @@ Objective-C and Objective-C++ Dialects}.
 -fanalyzer-fine-grained @gol
 -fno-analyzer-state-merge @gol
 -fno-analyzer-state-purge @gol
+-fno-analyzer-suppress-followups @gol
 -fanalyzer-transitivity @gol
 -fno-analyzer-undo-inlining @gol
 -fanalyzer-verbose-edges @gol
@@ -4282,6 +4284,10 @@ b->f();
 @noindent
 fails to compile.
 
+In cases where the different signatures are not an accident, the
+simplest solution is to add a using-declaration to the derived class
+to un-hide the base function, e.g. add @code{using A::f;} to @code{B}.
+
 The optional level suffix controls the behavior when all the
 declarations in the derived class override virtual functions in the
 base class, even if not all of the base functions are overridden:
@@ -6083,7 +6089,7 @@ Options} and @ref{Objective-C and Objective-C++ Dialect Options}.
 -Wunused-label     @gol
 -Wunused-value     @gol
 -Wunused-variable  @gol
--Wuse-after-free=3  @gol
+-Wuse-after-free=2  @gol
 -Wvla-parameter @r{(C and Objective-C only)} @gol
 -Wvolatile-register-var  @gol
 -Wzero-length-bounds}
@@ -8939,6 +8945,25 @@ programs.
 Warn for variables that might be changed by @code{longjmp} or
 @code{vfork}.  This warning is also enabled by @option{-Wextra}.
 
+@item -Wno-complain-wrong-lang
+@opindex Wcomplain-wrong-lang
+@opindex Wno-complain-wrong-lang
+By default, language front ends complain when a command-line option is
+valid, but not applicable to that front end.
+This may be disabled with @option{-Wno-complain-wrong-lang},
+which is mostly useful when invoking a single compiler driver for
+multiple source files written in different languages, for example:
+
+@smallexample
+$ g++ -fno-rtti a.cc b.f90
+@end smallexample
+
+The driver @file{g++} invokes the C++ front end to compile @file{a.cc}
+and the Fortran front end to compile @file{b.f90}.
+The latter front end diagnoses
+@samp{f951: Warning: command-line option '-fno-rtti' is valid for C++/D/ObjC++ but not for Fortran},
+which may be disabled with @option{-Wno-complain-wrong-lang}.
+
 @item -Wconversion
 @opindex Wconversion
 @opindex Wno-conversion
@@ -11007,6 +11032,30 @@ and which aren't relevant to leak analysis.
 
 With @option{-fno-analyzer-state-purge} this purging of state can
 be suppressed, for debugging state-handling issues.
+
+@item -fno-analyzer-suppress-followups
+@opindex fanalyzer-suppress-followups
+@opindex fno-analyzer-suppress-followups
+This option is intended for analyzer developers.
+
+By default the analyzer will stop exploring an execution path after
+encountering certain diagnostics, in order to avoid potentially issuing a
+cascade of follow-up diagnostics.
+
+The diagnostics that terminate analysis along a path are:
+
+@itemize
+@item @option{-Wanalyzer-null-argument}
+@item @option{-Wanalyzer-null-dereference}
+@item @option{-Wanalyzer-use-after-free}
+@item @option{-Wanalyzer-use-of-pointer-in-stale-stack-frame}
+@item @option{-Wanalyzer-use-of-uninitialized-value}
+@end itemize
+
+With @option{-fno-analyzer-suppress-followups} the analyzer will
+continue to explore such paths even after such diagnostics, which may
+be helpful for debugging issues in the analyzer, or for microbenchmarks
+for detecting undefined behavior.
 
 @item -fanalyzer-transitivity
 @opindex fanalyzer-transitivity
@@ -14674,8 +14723,8 @@ The names of specific parameters, and the meaning of the values, are
 tied to the internals of the compiler, and are subject to change
 without notice in future releases.
 
-In order to get minimal, maximal and default value of a parameter,
-one can use @option{--help=param -Q} options.
+In order to get the minimal, maximal and default values of a parameter,
+use the @option{--help=param -Q} options.
 
 In each case, the @var{value} is an integer.  The following choices
 of @var{name} are recognized for all targets:
@@ -15808,6 +15857,10 @@ If number of memory accesses in function being instrumented
 is greater or equal to this number, use callbacks instead of inline checks.
 E.g. to disable inline code use
 @option{--param asan-instrumentation-with-call-threshold=0}.
+
+@item asan-kernel-mem-intrinsic-prefix
+Prefix calls to memcpy, memset and memmove with __asan_ or __hwasan_
+for -fsanitize=kernel-address or -fsanitize=kernel-hwaddress.
 
 @item hwasan-instrument-stack
 Enable hwasan instrumentation of statically sized stack-allocated variables.
@@ -22880,7 +22933,7 @@ points to.
 The startup code from libgcc never sets @code{EIND}.
 Notice that startup code is a blend of code from libgcc and AVR-LibC.
 For the impact of AVR-LibC on @code{EIND}, see the
-@w{@uref{http://nongnu.org/avr-libc/user-manual/,AVR-LibC user manual}}.
+@w{@uref{https://www.nongnu.org/avr-libc/user-manual/,AVR-LibC user manual}}.
 
 @item
 It is legitimate for user-specific startup code to set up @code{EIND}

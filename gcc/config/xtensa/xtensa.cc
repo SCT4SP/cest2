@@ -3223,8 +3223,11 @@ xtensa_call_save_reg (int regno)
     return false;
 
   if (regno == A0_REG)
-    return crtl->profile || !crtl->is_leaf || crtl->calls_eh_return ||
-      df_regs_ever_live_p (regno);
+    /* Ensure the return address to be saved to the stack slot in order
+       to assist stack dump analysis when -Og is specified.  */
+    return optimize_debug
+	   || crtl->profile || !crtl->is_leaf || crtl->calls_eh_return
+	   || df_regs_ever_live_p (regno);
 
   if (crtl->calls_eh_return && IN_RANGE (regno, 2, 3))
     return true;
@@ -3545,8 +3548,6 @@ xtensa_expand_epilogue (bool sibcall_p)
 			      gen_frame_mem (SImode, x));
 	    }
 	}
-      if (sibcall_p)
-	emit_use (gen_rtx_REG (SImode, A0_REG));
 
       if (cfun->machine->current_frame_size > 0)
 	{

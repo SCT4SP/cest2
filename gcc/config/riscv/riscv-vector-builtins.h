@@ -141,6 +141,7 @@ enum rvv_base_type
   RVV_BASE_vector,
   RVV_BASE_scalar,
   RVV_BASE_mask,
+  RVV_BASE_signed_vector,
   RVV_BASE_unsigned_vector,
   RVV_BASE_unsigned_scalar,
   RVV_BASE_vector_ptr,
@@ -160,8 +161,13 @@ enum rvv_base_type
   RVV_BASE_quad_trunc_vector,
   RVV_BASE_oct_trunc_vector,
   RVV_BASE_double_trunc_scalar,
+  RVV_BASE_double_trunc_signed_vector,
   RVV_BASE_double_trunc_unsigned_vector,
   RVV_BASE_double_trunc_unsigned_scalar,
+  RVV_BASE_double_trunc_float_vector,
+  RVV_BASE_float_vector,
+  RVV_BASE_lmul1_vector,
+  RVV_BASE_widen_lmul1_vector,
   NUM_BASE_TYPES
 };
 
@@ -338,14 +344,19 @@ public:
   void add_all_one_mask_operand (machine_mode);
   void add_vundef_operand (machine_mode);
   void add_fixed_operand (rtx);
+  void add_integer_operand (rtx);
   void add_mem_operand (machine_mode, unsigned);
 
   machine_mode vector_mode (void) const;
   machine_mode index_mode (void) const;
+  machine_mode arg_mode (int) const;
 
   rtx use_exact_insn (insn_code);
   rtx use_contiguous_load_insn (insn_code);
   rtx use_contiguous_store_insn (insn_code);
+  rtx use_compare_insn (rtx_code, insn_code);
+  rtx use_ternop_insn (bool, insn_code);
+  rtx use_widen_ternop_insn (insn_code);
   rtx generate_insn (insn_code);
 
   /* The function call expression.  */
@@ -467,6 +478,13 @@ function_expander::add_fixed_operand (rtx x)
   create_fixed_operand (&m_ops[opno++], x);
 }
 
+/* Add an integer operand X.  */
+inline void
+function_expander::add_integer_operand (rtx x)
+{
+  create_integer_operand (&m_ops[opno++], INTVAL (x));
+}
+
 /* Return the machine_mode of the corresponding vector type.  */
 inline machine_mode
 function_expander::vector_mode (void) const
@@ -479,6 +497,13 @@ inline machine_mode
 function_expander::index_mode (void) const
 {
   return TYPE_MODE (op_info->args[1].get_tree_type (type.index));
+}
+
+/* Return the machine_mode of the corresponding arg type.  */
+inline machine_mode
+function_expander::arg_mode (int idx) const
+{
+  return TYPE_MODE (op_info->args[idx].get_tree_type (type.index));
 }
 
 /* Default implementation of function_base::call_properties, with conservatively

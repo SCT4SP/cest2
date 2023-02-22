@@ -67,9 +67,7 @@ public:
   }
   void add_vundef_operand (machine_mode mode)
   {
-    add_input_operand (gen_rtx_UNSPEC (mode, gen_rtvec (1, const0_rtx),
-				       UNSPEC_VUNDEF),
-		       mode);
+    add_input_operand (RVV_VUNDEF (mode), mode);
   }
   void add_policy_operand (enum tail_policy vta, enum mask_policy vma)
   {
@@ -398,16 +396,6 @@ get_vector_mode (scalar_mode inner_mode, poly_uint64 nunits)
   return opt_machine_mode ();
 }
 
-/* Helper functions for handling sew=64 on RV32 system. */
-bool
-simm32_p (rtx x)
-{
-  if (!CONST_INT_P (x))
-    return false;
-  unsigned HOST_WIDE_INT val = UINTVAL (x);
-  return val <= 0x7FFFFFFFULL || val >= 0xFFFFFFFF80000000ULL;
-}
-
 bool
 simm5_p (rtx x)
 {
@@ -427,11 +415,73 @@ neg_simm5_p (rtx x)
 bool
 has_vi_variant_p (rtx_code code, rtx x)
 {
-  if (code != PLUS && code != MINUS && code != AND && code != IOR && code != XOR
-      && code != SS_PLUS && code != SS_MINUS && code != US_PLUS
-      && code != US_MINUS)
-    return false;
-  return simm5_p (x);
+  switch (code)
+    {
+    case PLUS:
+    case AND:
+    case IOR:
+    case XOR:
+    case SS_PLUS:
+    case US_PLUS:
+    case EQ:
+    case NE:
+    case LE:
+    case LEU:
+    case GT:
+    case GTU:
+      return simm5_p (x);
+
+    case LT:
+    case LTU:
+    case GE:
+    case GEU:
+    case MINUS:
+    case SS_MINUS:
+      return neg_simm5_p (x);
+
+    default:
+      return false;
+    }
+}
+
+bool
+sew64_scalar_helper (rtx *operands, rtx *scalar_op, rtx vl,
+		     machine_mode vector_mode, machine_mode mask_mode,
+		     bool has_vi_variant_p,
+		     void (*emit_vector_func) (rtx *, rtx))
+{
+  machine_mode scalar_mode = GET_MODE_INNER (vector_mode);
+  if (has_vi_variant_p)
+    {
+      *scalar_op = force_reg (scalar_mode, *scalar_op);
+      return false;
+    }
+
+  if (TARGET_64BIT)
+    {
+      if (!rtx_equal_p (*scalar_op, const0_rtx))
+	*scalar_op = force_reg (scalar_mode, *scalar_op);
+      return false;
+    }
+
+  if (immediate_operand (*scalar_op, Pmode))
+    {
+      if (!rtx_equal_p (*scalar_op, const0_rtx))
+	*scalar_op = force_reg (Pmode, *scalar_op);
+
+      *scalar_op = gen_rtx_SIGN_EXTEND (scalar_mode, *scalar_op);
+      return false;
+    }
+
+  if (CONST_INT_P (*scalar_op))
+    *scalar_op = force_reg (scalar_mode, *scalar_op);
+
+  rtx tmp = gen_reg_rtx (vector_mode);
+  riscv_vector::emit_nonvlmax_op (code_for_pred_broadcast (vector_mode), tmp,
+				  *scalar_op, vl, mask_mode);
+  emit_vector_func (operands, tmp);
+
+  return true;
 }
 
 } // namespace riscv_vector
