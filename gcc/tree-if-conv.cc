@@ -1099,6 +1099,7 @@ if_convertible_stmt_p (gimple *stmt, vec<data_reference_p> refs)
 		   n = n->simdclone->next_clone)
 		if (n->simdclone->inbranch)
 		  {
+		    gimple_set_plf (stmt, GF_PLF_2, true);
 		    need_to_predicate = true;
 		    return true;
 		  }
@@ -2541,7 +2542,8 @@ predicate_statements (loop_p loop)
 	      release_defs (stmt);
 	      continue;
 	    }
-	  else if (gimple_plf (stmt, GF_PLF_2))
+	  else if (gimple_plf (stmt, GF_PLF_2)
+		   && is_gimple_assign (stmt))
 	    {
 	      tree lhs = gimple_assign_lhs (stmt);
 	      tree mask;
@@ -2625,13 +2627,14 @@ predicate_statements (loop_p loop)
 	      gimple_assign_set_rhs1 (stmt, ifc_temp_var (type, rhs, &gsi));
 	      update_stmt (stmt);
 	    }
-
-	  /* Convert functions that have a SIMD clone to IFN_MASK_CALL.  This
-	     will cause the vectorizer to match the "in branch" clone variants,
-	     and serves to build the mask vector in a natural way.  */
-	  gcall *call = dyn_cast <gcall *> (gsi_stmt (gsi));
-	  if (call && !gimple_call_internal_p (call))
+	  else if (gimple_plf (stmt, GF_PLF_2)
+		   && is_gimple_call (stmt))
 	    {
+	      /* Convert functions that have a SIMD clone to IFN_MASK_CALL.
+		 This will cause the vectorizer to match the "in branch"
+		 clone variants, and serves to build the mask vector
+		 in a natural way.  */
+	      gcall *call = dyn_cast <gcall *> (gsi_stmt (gsi));
 	      tree orig_fn = gimple_call_fn (call);
 	      int orig_nargs = gimple_call_num_args (call);
 	      auto_vec<tree> args;
@@ -3314,9 +3317,9 @@ get_bitfield_rep (gassign *stmt, bool write, tree *bitpos,
   tree field_decl = TREE_OPERAND (comp_ref, 1);
   tree rep_decl = DECL_BIT_FIELD_REPRESENTATIVE (field_decl);
 
-  /* Bail out if the representative is BLKmode as we will not be able to
-     vectorize this.  */
-  if (TYPE_MODE (TREE_TYPE (rep_decl)) == E_BLKmode)
+  /* Bail out if the representative is not a suitable type for a scalar
+     register variable.  */
+  if (!is_gimple_reg_type (TREE_TYPE (rep_decl)))
     return NULL_TREE;
 
   /* Bail out if the DECL_SIZE of the field_decl isn't the same as the BF's
@@ -3531,7 +3534,7 @@ tree_if_conversion (class loop *loop, vec<gimple *> *preds)
   auto_vec <gassign *, 4> writes_to_lower;
   bitmap exit_bbs;
   edge pe;
-  vec<data_reference_p> refs;
+  auto_vec<data_reference_p, 10> refs;
 
  again:
   rloop = NULL;
@@ -3541,7 +3544,6 @@ tree_if_conversion (class loop *loop, vec<gimple *> *preds)
   need_to_predicate = false;
   need_to_rewrite_undefined = false;
   any_complicated_phi = false;
-  refs.create (5);
 
   /* Apply more aggressive if-conversion when loop or its outer loop were
      marked with simd pragma.  When that's the case, we try to if-convert
@@ -3698,8 +3700,10 @@ tree_if_conversion (class loop *loop, vec<gimple *> *preds)
   data_reference_p dr;
   unsigned int i;
   for (i = 0; refs.iterate (i, &dr); i++)
-    free (dr->aux);
-
+    {
+      free (dr->aux);
+      free_data_ref (dr);
+    }
   refs.truncate (0);
 
   if (ifc_bbs)

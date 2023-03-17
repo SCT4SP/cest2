@@ -28,6 +28,8 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #include "system.h"
 #include "ansidecl.h"
 
+#define LIBNAME "m2pim"
+
 #include "gm2-libs-host.h"
 #include "m2rts.h"
 
@@ -50,7 +52,7 @@ extern int dtoa_calcsign (char *p, int str_size);
    (ndigits may be negative).  */
 
 long double
-ldtoa_strtold (const char *s, int *error)
+ldtoa_strtold (const char *s, bool *error)
 {
   char *endp;
   long double d;
@@ -65,7 +67,7 @@ ldtoa_strtold (const char *s, int *error)
   if (endp != NULL && (*endp == '\0'))
     *error = (errno != 0);
   else
-    *error = TRUE;
+    *error = true;
   return d;
 }
 
@@ -121,7 +123,7 @@ _M2_ldtoa_dep (void)
 extern "C" void __attribute__((__constructor__))
 _M2_ldtoa_ctor (void)
 {
-  M2RTS_RegisterModule ("ldtoa", _M2_ldtoa_init, _M2_ldtoa_finish,
+  M2RTS_RegisterModule ("ldtoa", LIBNAME, _M2_ldtoa_init, _M2_ldtoa_finish,
 			_M2_ldtoa_dep);
 }
 
