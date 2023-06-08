@@ -1,3 +1,52 @@
+2023-06-02  David Malcolm  <dmalcolm@redhat.com>
+
+	PR analyzer/109015
+	* kf.cc (class kf_atomic_exchange): New.
+	(class kf_atomic_exchange_n): New.
+	(class kf_atomic_fetch_op): New.
+	(class kf_atomic_op_fetch): New.
+	(class kf_atomic_load): New.
+	(class kf_atomic_load_n): New.
+	(class kf_atomic_store_n): New.
+	(register_atomic_builtins): New function.
+	(register_known_functions): Call register_atomic_builtins.
+
+2023-06-02  David Malcolm  <dmalcolm@redhat.com>
+
+	* store.cc (store::eval_alias_1): Regions in different memory
+	spaces can't alias.
+
+2023-05-18  Bernhard Reutner-Fischer  <aldot@gcc.gnu.org>
+
+	* region-model-manager.cc (get_code_for_cast): Use _P defines from
+	tree.h.
+	(region_model_manager::get_or_create_cast): Ditto.
+	(region_model_manager::get_region_for_global): Ditto.
+	* region-model.cc (region_model::get_lvalue_1): Ditto.
+	* region.cc (decl_region::maybe_get_constant_value): Ditto.
+
+2023-03-22  David Malcolm  <dmalcolm@redhat.com>
+
+	PR analyzer/109239
+	* program-point.cc: Include "analyzer/inlining-iterator.h".
+	(program_point::effectively_intraprocedural_p): New function.
+	* program-point.h (program_point::effectively_intraprocedural_p):
+	New decl.
+	* sm-malloc.cc (deref_before_check::emit): Use it when rejecting
+	interprocedural cases, so that we reject interprocedural cases
+	that have become intraprocedural due to inlining.
+
+2023-03-18  David Malcolm  <dmalcolm@redhat.com>
+
+	PR analyzer/109094
+	* region-model.cc (region_model::on_longjmp): Pass false for
+	new "eval_return_svalue" param of pop_frame.
+	(region_model::pop_frame): Add new "eval_return_svalue" param and
+	use it to suppress the call to get_rvalue on the result when
+	needed by on_longjmp.
+	* region-model.h (region_model::pop_frame): Add new
+	"eval_return_svalue" param.
+
 2023-03-10  David Malcolm  <dmalcolm@redhat.com>
 
 	PR analyzer/109059

@@ -1,3 +1,243 @@
+2023-06-02  Thomas Schwinge  <thomas@codesourcery.com>
+
+	PR testsuite/66005
+	* testsuite/lib/libgomp.exp: 'flock' through stdout.
+	* testsuite/flock: New.
+	* configure.ac (FLOCK): Point to that if no 'flock' available, but
+	'perl' is.
+	* configure: Regenerate.
+
+2023-06-02  Thomas Schwinge  <thomas@codesourcery.com>
+
+	* configure.ac (PERL): Remove.
+	* configure: Regenerate.
+	* Makefile.in: Likewise.
+	* testsuite/Makefile.in: Likewise.
+
+2023-06-01  Tobias Burnus  <tobias@codesourcery.com>
+
+	* libgomp.texi (OpenMP 5.2): Mark pure-directive handling as 'Y'.
+
+2023-05-26  Tobias Burnus  <tobias@codesourcery.com>
+
+	* testsuite/libgomp.fortran/allocate-4.f90: Update dg-error.
+
+2023-05-21  Tobias Burnus  <tobias@codesourcery.com>
+
+	PR libgomp/109875
+	* config/gcn/target.c (GOMP_teams4): Honor nteams-var ICV.
+	* config/nvptx/target.c (GOMP_teams4): Likewise.
+	* testsuite/libgomp.c-c++-common/teams-nteams-icv-1.c: New test.
+	* testsuite/libgomp.c-c++-common/teams-nteams-icv-2.c: New test.
+	* testsuite/libgomp.c-c++-common/teams-nteams-icv-3.c: New test.
+	* testsuite/libgomp.c-c++-common/teams-nteams-icv-4.c: New test.
+
+2023-05-19  Jakub Jelinek  <jakub@redhat.com>
+
+	PR libgomp/109904
+	* configure.ac (link_gomp): Include also $DL_LIBS.
+	* configure: Regenerated.
+
+2023-05-17  Tobias Burnus  <tobias@codesourcery.com>
+
+	* testsuite/libgomp.fortran/target-enter-data-3.f90: Uncomment
+	'target exit data'.
+	* testsuite/libgomp.fortran/target-enter-data-4.f90: New test.
+	* testsuite/libgomp.fortran/target-enter-data-5.f90: New test.
+	* testsuite/libgomp.fortran/target-enter-data-6.f90: New test.
+	* testsuite/libgomp.fortran/target-enter-data-7.f90: New test.
+
+2023-05-15  Thomas Schwinge  <thomas@codesourcery.com>
+
+	PR testsuite/66005
+	* configure.ac: Look for 'flock'.
+	* testsuite/Makefile.am (gcc_test_parallel_slots): Enable parallel testing.
+	* testsuite/config/default.exp: Don't 'load_lib "standard.exp"' here...
+	* testsuite/lib/libgomp.exp: ... but here, instead.
+	(libgomp_load): Override for parallel testing.
+	* testsuite/libgomp-site-extra.exp.in (FLOCK): Set.
+	* configure: Regenerate.
+	* Makefile.in: Regenerate.
+	* testsuite/Makefile.in: Regenerate.
+
+2023-05-15  Rainer Orth  <ro@CeBiTec.Uni-Bielefeld.DE>
+	    Thomas Schwinge  <thomas@codesourcery.com>
+
+	PR testsuite/66005
+	* testsuite/Makefile.am (PWD_COMMAND): New variable.
+	(%/site.exp): New target.
+	(check_p_numbers0, check_p_numbers1, check_p_numbers2)
+	(check_p_numbers3, check_p_numbers4, check_p_numbers5)
+	(check_p_numbers6, check_p_numbers, gcc_test_parallel_slots)
+	(check_p_subdirs)
+	(check_DEJAGNU_libgomp_targets): New variables.
+	($(check_DEJAGNU_libgomp_targets)): New target.
+	($(check_DEJAGNU_libgomp_targets)): New dependency.
+	(check-DEJAGNU $(check_DEJAGNU_libgomp_targets)): New targets.
+	* testsuite/Makefile.in: Regenerate.
+	* testsuite/lib/libgomp.exp: For parallel testing,
+	'load_file ../libgomp-test-support.exp'.
+
+2023-05-15  Thomas Schwinge  <thomas@codesourcery.com>
+
+	PR testsuite/91884
+	* configure.ac: 'AC_SUBST(CXX)'.
+	* configure: Regenerate.
+	* Makefile.in: Likewise.
+	* testsuite/Makefile.in: Likewise.
+	* testsuite/libgomp-site-extra.exp.in (GXX_UNDER_TEST)
+	(GFORTRAN_UNDER_TEST): Set.
+	* testsuite/lib/libgomp.exp (libgomp_init): Adjust.
+	* testsuite/libgomp.c++/c++.exp: Use 'GXX_UNDER_TEST'.
+	* testsuite/libgomp.oacc-c++/c++.exp: Likewise.
+	* testsuite/libgomp.fortran/fortran.exp: Use
+	'GFORTRAN_UNDER_TEST'.
+	* testsuite/libgomp.oacc-fortran/fortran.exp: Likewise.
+
+2023-05-15  Thomas Schwinge  <thomas@codesourcery.com>
+
+	PR testsuite/91884
+	* testsuite/lib/libgomp.exp (libgomp_target_compile): Don't
+	specify compiler.
+	* testsuite/libgomp.c++/c++.exp (ALWAYS_CFLAGS): Specify compiler.
+	* testsuite/libgomp.c/c.exp (ALWAYS_CFLAGS): Likewise.
+	* testsuite/libgomp.fortran/fortran.exp (ALWAYS_CFLAGS): Likewise.
+	* testsuite/libgomp.graphite/graphite.exp (ALWAYS_CFLAGS):
+	Likewise.
+	* testsuite/libgomp.oacc-c++/c++.exp (ALWAYS_CFLAGS): Likewise.
+	* testsuite/libgomp.oacc-c/c.exp (ALWAYS_CFLAGS): Likewise.
+	* testsuite/libgomp.oacc-fortran/fortran.exp (ALWAYS_CFLAGS):
+	Likewise.
+
+2023-05-12  Tobias Burnus  <tobias@codesourcery.com>
+
+	PR libstdc++/109816
+	* testsuite/libgomp.c++/target-map-class-1.C: New test.
+	* testsuite/libgomp.c++/target-map-class-2.C: New test.
+
+2023-05-12  Thomas Schwinge  <thomas@codesourcery.com>
+
+	* testsuite/lib/libgomp.exp (libgomp_target_compile): Generalize
+	'lang_library_path' into a list of 'lang_library_paths'.
+	* testsuite/libgomp.c++/c++.exp: Adjust.
+	* testsuite/libgomp.oacc-c++/c++.exp: Likewise.
+	* testsuite/libgomp.fortran/fortran.exp: Adjust.  Use that for
+	libquadmath, too.
+	* testsuite/libgomp.oacc-fortran/fortran.exp: Likewise.
+
+2023-05-12  Thomas Schwinge  <thomas@codesourcery.com>
+
+	* testsuite/lib/libgomp.exp (libgomp_target_compile): Don't look
+	at 'lang_test_file_found'.
+	* testsuite/libgomp.c++/c++.exp: Don't set and use it, and instead
+	'return' early if not able to test.  Simplify 'ld_library_path' setup.
+	* testsuite/libgomp.fortran/fortran.exp: Likewise.
+	* testsuite/libgomp.oacc-c++/c++.exp: Likewise.
+	* testsuite/libgomp.oacc-fortran/fortran.exp: Likewise.
+
+2023-05-12  Thomas Schwinge  <thomas@codesourcery.com>
+
+	* testsuite/libgomp.c++/c++.exp: Resolve 'lang_test_file_found'
+	first.
+	* testsuite/libgomp.fortran/fortran.exp: Likewise.
+	* testsuite/libgomp.oacc-c++/c++.exp: Likewise.
+	* testsuite/libgomp.oacc-fortran/fortran.exp: Likewise.
+
+2023-05-12  Thomas Schwinge  <thomas@codesourcery.com>
+
+	* testsuite/libgomp.c++/c++.exp: Localize 'lang_[...]' etc.
+	* testsuite/libgomp.c/c.exp: Likewise.
+	* testsuite/libgomp.fortran/fortran.exp: Likewise.
+	* testsuite/libgomp.graphite/graphite.exp: Likewise.
+	* testsuite/libgomp.oacc-c++/c++.exp: Likewise.
+	* testsuite/libgomp.oacc-c/c.exp: Likewise.
+	* testsuite/libgomp.oacc-fortran/fortran.exp: Likewise.
+
+2023-05-09  Thomas Schwinge  <thomas@codesourcery.com>
+
+	* testsuite/libgomp.c++/c++.exp: Don't set 'lang_test_file'.
+	* testsuite/libgomp.fortran/fortran.exp: Likewise.
+	* testsuite/libgomp.oacc-c++/c++.exp: Likewise.
+	* testsuite/libgomp.oacc-fortran/fortran.exp: Likewise.
+	* testsuite/libgomp.c/c.exp: Unset 'lang_test_file_found' instead of
+	'lang_test_file'.
+	* testsuite/libgomp.oacc-c/c.exp: Likewise.
+	* testsuite/libgomp.graphite/graphite.exp: Likewise.
+	* testsuite/lib/libgomp.exp (libgomp_target_compile): Look for
+	'lang_test_file_found' instead of 'lang_test_file'.
+
+2023-05-09  Thomas Schwinge  <thomas@codesourcery.com>
+
+	* testsuite/lib/libgomp.exp (libgomp_init): Only use 'blddir' if
+	set.
+	* testsuite/libgomp.c++/c++.exp: Likewise.
+	* testsuite/libgomp.oacc-c++/c++.exp: Likewise.
+
+2023-05-09  Thomas Schwinge  <thomas@codesourcery.com>
+
+	* testsuite/libgomp.c++/c++.exp (blddir): Don't set.
+	* testsuite/libgomp.oacc-c++/c++.exp (blddir): Likewise.
+
+2023-05-08  Thomas Schwinge  <thomas@codesourcery.com>
+
+	* testsuite/libgomp.c++/c++.exp: Use 'lang_include_flags' instead
+	of 'libstdcxx_includes'.
+	* testsuite/libgomp.oacc-c++/c++.exp: Likewise.
+
+2023-05-08  Thomas Schwinge  <thomas@codesourcery.com>
+
+	* target.c (gomp_target_rev): Instead of 'dev_to_host_cpy',
+	'host_to_dev_cpy', 'token', take a single 'goacc_asyncqueue'.
+	* libgomp.h (gomp_target_rev): Adjust.
+	* libgomp-plugin.c (GOMP_PLUGIN_target_rev): Adjust.
+	* libgomp-plugin.h (GOMP_PLUGIN_target_rev): Adjust.
+	* plugin/plugin-gcn.c (process_reverse_offload): Adjust.
+	* plugin/plugin-nvptx.c (rev_off_dev_to_host_cpy)
+	(rev_off_host_to_dev_cpy): Remove.
+	(GOMP_OFFLOAD_run): Adjust.
+
+2023-05-04  Julian Brown  <julian@codesourcery.com>
+
+	PR fortran/109622
+	* testsuite/libgomp.fortran/pr109622.f90: Move test...
+	* testsuite/libgomp.oacc-fortran/pr109622.f90: ...to here. Ignore
+	vector length warning.
+	* testsuite/libgomp.fortran/pr109622-2.f90: Move test...
+	* testsuite/libgomp.oacc-fortran/pr109622-2.f90: ...to here.  Add
+	missing copyin/copyout variable. Ignore vector length warnings.
+	* testsuite/libgomp.fortran/pr109622-3.f90: Move test...
+	* testsuite/libgomp.oacc-fortran/pr109622-3.f90: ...to here.  Ignore
+	vector length warnings.
+	* testsuite/libgomp.oacc-fortran/pr109622-4.f90: New test.
+
+2023-04-28  Julian Brown  <julian@codesourcery.com>
+
+	PR fortran/109622
+	* testsuite/libgomp.fortran/pr109622.f90: New test.
+	* testsuite/libgomp.fortran/pr109622-2.f90: New test.
+	* testsuite/libgomp.fortran/pr109622-3.f90: New test.
+
+2023-04-25  Tobias Burnus  <tobias@codesourcery.com>
+
+	* testsuite/libgomp.c-c++-common/scan-1.c: New test.
+	* testsuite/libgomp.c/scan-23.c: New test.
+	* testsuite/libgomp.fortran/scan-2.f90: New test.
+
+2023-03-28  Rainer Orth  <ro@CeBiTec.Uni-Bielefeld.DE>
+
+	* testsuite/libgomp.oacc-c-c++-common/routine-nohost-2.c: Add
+	weak_undefined options.
+
+2023-03-24  Tobias Burnus  <tobias@codesourcery.com>
+
+	* libgomp.texi (Offload-Target Specifics): Grammar fix.
+
+2023-03-24  Thomas Schwinge  <thomas@codesourcery.com>
+
+	PR fortran/104949
+	* target.c (gomp_map_vars_internal) <GOMP_MAP_FIRSTPRIVATE>: Add
+	caveat/safeguard.
+
 2023-03-10  Thomas Schwinge  <thomas@codesourcery.com>
 
 	PR libgomp/90596

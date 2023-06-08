@@ -1314,7 +1314,17 @@ commutative_optab_p (optab binoptab)
 	  || binoptab == smul_widen_optab
 	  || binoptab == umul_widen_optab
 	  || binoptab == smul_highpart_optab
-	  || binoptab == umul_highpart_optab);
+	  || binoptab == umul_highpart_optab
+	  || binoptab == vec_widen_sadd_optab
+	  || binoptab == vec_widen_uadd_optab
+	  || binoptab == vec_widen_sadd_hi_optab
+	  || binoptab == vec_widen_sadd_lo_optab
+	  || binoptab == vec_widen_uadd_hi_optab
+	  || binoptab == vec_widen_uadd_lo_optab
+	  || binoptab == vec_widen_sadd_even_optab
+	  || binoptab == vec_widen_sadd_odd_optab
+	  || binoptab == vec_widen_uadd_even_optab
+	  || binoptab == vec_widen_uadd_odd_optab);
 }
 
 /* X is to be used in mode MODE as operand OPN to BINOPTAB.  If we're
@@ -8139,6 +8149,11 @@ maybe_gen_insn (enum insn_code icode, unsigned int nops,
 			      ops[3].value, ops[4].value, ops[5].value,
 			      ops[6].value, ops[7].value, ops[8].value,
 			      ops[9].value);
+    case 11:
+      return GEN_FCN (icode) (ops[0].value, ops[1].value, ops[2].value,
+			      ops[3].value, ops[4].value, ops[5].value,
+			      ops[6].value, ops[7].value, ops[8].value,
+			      ops[9].value, ops[10].value);
     }
   gcc_unreachable ();
 }

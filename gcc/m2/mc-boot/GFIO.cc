@@ -727,7 +727,7 @@ static int ReadFromBuffer (FIO_File f, void * a, unsigned int nBytes)
                   (*p) = static_cast<unsigned char> ((*fd->buffer->contents).array[fd->buffer->position]);
                   fd->buffer->left -= 1;  /* remove consumed bytes  */
                   fd->buffer->position += 1;  /* move onwards n bytes  */
-                  nBytes = 0;
+                  nBytes = 0;  /* reduce the amount for future direct  */
                   /* read  */
                   return 1;
                 }
@@ -814,7 +814,6 @@ static int BufferedRead (FIO_File f, unsigned int nBytes, void * a)
   typedef unsigned char *BufferedRead__T3;
 
   void * t;
-  int result;
   int total;
   int n;
   BufferedRead__T3 p;
@@ -1242,7 +1241,6 @@ static int BufferedWrite (FIO_File f, unsigned int nBytes, void * a)
   typedef unsigned char *BufferedWrite__T5;
 
   void * t;
-  int result;
   int total;
   int n;
   BufferedWrite__T5 p;

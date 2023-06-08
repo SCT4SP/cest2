@@ -346,7 +346,7 @@ enforce_access (tree basetype_path, tree decl, tree diag_decl,
     }
 
   tree cs = current_scope ();
-  if (processing_template_decl
+  if (in_template_context
       && (CLASS_TYPE_P (cs) || TREE_CODE (cs) == FUNCTION_DECL))
     if (tree template_info = get_template_info (cs))
       {
@@ -2070,7 +2070,7 @@ finish_mem_initializers (tree mem_inits)
    right result.  If EVEN_UNEVAL, do this even in unevaluated context.  */
 
 tree
-force_paren_expr (tree expr, bool even_uneval)
+force_paren_expr (tree expr, bool even_uneval /* = false */)
 {
   /* This is only needed for decltype(auto) in C++14.  */
   if (cxx_dialect < cxx14)
@@ -4238,6 +4238,7 @@ finish_id_expression_1 (tree id_expression,
 		    : CP_ID_KIND_UNQUALIFIED)));
 
       if (dependent_p
+	  && !scope
 	  && DECL_P (decl)
 	  && any_dependent_type_attributes_p (DECL_ATTRIBUTES (decl)))
 	/* Dependent type attributes on the decl mean that the TREE_TYPE is
@@ -4467,6 +4468,35 @@ finish_underlying_type (tree type)
 				TYPE_UNSIGNED (underlying_type));
 
   return underlying_type;
+}
+
+/* Implement the __type_pack_element keyword: Return the type
+   at index IDX within TYPES.  */
+
+static tree
+finish_type_pack_element (tree idx, tree types, tsubst_flags_t complain)
+{
+  idx = maybe_constant_value (idx);
+  if (TREE_CODE (idx) != INTEGER_CST || !INTEGRAL_TYPE_P (TREE_TYPE (idx)))
+    {
+      if (complain & tf_error)
+	error ("%<__type_pack_element%> index is not an integral constant");
+      return error_mark_node;
+    }
+  HOST_WIDE_INT val = tree_to_shwi (idx);
+  if (val < 0)
+    {
+      if (complain & tf_error)
+	error ("%<__type_pack_element%> index is negative");
+      return error_mark_node;
+    }
+  if (val >= TREE_VEC_LENGTH (types))
+    {
+      if (complain & tf_error)
+	error ("%<__type_pack_element%> index is out of range");
+      return error_mark_node;
+    }
+  return TREE_VEC_ELT (types, val);
 }
 
 /* Implement the __direct_bases keyword: Return the direct base classes
@@ -5139,7 +5169,7 @@ handle_omp_array_sections_1 (tree c, tree t, vec<tree> &types,
 	  && TREE_CODE (TREE_OPERAND (t, 0)) == COMPONENT_REF)
 	t = TREE_OPERAND (t, 0);
       ret = t;
-      while (TREE_CODE (t) == INDIRECT_REF)
+      while (INDIRECT_REF_P (t))
 	{
 	  t = TREE_OPERAND (t, 0);
 	  STRIP_NOPS (t);
@@ -5176,7 +5206,7 @@ handle_omp_array_sections_1 (tree c, tree t, vec<tree> &types,
 		}
 	      t = TREE_OPERAND (t, 0);
 	      while (TREE_CODE (t) == MEM_REF
-		     || TREE_CODE (t) == INDIRECT_REF
+		     || INDIRECT_REF_P (t)
 		     || TREE_CODE (t) == ARRAY_REF)
 		{
 		  t = TREE_OPERAND (t, 0);
@@ -8067,7 +8097,7 @@ finish_omp_clauses (tree clauses, enum c_omp_region_type ort)
 			  if (REFERENCE_REF_P (t))
 			    t = TREE_OPERAND (t, 0);
 			  if (TREE_CODE (t) == MEM_REF
-			      || TREE_CODE (t) == INDIRECT_REF)
+			      || INDIRECT_REF_P (t))
 			    {
 			      t = TREE_OPERAND (t, 0);
 			      STRIP_NOPS (t);
@@ -8152,7 +8182,7 @@ finish_omp_clauses (tree clauses, enum c_omp_region_type ort)
 		  && OMP_CLAUSE_MAP_KIND (c) != GOMP_MAP_ATTACH_DETACH)
 		OMP_CLAUSE_DECL (c) = t;
 	    }
-	  while (TREE_CODE (t) == INDIRECT_REF
+	  while (INDIRECT_REF_P (t)
 		 || TREE_CODE (t) == ARRAY_REF)
 	    {
 	      t = TREE_OPERAND (t, 0);
@@ -8171,7 +8201,7 @@ finish_omp_clauses (tree clauses, enum c_omp_region_type ort)
 	    remove = true;
 	  indir_component_ref_p = false;
 	  if (TREE_CODE (t) == COMPONENT_REF
-	      && (TREE_CODE (TREE_OPERAND (t, 0)) == INDIRECT_REF
+	      && (INDIRECT_REF_P (TREE_OPERAND (t, 0))
 		  || TREE_CODE (TREE_OPERAND (t, 0)) == ARRAY_REF))
 	    {
 	      t = TREE_OPERAND (TREE_OPERAND (t, 0), 0);
@@ -8225,7 +8255,7 @@ finish_omp_clauses (tree clauses, enum c_omp_region_type ort)
 			t = TREE_OPERAND (t, 0);
 		    }
 		  while (TREE_CODE (t) == MEM_REF
-			 || TREE_CODE (t) == INDIRECT_REF
+			 || INDIRECT_REF_P (t)
 			 || TREE_CODE (t) == ARRAY_REF)
 		    {
 		      t = TREE_OPERAND (t, 0);
@@ -8676,7 +8706,7 @@ finish_omp_clauses (tree clauses, enum c_omp_region_type ort)
 		  t = OMP_CLAUSE_DECL (c);
 		  while (TREE_CODE (t) == TREE_LIST)
 		    t = TREE_CHAIN (t);
-		  while (TREE_CODE (t) == INDIRECT_REF
+		  while (INDIRECT_REF_P (t)
 			 || TREE_CODE (t) == ARRAY_REF)
 		    t = TREE_OPERAND (t, 0);
 		}
@@ -8991,7 +9021,7 @@ finish_omp_clauses (tree clauses, enum c_omp_region_type ort)
 	    {
 	      t = OMP_CLAUSE_DECL (c);
 	      while (handled_component_p (t)
-		     || TREE_CODE (t) == INDIRECT_REF
+		     || INDIRECT_REF_P (t)
 		     || TREE_CODE (t) == ADDR_EXPR
 		     || TREE_CODE (t) == MEM_REF
 		     || TREE_CODE (t) == NON_LVALUE_EXPR)
@@ -9040,7 +9070,7 @@ finish_omp_clauses (tree clauses, enum c_omp_region_type ort)
 		  if (TREE_CODE (t) == POINTER_PLUS_EXPR)
 		    t = TREE_OPERAND (t, 0);
 		  if (TREE_CODE (t) == ADDR_EXPR
-		      || TREE_CODE (t) == INDIRECT_REF)
+		      || INDIRECT_REF_P (t))
 		    t = TREE_OPERAND (t, 0);
 		  if (DECL_P (t))
 		    bitmap_clear_bit (&aligned_head, DECL_UID (t));
@@ -9579,7 +9609,7 @@ finish_omp_target_clauses_r (tree *tp, int *walk_subtrees, void *ptr)
      of DECL_VALUE_EXPRs during the target body walk seems the only way to
      find them.  */
   if (current_closure
-      && (TREE_CODE (t) == VAR_DECL
+      && (VAR_P (t)
 	  || TREE_CODE (t) == PARM_DECL
 	  || TREE_CODE (t) == RESULT_DECL)
       && DECL_HAS_VALUE_EXPR_P (t)
@@ -12090,9 +12120,13 @@ check_trait_type (tree type, int kind = 1)
   if (type == NULL_TREE)
     return true;
 
-  if (TREE_CODE (type) == TREE_LIST)
-    return (check_trait_type (TREE_VALUE (type))
-	    && check_trait_type (TREE_CHAIN (type)));
+  if (TREE_CODE (type) == TREE_VEC)
+    {
+      for (tree arg : tree_vec_range (type))
+	if (!check_trait_type (arg, kind))
+	  return false;
+      return true;
+    }
 
   if (kind == 1 && TREE_CODE (type) == ARRAY_TYPE && !TYPE_DOMAIN (type))
     return true; // Array of unknown bound. Don't care about completeness.
@@ -12106,7 +12140,12 @@ check_trait_type (tree type, int kind = 1)
   if (VOID_TYPE_P (type))
     return true;
 
-  return !!complete_type_or_else (strip_array_types (type), NULL_TREE);
+  type = complete_type (strip_array_types (type));
+  if (!COMPLETE_TYPE_P (type)
+      && cxx_incomplete_type_diagnostic (NULL_TREE, type, DK_PERMERROR)
+      && !flag_permissive)
+    return false;
+  return true;
 }
 
 /* Process a trait expression.  */
@@ -12239,7 +12278,8 @@ finish_trait_expr (location_t loc, cp_trait_kind kind, tree type1, tree type2)
 /* Process a trait type.  */
 
 tree
-finish_trait_type (cp_trait_kind kind, tree type1, tree type2)
+finish_trait_type (cp_trait_kind kind, tree type1, tree type2,
+		   tsubst_flags_t complain)
 {
   if (type1 == error_mark_node
       || type2 == error_mark_node)
@@ -12263,16 +12303,22 @@ finish_trait_type (cp_trait_kind kind, tree type1, tree type2)
     {
     case CPTK_UNDERLYING_TYPE:
       return finish_underlying_type (type1);
+
     case CPTK_REMOVE_CV:
       return cv_unqualified (type1);
+
     case CPTK_REMOVE_REFERENCE:
       if (TYPE_REF_P (type1))
 	type1 = TREE_TYPE (type1);
       return type1;
+
     case CPTK_REMOVE_CVREF:
       if (TYPE_REF_P (type1))
 	type1 = TREE_TYPE (type1);
       return cv_unqualified (type1);
+
+    case CPTK_TYPE_PACK_ELEMENT:
+      return finish_type_pack_element (type1, type2, complain);
 
 #define DEFTRAIT_EXPR(CODE, NAME, ARITY) \
     case CPTK_##CODE:
@@ -12316,8 +12362,8 @@ is_this_parameter (tree t)
   if (!DECL_P (t) || DECL_NAME (t) != this_identifier)
     return false;
   gcc_assert (TREE_CODE (t) == PARM_DECL
-	      || (TREE_CODE (t) == VAR_DECL && DECL_HAS_VALUE_EXPR_P (t))
-	      || (cp_binding_oracle && TREE_CODE (t) == VAR_DECL));
+	      || (VAR_P (t) && DECL_HAS_VALUE_EXPR_P (t))
+	      || (cp_binding_oracle && VAR_P (t)));
   return true;
 }
 

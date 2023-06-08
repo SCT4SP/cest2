@@ -279,6 +279,7 @@
 (define_code_iterator any_extract [sign_extract zero_extract])
 (define_code_iterator any_shiftrt [lshiftrt ashiftrt])
 
+(define_code_iterator piaop [plus ior and])
 (define_code_iterator bitop [xor ior and])
 (define_code_iterator xior [xor ior])
 (define_code_iterator eqne [eq ne])
@@ -417,8 +418,7 @@
         operands[0] = copy_to_mode_reg (<MODE>mode, operands[0]);
       }
     else if (REG_P (operands[0])
-             && IN_RANGE (REGNO (operands[0]), FIRST_VIRTUAL_REGISTER,
-                          LAST_VIRTUAL_REGISTER))
+             && VIRTUAL_REGISTER_P (operands[0]))
       {
         // Byte-wise pushing of virtual regs might result in something like
         //
@@ -3706,17 +3706,17 @@
 ;;    CSE has problems to operate on hard regs.
 ;;
 (define_insn_and_split "divmodqi4"
-  [(set (match_operand:QI 0 "pseudo_register_operand" "")
-        (div:QI (match_operand:QI 1 "pseudo_register_operand" "")
-                (match_operand:QI 2 "pseudo_register_operand" "")))
-   (set (match_operand:QI 3 "pseudo_register_operand" "")
+  [(set (match_operand:QI 0 "pseudo_register_operand")
+        (div:QI (match_operand:QI 1 "pseudo_register_operand")
+                (match_operand:QI 2 "pseudo_register_operand")))
+   (set (match_operand:QI 3 "pseudo_register_operand")
         (mod:QI (match_dup 1) (match_dup 2)))
    (clobber (reg:QI 22))
    (clobber (reg:QI 23))
    (clobber (reg:QI 24))
    (clobber (reg:QI 25))]
   ""
-  "this divmodqi4 pattern should have been splitted;"
+  { gcc_unreachable(); }
   ""
   [(set (reg:QI 24) (match_dup 1))
    (set (reg:QI 22) (match_dup 2))
@@ -3752,17 +3752,17 @@
   [(set_attr "type" "xcall")])
 
 (define_insn_and_split "udivmodqi4"
- [(set (match_operand:QI 0 "pseudo_register_operand" "")
-       (udiv:QI (match_operand:QI 1 "pseudo_register_operand" "")
-                (match_operand:QI 2 "pseudo_register_operand" "")))
-       (set (match_operand:QI 3 "pseudo_register_operand" "")
-            (umod:QI (match_dup 1) (match_dup 2)))
-       (clobber (reg:QI 22))
-       (clobber (reg:QI 23))
-       (clobber (reg:QI 24))
-       (clobber (reg:QI 25))]
+ [(set (match_operand:QI 0 "pseudo_register_operand")
+       (udiv:QI (match_operand:QI 1 "pseudo_register_operand")
+                (match_operand:QI 2 "pseudo_register_operand")))
+  (set (match_operand:QI 3 "pseudo_register_operand")
+       (umod:QI (match_dup 1) (match_dup 2)))
+  (clobber (reg:QI 22))
+  (clobber (reg:QI 23))
+  (clobber (reg:QI 24))
+  (clobber (reg:QI 25))]
   ""
-  "this udivmodqi4 pattern should have been splitted;"
+  { gcc_unreachable(); }
   ""
   [(set (reg:QI 24) (match_dup 1))
    (set (reg:QI 22) (match_dup 2))
@@ -3794,17 +3794,17 @@
   [(set_attr "type" "xcall")])
 
 (define_insn_and_split "divmodhi4"
-  [(set (match_operand:HI 0 "pseudo_register_operand" "")
-        (div:HI (match_operand:HI 1 "pseudo_register_operand" "")
-                (match_operand:HI 2 "pseudo_register_operand" "")))
-   (set (match_operand:HI 3 "pseudo_register_operand" "")
+  [(set (match_operand:HI 0 "pseudo_register_operand")
+        (div:HI (match_operand:HI 1 "pseudo_register_operand")
+                (match_operand:HI 2 "pseudo_register_operand")))
+   (set (match_operand:HI 3 "pseudo_register_operand")
         (mod:HI (match_dup 1) (match_dup 2)))
    (clobber (reg:QI 21))
    (clobber (reg:HI 22))
    (clobber (reg:HI 24))
    (clobber (reg:HI 26))]
   ""
-  "this should have been splitted;"
+  { gcc_unreachable(); }
   ""
   [(set (reg:HI 24) (match_dup 1))
    (set (reg:HI 22) (match_dup 2))
@@ -3840,17 +3840,17 @@
   [(set_attr "type" "xcall")])
 
 (define_insn_and_split "udivmodhi4"
-  [(set (match_operand:HI 0 "pseudo_register_operand" "")
-        (udiv:HI (match_operand:HI 1 "pseudo_register_operand" "")
-                 (match_operand:HI 2 "pseudo_register_operand" "")))
-   (set (match_operand:HI 3 "pseudo_register_operand" "")
+  [(set (match_operand:HI 0 "pseudo_register_operand")
+        (udiv:HI (match_operand:HI 1 "pseudo_register_operand")
+                 (match_operand:HI 2 "pseudo_register_operand")))
+   (set (match_operand:HI 3 "pseudo_register_operand")
         (umod:HI (match_dup 1) (match_dup 2)))
    (clobber (reg:QI 21))
    (clobber (reg:HI 22))
    (clobber (reg:HI 24))
    (clobber (reg:HI 26))]
   ""
-  "this udivmodhi4 pattern should have been splitted.;"
+  { gcc_unreachable(); }
   ""
   [(set (reg:HI 24) (match_dup 1))
    (set (reg:HI 22) (match_dup 2))
@@ -4091,14 +4091,14 @@
 ;; implementation works the other way round.
 
 (define_insn_and_split "divmodpsi4"
-  [(parallel [(set (match_operand:PSI 0 "pseudo_register_operand" "")
-                   (div:PSI (match_operand:PSI 1 "pseudo_register_operand" "")
-                            (match_operand:PSI 2 "pseudo_register_operand" "")))
-              (set (match_operand:PSI 3 "pseudo_register_operand" "")
-                   (mod:PSI (match_dup 1)
-                            (match_dup 2)))
-              (clobber (reg:DI 18))
-              (clobber (reg:QI 26))])]
+  [(set (match_operand:PSI 0 "pseudo_register_operand")
+        (div:PSI (match_operand:PSI 1 "pseudo_register_operand")
+                 (match_operand:PSI 2 "pseudo_register_operand")))
+   (set (match_operand:PSI 3 "pseudo_register_operand")
+        (mod:PSI (match_dup 1)
+                 (match_dup 2)))
+   (clobber (reg:DI 18))
+   (clobber (reg:QI 26))]
   ""
   { gcc_unreachable(); }
   ""
@@ -4140,14 +4140,14 @@
   [(set_attr "type" "xcall")])
 
 (define_insn_and_split "udivmodpsi4"
-  [(parallel [(set (match_operand:PSI 0 "pseudo_register_operand" "")
-                   (udiv:PSI (match_operand:PSI 1 "pseudo_register_operand" "")
-                             (match_operand:PSI 2 "pseudo_register_operand" "")))
-              (set (match_operand:PSI 3 "pseudo_register_operand" "")
-                   (umod:PSI (match_dup 1)
-                             (match_dup 2)))
-              (clobber (reg:DI 18))
-              (clobber (reg:QI 26))])]
+  [(set (match_operand:PSI 0 "pseudo_register_operand")
+        (udiv:PSI (match_operand:PSI 1 "pseudo_register_operand")
+                  (match_operand:PSI 2 "pseudo_register_operand")))
+   (set (match_operand:PSI 3 "pseudo_register_operand")
+        (umod:PSI (match_dup 1)
+                  (match_dup 2)))
+   (clobber (reg:DI 18))
+   (clobber (reg:QI 26))]
   ""
   { gcc_unreachable(); }
   ""
@@ -4191,17 +4191,18 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define_insn_and_split "divmodsi4"
-  [(parallel [(set (match_operand:SI 0 "pseudo_register_operand" "")
-                   (div:SI (match_operand:SI 1 "pseudo_register_operand" "")
-                           (match_operand:SI 2 "pseudo_register_operand" "")))
-              (set (match_operand:SI 3 "pseudo_register_operand" "")
-                   (mod:SI (match_dup 1) (match_dup 2)))
-              (clobber (reg:SI 18))
-              (clobber (reg:SI 22))
-              (clobber (reg:HI 26))
-              (clobber (reg:HI 30))])]
+  [(set (match_operand:SI 0 "pseudo_register_operand")
+        (div:SI (match_operand:SI 1 "pseudo_register_operand")
+                (match_operand:SI 2 "pseudo_register_operand")))
+   (set (match_operand:SI 3 "pseudo_register_operand")
+        (mod:SI (match_dup 1)
+	        (match_dup 2)))
+   (clobber (reg:SI 18))
+   (clobber (reg:SI 22))
+   (clobber (reg:HI 26))
+   (clobber (reg:HI 30))]
   ""
-  "this divmodsi4 pattern should have been splitted;"
+  { gcc_unreachable(); }
   ""
   [(set (reg:SI 22) (match_dup 1))
    (set (reg:SI 18) (match_dup 2))
@@ -4237,17 +4238,18 @@
   [(set_attr "type" "xcall")])
 
 (define_insn_and_split "udivmodsi4"
-  [(parallel [(set (match_operand:SI 0 "pseudo_register_operand" "")
-                   (udiv:SI (match_operand:SI 1 "pseudo_register_operand" "")
-                           (match_operand:SI 2 "pseudo_register_operand" "")))
-              (set (match_operand:SI 3 "pseudo_register_operand" "")
-                   (umod:SI (match_dup 1) (match_dup 2)))
-              (clobber (reg:SI 18))
-              (clobber (reg:SI 22))
-              (clobber (reg:HI 26))
-              (clobber (reg:HI 30))])]
+  [(set (match_operand:SI 0 "pseudo_register_operand")
+        (udiv:SI (match_operand:SI 1 "pseudo_register_operand")
+                 (match_operand:SI 2 "pseudo_register_operand")))
+   (set (match_operand:SI 3 "pseudo_register_operand")
+        (umod:SI (match_dup 1)
+                 (match_dup 2)))
+   (clobber (reg:SI 18))
+   (clobber (reg:SI 22))
+   (clobber (reg:HI 26))
+   (clobber (reg:HI 30))]
   ""
-  "this udivmodsi4 pattern should have been splitted;"
+  { gcc_unreachable(); }
   ""
   [(set (reg:SI 22) (match_dup 1))
    (set (reg:SI 18) (match_dup 2))
@@ -4712,7 +4714,8 @@
   [(parallel [(set (match_operand:HISI 0 "register_operand")
                    (bitop:HISI (match_dup 0)
                                (match_operand:HISI 1 "register_operand")))
-              (clobber (scratch:QI))])]
+              (clobber (scratch:QI))
+              (clobber (reg:CC REG_CC))])]
   "optimize
    && reload_completed"
   [(const_int 1)]
@@ -4725,6 +4728,43 @@
       }
     DONE;
   })
+
+;; If  $0 = $0 <op> const  requires a QI scratch, and d-reg $1 dies after
+;; the first insn, then we can replace
+;;    $0 = $1
+;;    $0 = $0 <op> const
+;; by
+;;    $1 = $1 <op> const
+;;    $0 = $1
+;; This transorms constraint alternative "r,0,n,&d" of the first operation
+;; to alternative "d,0,n,X".
+;; "*addhi3_clobber"  "*addpsi3"  "*addsi3"
+;; "*addhq3"  "*adduhq3"  "*addha3"  "*adduha3"
+;; "*addsq3"  "*addusq3"  "*addsa3"  "*addusa3"
+;; "*iorhi3"  "*iorpsi3"  "*iorsi3"
+;; "*andhi3"  "*andpsi3"  "*andsi3"
+(define_peephole2
+  [(parallel [(set (match_operand:ORDERED234 0 "register_operand")
+                   (match_operand:ORDERED234 1 "d_register_operand"))
+              (clobber (reg:CC REG_CC))])
+   (parallel [(set (match_dup 0)
+                   (piaop:ORDERED234 (match_dup 0)
+                                     (match_operand:ORDERED234 2 "const_operand")))
+              ; A d-reg as scratch tells that this insn is expensive, and
+              ; that $0 is not a d-register: l-reg or something like SI:14 etc.
+              (clobber (match_operand:QI 3 "d_register_operand"))
+              (clobber (reg:CC REG_CC))])]
+  "peep2_reg_dead_p (1, operands[1])"
+  [(parallel [(set (match_dup 1)
+                   (piaop:ORDERED234 (match_dup 1)
+                                     (match_dup 2)))
+              (clobber (scratch:QI))
+              (clobber (reg:CC REG_CC))])
+   ; Unfortunately, the following insn misses a REG_DEAD note for $1,
+   ; so this peep2 works only once.
+   (parallel [(set (match_dup 0)
+                   (match_dup 1))
+              (clobber (reg:CC REG_CC))])])
 
 
 ;; swap swap swap swap swap swap swap swap swap swap swap swap swap swap swap
@@ -9095,16 +9135,20 @@
   "bst %3,0\;bld %0,%4"
   [(set_attr "length" "2")])
 
-;; Move bit $3.0 into bit $0.0.
-;; For bit 0, combiner generates slightly different pattern.
-(define_insn "*movbitqi.0"
-  [(set (match_operand:QI 0 "register_operand"                     "=r")
-        (ior:QI (and:QI (match_operand:QI 1 "register_operand"      "0")
-                        (match_operand:QI 2 "single_zero_operand"   "n"))
-                (and:QI (match_operand:QI 3 "register_operand"      "r")
-                        (const_int 1))))]
-  "0 == exact_log2 (~INTVAL(operands[2]) & GET_MODE_MASK (QImode))"
-  "bst %3,0\;bld %0,0"
+;; Move bit $3.x into bit $0.x.
+(define_insn "*movbit<mode>.0-6"
+  [(set (match_operand:QISI 0 "register_operand"                       "=r")
+        (ior:QISI (and:QISI (match_operand:QISI 1 "register_operand"    "0")
+                            (match_operand:QISI 2 "single_zero_operand" "n"))
+                  (and:QISI (match_operand:QISI 3 "register_operand"    "r")
+                            (match_operand:QISI 4 "single_one_operand"  "n"))))]
+  "GET_MODE_MASK(<MODE>mode)
+   == (GET_MODE_MASK(<MODE>mode) & (INTVAL(operands[2]) ^ INTVAL(operands[4])))"
+  {
+    auto bitmask = GET_MODE_MASK (<MODE>mode) & UINTVAL (operands[4]);
+    operands[4] = GEN_INT (exact_log2 (bitmask));
+    return "bst %T3%T4" CR_TAB "bld %T0%T4";
+  }
   [(set_attr "length" "2")])
 
 ;; Move bit $2.0 into bit $0.7.

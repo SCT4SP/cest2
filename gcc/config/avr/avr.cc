@@ -961,8 +961,7 @@ avr_lookup_function_attribute1 (const_tree func, const char *name)
       func = TREE_TYPE (func);
     }
 
-  gcc_assert (TREE_CODE (func) == FUNCTION_TYPE
-              || TREE_CODE (func) == METHOD_TYPE);
+  gcc_assert (FUNC_OR_METHOD_TYPE_P (func));
 
   return NULL_TREE != lookup_attribute (name, TYPE_ATTRIBUTES (func));
 }
@@ -1017,6 +1016,19 @@ static int
 avr_no_gccisr_function_p (tree func)
 {
   return avr_lookup_function_attribute1 (func, "no_gccisr");
+}
+
+
+/* Implement `TARGET_CAN_INLINE_P'.  */
+/* Some options like -mgas_isr_prologues depend on optimization level,
+   and the inliner might think that due to different options, inlining
+   is not permitted; see PR104327.  */
+
+static bool
+avr_can_inline_p (tree /* caller */, tree /* callee */)
+{
+  // No restrictions whatsoever.
+  return true;
 }
 
 /* Implement `TARGET_SET_CURRENT_FUNCTION'.  */
@@ -9839,7 +9851,7 @@ avr_progmem_p (tree decl, tree attributes)
 static bool
 avr_decl_absdata_p (tree decl, tree attributes)
 {
-  return (TREE_CODE (decl) == VAR_DECL
+  return (VAR_P (decl)
           && NULL_TREE != lookup_attribute ("absdata", attributes));
 }
 
@@ -9976,7 +9988,7 @@ avr_insert_attributes (tree node, tree *attributes)
 
   /* Add the section attribute if the variable is in progmem.  */
 
-  if (TREE_CODE (node) == VAR_DECL
+  if (VAR_P (node)
       && (TREE_STATIC (node) || DECL_EXTERNAL (node))
       && avr_progmem_p (node, *attributes))
     {
@@ -10190,7 +10202,7 @@ avr_section_type_flags (tree decl, const char *name, int reloc)
 
   if (startswith (name, ".noinit"))
     {
-      if (decl && TREE_CODE (decl) == VAR_DECL
+      if (decl && VAR_P (decl)
 	  && DECL_INITIAL (decl) == NULL_TREE)
 	flags |= SECTION_BSS;  /* @nobits */
       else
@@ -10338,7 +10350,7 @@ avr_encode_section_info (tree decl, rtx rtl, int new_decl_p)
 
   if (AVR_TINY
       && decl
-      && VAR_DECL == TREE_CODE (decl)
+      && VAR_P (decl)
       && MEM_P (rtl)
       && SYMBOL_REF_P (XEXP (rtl, 0)))
     {
@@ -10842,6 +10854,15 @@ avr_rtx_costs_1 (rtx x, machine_mode mode, int outer_code,
             *total += COSTS_N_INSNS (1);
           if (REG_P (XEXP (x, 1)))
             *total += COSTS_N_INSNS (1);
+          return true;
+        }
+      if (IOR == code
+          && AND == GET_CODE (XEXP (x, 0))
+          && AND == GET_CODE (XEXP (x, 1))
+          && single_zero_operand (XEXP (XEXP (x, 0), 1), mode))
+        {
+          // Open-coded bit transfer.
+          *total = COSTS_N_INSNS (2);
           return true;
         }
       *total = COSTS_N_INSNS (GET_MODE_SIZE (mode));
@@ -11512,6 +11533,52 @@ avr_rtx_costs (rtx x, machine_mode mode, int outer_code,
     }
 
   return done;
+}
+
+
+/* Implement `TARGET_INSN_COST'.  */
+/* For some insns, it is not enough to look at the cost of the SET_SRC.
+   In that case, have a look at the entire insn, e.g. during insn combine.  */
+
+static int
+avr_insn_cost (rtx_insn *insn, bool speed)
+{
+  const int unknown_cost = -1;
+  int cost = unknown_cost;
+
+  rtx set = single_set (insn);
+
+  if (set
+      && ZERO_EXTRACT == GET_CODE (SET_DEST (set)))
+    {
+      // Try find anything that would flip the extracted bit.
+      bool not_bit_p = false;
+
+      subrtx_iterator::array_type array;
+      FOR_EACH_SUBRTX (iter, array, SET_SRC (set), NONCONST)
+	{
+	  enum rtx_code code = GET_CODE (*iter);
+	  not_bit_p |= code == NOT || code == XOR || code == GE;
+	}
+
+      // Don't go too deep into the analysis.  In almost all cases,
+      // using BLD/BST is the best we can do for single-bit moves,
+      // even considering CSE.
+      cost = COSTS_N_INSNS (2 + not_bit_p);
+    }
+
+  if (cost != unknown_cost)
+    {
+      if (avr_log.rtx_costs)
+	avr_edump ("\n%? (%s) insn_cost=%d\n%r\n",
+		   speed ? "speed" : "size", cost, insn);
+      return cost;
+    }
+
+  // Resort to what rtlanal.cc::insn_cost() implements as a default
+  // when targetm.insn_cost() is not implemented.
+
+  return pattern_cost (PATTERN (insn), speed);
 }
 
 
@@ -14426,10 +14493,13 @@ avr_fold_builtin (tree fndecl, int n_args ATTRIBUTE_UNUSED, tree *arg,
         if (changed)
           return build_call_expr (fndecl, 3, tmap, tbits, tval);
 
-        /* If bits don't change their position we can use vanilla logic
-           to merge the two arguments.  */
+        /* If bits don't change their position, we can use vanilla logic
+           to merge the two arguments...  */
 
-	if (avr_map_metric (map, MAP_NONFIXED_0_7) == 0)
+        if (avr_map_metric (map, MAP_NONFIXED_0_7) == 0
+            // ...except when we are copying just one bit. In that
+            // case, BLD/BST is better than XOR/AND/XOR, see PR90622.
+            && avr_map_metric (map, MAP_FIXED_0_7) != 1)
           {
             int mask_f = avr_map_metric (map, MAP_MASK_PREIMAGE_F);
             tree tres, tmask = build_int_cst (val_type, mask_f ^ 0xff);
@@ -14572,6 +14642,8 @@ avr_float_lib_compare_returns_bool (machine_mode mode, enum rtx_code)
 #undef  TARGET_ASM_FINAL_POSTSCAN_INSN
 #define TARGET_ASM_FINAL_POSTSCAN_INSN avr_asm_final_postscan_insn
 
+#undef  TARGET_INSN_COST
+#define TARGET_INSN_COST avr_insn_cost
 #undef  TARGET_REGISTER_MOVE_COST
 #define TARGET_REGISTER_MOVE_COST avr_register_move_cost
 #undef  TARGET_MEMORY_MOVE_COST
@@ -14710,6 +14782,9 @@ avr_float_lib_compare_returns_bool (machine_mode mode, enum rtx_code)
 
 #undef  TARGET_MD_ASM_ADJUST
 #define TARGET_MD_ASM_ADJUST avr_md_asm_adjust
+
+#undef  TARGET_CAN_INLINE_P
+#define TARGET_CAN_INLINE_P avr_can_inline_p
 
 struct gcc_target targetm = TARGET_INITIALIZER;
 
