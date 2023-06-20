@@ -521,7 +521,8 @@ ix86_expand_move (machine_mode mode, rtx operands[])
 		  return;
 		}
 	    }
-	  else if (GET_MODE_SIZE (mode) >= 16)
+	  else if (CONST_WIDE_INT_P (op1)
+		   && GET_MODE_SIZE (mode) >= 16)
 	    {
 	      rtx tmp = ix86_convert_const_wide_int_to_broadcast
 		(GET_MODE (op0), op1);
@@ -696,8 +697,9 @@ ix86_expand_vector_move (machine_mode mode, rtx operands[])
       return;
     }
 
-  /* Special case TImode to V1TImode conversions, via V2DI.  */
-  if (mode == V1TImode
+  /* Special case TImode to 128-bit vector conversions via V2DI.  */
+  if (VECTOR_MODE_P (mode)
+      && GET_MODE_SIZE (mode) == 16
       && SUBREG_P (op1)
       && GET_MODE (SUBREG_REG (op1)) == TImode
       && TARGET_64BIT && TARGET_SSE
@@ -709,7 +711,7 @@ ix86_expand_vector_move (machine_mode mode, rtx operands[])
       emit_move_insn (lo, gen_lowpart (DImode, SUBREG_REG (op1)));
       emit_move_insn (hi, gen_highpart (DImode, SUBREG_REG (op1)));
       emit_insn (gen_vec_concatv2di (tmp, lo, hi));
-      emit_move_insn (op0, gen_lowpart (V1TImode, tmp));
+      emit_move_insn (op0, gen_lowpart (mode, tmp));
       return;
     }
 
@@ -1019,6 +1021,7 @@ ix86_split_mmx_pack (rtx operands[], enum rtx_code code)
   rtx op0 = operands[0];
   rtx op1 = operands[1];
   rtx op2 = operands[2];
+  rtx src;
 
   machine_mode dmode = GET_MODE (op0);
   machine_mode smode = GET_MODE (op1);
@@ -1042,11 +1045,20 @@ ix86_split_mmx_pack (rtx operands[], enum rtx_code code)
   op1 = lowpart_subreg (sse_smode, op1, GET_MODE (op1));
   op2 = lowpart_subreg (sse_smode, op2, GET_MODE (op2));
 
-  op1 = gen_rtx_fmt_e (code, sse_half_dmode, op1);
-  op2 = gen_rtx_fmt_e (code, sse_half_dmode, op2);
-  rtx insn = gen_rtx_SET (dest, gen_rtx_VEC_CONCAT (sse_dmode,
-						    op1, op2));
-  emit_insn (insn);
+  /* paskusdw/packuswb does unsigned saturation of a signed source
+     which is different from generic us_truncate RTX.  */
+  if (code == US_TRUNCATE)
+    src = gen_rtx_UNSPEC (sse_dmode,
+			  gen_rtvec (2, op1, op2),
+			  UNSPEC_US_TRUNCATE);
+  else
+    {
+      op1 = gen_rtx_fmt_e (code, sse_half_dmode, op1);
+      op2 = gen_rtx_fmt_e (code, sse_half_dmode, op2);
+      src = gen_rtx_VEC_CONCAT (sse_dmode, op1, op2);
+    }
+
+  emit_move_insn (dest, src);
 
   ix86_move_vector_high_sse_to_mmx (op0);
 }
@@ -12644,6 +12656,21 @@ ix86_check_builtin_isa_match (unsigned int fcode,
   return (bisa & isa) == bisa && (bisa2 & isa2) == bisa2;
 }
 
+/* Emit instructions to set the carry flag from ARG.  */
+
+void
+ix86_expand_carry (rtx arg)
+{
+  if (!CONST_INT_P (arg) || arg == const0_rtx)
+    {
+      arg = convert_to_mode (QImode, arg, 1);
+      arg = copy_to_mode_reg (QImode, arg);
+      emit_insn (gen_addqi3_cconly_overflow (arg, constm1_rtx));
+    }
+  else
+    emit_insn (gen_x86_stc ());
+}
+
 /* Expand an expression EXP that calls a built-in function,
    with result going to TARGET if that's convenient
    (and in mode MODE if that's convenient).
@@ -13948,8 +13975,6 @@ rdseed_step:
       arg3 = CALL_EXPR_ARG (exp, 3); /* unsigned int *sum_out.  */
 
       op1 = expand_normal (arg0);
-      if (!integer_zerop (arg0))
-	op1 = copy_to_mode_reg (QImode, convert_to_mode (QImode, op1, 1));
 
       op2 = expand_normal (arg1);
       if (!register_operand (op2, mode0))
@@ -13967,7 +13992,7 @@ rdseed_step:
 	}
 
       op0 = gen_reg_rtx (mode0);
-      if (integer_zerop (arg0))
+      if (op1 == const0_rtx)
 	{
 	  /* If arg0 is 0, optimize right away into add or sub
 	     instruction that sets CCCmode flags.  */
@@ -13977,7 +14002,7 @@ rdseed_step:
       else
 	{
 	  /* Generate CF from input operand.  */
-	  emit_insn (gen_addqi3_cconly_overflow (op1, constm1_rtx));
+	  ix86_expand_carry (op1);
 
 	  /* Generate instruction that consumes CF.  */
 	  op1 = gen_rtx_REG (CCCmode, FLAGS_REG);
@@ -16371,7 +16396,7 @@ quarter:
 	  machine_mode concat_mode = tmp_mode == DImode ? V2DImode : V2SImode;
 	  rtx tmp = gen_reg_rtx (concat_mode);
 	  vals = gen_rtx_PARALLEL (concat_mode, gen_rtvec_v (2, words));
-	  ix86_expand_vector_init_general (false, concat_mode, tmp, vals);
+	  ix86_expand_vector_init_general (mmx_ok, concat_mode, tmp, vals);
 	  emit_move_insn (target, gen_lowpart (mode, tmp));
 	}
       else if (n_words == 4)

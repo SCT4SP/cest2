@@ -7531,8 +7531,11 @@ store_constructor (tree exp, rtx target, int cleared, poly_int64 size,
 	  }
 
 	/* Inform later passes that the old value is dead.  */
-	if (!cleared && !vector && REG_P (target))
-	  emit_move_insn (target, CONST0_RTX (mode));
+	if (!cleared && !vector && REG_P (target) && maybe_gt (n_elts, 1u))
+	  {
+	    emit_move_insn (target, CONST0_RTX (mode));
+	    cleared = 1;
+	  }
 
         if (MEM_P (target))
 	  alias = MEM_ALIAS_SET (target);
@@ -12952,12 +12955,16 @@ expand_single_bit_test (location_t loc, enum tree_code code,
 
   rtx inner0 = expand_expr (inner, NULL_RTX, VOIDmode, EXPAND_NORMAL);
 
+  if (CONST_SCALAR_INT_P (inner0))
+    {
+      wide_int t = rtx_mode_t (inner0, operand_mode);
+      bool setp = (wi::lrshift (t, bitnum) & 1) != 0;
+      return (setp ^ (code == EQ_EXPR)) ? const1_rtx : const0_rtx;
+    }
   int bitpos = bitnum;
 
-  scalar_int_mode imode = as_a <scalar_int_mode>(GET_MODE (inner0));
-
   if (BYTES_BIG_ENDIAN)
-    bitpos = GET_MODE_BITSIZE (imode) - 1 - bitpos;
+    bitpos = GET_MODE_BITSIZE (operand_mode) - 1 - bitpos;
 
   inner0 = extract_bit_field (inner0, 1, bitpos, 1, target,
 			      operand_mode, mode, 0, NULL);
@@ -13158,37 +13165,31 @@ do_store_flag (sepops ops, rtx target, machine_mode mode)
       && (TYPE_PRECISION (ops->type) != 1 || TYPE_UNSIGNED (ops->type)))
     {
       wide_int nz = tree_nonzero_bits (arg0);
+      gimple *srcstmt = get_def_for_expr (arg0, BIT_AND_EXPR);
+      /* If the defining statement was (x & POW2), then use that instead of
+	 the non-zero bits.  */
+      if (srcstmt && integer_pow2p (gimple_assign_rhs2 (srcstmt)))
+	{
+	  nz = wi::to_wide (gimple_assign_rhs2 (srcstmt));
+	  arg0 = gimple_assign_rhs1 (srcstmt);
+	}
 
       if (wi::popcount (nz) == 1
 	  && (integer_zerop (arg1)
 	      || wi::to_wide (arg1) == nz))
 	{
-	  tree op0;
-	  int bitnum;
-	  gimple *srcstmt = get_def_for_expr (arg0, BIT_AND_EXPR);
-	  /* If the defining statement was (x & POW2), then remove the and
-	     as we are going to add it back. */
-	  if (srcstmt
-	      && integer_pow2p (gimple_assign_rhs2 (srcstmt)))
-	    {
-	      op0 = gimple_assign_rhs1 (srcstmt);
-	      bitnum = tree_log2 (gimple_assign_rhs2 (srcstmt));
-	    }
-	  else
-	    {
-	      op0 = arg0;
-	      bitnum = wi::exact_log2 (nz);
-	    }
+	  int bitnum = wi::exact_log2 (nz);
 	  enum tree_code tcode = EQ_EXPR;
 	  if ((code == NE) ^ !integer_zerop (arg1))
 	    tcode = NE_EXPR;
 
 	  type = lang_hooks.types.type_for_mode (mode, unsignedp);
 	  return expand_single_bit_test (loc, tcode,
-					 op0,
+					 arg0,
 					 bitnum, type, target, mode);
 	}
     }
+
 
   if (! get_subtarget (target)
       || GET_MODE (subtarget) != operand_mode)

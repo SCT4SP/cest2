@@ -1040,10 +1040,10 @@ simplify_context::simplify_unary_operation_1 (rtx_code code, machine_mode mode,
 	}
 
       /* (not (bswap x)) -> (bswap (not x)).  */
-      if (GET_CODE (op) == BSWAP)
+      if (GET_CODE (op) == BSWAP || GET_CODE (op) == BITREVERSE)
 	{
 	  rtx x = simplify_gen_unary (NOT, mode, XEXP (op, 0), mode);
-	  return simplify_gen_unary (BSWAP, mode, x, mode);
+	  return simplify_gen_unary (GET_CODE (op), mode, x, mode);
 	}
       break;
 
@@ -1419,6 +1419,7 @@ simplify_context::simplify_unary_operation_1 (rtx_code code, machine_mode mode,
       switch (GET_CODE (op))
 	{
 	case BSWAP:
+	case BITREVERSE:
 	  /* (popcount (bswap <X>)) = (popcount <X>).  */
 	  return simplify_gen_unary (POPCOUNT, mode, XEXP (op, 0),
 				     GET_MODE (XEXP (op, 0)));
@@ -1448,6 +1449,7 @@ simplify_context::simplify_unary_operation_1 (rtx_code code, machine_mode mode,
 	{
 	case NOT:
 	case BSWAP:
+	case BITREVERSE:
 	  return simplify_gen_unary (PARITY, mode, XEXP (op, 0),
 				     GET_MODE (XEXP (op, 0)));
 
@@ -1478,6 +1480,12 @@ simplify_context::simplify_unary_operation_1 (rtx_code code, machine_mode mode,
     case BSWAP:
       /* (bswap (bswap x)) -> x.  */
       if (GET_CODE (op) == BSWAP)
+	return XEXP (op, 0);
+      break;
+
+    case BITREVERSE:
+      /* (bitreverse (bitreverse x)) -> x.  */
+      if (GET_CODE (op) == BITREVERSE)
 	return XEXP (op, 0);
       break;
 
@@ -2114,11 +2122,29 @@ simplify_const_unary_operation (enum rtx_code code, machine_mode mode,
 	  result = wi::bswap (op0);
 	  break;
 
+	case BITREVERSE:
+	  result = wi::bitreverse (op0);
+	  break;
+
 	case TRUNCATE:
 	case ZERO_EXTEND:
 	  result = wide_int::from (op0, width, UNSIGNED);
 	  break;
 
+	case US_TRUNCATE:
+	case SS_TRUNCATE:
+	  {
+	    signop sgn = code == US_TRUNCATE ? UNSIGNED : SIGNED;
+	    wide_int nmax
+	      = wide_int::from (wi::max_value (width, sgn),
+				GET_MODE_PRECISION (imode), sgn);
+	    wide_int nmin
+	      = wide_int::from (wi::min_value (width, sgn),
+				GET_MODE_PRECISION (imode), sgn);
+	    result = wi::min (wi::max (op0, nmin, sgn), nmax, sgn);
+	    result = wide_int::from (result, width, sgn);
+	    break;
+	  }
 	case SIGN_EXTEND:
 	  result = wide_int::from (op0, width, SIGNED);
 	  break;
@@ -2805,7 +2831,8 @@ simplify_context::simplify_binary_operation_1 (rtx_code code,
 	 when x is NaN, infinite, or finite and nonzero.  They aren't
 	 when x is -0 and the rounding mode is not towards -infinity,
 	 since (-0) + 0 is then 0.  */
-      if (!HONOR_SIGNED_ZEROS (mode) && trueop1 == CONST0_RTX (mode))
+      if (!HONOR_SIGNED_ZEROS (mode) && !HONOR_SNANS (mode)
+	  && trueop1 == CONST0_RTX (mode))
 	return op0;
 
       /* ((-a) + b) -> (b - a) and similarly for (a + (-b)).  These
@@ -4356,6 +4383,31 @@ simplify_ashift:
 	return op0;
       return 0;
 
+    case COPYSIGN:
+      if (rtx_equal_p (trueop0, trueop1) && ! side_effects_p (op0))
+	return op0;
+      if (CONST_DOUBLE_AS_FLOAT_P (trueop1))
+	{
+	  REAL_VALUE_TYPE f1;
+	  real_convert (&f1, mode, CONST_DOUBLE_REAL_VALUE (trueop1));
+	  rtx tmp = simplify_gen_unary (ABS, mode, op0, mode);
+	  if (REAL_VALUE_NEGATIVE (f1))
+	    tmp = simplify_gen_unary (NEG, mode, op0, mode);
+	  return tmp;
+	}
+      if (GET_CODE (op0) == NEG || GET_CODE (op0) == ABS)
+	return simplify_gen_binary (COPYSIGN, mode, XEXP (op0, 0), op1);
+      if (GET_CODE (op1) == ABS
+	  && ! side_effects_p (op1))
+	return simplify_gen_unary (ABS, mode, op0, mode);
+      if (GET_CODE (op0) == COPYSIGN
+	  && ! side_effects_p (XEXP (op0, 1)))
+	return simplify_gen_binary (COPYSIGN, mode, XEXP (op0, 0), op1);
+      if (GET_CODE (op1) == COPYSIGN
+	  && ! side_effects_p (XEXP (op1, 0)))
+	return simplify_gen_binary (COPYSIGN, mode, op0, XEXP (op1, 1));
+      return 0;
+
     case VEC_SERIES:
       if (op1 == CONST0_RTX (GET_MODE_INNER (mode)))
 	return gen_vec_duplicate (mode, op0);
@@ -4809,6 +4861,17 @@ simplify_ashift:
 	    return simplify_gen_binary (VEC_SELECT, mode, XEXP (trueop0, 0),
 					gen_rtx_PARALLEL (VOIDmode, vec));
 	  }
+	/* (vec_concat:
+	     (subreg_lowpart:N OP)
+	     (vec_select:N OP P))  -->  OP when P selects the high half
+	    of the OP.  */
+	if (GET_CODE (trueop0) == SUBREG
+	    && subreg_lowpart_p (trueop0)
+	    && GET_CODE (trueop1) == VEC_SELECT
+	    && SUBREG_REG (trueop0) == XEXP (trueop1, 0)
+	    && !side_effects_p (XEXP (trueop1, 0))
+	    && vec_series_highpart_p (op1_mode, mode, XEXP (trueop1, 1)))
+	  return XEXP (trueop1, 0);
       }
       return 0;
 
@@ -4995,6 +5058,14 @@ simplify_const_binary_operation (enum rtx_code code, machine_mode mode,
 	    }
 	   real_from_target (&r, tmp0, mode);
 	   return const_double_from_real_value (r, mode);
+	}
+      else if (code == COPYSIGN)
+	{
+	  REAL_VALUE_TYPE f0, f1;
+	  real_convert (&f0, mode, CONST_DOUBLE_REAL_VALUE (op0));
+	  real_convert (&f1, mode, CONST_DOUBLE_REAL_VALUE (op1));
+	  real_copysign (&f0, &f1);
+	  return const_double_from_real_value (f0, mode);
 	}
       else
 	{

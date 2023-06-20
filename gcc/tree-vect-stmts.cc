@@ -56,6 +56,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "gimple-fold.h"
 #include "regs.h"
 #include "attribs.h"
+#include "optabs-libfuncs.h"
 
 /* For lang_hooks.types.type_for_mode.  */
 #include "langhooks.h"
@@ -3128,18 +3129,71 @@ vect_get_strided_load_store_ops (stmt_vec_info stmt_info,
   *vec_offset = cse_and_gimplify_to_preheader (loop_vinfo, offset);
 }
 
+/* Prepare the pointer IVs which needs to be updated by a variable amount.
+   Such variable amount is the outcome of .SELECT_VL. In this case, we can
+   allow each iteration process the flexible number of elements as long as
+   the number <= vf elments.
+
+   Return data reference according to SELECT_VL.
+   If new statements are needed, insert them before GSI.  */
+
+static tree
+vect_get_loop_variant_data_ptr_increment (
+  vec_info *vinfo, tree aggr_type, gimple_stmt_iterator *gsi,
+  vec_loop_lens *loop_lens, dr_vec_info *dr_info,
+  vect_memory_access_type memory_access_type)
+{
+  loop_vec_info loop_vinfo = dyn_cast<loop_vec_info> (vinfo);
+  tree step = vect_dr_behavior (vinfo, dr_info)->step;
+
+  /* TODO: We don't support gather/scatter or load_lanes/store_lanes for pointer
+     IVs are updated by variable amount but we will support them in the future.
+   */
+  gcc_assert (memory_access_type != VMAT_GATHER_SCATTER
+	      && memory_access_type != VMAT_LOAD_STORE_LANES);
+
+  /* When we support SELECT_VL pattern, we dynamic adjust
+     the memory address by .SELECT_VL result.
+
+     The result of .SELECT_VL is the number of elements to
+     be processed of each iteration. So the memory address
+     adjustment operation should be:
+
+     addr = addr + .SELECT_VL (ARG..) * step;
+  */
+  tree loop_len
+    = vect_get_loop_len (loop_vinfo, gsi, loop_lens, 1, aggr_type, 0, 0);
+  tree len_type = TREE_TYPE (loop_len);
+  /* Since the outcome of .SELECT_VL is element size, we should adjust
+     it into bytesize so that it can be used in address pointer variable
+     amount IVs adjustment.  */
+  tree tmp = fold_build2 (MULT_EXPR, len_type, loop_len,
+			  wide_int_to_tree (len_type, wi::to_widest (step)));
+  tree bump = make_temp_ssa_name (len_type, NULL, "ivtmp");
+  gassign *assign = gimple_build_assign (bump, tmp);
+  gsi_insert_before (gsi, assign, GSI_SAME_STMT);
+  return bump;
+}
+
 /* Return the amount that should be added to a vector pointer to move
    to the next or previous copy of AGGR_TYPE.  DR_INFO is the data reference
    being vectorized and MEMORY_ACCESS_TYPE describes the type of
    vectorization.  */
 
 static tree
-vect_get_data_ptr_increment (vec_info *vinfo,
+vect_get_data_ptr_increment (vec_info *vinfo, gimple_stmt_iterator *gsi,
 			     dr_vec_info *dr_info, tree aggr_type,
-			     vect_memory_access_type memory_access_type)
+			     vect_memory_access_type memory_access_type,
+			     vec_loop_lens *loop_lens = nullptr)
 {
   if (memory_access_type == VMAT_INVARIANT)
     return size_zero_node;
+
+  loop_vec_info loop_vinfo = dyn_cast<loop_vec_info> (vinfo);
+  if (loop_vinfo && LOOP_VINFO_USING_SELECT_VL_P (loop_vinfo))
+    return vect_get_loop_variant_data_ptr_increment (vinfo, aggr_type, gsi,
+						     loop_lens, dr_info,
+						     memory_access_type);
 
   tree iv_step = TYPE_SIZE_UNIT (aggr_type);
   tree step = vect_dr_behavior (vinfo, dr_info)->step;
@@ -3639,7 +3693,8 @@ vectorizable_call (vec_info *vinfo,
 		      unsigned int vec_num = vec_oprnds0.length ();
 		      /* Always true for SLP.  */
 		      gcc_assert (ncopies == 1);
-		      vargs[varg++] = vect_get_loop_mask (gsi, masks, vec_num,
+		      vargs[varg++] = vect_get_loop_mask (loop_vinfo,
+							  gsi, masks, vec_num,
 							  vectype_out, i);
 		    }
 		  size_t k;
@@ -3680,7 +3735,8 @@ vectorizable_call (vec_info *vinfo,
 			  unsigned int vec_num = vec_oprnds0.length ();
 			  /* Always true for SLP.  */
 			  gcc_assert (ncopies == 1);
-			  tree mask = vect_get_loop_mask (gsi, masks, vec_num,
+			  tree mask = vect_get_loop_mask (loop_vinfo,
+							  gsi, masks, vec_num,
 							  vectype_out, i);
 			  vargs[mask_opno] = prepare_vec_mask
 			    (loop_vinfo, TREE_TYPE (mask), mask,
@@ -3705,7 +3761,7 @@ vectorizable_call (vec_info *vinfo,
 
 	  int varg = 0;
 	  if (masked_loop_p && reduc_idx >= 0)
-	    vargs[varg++] = vect_get_loop_mask (gsi, masks, ncopies,
+	    vargs[varg++] = vect_get_loop_mask (loop_vinfo, gsi, masks, ncopies,
 						vectype_out, j);
 	  for (i = 0; i < nargs; i++)
 	    {
@@ -3724,7 +3780,7 @@ vectorizable_call (vec_info *vinfo,
 
 	  if (mask_opno >= 0 && masked_loop_p)
 	    {
-	      tree mask = vect_get_loop_mask (gsi, masks, ncopies,
+	      tree mask = vect_get_loop_mask (loop_vinfo, gsi, masks, ncopies,
 					      vectype_out, j);
 	      vargs[mask_opno]
 		= prepare_vec_mask (loop_vinfo, TREE_TYPE (mask), mask,
@@ -6475,8 +6531,8 @@ vectorizable_operation (vec_info *vinfo,
                              "no optab.\n");
 	  return false;
 	}
-      target_support_p = (optab_handler (optab, vec_mode)
-			  != CODE_FOR_nothing);
+      target_support_p = (optab_handler (optab, vec_mode) != CODE_FOR_nothing
+			  || optab_libfunc (optab, vec_mode));
     }
 
   bool using_emulated_vectors_p = vect_emulated_vector_p (vectype);
@@ -6770,8 +6826,8 @@ vectorizable_operation (vec_info *vinfo,
 	}
       else if (masked_loop_p && mask_out_inactive)
 	{
-	  tree mask = vect_get_loop_mask (gsi, masks, vec_num * ncopies,
-					  vectype, i);
+	  tree mask = vect_get_loop_mask (loop_vinfo, gsi, masks,
+					  vec_num * ncopies, vectype, i);
 	  auto_vec<tree> vops (5);
 	  vops.quick_push (mask);
 	  vops.quick_push (vop0);
@@ -6812,8 +6868,8 @@ vectorizable_operation (vec_info *vinfo,
 	      if (loop_vinfo->scalar_cond_masked_set.contains ({ op0,
 								 ncopies}))
 		{
-		  mask = vect_get_loop_mask (gsi, masks, vec_num * ncopies,
-					     vectype, i);
+		  mask = vect_get_loop_mask (loop_vinfo, gsi, masks,
+					     vec_num * ncopies, vectype, i);
 
 		  vop0 = prepare_vec_mask (loop_vinfo, TREE_TYPE (mask), mask,
 					   vop0, gsi);
@@ -6822,8 +6878,8 @@ vectorizable_operation (vec_info *vinfo,
 	      if (loop_vinfo->scalar_cond_masked_set.contains ({ op1,
 								 ncopies }))
 		{
-		  mask = vect_get_loop_mask (gsi, masks, vec_num * ncopies,
-					     vectype, i);
+		  mask = vect_get_loop_mask (loop_vinfo, gsi, masks,
+					     vec_num * ncopies, vectype, i);
 
 		  vop1 = prepare_vec_mask (loop_vinfo, TREE_TYPE (mask), mask,
 					   vop1, gsi);
@@ -7629,7 +7685,7 @@ vectorizable_scan_store (vec_info *vinfo,
   tree vec_oprnd3 = NULL_TREE;
   tree dataref_ptr = DR_BASE_ADDRESS (dr_info->dr);
   tree dataref_offset = build_int_cst (ref_type, 0);
-  tree bump = vect_get_data_ptr_increment (vinfo, dr_info,
+  tree bump = vect_get_data_ptr_increment (vinfo, gsi, dr_info,
 					   vectype, VMAT_CONTIGUOUS);
   tree ldataref_ptr = NULL_TREE;
   tree orig = NULL_TREE;
@@ -8539,8 +8595,8 @@ vectorizable_store (vec_info *vinfo,
 	aggr_type = build_array_type_nelts (elem_type, vec_num * nunits);
       else
 	aggr_type = vectype;
-      bump = vect_get_data_ptr_increment (vinfo, dr_info, aggr_type,
-					  memory_access_type);
+      bump = vect_get_data_ptr_increment (vinfo, gsi, dr_info, aggr_type,
+					  memory_access_type, loop_lens);
     }
 
   if (mask)
@@ -8663,6 +8719,7 @@ vectorizable_store (vec_info *vinfo,
 	}
       else
 	{
+	  gcc_assert (!LOOP_VINFO_USING_SELECT_VL_P (loop_vinfo));  
 	  /* For interleaved stores we created vectorized defs for all the
 	     defs stored in OPRNDS in the previous iteration (previous copy).
 	     DR_CHAIN is then used as an input to vect_permute_store_chain().
@@ -8706,8 +8763,8 @@ vectorizable_store (vec_info *vinfo,
 
 	  tree final_mask = NULL;
 	  if (loop_masks)
-	    final_mask = vect_get_loop_mask (gsi, loop_masks, ncopies,
-					     vectype, j);
+	    final_mask = vect_get_loop_mask (loop_vinfo, gsi, loop_masks,
+					     ncopies, vectype, j);
 	  if (vec_mask)
 	    final_mask = prepare_vec_mask (loop_vinfo, mask_vectype,
 					   final_mask, vec_mask, gsi);
@@ -8760,7 +8817,7 @@ vectorizable_store (vec_info *vinfo,
 
 	      tree final_mask = NULL_TREE;
 	      if (loop_masks)
-		final_mask = vect_get_loop_mask (gsi, loop_masks,
+		final_mask = vect_get_loop_mask (loop_vinfo, gsi, loop_masks,
 						 vec_num * ncopies,
 						 vectype, vec_num * j + i);
 	      if (vec_mask)
@@ -9975,8 +10032,8 @@ vectorizable_load (vec_info *vinfo,
 	aggr_type = build_array_type_nelts (elem_type, vec_num * nunits);
       else
 	aggr_type = vectype;
-      bump = vect_get_data_ptr_increment (vinfo, dr_info, aggr_type,
-					  memory_access_type);
+      bump = vect_get_data_ptr_increment (vinfo, gsi, dr_info, aggr_type,
+					  memory_access_type, loop_lens);
     }
 
   auto_vec<tree> vec_offsets;
@@ -10056,6 +10113,7 @@ vectorizable_load (vec_info *vinfo,
 	}
       else
 	{
+	  gcc_assert (!LOOP_VINFO_USING_SELECT_VL_P (loop_vinfo));
 	  if (dataref_offset)
 	    dataref_offset = int_const_binop (PLUS_EXPR, dataref_offset,
 					      bump);
@@ -10078,8 +10136,8 @@ vectorizable_load (vec_info *vinfo,
 
 	  tree final_mask = NULL_TREE;
 	  if (loop_masks)
-	    final_mask = vect_get_loop_mask (gsi, loop_masks, ncopies,
-					     vectype, j);
+	    final_mask = vect_get_loop_mask (loop_vinfo, gsi, loop_masks,
+					     ncopies, vectype, j);
 	  if (vec_mask)
 	    final_mask = prepare_vec_mask (loop_vinfo, mask_vectype,
 					   final_mask, vec_mask, gsi);
@@ -10129,7 +10187,7 @@ vectorizable_load (vec_info *vinfo,
 	      tree final_mask = NULL_TREE;
 	      if (loop_masks
 		  && memory_access_type != VMAT_INVARIANT)
-		final_mask = vect_get_loop_mask (gsi, loop_masks,
+		final_mask = vect_get_loop_mask (loop_vinfo, gsi, loop_masks,
 						 vec_num * ncopies,
 						 vectype, vec_num * j + i);
 	      if (vec_mask)
@@ -11153,7 +11211,7 @@ vectorizable_condition (vec_info *vinfo,
 	  if (masks)
 	    {
 	      tree loop_mask
-		= vect_get_loop_mask (gsi, masks, vec_num * ncopies,
+		= vect_get_loop_mask (loop_vinfo, gsi, masks, vec_num * ncopies,
 				      vectype, i);
 	      tree tmp2 = make_ssa_name (vec_cmp_type);
 	      gassign *g

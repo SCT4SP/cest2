@@ -4272,6 +4272,14 @@ maybe_init_list_as_array (tree elttype, tree init)
   if (has_non_trivial_temporaries (first))
     return NULL_TREE;
 
+  /* We can't do this if copying from the initializer_list would be
+     ill-formed.  */
+  tree copy_argtypes = make_tree_vec (1);
+  TREE_VEC_ELT (copy_argtypes, 0)
+    = cp_build_qualified_type (elttype, TYPE_QUAL_CONST);
+  if (!is_xible (INIT_EXPR, elttype, copy_argtypes))
+    return NULL_TREE;
+
   init_elttype = cp_build_qualified_type (init_elttype, TYPE_QUAL_CONST);
   tree arr = build_array_of_n_type (init_elttype, CONSTRUCTOR_NELTS (init));
   arr = finish_compound_literal (arr, init, tf_none);
@@ -8533,7 +8541,16 @@ convert_like_internal (conversion *convs, tree expr, tree fn, int argnum,
 	unsigned len = CONSTRUCTOR_NELTS (expr);
 	tree array;
 
-	if (len)
+	if (tree init = maybe_init_list_as_array (elttype, expr))
+	  {
+	    elttype = cp_build_qualified_type
+	      (elttype, cp_type_quals (elttype) | TYPE_QUAL_CONST);
+	    array = build_array_of_n_type (elttype, len);
+	    array = build_vec_init_expr (array, init, complain);
+	    array = get_target_expr (array);
+	    array = cp_build_addr_expr (array, complain);
+	  }
+	else if (len)
 	  {
 	    tree val; unsigned ix;
 
@@ -12543,11 +12560,11 @@ add_warning (struct z_candidate *winner, struct z_candidate *loser)
 }
 
 /* CAND is a constructor candidate in joust in C++17 and up.  If it copies a
-   prvalue returned from a conversion function, replace CAND with the candidate
-   for the conversion and return true.  Otherwise, return false.  */
+   prvalue returned from a conversion function, return true.  Otherwise, return
+   false.  */
 
 static bool
-joust_maybe_elide_copy (z_candidate *&cand)
+joust_maybe_elide_copy (z_candidate *cand)
 {
   tree fn = cand->fn;
   if (!DECL_COPY_CONSTRUCTOR_P (fn) && !DECL_MOVE_CONSTRUCTOR_P (fn))
@@ -12563,10 +12580,7 @@ joust_maybe_elide_copy (z_candidate *&cand)
 			   (conv->type, DECL_CONTEXT (fn)));
       z_candidate *uc = conv->cand;
       if (DECL_CONV_FN_P (uc->fn))
-	{
-	  cand = uc;
-	  return true;
-	}
+	return true;
     }
   return false;
 }
@@ -12716,27 +12730,6 @@ joust (struct z_candidate *cand1, struct z_candidate *cand2, bool warn,
 	  off1 = 1;
 	  --len;
 	}
-    }
-
-  /* Handle C++17 copy elision in [over.match.ctor] (direct-init) context.  The
-     standard currently says that only constructors are candidates, but if one
-     copies a prvalue returned by a conversion function we want to treat the
-     conversion as the candidate instead.
-
-     Clang does something similar, as discussed at
-     http://lists.isocpp.org/core/2017/10/3166.php
-     http://lists.isocpp.org/core/2019/03/5721.php  */
-  int elided_tiebreaker = 0;
-  if (len == 1 && cxx_dialect >= cxx17
-      && DECL_P (cand1->fn)
-      && DECL_COMPLETE_CONSTRUCTOR_P (cand1->fn)
-      && !(cand1->flags & LOOKUP_ONLYCONVERTING))
-    {
-      bool elided1 = joust_maybe_elide_copy (cand1);
-      bool elided2 = joust_maybe_elide_copy (cand2);
-      /* As a tiebreaker below we will prefer a constructor to a conversion
-	 operator exposed this way.  */
-      elided_tiebreaker = elided2 - elided1;
     }
 
   for (i = 0; i < len; ++i)
@@ -12900,11 +12893,6 @@ joust (struct z_candidate *cand1, struct z_candidate *cand2, bool warn,
   if (winner)
     return winner;
 
-  /* Put this tiebreaker first, so that we don't try to look at second_conv of
-     a constructor candidate that doesn't have one.  */
-  if (elided_tiebreaker)
-    return elided_tiebreaker;
-
   /* DR 495 moved this tiebreaker above the template ones.  */
   /* or, if not that,
      the  context  is  an  initialization by user-defined conversion (see
@@ -12940,6 +12928,25 @@ joust (struct z_candidate *cand1, struct z_candidate *cand2, bool warn,
 	      return (sp == cand1) ? -1 : 1;
       }
   }
+
+  /* DR2327: C++17 copy elision in [over.match.ctor] (direct-init) context.
+     The standard currently says that only constructors are candidates, but if
+     one copies a prvalue returned by a conversion function we prefer that.
+
+     Clang does something similar, as discussed at
+     http://lists.isocpp.org/core/2017/10/3166.php
+     http://lists.isocpp.org/core/2019/03/5721.php  */
+  if (len == 1 && cxx_dialect >= cxx17
+      && DECL_P (cand1->fn)
+      && DECL_COMPLETE_CONSTRUCTOR_P (cand1->fn)
+      && !(cand1->flags & LOOKUP_ONLYCONVERTING))
+    {
+      bool elided1 = joust_maybe_elide_copy (cand1);
+      bool elided2 = joust_maybe_elide_copy (cand2);
+      winner = elided1 - elided2;
+      if (winner)
+	return winner;
+    }
 
   /* or, if not that,
      F1 is a non-template function and F2 is a template function

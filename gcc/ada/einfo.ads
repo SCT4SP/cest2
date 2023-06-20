@@ -1677,6 +1677,10 @@ package Einfo is
 --       Exp_Dbug for a full description of the use of this flag and also the
 --       related flag Has_Qualified_Name.
 
+--    Has_Ghost_Predicate_Aspect
+--       Defined in all types and subtypes. Set if a Ghost_Predicate aspect
+--       was explicitly applied to the type.
+
 --    Has_Gigi_Rep_Item
 --       Defined in all entities. Set if the rep item chain (referenced by
 --       First_Rep_Item and linked through the Next_Rep_Item chain) contains a
@@ -1965,7 +1969,7 @@ package Einfo is
 --       is defined for the type.
 
 --    Has_Private_Ancestor
---       Applies to type extensions. True if some ancestor is derived from a
+--       Applies to derived record types. True if an ancestor is derived from a
 --       private type, making some components invisible and aggregates illegal.
 --       This flag is set at the point of derivation. The legality of the
 --       aggregate must be rechecked because it also depends on the visibility
@@ -5026,6 +5030,7 @@ package Einfo is
    --    Has_Delayed_Rep_Aspects
    --    Has_Discriminants
    --    Has_Dynamic_Predicate_Aspect
+   --    Has_Ghost_Predicate_Aspect
    --    Has_Independent_Components           (base type only)
    --    Has_Inheritable_Invariants           (base type only)
    --    Has_Inherited_DIC                    (base type only)

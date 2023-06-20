@@ -1306,11 +1306,22 @@ riscv_const_insns (rtx x)
 		if (satisfies_constraint_vi (x))
 		  return 1;
 
-		/* A const duplicate vector can always be broadcast from
-		   a general-purpose register.  This means we need as many
-		   insns as it takes to load the constant into the GPR
-		   and one vmv.v.x.  */
-		return 1 + riscv_integer_cost (INTVAL (elt));
+		/* Any int/FP constants can always be broadcast from a
+		   scalar register.  Loading of a floating-point
+		   constant incurs a literal-pool access.  Allow this in
+		   order to increase vectorization possibilities.  */
+		int n = riscv_const_insns (elt);
+		if (CONST_DOUBLE_P (elt))
+		    return 1 + 4; /* vfmv.v.f + memory access.  */
+		else
+		  {
+		    /* We need as many insns as it takes to load the constant
+		       into a GPR and one vmv.v.x.  */
+		    if (n != 0)
+		      return 1 + n;
+		    else
+		      return 1 + 4; /*vmv.v.x + memory access.  */
+		  }
 	      }
 	  }
 
@@ -1415,7 +1426,7 @@ riscv_emit_set (rtx target, rtx src)
 
 /* Emit an instruction of the form (set DEST (CODE X Y)).  */
 
-static rtx
+rtx
 riscv_emit_binary (enum rtx_code code, rtx dest, rtx x, rtx y)
 {
   return riscv_emit_set (dest, gen_rtx_fmt_ee (code, GET_MODE (dest), x, y));
@@ -3795,6 +3806,82 @@ riscv_pass_fpr_pair (machine_mode mode, unsigned regno1,
 				   GEN_INT (offset2))));
 }
 
+/* Return true if a vector type is included in the type TYPE.  */
+
+static bool
+riscv_arg_has_vector (const_tree type)
+{
+  if (riscv_v_ext_mode_p (TYPE_MODE (type)))
+    return true;
+
+  if (!COMPLETE_TYPE_P (type))
+    return false;
+
+  switch (TREE_CODE (type))
+    {
+    case RECORD_TYPE:
+      /* If it is a record, it is further determined whether its fields have
+	 vector type.  */
+      for (tree f = TYPE_FIELDS (type); f; f = DECL_CHAIN (f))
+	if (TREE_CODE (f) == FIELD_DECL)
+	  {
+	    tree field_type = TREE_TYPE (f);
+	    if (!TYPE_P (field_type))
+	      break;
+
+	    if (riscv_arg_has_vector (field_type))
+	      return true;
+	  }
+      break;
+    case ARRAY_TYPE:
+      return riscv_arg_has_vector (TREE_TYPE (type));
+    default:
+      break;
+    }
+
+  return false;
+}
+
+/* Pass the type to check whether it's a vector type or contains vector type.
+   Only check the value type and no checking for vector pointer type.  */
+
+static void
+riscv_pass_in_vector_p (const_tree type)
+{
+  static int warned = 0;
+
+  if (type && riscv_v_ext_mode_p (TYPE_MODE (type)) && !warned)
+    {
+      warning (OPT_Wpsabi,
+	       "ABI for the vector type is currently in experimental stage and "
+	       "may changes in the upcoming version of GCC.");
+      warned = 1;
+    }
+}
+
+/* Initialize a variable CUM of type CUMULATIVE_ARGS
+   for a call to a function whose data type is FNTYPE.
+   For a library call, FNTYPE is 0.  */
+
+void
+riscv_init_cumulative_args (CUMULATIVE_ARGS *cum,
+			    tree fntype ATTRIBUTE_UNUSED,
+			    rtx libname ATTRIBUTE_UNUSED,
+			    tree fndecl,
+			    int caller ATTRIBUTE_UNUSED)
+{
+  memset (cum, 0, sizeof (*cum));
+
+  if (fndecl)
+    {
+      const tree_function_decl &fn
+	= FUNCTION_DECL_CHECK (fndecl)->function_decl;
+
+      if (fn.built_in_class == NOT_BUILT_IN)
+	  cum->rvv_psabi_warning = 1;
+    }
+}
+
 /* Fill INFO with information about a single argument, and return an
    RTL pattern to pass or return the argument.  CUM is the cumulative
    state for earlier arguments.  MODE is the mode of this argument and
@@ -3816,13 +3903,19 @@ riscv_get_arg_info (struct riscv_arg_info *info, const CUMULATIVE_ARGS *cum,
   info->gpr_offset = cum->num_gprs;
   info->fpr_offset = cum->num_fprs;
 
-  /* TODO: Currently, it will cause an ICE for --param
-     riscv-autovec-preference=fixed-vlmax. So, we just return NULL_RTX here
-     let GCC generate loads/stores. Ideally, we should either warn the user not
-     to use an RVV vector type as function argument or support the calling
-     convention directly.  */
+  if (cum->rvv_psabi_warning)
+    {
+      /* Only check existing of vector type.  */
+      riscv_pass_in_vector_p (type);
+    }
+
+  /* All current vector arguments and return values are passed through the
+     function stack. Ideally, we should either warn the user not to use an RVV
+     vector type as function argument or support a calling convention
+     with better performance.  */
   if (riscv_v_ext_mode_p (mode))
     return NULL_RTX;
+
   if (named)
     {
       riscv_aggregate_field fields[2];
@@ -3973,7 +4066,18 @@ riscv_function_value (const_tree type, const_tree func, machine_mode mode)
     }
 
   memset (&args, 0, sizeof args);
-  return riscv_get_arg_info (&info, &args, mode, type, true, true);
+
+  const_tree arg_type = type;
+  if (func && DECL_RESULT (func))
+    {
+      const tree_function_decl &fn = FUNCTION_DECL_CHECK (func)->function_decl;
+      if (fn.built_in_class == NOT_BUILT_IN)
+	args.rvv_psabi_warning = 1;
+
+      arg_type = TREE_TYPE (DECL_RESULT (func));
+    }
+
+  return riscv_get_arg_info (&info, &args, mode, arg_type, true, true);
 }
 
 /* Implement TARGET_PASS_BY_REFERENCE. */
@@ -3995,6 +4099,13 @@ riscv_pass_by_reference (cumulative_args_t cum_v, const function_arg_info &arg)
       if (info.num_fprs)
 	return false;
     }
+
+  /* All current vector arguments and return values are passed through the
+     function stack. Ideally, we should either warn the user not to use an RVV
+     vector type as function argument or support a calling convention
+     with better performance.  */
+  if (riscv_v_ext_mode_p (arg.mode))
+    return true;
 
   /* Pass by reference if the data do not fit in two integer registers.  */
   return !IN_RANGE (size, 0, 2 * UNITS_PER_WORD);
@@ -4459,7 +4570,6 @@ riscv_print_operand (FILE *file, rtx op, int letter)
     }
   machine_mode mode = GET_MODE (op);
   enum rtx_code code = GET_CODE (op);
-  const enum memmodel model = memmodel_base (INTVAL (op));
 
   switch (letter)
     {
@@ -4596,7 +4706,8 @@ riscv_print_operand (FILE *file, rtx op, int letter)
       fputs (GET_RTX_NAME (code), file);
       break;
 
-    case 'A':
+    case 'A': {
+      const enum memmodel model = memmodel_base (INTVAL (op));
       if (riscv_memmodel_needs_amo_acquire (model)
 	  && riscv_memmodel_needs_amo_release (model))
 	fputs (".aqrl", file);
@@ -4605,18 +4716,23 @@ riscv_print_operand (FILE *file, rtx op, int letter)
       else if (riscv_memmodel_needs_amo_release (model))
 	fputs (".rl", file);
       break;
+    }
 
-    case 'I':
+    case 'I': {
+      const enum memmodel model = memmodel_base (INTVAL (op));
       if (model == MEMMODEL_SEQ_CST)
 	fputs (".aqrl", file);
       else if (riscv_memmodel_needs_amo_acquire (model))
 	fputs (".aq", file);
       break;
+    }
 
-    case 'J':
+    case 'J': {
+      const enum memmodel model = memmodel_base (INTVAL (op));
       if (riscv_memmodel_needs_amo_release (model))
 	fputs (".rl", file);
       break;
+    }
 
     case 'i':
       if (code != REG)
@@ -4980,12 +5096,15 @@ riscv_compute_frame_info (void)
 
   frame = &cfun->machine->frame;
 
-  /* In an interrupt function, if we have a large frame, then we need to
-     save/restore t0.  We check for this before clearing the frame struct.  */
+  /* In an interrupt function, there are two cases in which t0 needs to be used:
+     1, If we have a large frame, then we need to save/restore t0.  We check for
+     this before clearing the frame struct.
+     2, Need to save and restore some CSRs in the frame.  */
   if (cfun->machine->interrupt_handler_p)
     {
       HOST_WIDE_INT step1 = riscv_first_stack_step (frame, frame->total_size);
-      if (! POLY_SMALL_OPERAND_P ((frame->total_size - step1)))
+      if (! POLY_SMALL_OPERAND_P ((frame->total_size - step1))
+	  || (TARGET_HARD_FLOAT || TARGET_ZFINX))
 	interrupt_save_prologue_temp = true;
     }
 
@@ -5031,6 +5150,17 @@ riscv_compute_frame_info (void)
 	  frame->save_libcall_adjustment = x_save_size;
 	}
     }
+
+  /* In an interrupt function, we need extra space for the initial saves of CSRs.  */
+  if (cfun->machine->interrupt_handler_p
+      && ((TARGET_HARD_FLOAT && frame->fmask)
+	  || (TARGET_ZFINX
+	      /* Except for RISCV_PROLOGUE_TEMP_REGNUM.  */
+	      && (frame->mask & ~(1 << RISCV_PROLOGUE_TEMP_REGNUM)))))
+    /* Save and restore FCSR.  */
+    /* TODO: When P or V extensions support interrupts, some of their CSRs
+       may also need to be saved and restored.  */
+    x_save_size += riscv_stack_align (1 * UNITS_PER_WORD);
 
   /* At the bottom of the frame are any outgoing stack arguments. */
   offset = riscv_stack_align (crtl->outgoing_args_size);
@@ -5275,6 +5405,34 @@ riscv_for_each_saved_reg (poly_int64 sp_offset, riscv_save_restore_fn fn,
 		  continue;
 		}
 	    }
+	}
+
+      /* In an interrupt function, save and restore some necessary CSRs in the stack
+	 to avoid changes in CSRs.  */
+      if (regno == RISCV_PROLOGUE_TEMP_REGNUM
+	  && cfun->machine->interrupt_handler_p
+	  && ((TARGET_HARD_FLOAT  && cfun->machine->frame.fmask)
+	      || (TARGET_ZFINX
+		  && (cfun->machine->frame.mask & ~(1 << RISCV_PROLOGUE_TEMP_REGNUM)))))
+	{
+	  unsigned int fcsr_size = GET_MODE_SIZE (SImode);
+	  if (!epilogue)
+	    {
+	      riscv_save_restore_reg (word_mode, regno, offset, fn);
+	      offset -= fcsr_size;
+	      emit_insn (gen_riscv_frcsr (RISCV_PROLOGUE_TEMP (SImode)));
+	      riscv_save_restore_reg (SImode, RISCV_PROLOGUE_TEMP_REGNUM,
+				      offset, riscv_save_reg);
+	    }
+	  else
+	    {
+	      riscv_save_restore_reg (SImode, RISCV_PROLOGUE_TEMP_REGNUM,
+				      offset - fcsr_size, riscv_restore_reg);
+	      emit_insn (gen_riscv_fscsr (RISCV_PROLOGUE_TEMP (SImode)));
+	      riscv_save_restore_reg (word_mode, regno, offset, fn);
+	      offset -= fcsr_size;
+	    }
+	  continue;
 	}
 
       riscv_save_restore_reg (word_mode, regno, offset, fn);
@@ -7087,8 +7245,8 @@ riscv_libgcc_floating_mode_supported_p (scalar_float_mode mode)
        precision of the _FloatN type; evaluate all other operations and
        constants to the range and precision of the semantic type;
 
-   If we have the zfh/zhinx extensions then we support _Float16 in native
-   precision, so we should set this to 16.  */
+   If we have the zfh/zhinx/zvfh extensions then we support _Float16
+   in native precision, so we should set this to 16.  */
 static enum flt_eval_method
 riscv_excess_precision (enum excess_precision_type type)
 {
@@ -7096,7 +7254,7 @@ riscv_excess_precision (enum excess_precision_type type)
     {
     case EXCESS_PRECISION_TYPE_FAST:
     case EXCESS_PRECISION_TYPE_STANDARD:
-      return ((TARGET_ZFH || TARGET_ZHINX)
+      return ((TARGET_ZFH || TARGET_ZHINX || TARGET_ZVFH)
 		? FLT_EVAL_METHOD_PROMOTE_TO_FLOAT16
 		: FLT_EVAL_METHOD_PROMOTE_TO_FLOAT);
     case EXCESS_PRECISION_TYPE_IMPLICIT:
@@ -7631,6 +7789,19 @@ riscv_vectorize_related_mode (machine_mode vector_mode, scalar_mode element_mode
   return default_vectorize_related_mode (vector_mode, element_mode, nunits);
 }
 
+/* Implement TARGET_VECTORIZE_VEC_PERM_CONST.  */
+
+static bool
+riscv_vectorize_vec_perm_const (machine_mode vmode, machine_mode op_mode,
+				rtx target, rtx op0, rtx op1,
+				const vec_perm_indices &sel)
+{
+  if (TARGET_VECTOR && riscv_v_ext_vector_mode_p (vmode))
+    return riscv_vector::expand_vec_perm_const (vmode, op_mode, target, op0,
+						op1, sel);
+
+  return false;
+}
 
 /* Initialize the GCC target structure.  */
 #undef TARGET_ASM_ALIGNED_HI_OP
@@ -7929,6 +8100,9 @@ riscv_vectorize_related_mode (machine_mode vector_mode, scalar_mode element_mode
 
 #undef TARGET_VECTORIZE_RELATED_MODE
 #define TARGET_VECTORIZE_RELATED_MODE riscv_vectorize_related_mode
+
+#undef TARGET_VECTORIZE_VEC_PERM_CONST
+#define TARGET_VECTORIZE_VEC_PERM_CONST riscv_vectorize_vec_perm_const
 
 struct gcc_target targetm = TARGET_INITIALIZER;
 

@@ -1983,11 +1983,20 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
   (bit_not (bit_not @0))
   @0)
 
+/* zero_one_valued_p will match when a value is known to be either
+   0 or 1 including constants 0 or 1.
+   Signed 1-bits includes -1 so they cannot match here. */
 (match zero_one_valued_p
  @0
- (if (INTEGRAL_TYPE_P (type) && tree_nonzero_bits (@0) == 1)))
+ (if (INTEGRAL_TYPE_P (type)
+      && (TYPE_UNSIGNED (type)
+	  || TYPE_PRECISION (type) > 1)
+      && wi::leu_p (tree_nonzero_bits (@0), 1))))
 (match zero_one_valued_p
- truth_valued_p@0)
+ truth_valued_p@0
+ (if (INTEGRAL_TYPE_P (type)
+      && (TYPE_UNSIGNED (type)
+	  || TYPE_PRECISION (type) > 1))))
 
 /* Transform { 0 or 1 } * { 0 or 1 } into { 0 or 1 } & { 0 or 1 }.  */
 (simplify
@@ -2056,7 +2065,10 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
  (if (INTEGRAL_TYPE_P (type)
       && INTEGRAL_TYPE_P (TREE_TYPE (@0))
       && TREE_CODE (TREE_TYPE (@0)) != BOOLEAN_TYPE
-      && !TYPE_UNSIGNED (TREE_TYPE (@0)))
+      /* Sign extending of the neg or a truncation of the neg
+         is needed. */
+      && (!TYPE_UNSIGNED (TREE_TYPE (@0))
+	  || TYPE_PRECISION (type) <= TYPE_PRECISION (TREE_TYPE (@0))))
   (mult (convert @0) @1)))
 
 /* Narrow integer multiplication by a zero_one_valued_p operand.
@@ -3683,8 +3695,8 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
   (cond (le @0 integer_zerop@1) (negate@2 @0) integer_zerop@1)
   (max @2 @1))
 
-/* ((x & 0x1) == 0) ? y : z <op> y -> (-(typeof(y))(x & 0x1) & z) <op> y */
-(for op (bit_xor bit_ior)
+/* (zero_one == 0) ? y : z <op> y -> ((typeof(y))zero_one * z) <op> y */
+(for op (bit_xor bit_ior plus)
  (simplify
   (cond (eq zero_one_valued_p@0
             integer_zerop)
@@ -3693,10 +3705,10 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
   (if (INTEGRAL_TYPE_P (type)
        && TYPE_PRECISION (type) > 1
        && (INTEGRAL_TYPE_P (TREE_TYPE (@0))))
-       (op (bit_and (negate (convert:type @0)) @2) @1))))
+       (op (mult (convert:type @0) @2) @1))))
 
-/* ((x & 0x1) == 0) ? z <op> y : y -> (-(typeof(y))(x & 0x1) & z) <op> y */
-(for op (bit_xor bit_ior)
+/* (zero_one != 0) ? z <op> y : y -> ((typeof(y))zero_one * z) <op> y */
+(for op (bit_xor bit_ior plus)
  (simplify
   (cond (ne zero_one_valued_p@0
             integer_zerop)
@@ -3705,7 +3717,7 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
   (if (INTEGRAL_TYPE_P (type)
        && TYPE_PRECISION (type) > 1
        && (INTEGRAL_TYPE_P (TREE_TYPE (@0))))
-       (op (bit_and (negate (convert:type @0)) @2) @1))))
+       (op (mult (convert:type @0) @2) @1))))
 
 /* Simplifications of shift and rotates.  */
 
@@ -4145,19 +4157,19 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
       int inside_ptr = POINTER_TYPE_P (inside_type);
       int inside_float = FLOAT_TYPE_P (inside_type);
       int inside_vec = VECTOR_TYPE_P (inside_type);
-      unsigned int inside_prec = TYPE_PRECISION (inside_type);
+      unsigned int inside_prec = element_precision (inside_type);
       int inside_unsignedp = TYPE_UNSIGNED (inside_type);
       int inter_int = INTEGRAL_TYPE_P (inter_type);
       int inter_ptr = POINTER_TYPE_P (inter_type);
       int inter_float = FLOAT_TYPE_P (inter_type);
       int inter_vec = VECTOR_TYPE_P (inter_type);
-      unsigned int inter_prec = TYPE_PRECISION (inter_type);
+      unsigned int inter_prec = element_precision (inter_type);
       int inter_unsignedp = TYPE_UNSIGNED (inter_type);
       int final_int = INTEGRAL_TYPE_P (type);
       int final_ptr = POINTER_TYPE_P (type);
       int final_float = FLOAT_TYPE_P (type);
       int final_vec = VECTOR_TYPE_P (type);
-      unsigned int final_prec = TYPE_PRECISION (type);
+      unsigned int final_prec = element_precision (type);
       int final_unsignedp = TYPE_UNSIGNED (type);
     }
    (switch
@@ -4713,6 +4725,24 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
     )
    )
   )
+ )
+)
+
+(simplify
+ (cond @0 zero_one_valued_p@1 zero_one_valued_p@2)
+ (switch
+  /* bool0 ? bool1 : 0 -> bool0 & bool1 */
+  (if (integer_zerop (@2))
+   (bit_and (convert @0) @1))
+  /* bool0 ? 0 : bool2 -> (bool0^1) & bool2 */
+  (if (integer_zerop (@1))
+   (bit_and (bit_xor (convert @0) { build_one_cst (type); } ) @2))
+  /* bool0 ? 1 : bool2 -> bool0 | bool2 */
+  (if (integer_onep (@1))
+   (bit_ior (convert @0) @2))
+  /* bool0 ? bool1 : 1 -> (bool0^1) | bool1 */
+  (if (integer_onep (@2))
+   (bit_ior (bit_xor (convert @0) @2) @1))
  )
 )
 
@@ -5896,13 +5926,17 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
   (cmp (negate @0) (negate @1))
   (if (FLOAT_TYPE_P (TREE_TYPE (@0))
        || (ANY_INTEGRAL_TYPE_P (TREE_TYPE (@0))
-	   && TYPE_OVERFLOW_UNDEFINED (TREE_TYPE (@0))))
+	   && (cmp == EQ_EXPR
+	       || cmp == NE_EXPR
+	       || TYPE_OVERFLOW_UNDEFINED (TREE_TYPE (@0)))))
    (scmp @0 @1)))
  (simplify
   (cmp (negate @0) CONSTANT_CLASS_P@1)
   (if (FLOAT_TYPE_P (TREE_TYPE (@0))
        || (ANY_INTEGRAL_TYPE_P (TREE_TYPE (@0))
-	   && TYPE_OVERFLOW_UNDEFINED (TREE_TYPE (@0))))
+	   && (cmp == EQ_EXPR
+	       || cmp == NE_EXPR
+	       || TYPE_OVERFLOW_UNDEFINED (TREE_TYPE (@0)))))
    (with { tree tem = const_unop (NEGATE_EXPR, TREE_TYPE (@0), @1); }
     (if (tem && !TREE_OVERFLOW (tem))
      (scmp @0 { tem; }))))))
@@ -6086,8 +6120,8 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
    (cmp @0 (bit_xor @1 (convert @2)))))
 
  (simplify
-  (cmp (convert? addr@0) integer_zerop)
-  (if (tree_single_nonzero_warnv_p (@0, NULL))
+  (cmp (nop_convert? @0) integer_zerop)
+  (if (tree_expr_nonzero_p (@0))
    { constant_boolean_node (cmp == NE_EXPR, type); }))
 
  /* (X & C) op (Y & C) into (X ^ Y) & C op 0.  */
@@ -6375,6 +6409,17 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
 	  (ge (view_convert:st @0) { build_zero_cst (st); }))
 	 (if (cmp == GT_EXPR)
 	  (lt (view_convert:st @0) { build_zero_cst (st); })))))))))))
+
+/* unsigned < (typeof unsigned)(unsigned != 0) is always false.  */
+(simplify
+ (lt:c @0 (convert (ne @0 integer_zerop)))
+ (if (TYPE_UNSIGNED (TREE_TYPE (@0)))
+  { constant_boolean_node (false, type); }))
+
+/* x != (typeof x)(x == 0) is always true.  */
+(simplify
+ (ne:c @0 (convert (eq @0 integer_zerop)))
+ { constant_boolean_node (true, type); })
 
 (for cmp (unordered ordered unlt unle ungt unge uneq ltgt)
  /* If the second operand is NaN, the result is constant.  */

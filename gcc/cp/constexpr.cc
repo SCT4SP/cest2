@@ -2897,7 +2897,7 @@ cxx_eval_call_expression (const constexpr_ctx *ctx, tree t,
 
   /* We can't defer instantiating the function any longer.  */
   if (!DECL_INITIAL (fun)
-      && DECL_TEMPLOID_INSTANTIATION (fun)
+      && (DECL_TEMPLOID_INSTANTIATION (fun) || DECL_DEFAULTED_FN (fun))
       && !uid_sensitive_constexpr_evaluation_p ())
     {
       location_t save_loc = input_location;
@@ -2905,7 +2905,10 @@ cxx_eval_call_expression (const constexpr_ctx *ctx, tree t,
       ++function_depth;
       if (ctx->manifestly_const_eval == mce_true)
 	FNDECL_MANIFESTLY_CONST_EVALUATED (fun) = true;
-      instantiate_decl (fun, /*defer_ok*/false, /*expl_inst*/false);
+      if (DECL_TEMPLOID_INSTANTIATION (fun))
+	instantiate_decl (fun, /*defer_ok*/false, /*expl_inst*/false);
+      else
+	synthesize_method (fun);
       --function_depth;
       input_location = save_loc;
     }
@@ -5240,12 +5243,12 @@ cxx_eval_vec_init_1 (const constexpr_ctx *ctx, tree atype, tree init,
       else
 	{
 	  /* Copying an element.  */
-	  gcc_assert (same_type_ignoring_top_level_qualifiers_p
-		      (atype, TREE_TYPE (init)));
 	  eltinit = cp_build_array_ref (input_location, init, idx, complain);
 	  if (!lvalue_p (init))
 	    eltinit = move (eltinit);
-	  eltinit = force_rvalue (eltinit, complain);
+	  eltinit = (perform_implicit_conversion_flags
+		     (elttype, eltinit, complain,
+		      LOOKUP_IMPLICIT|LOOKUP_NO_NARROWING));
 	  eltinit = cxx_eval_constant_expression (&new_ctx, eltinit, lval,
 						  non_constant_p, overflow_p);
 	}
@@ -8110,11 +8113,14 @@ instantiate_cx_fn_r (tree *tp, int *walk_subtrees, void */*data*/)
       && DECL_DECLARED_CONSTEXPR_P (*tp)
       && !DECL_INITIAL (*tp)
       && !trivial_fn_p (*tp)
-      && DECL_TEMPLOID_INSTANTIATION (*tp)
+      && (DECL_TEMPLOID_INSTANTIATION (*tp) || DECL_DEFAULTED_FN (*tp))
       && !uid_sensitive_constexpr_evaluation_p ())
     {
       ++function_depth;
-      instantiate_decl (*tp, /*defer_ok*/false, /*expl_inst*/false);
+      if (DECL_TEMPLOID_INSTANTIATION (*tp))
+	instantiate_decl (*tp, /*defer_ok*/false, /*expl_inst*/false);
+      else
+	synthesize_method (*tp);
       --function_depth;
     }
   else if (TREE_CODE (*tp) == CALL_EXPR

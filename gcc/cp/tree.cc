@@ -522,6 +522,7 @@ build_target_expr (tree decl, tree value, tsubst_flags_t complain)
   if (CP_TYPE_CONST_NON_VOLATILE_P (type)
       && !TYPE_HAS_NONTRIVIAL_DESTRUCTOR (type)
       && !VOID_TYPE_P (TREE_TYPE (value))
+      && !TYPE_HAS_MUTABLE_P (type)
       && reduced_constant_expression_p (value))
     TREE_READONLY (decl) = true;
 
@@ -785,8 +786,6 @@ build_vec_init_elt (tree type, tree init, tsubst_flags_t complain)
   releasing_vec argvec;
   if (init && !BRACE_ENCLOSED_INITIALIZER_P (init))
     {
-      gcc_assert (same_type_ignoring_top_level_qualifiers_p
-		  (type, TREE_TYPE (init)));
       tree init_type = strip_array_types (TREE_TYPE (init));
       tree dummy = build_dummy_object (init_type);
       if (!lvalue_p (init))

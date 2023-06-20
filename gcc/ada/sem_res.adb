@@ -3914,9 +3914,10 @@ package body Sem_Res is
                                                   Obj_Ref       => N,
                                                   Check_Actuals => True)
                   then
+                     Error_Msg_Code := GEC_Volatile_Non_Interfering_Context;
                      Error_Msg_N
-                       ("volatile object cannot appear in this context"
-                        & " (SPARK RM 7.1.3(10))", N);
+                       ("volatile object cannot appear in this context '[[]']",
+                        N);
                   end if;
 
                   return Skip;
@@ -7290,10 +7291,19 @@ package body Sem_Res is
                Cannot_Inline
                  ("cannot inline & (in default expression)?", N, Nam_UA);
 
-            --  Calls cannot be inlined inside quantified expressions, which
-            --  are left in expression form for GNATprove. Since these
-            --  expressions are only preanalyzed, we need to detect the failure
-            --  to inline outside of the case for Full_Analysis below.
+            --  Calls cannot be inlined inside potentially unevaluated
+            --  expressions, as this would create complex actions inside
+            --  expressions, that are not handled by GNATprove.
+
+            elsif Is_Potentially_Unevaluated (N) then
+               Cannot_Inline
+                  ("cannot inline & (in potentially unevaluated context)?",
+                   N, Nam_UA);
+
+            --  Calls are not inlined inside the loop_parameter_specification
+            --  or iterator_specification of the quantified expression, as they
+            --  are only preanalyzed. Calls in the predicate part are handled
+            --  by the previous test on potentially unevaluated expressions.
 
             elsif In_Quantified_Expression (N) then
                Cannot_Inline
@@ -7364,15 +7374,6 @@ package body Sem_Res is
 
                elsif No (Body_To_Inline (Nam_Decl)) then
                   null;
-
-               --  Calls cannot be inlined inside potentially unevaluated
-               --  expressions, as this would create complex actions inside
-               --  expressions, that are not handled by GNATprove.
-
-               elsif Is_Potentially_Unevaluated (N) then
-                  Cannot_Inline
-                    ("cannot inline & (in potentially unevaluated context)?",
-                     N, Nam_UA);
 
                --  Calls cannot be inlined inside the conditions of while
                --  loops, as this would create complex actions inside
@@ -8112,9 +8113,9 @@ package body Sem_Res is
               and then
                 not Is_OK_Volatile_Context (Par, N, Check_Actuals => False)
             then
+               Error_Msg_Code := GEC_Volatile_Non_Interfering_Context;
                SPARK_Msg_N
-                 ("volatile object cannot appear in this context "
-                  & "(SPARK RM 7.1.3(10))", N);
+                 ("volatile object cannot appear in this context '[[]']", N);
             end if;
 
             --  Parameters of modes OUT or IN OUT of the subprogram shall not
@@ -8125,7 +8126,7 @@ package body Sem_Res is
             --  data from the object.
 
             if Ekind (E) in E_Out_Parameter | E_In_Out_Parameter
-              and then Scope (E) = Current_Scope
+              and then Scope (E) = Current_Scope_No_Loops
               and then Within_Exceptional_Cases_Consequence (N)
               and then not In_Attribute_Old (N)
               and then not (Nkind (Parent (N)) = N_Attribute_Reference
@@ -8133,7 +8134,8 @@ package body Sem_Res is
                             Attribute_Name (Parent (N)) in Name_Constrained
                                                          | Name_First
                                                          | Name_Last
-                                                         | Name_Length)
+                                                         | Name_Length
+                                                         | Name_Range)
               and then not Is_By_Reference_Type (Etype (E))
               and then not Is_Aliased (E)
             then
@@ -9610,17 +9612,6 @@ package body Sem_Res is
       Desig_Typ : Entity_Id;
 
    begin
-      --  In an instance the proper view may not always be correct for
-      --  private types, see e.g. Sem_Type.Covers for similar handling.
-
-      if Is_Private_Type (Etype (P))
-        and then Present (Full_View (Etype (P)))
-        and then Is_Access_Type (Full_View (Etype (P)))
-        and then In_Instance
-      then
-         Set_Etype (P, Full_View (Etype (P)));
-      end if;
-
       if Is_Access_Type (Etype (P)) then
          Desig_Typ := Implicitly_Designated_Type (Etype (P));
          Insert_Explicit_Dereference (P);

@@ -1760,6 +1760,10 @@ static const struct attribute_spec rs6000_attribute_table[] =
 
 #undef TARGET_UPDATE_IPA_FN_TARGET_INFO
 #define TARGET_UPDATE_IPA_FN_TARGET_INFO rs6000_update_ipa_fn_target_info
+
+#undef TARGET_CONST_ANCHOR
+#define TARGET_CONST_ANCHOR 0x8000
+
 
 
 /* Processor table.  */
@@ -17322,7 +17326,7 @@ output_toc (FILE *file, rtx x, int labelno, machine_mode mode)
       if (DECIMAL_FLOAT_MODE_P (GET_MODE (x)))
 	REAL_VALUE_TO_TARGET_DECIMAL128 (*CONST_DOUBLE_REAL_VALUE (x), k);
       else
-	REAL_VALUE_TO_TARGET_LONG_DOUBLE (*CONST_DOUBLE_REAL_VALUE (x), k);
+	real_to_target (k, CONST_DOUBLE_REAL_VALUE (x), GET_MODE (x));
 
       if (TARGET_64BIT)
 	{

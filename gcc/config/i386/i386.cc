@@ -5358,19 +5358,19 @@ standard_sse_constant_opcode (rtx_insn *insn, rtx *operands)
       if (GET_MODE_SIZE (mode) == 64)
 	{
 	  gcc_assert (TARGET_AVX512F);
-	  return "vpcmpeqd \t %t0, %t0, %t0";
+	  return "vpcmpeqd\t%t0, %t0, %t0";
 	}
       else if (GET_MODE_SIZE (mode) == 32)
 	{
 	  gcc_assert (TARGET_AVX);
-	  return "vpcmpeqd \t %x0, %x0, %x0";
+	  return "vpcmpeqd\t%x0, %x0, %x0";
 	}
       gcc_unreachable ();
     }
   else if (vector_all_ones_zero_extend_quarter_operand (x, mode))
     {
       gcc_assert (TARGET_AVX512F);
-      return "vpcmpeqd \t %x0, %x0, %x0";
+      return "vpcmpeqd\t%x0, %x0, %x0";
     }
 
   gcc_unreachable ();
@@ -15954,6 +15954,17 @@ ix86_cc_mode (enum rtx_code code, rtx op0, rtx op1)
 	       && REGNO (XEXP (op1, 0)) == FLAGS_REG
 	       && XEXP (op1, 1) == const0_rtx)
 	return CCCmode;
+      /* Similarly for *x86_cmc pattern.
+	 Match LTU of op0 (neg:QI (ltu:QI (reg:CCC FLAGS_REG) (const_int 0)))
+	 and op1 (geu:QI (reg:CCC FLAGS_REG) (const_int 0)).
+	 It is sufficient to test that the operand modes are CCCmode.  */
+      else if (code == LTU
+	       && GET_CODE (op0) == NEG
+	       && GET_CODE (XEXP (op0, 0)) == LTU
+	       && GET_MODE (XEXP (XEXP (op0, 0), 0)) == CCCmode
+	       && GET_CODE (op1) == GEU
+	       && GET_MODE (XEXP (op1, 0)) == CCCmode)
+	return CCCmode;
       else
 	return CCmode;
     case GTU:			/* CF=0 & ZF=0 */
@@ -18433,6 +18444,7 @@ bool
 ix86_gimple_fold_builtin (gimple_stmt_iterator *gsi)
 {
   gimple *stmt = gsi_stmt (*gsi), *g;
+  gimple_seq stmts = NULL;
   tree fndecl = gimple_call_fndecl (stmt);
   gcc_checking_assert (fndecl && fndecl_built_in_p (fndecl, BUILT_IN_MD));
   int n_args = gimple_call_num_args (stmt);
@@ -18555,14 +18567,15 @@ ix86_gimple_fold_builtin (gimple_stmt_iterator *gsi)
 	{
 	  loc = gimple_location (stmt);
 	  tree type = TREE_TYPE (arg2);
-	  gimple_seq stmts = NULL;
 	  if (VECTOR_FLOAT_TYPE_P (type))
 	    {
 	      tree itype = GET_MODE_INNER (TYPE_MODE (type)) == E_SFmode
 		? intSI_type_node : intDI_type_node;
 	      type = get_same_sized_vectype (itype, type);
-	      arg2 = gimple_build (&stmts, VIEW_CONVERT_EXPR, type, arg2);
 	    }
+	  else
+	    type = signed_type_for (type);
+	  arg2 = gimple_build (&stmts, VIEW_CONVERT_EXPR, type, arg2);
 	  tree zero_vec = build_zero_cst (type);
 	  tree cmp_type = truth_type_for (type);
 	  tree cmp = gimple_build (&stmts, LT_EXPR, cmp_type, arg2, zero_vec);
@@ -18610,7 +18623,6 @@ ix86_gimple_fold_builtin (gimple_stmt_iterator *gsi)
 	  tree zero_vec = build_zero_cst (type);
 	  tree minus_one_vec = build_minus_one_cst (type);
 	  tree cmp_type = truth_type_for (type);
-	  gimple_seq stmts = NULL;
 	  tree cmp = gimple_build (&stmts, tcode, cmp_type, arg0, arg1);
 	  gsi_insert_seq_before (gsi, stmts, GSI_SAME_STMT);
 	  g = gimple_build_assign (gimple_call_lhs (stmt),
@@ -18904,14 +18916,18 @@ ix86_gimple_fold_builtin (gimple_stmt_iterator *gsi)
       break;
 
     case IX86_BUILTIN_PABSB:
+    case IX86_BUILTIN_PABSW:
+    case IX86_BUILTIN_PABSD:
+      /* 64-bit vector abs<mode>2 is only supported under TARGET_MMX_WITH_SSE.  */
+      if (!TARGET_MMX_WITH_SSE)
+	break;
+      /* FALLTHRU.  */
     case IX86_BUILTIN_PABSB128:
     case IX86_BUILTIN_PABSB256:
     case IX86_BUILTIN_PABSB512:
-    case IX86_BUILTIN_PABSW:
     case IX86_BUILTIN_PABSW128:
     case IX86_BUILTIN_PABSW256:
     case IX86_BUILTIN_PABSW512:
-    case IX86_BUILTIN_PABSD:
     case IX86_BUILTIN_PABSD128:
     case IX86_BUILTIN_PABSD256:
     case IX86_BUILTIN_PABSD512:
@@ -18933,9 +18949,19 @@ ix86_gimple_fold_builtin (gimple_stmt_iterator *gsi)
       if (n_args > 1
 	  && !ix86_masked_all_ones (elems, gimple_call_arg (stmt, n_args - 1)))
 	break;
-      loc = gimple_location (stmt);
-      g = gimple_build_assign (gimple_call_lhs (stmt), ABS_EXPR, arg0);
-      gsi_replace (gsi, g, false);
+      {
+	tree utype, ures, vce;
+	utype = unsigned_type_for (TREE_TYPE (arg0));
+	/* PABSB/W/D/Q store the unsigned result in dst, use ABSU_EXPR
+	   instead of ABS_EXPR to hanlde overflow case(TYPE_MIN).  */
+	ures = gimple_build (&stmts, ABSU_EXPR, utype, arg0);
+	gsi_insert_seq_before (gsi, stmts, GSI_SAME_STMT);
+	loc = gimple_location (stmt);
+	vce = build1 (VIEW_CONVERT_EXPR, TREE_TYPE (arg0), ures);
+	g = gimple_build_assign (gimple_call_lhs (stmt),
+				 VIEW_CONVERT_EXPR, vce);
+	gsi_replace (gsi, g, false);
+      }
       return true;
 
     default:
@@ -21303,6 +21329,31 @@ ix86_rtx_costs (rtx x, machine_mode mode, int outer_code_i, int opno,
 	{
 	  /* This is *setcc_qi_addqi3_cconly_overflow_1_* patterns, a nop.  */
 	  *total = 0;
+	  return true;
+	}
+      /* Match x
+	 (compare:CCC (neg:QI (ltu:QI (reg:CCC FLAGS_REG) (const_int 0)))
+		      (geu:QI (reg:CCC FLAGS_REG) (const_int 0)))  */
+      if (mode == CCCmode
+	  && GET_CODE (op0) == NEG
+	  && GET_CODE (XEXP (op0, 0)) == LTU
+	  && REG_P (XEXP (XEXP (op0, 0), 0))
+	  && GET_MODE (XEXP (XEXP (op0, 0), 0)) == CCCmode
+	  && REGNO (XEXP (XEXP (op0, 0), 0)) == FLAGS_REG
+	  && XEXP (XEXP (op0, 0), 1) == const0_rtx
+	  && GET_CODE (op1) == GEU
+	  && REG_P (XEXP (op1, 0))
+	  && GET_MODE (XEXP (op1, 0)) == CCCmode
+	  && REGNO (XEXP (op1, 0)) == FLAGS_REG
+	  && XEXP (op1, 1) == const0_rtx)
+	{
+	  /* This is *x86_cmc.  */
+	  if (!speed)
+	    *total = COSTS_N_BYTES (1);
+	  else if (TARGET_SLOW_STC)
+	    *total = COSTS_N_INSNS (2);
+	  else 
+	    *total = COSTS_N_INSNS (1);
 	  return true;
 	}
 

@@ -1308,7 +1308,14 @@ enum gfc_omp_map_op
   OMP_MAP_RELEASE,
   OMP_MAP_ALWAYS_TO,
   OMP_MAP_ALWAYS_FROM,
-  OMP_MAP_ALWAYS_TOFROM
+  OMP_MAP_ALWAYS_TOFROM,
+  OMP_MAP_PRESENT_ALLOC,
+  OMP_MAP_PRESENT_TO,
+  OMP_MAP_PRESENT_FROM,
+  OMP_MAP_PRESENT_TOFROM,
+  OMP_MAP_ALWAYS_PRESENT_TO,
+  OMP_MAP_ALWAYS_PRESENT_FROM,
+  OMP_MAP_ALWAYS_PRESENT_TOFROM
 };
 
 enum gfc_omp_defaultmap
@@ -1362,6 +1369,7 @@ typedef struct gfc_omp_namelist
 	} linear;
       struct gfc_common_head *common;
       bool lastprivate_conditional;
+      bool present_modifier;
     } u;
   union
     {
@@ -2913,9 +2921,6 @@ typedef struct gfc_association_list
      happen for SELECT TYPE temporaries and must be considered
      for memory handling.  */
   unsigned dangling:1;
-
-  /* True when the rank of the target expression is guessed during parsing.  */
-  unsigned rankguessed:1;
 
   char name[GFC_MAX_SYMBOL_LEN + 1];
   gfc_symtree *st; /* Symtree corresponding to name.  */

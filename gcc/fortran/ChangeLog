@@ -1,3 +1,76 @@
+2023-06-19  Tobias Burnus  <tobias@codesourcery.com>
+
+	* intrinsic.texi (OpenMP Modules OMP_LIB and OMP_LIB_KINDS): Also
+	add references to the OpenMP 5.1 and 5.2 spec; add omp_initial_device
+	and omp_invalid_device named constants.
+
+2023-06-13  Harald Anlauf  <anlauf@gmx.de>
+	    Mikael Morin  <mikael@gcc.gnu.org>
+
+	PR fortran/86277
+	* trans-array.cc (gfc_trans_allocate_array_storage): When passing a
+	zero-sized array with fixed (= non-dynamic) size, allocate temporary
+	by the caller, not by the callee.
+
+2023-06-10  Francois-Xavier Coudert  <fxcoudert@gcc.gnu.org>
+
+	* f95-lang.cc (gfc_init_builtin_functions): Add fmax() and
+	fmin() built-ins, and their variants.
+	* mathbuiltins.def: Add FMAX and FMIN built-ins.
+	* trans-intrinsic.cc (conv_intrinsic_ieee_minmax): New function.
+	(gfc_conv_ieee_arithmetic_function): Handle IEEE_MIN_NUM and
+	IEEE_MAX_NUM functions.
+
+2023-06-09  Jakub Jelinek  <jakub@redhat.com>
+
+	PR fortran/96024
+	* primary.cc (gfc_convert_to_structure_constructor): Only do
+	constant string ctor length verification and truncation/padding
+	if constant length has INTEGER type.
+
+2023-06-08  Paul Thomas  <pault@gcc.gnu.org>
+
+	PR fortran/87477
+	PR fortran/99350
+	PR fortran/107821
+	PR fortran/109451
+	* decl.cc (char_len_param_value): Simplify a copy of the expr
+	and replace the original if there is no error.
+	* gfortran.h : Remove the redundant field 'rankguessed' from
+	'gfc_association_list'.
+	* resolve.cc (resolve_assoc_var): Remove refs to 'rankguessed'.
+	(resolve_variable): Associate names with constant or structure
+	constructor targets cannot have array refs.
+	* trans-array.cc (gfc_conv_expr_descriptor): Guard expression
+	character length backend decl before using it. Suppress the
+	assignment if lhs equals rhs.
+	* trans-io.cc (gfc_trans_transfer): Scalarize transfer of
+	associate variables pointing to a variable. Add comment.
+	* trans-stmt.cc (trans_associate_var): Remove requirement that
+	the character length be deferred before assigning the value
+	returned by gfc_conv_expr_descriptor. Also, guard the backend
+	decl before testing with VAR_P.
+
+2023-06-06  Kwok Cheung Yeung  <kcy@codesourcery.com>
+	    Tobias Burnus  <tobias@codesourcery.com>
+
+	* dump-parse-tree.cc (show_omp_namelist): Display 'present' map
+	modifier.
+	(show_omp_clauses): Display 'present' motion modifier for 'to'
+	and 'from' clauses.
+	* gfortran.h (enum gfc_omp_map_op): Add entries with 'present'
+	modifiers.
+	(struct gfc_omp_namelist): Add 'present_modifer'.
+	* openmp.cc (gfc_match_motion_var_list): New, handles optional
+	'present' modifier for to/from clauses.
+	(gfc_match_omp_clauses): Call it for to/from clauses; parse 'present'
+	in defaultmap and map clauses.
+	(resolve_omp_clauses): Allow 'present' modifiers on 'target',
+	'target data', 'target enter' and 'target exit'	directives.
+	* trans-openmp.cc (gfc_trans_omp_clauses): Apply 'present' modifiers
+	to tree node for 'map', 'to' and 'from'	clauses.  Apply 'present' for
+	defaultmap.
+
 2023-06-02  Steve Kargl  <kargl@gcc.gnu.org>
 
 	PR fortran/100607

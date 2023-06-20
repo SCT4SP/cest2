@@ -50,12 +50,14 @@ along with GCC; see the file COPYING3.  If not see
    - mask_load_lanes: currently just vec_mask_load_lanes
    - gather_load: used for {mask_,}gather_load
    - len_load: currently just len_load
+   - len_maskload: currently just len_maskload
 
    - mask_store: currently just maskstore
    - store_lanes: currently just vec_store_lanes
    - mask_store_lanes: currently just vec_mask_store_lanes
    - scatter_store: used for {mask_,}scatter_store
    - len_store: currently just len_store
+   - len_maskstore: currently just len_maskstore
 
    - unary: a normal unary optab, such as vec_reverse_<mode>
    - binary: a normal binary optab, such as vec_interleave_lo_<mode>
@@ -157,6 +159,7 @@ DEF_INTERNAL_OPTAB_FN (MASK_GATHER_LOAD, ECF_PURE,
 		       mask_gather_load, gather_load)
 
 DEF_INTERNAL_OPTAB_FN (LEN_LOAD, ECF_PURE, len_load, len_load)
+DEF_INTERNAL_OPTAB_FN (LEN_MASK_LOAD, ECF_PURE, len_maskload, len_maskload)
 
 DEF_INTERNAL_OPTAB_FN (SCATTER_STORE, 0, scatter_store, scatter_store)
 DEF_INTERNAL_OPTAB_FN (MASK_SCATTER_STORE, 0,
@@ -175,8 +178,10 @@ DEF_INTERNAL_OPTAB_FN (VCOND_MASK, 0, vcond_mask, vec_cond_mask)
 DEF_INTERNAL_OPTAB_FN (VEC_SET, 0, vec_set, vec_set)
 
 DEF_INTERNAL_OPTAB_FN (LEN_STORE, 0, len_store, len_store)
+DEF_INTERNAL_OPTAB_FN (LEN_MASK_STORE, 0, len_maskstore, len_maskstore)
 
 DEF_INTERNAL_OPTAB_FN (WHILE_ULT, ECF_CONST | ECF_NOTHROW, while_ult, while)
+DEF_INTERNAL_OPTAB_FN (SELECT_VL, ECF_CONST | ECF_NOTHROW, select_vl, binary)
 DEF_INTERNAL_OPTAB_FN (CHECK_RAW_PTRS, ECF_CONST | ECF_NOTHROW,
 		       check_raw_ptrs, check_ptrs)
 DEF_INTERNAL_OPTAB_FN (CHECK_WAR_PTRS, ECF_CONST | ECF_NOTHROW,
@@ -190,6 +195,9 @@ DEF_INTERNAL_OPTAB_FN (DIV_POW2, ECF_CONST | ECF_NOTHROW, sdiv_pow2, binary)
 DEF_INTERNAL_OPTAB_FN (FMS, ECF_CONST, fms, ternary)
 DEF_INTERNAL_OPTAB_FN (FNMA, ECF_CONST, fnma, ternary)
 DEF_INTERNAL_OPTAB_FN (FNMS, ECF_CONST, fnms, ternary)
+
+DEF_INTERNAL_SIGNED_OPTAB_FN (ABD, ECF_CONST | ECF_NOTHROW, first,
+			      sabd, uabd, binary)
 
 DEF_INTERNAL_SIGNED_OPTAB_FN (AVG_FLOOR, ECF_CONST | ECF_NOTHROW, first,
 			      savg_floor, uavg_floor, binary)
@@ -415,6 +423,8 @@ DEF_INTERNAL_FN (ASAN_POISON_USE, ECF_LEAF | ECF_NOTHROW | ECF_NOVOPS, NULL)
 DEF_INTERNAL_FN (ADD_OVERFLOW, ECF_CONST | ECF_LEAF | ECF_NOTHROW, NULL)
 DEF_INTERNAL_FN (SUB_OVERFLOW, ECF_CONST | ECF_LEAF | ECF_NOTHROW, NULL)
 DEF_INTERNAL_FN (MUL_OVERFLOW, ECF_CONST | ECF_LEAF | ECF_NOTHROW, NULL)
+DEF_INTERNAL_FN (UADDC, ECF_CONST | ECF_LEAF | ECF_NOTHROW, NULL)
+DEF_INTERNAL_FN (USUBC, ECF_CONST | ECF_LEAF | ECF_NOTHROW, NULL)
 DEF_INTERNAL_FN (TSAN_FUNC_EXIT, ECF_NOVOPS | ECF_LEAF | ECF_NOTHROW, NULL)
 DEF_INTERNAL_FN (VA_ARG, ECF_NOTHROW | ECF_LEAF, NULL)
 DEF_INTERNAL_FN (VEC_CONVERT, ECF_CONST | ECF_LEAF | ECF_NOTHROW, NULL)

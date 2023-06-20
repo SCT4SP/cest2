@@ -9918,16 +9918,27 @@ lookup_template_class (tree d1, tree arglist, tree in_decl, tree context,
 	 template.  */
 
       /* Shortcut looking up the current class scope again.  */
-      if (current_class_type)
-	if (tree ti = CLASSTYPE_TEMPLATE_INFO (current_class_type))
+      for (tree cur = current_nonlambda_class_type ();
+	   cur != NULL_TREE;
+	   cur = get_containing_scope (cur))
+	{
+	  if (!CLASS_TYPE_P (cur))
+	    continue;
+
+	  tree ti = CLASSTYPE_TEMPLATE_INFO (cur);
+	  if (!ti || arg_depth > TMPL_ARGS_DEPTH (TI_ARGS (ti)))
+	    break;
+
 	  if (gen_tmpl == most_general_template (TI_TEMPLATE (ti))
 	      && comp_template_args (arglist, TI_ARGS (ti)))
-	    return current_class_type;
+	    return cur;
+	}
 
       /* Calculate the BOUND_ARGS.  These will be the args that are
 	 actually tsubst'd into the definition to create the
 	 instantiation.  */
-      arglist = coerce_template_parms (parmlist, arglist, gen_tmpl, complain);
+      if (PRIMARY_TEMPLATE_P (gen_tmpl))
+	arglist = coerce_template_parms (parmlist, arglist, gen_tmpl, complain);
 
       if (arglist == error_mark_node)
 	/* We were unable to bind the arguments.  */
@@ -22725,10 +22736,16 @@ maybe_adjust_types_for_deduction (tree tparms,
       break;
 
     case DEDUCE_CONV:
+      /* [temp.deduct.conv] First remove a reference type on parm.
+	 DRs 322 & 976 affected this.  */
+      if (TYPE_REF_P (*parm))
+	*parm = TREE_TYPE (*parm);
+
       /* Swap PARM and ARG throughout the remainder of this
 	 function; the handling is precisely symmetric since PARM
 	 will initialize ARG rather than vice versa.  */
       std::swap (parm, arg);
+
       break;
 
     case DEDUCE_EXACT:
@@ -22794,11 +22811,6 @@ maybe_adjust_types_for_deduction (tree tparms,
       *parm = TREE_TYPE (*parm);
       result |= UNIFY_ALLOW_OUTER_MORE_CV_QUAL;
     }
-
-  /* DR 322. For conversion deduction, remove a reference type on parm
-     too (which has been swapped into ARG).  */
-  if (strict == DEDUCE_CONV && TYPE_REF_P (*arg))
-    *arg = TREE_TYPE (*arg);
 
   return result;
 }

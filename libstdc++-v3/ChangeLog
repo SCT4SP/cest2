@@ -1,3 +1,270 @@
+2023-06-16  Alexandre Oliva  <oliva@adacore.com>
+
+	* testsuite/20_util/from_chars/4.cc: Skip long double on
+	aarch64-rtems.
+
+2023-06-16  Joel Brobecker  <brobecker@adacore.com>
+
+	* configure.ac ["x${with_newlib}" = "xyes"]: Define
+	HAVE_HYPOTF.  Add compile-checks for various long double
+	math functions as well.
+	* configure: Regenerate.
+
+2023-06-14  Jonny Grant  <jg@jguk.org>
+
+	* doc/xml/manual/extensions.xml: Remove demangle exception
+	description and include.
+	* doc/html/manual/ext_demangling.html: Regenerate.
+
+2023-06-10  Hans-Peter Nilsson  <hp@axis.com>
+
+	* testsuite/27_io/basic_istream/ignore/wchar_t/94749.cc (main)
+	[! SIMULATOR_TEST]: Also exclude running test05.
+	* testsuite/27_io/basic_istream/ignore/char/94749.cc: Ditto.
+
+2023-06-09  Ken Matsui  <kmatsui@cs.washington.edu>
+
+	* include/std/type_traits: Use using instead of typedef
+
+2023-06-09  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/110077
+	* src/c++17/floating_from_chars.cc (from_chars) <_Float128>:
+	Only define if _Float128 and long double have different
+	representations.
+
+2023-06-09  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/100285
+	* include/experimental/internet [IPPROTO_TCP || IPPROTO_UDP]
+	(basic_endpoint, basic_resolver_entry, resolver_base)
+	(basic_resolver_results, basic_resolver): Only define if the tcp
+	or udp protocols will be defined.
+
+2023-06-09  Jonathan Wakely  <jwakely@redhat.com>
+
+	* acinclude.m4 (libtool_VERSION): Update to 6.0.33.
+	* configure: Regenerate.
+	* doc/xml/manual/abi.xml: Add libstdc++.so.6.0.33.
+	* doc/html/manual/abi.html: Regenerate.
+
+2023-06-09  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/110149
+	* include/std/format (formatter<const void*, charT>::parse):
+	Only alow 0 and P for C++26 and non-strict modes.
+	(formatter<const void*, charT>::format): Use toupper for P
+	type, and insert zero-fill characters for 0 option.
+	* testsuite/std/format/functions/format.cc: Check pointer
+	formatting. Only check P2510R3 extensions conditionally.
+	* testsuite/std/format/parse_ctx.cc: Only check P2510R3
+	extensions conditionally.
+
+2023-06-09  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/110167
+	* include/std/array (to_array): Initialize arrays of trivial
+	types using memcpy. For non-trivial types, use lambda
+	expressions instead of a separate helper function.
+	(__to_array): Remove.
+	* testsuite/23_containers/array/creation/110167.cc: New test.
+
+2023-06-09  Jonathan Wakely  <jwakely@redhat.com>
+
+	* testsuite/23_containers/deque/modifiers/emplace/52799.cc:
+	Removed.
+	* testsuite/23_containers/deque/modifiers/emplace/const_iterator.cc:
+	Removed.
+	* testsuite/23_containers/list/modifiers/emplace/52799.cc:
+	Removed.
+	* testsuite/23_containers/list/modifiers/emplace/const_iterator.cc:
+	Removed.
+	* testsuite/23_containers/vector/modifiers/emplace/52799.cc:
+	Removed.
+	* testsuite/23_containers/vector/modifiers/emplace/const_iterator.cc:
+	Removed.
+	* testsuite/23_containers/deque/modifiers/emplace/1.cc: New
+	test.
+	* testsuite/23_containers/list/modifiers/emplace/1.cc: New
+	test.
+	* testsuite/23_containers/vector/modifiers/emplace/1.cc: New
+	test.
+
+2023-06-07  Jakub Jelinek  <jakub@redhat.com>
+
+	PR libstdc++/110145
+	* testsuite/20_util/to_chars/double.cc: Include <cfloat>.
+	(double_to_chars_test_cases,
+	double_scientific_precision_to_chars_test_cases_2,
+	double_fixed_precision_to_chars_test_cases_2): #if out 1e126, 4.91e-6
+	and 5.547e-6 tests if FLT_EVAL_METHOD is negative or larger than 1.
+	Add unconditional tests with corresponding double constants
+	0x1.7a2ecc414a03fp+418, 0x1.4981285e98e79p-18 and
+	0x1.7440bbff418b9p-18.
+
+2023-06-07  Jonathan Wakely  <jwakely@redhat.com>
+
+	* testsuite/util/testsuite_abi.cc (check_version): Re-add
+	CXXABI_1.3.14.
+
+2023-06-07  Jonathan Wakely  <jwakely@redhat.com>
+
+	* testsuite/18_support/nested_exception/rethrow_if_nested-term.cc:
+	Require effective target exceptions_enabled instead of using
+	dg-skip-if.
+	* testsuite/23_containers/vector/capacity/constexpr.cc: Expect
+	shrink_to_fit() to be a no-op without exceptions enabled.
+	* testsuite/23_containers/vector/capacity/shrink_to_fit.cc:
+	Likewise.
+	* testsuite/ext/bitmap_allocator/check_allocate_max_size.cc:
+	Require effective target exceptions_enabled.
+	* testsuite/ext/malloc_allocator/check_allocate_max_size.cc:
+	Likewise.
+	* testsuite/ext/mt_allocator/check_allocate_max_size.cc:
+	Likewise.
+	* testsuite/ext/new_allocator/check_allocate_max_size.cc:
+	Likewise.
+	* testsuite/ext/pool_allocator/check_allocate_max_size.cc:
+	Likewise.
+	* testsuite/ext/throw_allocator/check_allocate_max_size.cc:
+	Likewise.
+
+2023-06-07  Jonathan Wakely  <jwakely@redhat.com>
+
+	* testsuite/20_util/duration/cons/2.cc: Use values that aren't
+	affected by rounding.
+	* testsuite/20_util/from_chars/5.cc: Cast arithmetic result to
+	double before comparing for equality.
+	* testsuite/20_util/from_chars/6.cc: Likewise.
+	* testsuite/20_util/variant/86874.cc: Use values that aren't
+	affected by rounding.
+	* testsuite/25_algorithms/lower_bound/partitioned.cc: Compare to
+	original value instead of to floating-point-literal.
+	* testsuite/26_numerics/random/discrete_distribution/cons/range.cc:
+	Cast arithmetic result to double before comparing for equality.
+	* testsuite/26_numerics/random/piecewise_constant_distribution/cons/range.cc:
+	Likewise.
+	* testsuite/26_numerics/random/piecewise_linear_distribution/cons/range.cc:
+	Likewise.
+	* testsuite/26_numerics/valarray/transcend.cc (eq): Check that
+	the absolute difference is less than 0.01 instead of comparing
+	to two decimal places.
+	* testsuite/27_io/basic_istream/extractors_arithmetic/char/01.cc:
+	Cast arithmetic result to double before comparing for equality.
+	* testsuite/27_io/basic_istream/extractors_arithmetic/char/09.cc:
+	Likewise.
+	* testsuite/27_io/basic_istream/extractors_arithmetic/char/10.cc:
+	Likewise.
+	* testsuite/27_io/basic_istream/extractors_arithmetic/wchar_t/01.cc:
+	Likewise.
+	* testsuite/27_io/basic_istream/extractors_arithmetic/wchar_t/09.cc:
+	Likewise.
+	* testsuite/27_io/basic_istream/extractors_arithmetic/wchar_t/10.cc:
+	Likewise.
+	* testsuite/ext/random/hoyt_distribution/cons/parms.cc: Likewise.
+
+2023-06-07  Jonathan Wakely  <jwakely@redhat.com>
+
+	Revert:
+	2023-06-06  Jonathan Wakely  <jwakely@redhat.com>
+
+	* configure.ac: Use AS_IF.
+	* configure: Regenerate.
+
+2023-06-07  Thomas Schwinge  <thomas@codesourcery.com>
+
+	* testsuite/lib/prune.exp (libstdc++-dg-prune): Support
+	'UNSUPPORTED: [...]: exception handling disabled'.
+
+2023-06-06  Jonathan Wakely  <jwakely@redhat.com>
+
+	* testsuite/util/testsuite_abi.cc (check_version): Add
+	CXXABI_1.3.15 symver and make it the latestp. Remove
+	GLIBCXX_IEEE128_3.4.31 and GLIBCXX_LDBL_3.4.31 from latestp.
+
+2023-06-06  Jonathan Wakely  <jwakely@redhat.com>
+	    Jakub Jelinek  <jakub@redhat.com>
+
+	PR libstdc++/104772
+	* include/std/limits: (numeric_limits<__float128>): Define
+	for __STRICT_ANSI__ as well.
+	* testsuite/18_support/numeric_limits/128bit.cc: Remove
+	check for __STRICT_ANSI__.
+
+2023-06-06  Jonathan Wakely  <jwakely@redhat.com>
+
+	* configure.ac: Use AS_IF.
+	* configure: Regenerate.
+
+2023-06-06  Matthias Kretz  <m.kretz@gsi.de>
+
+	PR libstdc++/109822
+	* include/experimental/bits/simd_builtin.h (_S_store): Rewrite
+	to avoid casts to other vector types. Implement store as
+	succession of power-of-2 sized memcpy to avoid PR90424.
+
+2023-06-06  Matthias Kretz  <m.kretz@gsi.de>
+
+	PR libstdc++/110054
+	* include/experimental/bits/simd_builtin.h (_S_masked_store):
+	Call into deduced ABI's SimdImpl after conversion.
+	* include/experimental/bits/simd_x86.h (_S_masked_store_nocvt):
+	Don't use _mm_maskmoveu_si128. Use the generic fall-back
+	implementation. Also fix masked stores without SSE2, which
+	were not doing anything before.
+
+2023-06-06  Matthias Kretz  <m.kretz@gsi.de>
+
+	* include/experimental/bits/simd.h (__bit_cast): Use
+	__gnu__::__vector_size__ instead of gnu::vector_size.
+
+2023-06-06  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/110139
+	* include/std/array (__array_traits<T, 0>::operator T*()): Make
+	conversion operator explicit.
+	(array::front): Use size_type as subscript operand.
+	(array::data): Use static_cast to make conversion explicit.
+	* testsuite/23_containers/array/element_access/110139.cc: New
+	test.
+
+2023-06-06  Joseph Faulls  <Joseph.Faulls@imgtec.com>
+
+	* include/bits/locale_classes.tcc: Remove check for
+	codecvt<char8_t, char, mbstate_t> facet.
+
+2023-06-06  Jonathan Wakely  <jwakely@redhat.com>
+
+	* src/filesystem/ops-common.h (do_copy_file) [O_CLOEXEC]: Set
+	close-on-exec flag on file descriptors.
+
+2023-06-06  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/108178
+	* src/filesystem/ops-common.h (do_copy_file): Check for empty
+	files by trying to read a character.
+	* testsuite/27_io/filesystem/operations/copy_file_108178.cc:
+	New test.
+
+2023-06-06  Jannik Glückert  <jannik.glueckert@gmail.com>
+
+	* acinclude.m4 (_GLIBCXX_USE_COPY_FILE_RANGE): Define.
+	* config.h.in: Regenerate.
+	* configure: Regenerate.
+	* src/filesystem/ops-common.h (copy_file_copy_file_range):
+	Define new function.
+	(do_copy_file): Use it.
+
+2023-06-06  Jannik Glückert  <jannik.glueckert@gmail.com>
+
+	* acinclude.m4 (_GLIBCXX_HAVE_LSEEK): Define.
+	* config.h.in: Regenerate.
+	* configure: Regenerate.
+	* src/filesystem/ops-common.h (copy_file_sendfile): Define new
+	function for sendfile logic. Loop to support large files. Skip
+	zero-length files.
+	(do_copy_file): Use it.
+
 2023-06-04  Jason Merrill  <jason@redhat.com>
 
 	PR c++/97720
