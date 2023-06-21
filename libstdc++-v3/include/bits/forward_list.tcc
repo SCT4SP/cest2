@@ -46,6 +46,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 
   template<typename _Tp, typename _Alloc>
     template<typename... _Args>
+      _GLIBCXX_CEST_CONSTEXPR
       _Fwd_list_node_base*
       _Fwd_list_base<_Tp, _Alloc>::
       _M_insert_after(const_iterator __pos, _Args&&... __args)
@@ -59,6 +60,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
       }
 
   template<typename _Tp, typename _Alloc>
+    _GLIBCXX_CEST_CONSTEXPR
     _Fwd_list_node_base*
     _Fwd_list_base<_Tp, _Alloc>::
     _M_erase_after(_Fwd_list_node_base* __pos)
@@ -73,6 +75,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
     }
 
   template<typename _Tp, typename _Alloc>
+    _GLIBCXX_CEST_CONSTEXPR
     _Fwd_list_node_base*
     _Fwd_list_base<_Tp, _Alloc>::
     _M_erase_after(_Fwd_list_node_base* __pos,
@@ -95,6 +98,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
   // Called by the range constructor to implement [23.3.4.2]/9
   template<typename _Tp, typename _Alloc>
     template<typename _InputIterator>
+      _GLIBCXX_CEST_CONSTEXPR
       void
       forward_list<_Tp, _Alloc>::
       _M_range_initialize(_InputIterator __first, _InputIterator __last)
@@ -109,6 +113,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 
   // Called by forward_list(n,v,a).
   template<typename _Tp, typename _Alloc>
+    _GLIBCXX_CEST_CONSTEXPR
     void
     forward_list<_Tp, _Alloc>::
     _M_fill_initialize(size_type __n, const value_type& __value)
@@ -135,6 +140,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
     }
 
   template<typename _Tp, typename _Alloc>
+    _GLIBCXX_CEST_CONSTEXPR
     forward_list<_Tp, _Alloc>&
     forward_list<_Tp, _Alloc>::
     operator=(const forward_list& __list)
@@ -216,6 +222,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 
   template<typename _Tp, typename _Alloc>
     typename forward_list<_Tp, _Alloc>::iterator
+    _GLIBCXX_CEST_CONSTEXPR
     forward_list<_Tp, _Alloc>::
     _M_splice_after(const_iterator __pos,
 		    const_iterator __before, const_iterator __last)
@@ -251,6 +258,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
     }
 
   template<typename _Tp, typename _Alloc>
+    _GLIBCXX_CEST_CONSTEXPR
     typename forward_list<_Tp, _Alloc>::iterator
     forward_list<_Tp, _Alloc>::
     insert_after(const_iterator __pos, size_type __n, const _Tp& __val)
@@ -266,6 +274,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 
   template<typename _Tp, typename _Alloc>
     template<typename _InputIterator, typename>
+      _GLIBCXX_CEST_CONSTEXPR
       typename forward_list<_Tp, _Alloc>::iterator
       forward_list<_Tp, _Alloc>::
       insert_after(const_iterator __pos,
@@ -389,6 +398,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
       }
 
   template<typename _Tp, typename _Alloc>
+    _GLIBCXX_CEST_CONSTEXPR
     bool
     operator==(const forward_list<_Tp, _Alloc>& __lx,
 	       const forward_list<_Tp, _Alloc>& __ly)

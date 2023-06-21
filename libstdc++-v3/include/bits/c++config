@@ -202,6 +202,15 @@
 # endif
 #endif
 
+// Defined if extra constexpr support is present.
+#define _GLIBCXX_CEST_VERSION 1
+
+#if _GLIBCXX_CEST_VERSION
+# ifndef _GLIBCXX_CEST_CONSTEXPR
+#  define _GLIBCXX_CEST_CONSTEXPR _GLIBCXX23_CONSTEXPR
+# endif
+#endif
+
 #ifndef _GLIBCXX17_INLINE
 # if __cplusplus >= 201703L
 #  define _GLIBCXX17_INLINE inline

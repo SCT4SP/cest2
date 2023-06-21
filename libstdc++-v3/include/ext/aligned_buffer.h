@@ -33,6 +33,9 @@
 
 #if __cplusplus >= 201103L
 # include <type_traits>
+# if _GLIBCXX_CEST_VERSION
+#  include <bits/allocator.h>
+# endif
 #else
 # include <bits/c++0x_warning.h>
 #endif
@@ -77,7 +80,58 @@ namespace __gnu_cxx
       { return static_cast<const _Tp*>(_M_addr()); }
     };
 
-#if _GLIBCXX_INLINE_VERSION
+  // As casts are not permitted from void* to _Tp* during constant evaluation,
+  // this class template emulates the functionality of __aligned_buffer,
+  // by using compile-time dynamic memory allocation via std::allocator.
+  template<typename _Tp>
+    struct __constexpr_buffer
+    : std::aligned_storage<sizeof(_Tp), __alignof__(_Tp)>
+    {
+      _Tp* _M_storage_ptr;
+
+      _GLIBCXX_CEST_CONSTEXPR
+      __constexpr_buffer()
+        : _M_storage_ptr{std::allocator<_Tp>().allocate(1)} { }
+
+      // Can be used to avoid value-initialization
+      _GLIBCXX_CEST_CONSTEXPR
+      __constexpr_buffer(std::nullptr_t) : __constexpr_buffer() {}
+
+      _GLIBCXX_CEST_CONSTEXPR
+      ~__constexpr_buffer()
+      {
+        std::allocator<_Tp>().deallocate(_M_storage_ptr,1);
+      }
+
+      _GLIBCXX_CEST_CONSTEXPR
+      void*
+      _M_addr() noexcept
+      {
+        return static_cast<void*>(_M_storage_ptr);
+      }
+
+      _GLIBCXX_CEST_CONSTEXPR
+      const void*
+      _M_addr() const noexcept
+      {
+        return static_cast<const void*>(_M_storage_ptr);
+      }
+
+      _GLIBCXX_CEST_CONSTEXPR
+      _Tp*
+      _M_ptr() noexcept
+      { return _M_storage_ptr; }
+
+      _GLIBCXX_CEST_CONSTEXPR
+      const _Tp*
+      _M_ptr() const noexcept
+      { return _M_storage_ptr; }
+    };
+
+#if _GLIBCXX_CEST_VERSION
+  template<typename _Tp>
+    using __aligned_buffer = __constexpr_buffer<_Tp>;
+#elif _GLIBCXX_INLINE_VERSION
   template<typename _Tp>
     using __aligned_buffer = __aligned_membuf<_Tp>;
 #else
