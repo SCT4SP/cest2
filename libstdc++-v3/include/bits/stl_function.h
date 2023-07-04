@@ -1158,10 +1158,12 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     struct _Identity
     : public unary_function<_Tp, _Tp>
     {
+      _GLIBCXX_CEST_CONSTEXPR
       _Tp&
       operator()(_Tp& __x) const
       { return __x; }
 
+      _GLIBCXX_CEST_CONSTEXPR
       const _Tp&
       operator()(const _Tp& __x) const
       { return __x; }
@@ -1174,21 +1176,25 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     struct _Select1st
     : public unary_function<_Pair, typename _Pair::first_type>
     {
+      _GLIBCXX_CEST_CONSTEXPR
       typename _Pair::first_type&
       operator()(_Pair& __x) const
       { return __x.first; }
 
+      _GLIBCXX_CEST_CONSTEXPR
       const typename _Pair::first_type&
       operator()(const _Pair& __x) const
       { return __x.first; }
 
 #if __cplusplus >= 201103L
       template<typename _Pair2>
+        _GLIBCXX_CEST_CONSTEXPR
         typename _Pair2::first_type&
         operator()(_Pair2& __x) const
         { return __x.first; }
 
       template<typename _Pair2>
+        _GLIBCXX_CEST_CONSTEXPR
         const typename _Pair2::first_type&
         operator()(const _Pair2& __x) const
         { return __x.first; }
@@ -1199,10 +1205,12 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     struct _Select2nd
     : public unary_function<_Pair, typename _Pair::second_type>
     {
+      _GLIBCXX_CEST_CONSTEXPR
       typename _Pair::second_type&
       operator()(_Pair& __x) const
       { return __x.second; }
 
+      _GLIBCXX_CEST_CONSTEXPR
       const typename _Pair::second_type&
       operator()(const _Pair& __x) const
       { return __x.second; }
