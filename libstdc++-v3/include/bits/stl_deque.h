@@ -128,6 +128,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
       typedef __ptr_rebind<_Ptr, _Elt_pointer>		   _Map_pointer;
 #endif
 
+      _GLIBCXX_CEST_CONSTEXPR
       static size_t _S_buffer_size() _GLIBCXX_NOEXCEPT
       { return __deque_buf_size(sizeof(_Tp)); }
 
@@ -144,10 +145,12 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
       _Elt_pointer _M_last;
       _Map_pointer _M_node;
 
+      _GLIBCXX_CEST_CONSTEXPR
       _Deque_iterator(_Elt_pointer __x, _Map_pointer __y) _GLIBCXX_NOEXCEPT
       : _M_cur(__x), _M_first(*__y),
 	_M_last(*__y + _S_buffer_size()), _M_node(__y) { }
 
+      _GLIBCXX_CEST_CONSTEXPR
       _Deque_iterator() _GLIBCXX_NOEXCEPT
       : _M_cur(), _M_first(), _M_last(), _M_node() { }
 
@@ -161,10 +164,12 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
       template<typename _Iter,
 	       typename = _Require<is_same<_Self, const_iterator>,
 				   is_same<_Iter, iterator>>>
+       _GLIBCXX_CEST_CONSTEXPR
        _Deque_iterator(const _Iter& __x) noexcept
        : _M_cur(__x._M_cur), _M_first(__x._M_first),
 	 _M_last(__x._M_last), _M_node(__x._M_node) { }
 
+      _GLIBCXX_CEST_CONSTEXPR
       _Deque_iterator(const _Deque_iterator& __x) noexcept
        : _M_cur(__x._M_cur), _M_first(__x._M_first),
 	 _M_last(__x._M_last), _M_node(__x._M_node) { }
@@ -172,20 +177,24 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
       _Deque_iterator& operator=(const _Deque_iterator&) = default;
 #endif
 
+      _GLIBCXX_CEST_CONSTEXPR
       iterator
       _M_const_cast() const _GLIBCXX_NOEXCEPT
       { return iterator(_M_cur, _M_node); }
 
       _GLIBCXX_NODISCARD
+      _GLIBCXX_CEST_CONSTEXPR
       reference
       operator*() const _GLIBCXX_NOEXCEPT
       { return *_M_cur; }
 
       _GLIBCXX_NODISCARD
+      _GLIBCXX_CEST_CONSTEXPR
       pointer
       operator->() const _GLIBCXX_NOEXCEPT
       { return _M_cur; }
 
+      _GLIBCXX_CEST_CONSTEXPR
       _Self&
       operator++() _GLIBCXX_NOEXCEPT
       {
@@ -198,6 +207,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 	return *this;
       }
 
+      _GLIBCXX_CEST_CONSTEXPR
       _Self
       operator++(int) _GLIBCXX_NOEXCEPT
       {
@@ -206,6 +216,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 	return __tmp;
       }
 
+      _GLIBCXX_CEST_CONSTEXPR
       _Self&
       operator--() _GLIBCXX_NOEXCEPT
       {
@@ -218,6 +229,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 	return *this;
       }
 
+      _GLIBCXX_CEST_CONSTEXPR
       _Self
       operator--(int) _GLIBCXX_NOEXCEPT
       {
@@ -226,6 +238,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 	return __tmp;
       }
 
+      _GLIBCXX_CEST_CONSTEXPR
       _Self&
       operator+=(difference_type __n) _GLIBCXX_NOEXCEPT
       {
@@ -245,11 +258,13 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 	return *this;
       }
 
+      _GLIBCXX_CEST_CONSTEXPR
       _Self&
       operator-=(difference_type __n) _GLIBCXX_NOEXCEPT
       { return *this += -__n; }
 
       _GLIBCXX_NODISCARD
+      _GLIBCXX_CEST_CONSTEXPR
       reference
       operator[](difference_type __n) const _GLIBCXX_NOEXCEPT
       { return *(*this + __n); }
@@ -259,6 +274,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  _M_cur, which should therefore be set by the caller
        *  immediately afterwards, based on _M_first and _M_last.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       void
       _M_set_node(_Map_pointer __new_node) _GLIBCXX_NOEXCEPT
       {
@@ -268,6 +284,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
       }
 
       _GLIBCXX_NODISCARD
+      _GLIBCXX_CEST_CONSTEXPR
       friend bool
       operator==(const _Self& __x, const _Self& __y) _GLIBCXX_NOEXCEPT
       { return __x._M_cur == __y._M_cur; }
@@ -277,6 +294,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
       // operators are in scope (for additional details, see libstdc++/3628)
       template<typename _RefR, typename _PtrR>
 	_GLIBCXX_NODISCARD
+	_GLIBCXX_CEST_CONSTEXPR
 	friend bool
 	operator==(const _Self& __x,
 		   const _Deque_iterator<_Tp, _RefR, _PtrR>& __y)
@@ -285,6 +303,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 
 #if __cpp_lib_three_way_comparison
       [[nodiscard]]
+      _GLIBCXX_CEST_CONSTEXPR
       friend strong_ordering
       operator<=>(const _Self& __x, const _Self& __y) noexcept
       {
@@ -300,6 +319,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 
       template<typename _RefR, typename _PtrR>
 	_GLIBCXX_NODISCARD
+	_GLIBCXX_CEST_CONSTEXPR
 	friend bool
 	operator!=(const _Self& __x,
 		   const _Deque_iterator<_Tp, _RefR, _PtrR>& __y)
@@ -307,6 +327,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 	{ return !(__x == __y); }
 
       _GLIBCXX_NODISCARD
+      _GLIBCXX_CEST_CONSTEXPR
       friend bool
       operator<(const _Self& __x, const _Self& __y) _GLIBCXX_NOEXCEPT
       {
@@ -316,6 +337,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 
       template<typename _RefR, typename _PtrR>
 	_GLIBCXX_NODISCARD
+	_GLIBCXX_CEST_CONSTEXPR
 	friend bool
 	operator<(const _Self& __x,
 		  const _Deque_iterator<_Tp, _RefR, _PtrR>& __y)
@@ -326,12 +348,14 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 	}
 
       _GLIBCXX_NODISCARD
+      _GLIBCXX_CEST_CONSTEXPR
       friend bool
       operator>(const _Self& __x, const _Self& __y) _GLIBCXX_NOEXCEPT
       { return __y < __x; }
 
       template<typename _RefR, typename _PtrR>
 	_GLIBCXX_NODISCARD
+	_GLIBCXX_CEST_CONSTEXPR
 	friend bool
 	operator>(const _Self& __x,
 		  const _Deque_iterator<_Tp, _RefR, _PtrR>& __y)
@@ -339,12 +363,14 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 	{ return __y < __x; }
 
       _GLIBCXX_NODISCARD
+      _GLIBCXX_CEST_CONSTEXPR
       friend bool
       operator<=(const _Self& __x, const _Self& __y) _GLIBCXX_NOEXCEPT
       { return !(__y < __x); }
 
       template<typename _RefR, typename _PtrR>
 	_GLIBCXX_NODISCARD
+	_GLIBCXX_CEST_CONSTEXPR
 	friend bool
 	operator<=(const _Self& __x,
 		   const _Deque_iterator<_Tp, _RefR, _PtrR>& __y)
@@ -352,12 +378,14 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 	{ return !(__y < __x); }
 
       _GLIBCXX_NODISCARD
+      _GLIBCXX_CEST_CONSTEXPR
       friend bool
       operator>=(const _Self& __x, const _Self& __y) _GLIBCXX_NOEXCEPT
       { return !(__x < __y); }
 
       template<typename _RefR, typename _PtrR>
 	_GLIBCXX_NODISCARD
+	_GLIBCXX_CEST_CONSTEXPR
 	friend bool
 	operator>=(const _Self& __x,
 		   const _Deque_iterator<_Tp, _RefR, _PtrR>& __y)
@@ -366,6 +394,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 #endif // three-way comparison
 
       _GLIBCXX_NODISCARD
+      _GLIBCXX_CEST_CONSTEXPR
       friend difference_type
       operator-(const _Self& __x, const _Self& __y) _GLIBCXX_NOEXCEPT
       {
@@ -381,6 +410,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
       // parameters.
       template<typename _RefR, typename _PtrR>
 	_GLIBCXX_NODISCARD
+	_GLIBCXX_CEST_CONSTEXPR
 	friend difference_type
 	operator-(const _Self& __x,
 		  const _Deque_iterator<_Tp, _RefR, _PtrR>& __y)
@@ -393,6 +423,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 	}
 
       _GLIBCXX_NODISCARD
+      _GLIBCXX_CEST_CONSTEXPR
       friend _Self
       operator+(const _Self& __x, difference_type __n) _GLIBCXX_NOEXCEPT
       {
@@ -402,6 +433,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
       }
 
       _GLIBCXX_NODISCARD
+      _GLIBCXX_CEST_CONSTEXPR
       friend _Self
       operator-(const _Self& __x, difference_type __n) _GLIBCXX_NOEXCEPT
       {
@@ -411,6 +443,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
       }
 
       _GLIBCXX_NODISCARD
+      _GLIBCXX_CEST_CONSTEXPR
       friend _Self
       operator+(difference_type __n, const _Self& __x) _GLIBCXX_NOEXCEPT
       { return __x + __n; }
@@ -448,6 +481,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 
       typedef _Alloc		  allocator_type;
 
+      _GLIBCXX_CEST_CONSTEXPR
       allocator_type
       get_allocator() const _GLIBCXX_NOEXCEPT
       { return allocator_type(_M_get_Tp_allocator()); }
@@ -455,23 +489,28 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
       typedef _Deque_iterator<_Tp, _Tp&, _Ptr>	  iterator;
       typedef _Deque_iterator<_Tp, const _Tp&, _Ptr_const>   const_iterator;
 
+      _GLIBCXX_CEST_CONSTEXPR
       _Deque_base()
       : _M_impl()
       { _M_initialize_map(0); }
 
+      _GLIBCXX_CEST_CONSTEXPR
       _Deque_base(size_t __num_elements)
       : _M_impl()
       { _M_initialize_map(__num_elements); }
 
+      _GLIBCXX_CEST_CONSTEXPR
       _Deque_base(const allocator_type& __a, size_t __num_elements)
       : _M_impl(__a)
       { _M_initialize_map(__num_elements); }
 
+      _GLIBCXX_CEST_CONSTEXPR
       _Deque_base(const allocator_type& __a)
       : _M_impl(__a)
       { /* Caller must initialize map. */ }
 
 #if __cplusplus >= 201103L
+      _GLIBCXX_CEST_CONSTEXPR
       _Deque_base(_Deque_base&& __x)
       : _M_impl(std::move(__x._M_get_Tp_allocator()))
       {
@@ -480,10 +519,12 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 	  this->_M_impl._M_swap_data(__x._M_impl);
       }
 
+      _GLIBCXX_CEST_CONSTEXPR
       _Deque_base(_Deque_base&& __x, const allocator_type& __a)
       : _M_impl(std::move(__x._M_impl), _Tp_alloc_type(__a))
       { __x._M_initialize_map(0); }
 
+      _GLIBCXX_CEST_CONSTEXPR
       _Deque_base(_Deque_base&& __x, const allocator_type& __a, size_t __n)
       : _M_impl(__a)
       {
@@ -502,6 +543,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
       }
 #endif
 
+      _GLIBCXX_CEST_CONSTEXPR
       ~_Deque_base() _GLIBCXX_NOEXCEPT;
 
       typedef typename iterator::_Map_pointer _Map_pointer;
@@ -513,6 +555,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 	iterator _M_start;
 	iterator _M_finish;
 
+	_GLIBCXX_CEST_CONSTEXPR
 	_Deque_impl_data() _GLIBCXX_NOEXCEPT
 	: _M_map(), _M_map_size(), _M_start(), _M_finish()
 	{ }
@@ -522,11 +565,13 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 	_Deque_impl_data&
 	operator=(const _Deque_impl_data&) = default;
 
+	_GLIBCXX_CEST_CONSTEXPR
 	_Deque_impl_data(_Deque_impl_data&& __x) noexcept
 	: _Deque_impl_data(__x)
 	{ __x = _Deque_impl_data(); }
 #endif
 
+	_GLIBCXX_CEST_CONSTEXPR
 	void
 	_M_swap_data(_Deque_impl_data& __x) _GLIBCXX_NOEXCEPT
 	{
@@ -542,11 +587,13 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
       struct _Deque_impl
       : public _Tp_alloc_type, public _Deque_impl_data
       {
+	_GLIBCXX_CEST_CONSTEXPR
 	_Deque_impl() _GLIBCXX_NOEXCEPT_IF(
 	  is_nothrow_default_constructible<_Tp_alloc_type>::value)
 	: _Tp_alloc_type()
 	{ }
 
+	_GLIBCXX_CEST_CONSTEXPR
 	_Deque_impl(const _Tp_alloc_type& __a) _GLIBCXX_NOEXCEPT
 	: _Tp_alloc_type(__a)
 	{ }
@@ -554,28 +601,34 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 #if __cplusplus >= 201103L
 	_Deque_impl(_Deque_impl&&) = default;
 
+	_GLIBCXX_CEST_CONSTEXPR
 	_Deque_impl(_Tp_alloc_type&& __a) noexcept
 	: _Tp_alloc_type(std::move(__a))
 	{ }
 
+	_GLIBCXX_CEST_CONSTEXPR
 	_Deque_impl(_Deque_impl&& __d, _Tp_alloc_type&& __a)
 	: _Tp_alloc_type(std::move(__a)), _Deque_impl_data(std::move(__d))
 	{ }
 #endif
       };
 
+      _GLIBCXX_CEST_CONSTEXPR
       _Tp_alloc_type&
       _M_get_Tp_allocator() _GLIBCXX_NOEXCEPT
       { return this->_M_impl; }
 
+      _GLIBCXX_CEST_CONSTEXPR
       const _Tp_alloc_type&
       _M_get_Tp_allocator() const _GLIBCXX_NOEXCEPT
       { return this->_M_impl; }
 
+      _GLIBCXX_CEST_CONSTEXPR
       _Map_alloc_type
       _M_get_map_allocator() const _GLIBCXX_NOEXCEPT
       { return _Map_alloc_type(_M_get_Tp_allocator()); }
 
+      _GLIBCXX_CEST_CONSTEXPR
       _Ptr
       _M_allocate_node()
       {
@@ -583,6 +636,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 	return _Traits::allocate(_M_impl, __deque_buf_size(sizeof(_Tp)));
       }
 
+      _GLIBCXX_CEST_CONSTEXPR
       void
       _M_deallocate_node(_Ptr __p) _GLIBCXX_NOEXCEPT
       {
@@ -590,22 +644,38 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 	_Traits::deallocate(_M_impl, __p, __deque_buf_size(sizeof(_Tp)));
       }
 
+      _GLIBCXX_CEST_CONSTEXPR
       _Map_pointer
       _M_allocate_map(size_t __n)
       {
 	_Map_alloc_type __map_alloc = _M_get_map_allocator();
-	return _Map_alloc_traits::allocate(__map_alloc, __n);
+	_Map_pointer __p = _Map_alloc_traits::allocate(__map_alloc, __n);
+#if _GLIBCXX_CEST_VERSION
+	if (__builtin_is_constant_evaluated())
+	  for (size_t __i = 0; __i < __n; ++__i)
+	    _Map_alloc_traits::construct(__map_alloc, __p + __i);
+#endif
+	return __p;
       }
 
+      _GLIBCXX_CEST_CONSTEXPR
       void
       _M_deallocate_map(_Map_pointer __p, size_t __n) _GLIBCXX_NOEXCEPT
       {
 	_Map_alloc_type __map_alloc = _M_get_map_allocator();
+#if _GLIBCXX_CEST_VERSION
+	if (__builtin_is_constant_evaluated())
+	  for (size_t __i = 0; __i < __n; ++__i)
+	    _Map_alloc_traits::destroy(__map_alloc, __p + __i);
+#endif
 	_Map_alloc_traits::deallocate(__map_alloc, __p, __n);
       }
 
+      _GLIBCXX_CEST_CONSTEXPR
       void _M_initialize_map(size_t);
+      _GLIBCXX_CEST_CONSTEXPR
       void _M_create_nodes(_Map_pointer __nstart, _Map_pointer __nfinish);
+      _GLIBCXX_CEST_CONSTEXPR
       void _M_destroy_nodes(_Map_pointer __nstart,
 			    _Map_pointer __nfinish) _GLIBCXX_NOEXCEPT;
       enum { _S_initial_map_size = 8 };
@@ -614,6 +684,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
     };
 
   template<typename _Tp, typename _Alloc>
+    _GLIBCXX_CEST_CONSTEXPR
     _Deque_base<_Tp, _Alloc>::
     ~_Deque_base() _GLIBCXX_NOEXCEPT
     {
@@ -634,6 +705,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
    *  The initial underlying memory layout is a bit complicated...
   */
   template<typename _Tp, typename _Alloc>
+    _GLIBCXX_CEST_CONSTEXPR
     void
     _Deque_base<_Tp, _Alloc>::
     _M_initialize_map(size_t __num_elements)
@@ -673,6 +745,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
     }
 
   template<typename _Tp, typename _Alloc>
+    _GLIBCXX_CEST_CONSTEXPR
     void
     _Deque_base<_Tp, _Alloc>::
     _M_create_nodes(_Map_pointer __nstart, _Map_pointer __nfinish)
@@ -691,13 +764,16 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
     }
 
   template<typename _Tp, typename _Alloc>
+    _GLIBCXX_CEST_CONSTEXPR
     void
     _Deque_base<_Tp, _Alloc>::
     _M_destroy_nodes(_Map_pointer __nstart,
 		     _Map_pointer __nfinish) _GLIBCXX_NOEXCEPT
     {
       for (_Map_pointer __n = __nstart; __n < __nfinish; ++__n)
+	    {
 	_M_deallocate_node(*__n);
+	    }
     }
 
   /**
@@ -825,6 +901,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
       typedef _Alloc					allocator_type;
 
     private:
+      _GLIBCXX_CEST_CONSTEXPR
       static size_t _S_buffer_size() _GLIBCXX_NOEXCEPT
       { return __deque_buf_size(sizeof(_Tp)); }
 
@@ -861,6 +938,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  @brief  Creates a %deque with no elements.
        *  @param  __a  An allocator object.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       explicit
       deque(const allocator_type& __a)
       : _Base(__a, 0) { }
@@ -874,6 +952,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  This constructor fills the %deque with @a n default
        *  constructed elements.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       explicit
       deque(size_type __n, const allocator_type& __a = allocator_type())
       : _Base(__a, _S_check_init_len(__n, __a))
@@ -887,6 +966,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *
        *  This constructor fills the %deque with @a __n copies of @a __value.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       deque(size_type __n, const value_type& __value,
 	    const allocator_type& __a = allocator_type())
       : _Base(__a, _S_check_init_len(__n, __a))
@@ -914,6 +994,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  The newly-created %deque uses a copy of the allocator object used
        *  by @a __x (unless the allocator traits dictate a different object).
        */
+      _GLIBCXX_CEST_CONSTEXPR
       deque(const deque& __x)
       : _Base(_Alloc_traits::_S_select_on_copy(__x._M_get_Tp_allocator()),
 	      __x.size())
@@ -933,6 +1014,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
       deque(deque&&) = default;
 
       /// Copy constructor with alternative allocator
+      _GLIBCXX_CEST_CONSTEXPR
       deque(const deque& __x, const __type_identity_t<allocator_type>& __a)
       : _Base(__a, __x.size())
       { std::__uninitialized_copy_a(__x.begin(), __x.end(),
@@ -940,15 +1022,18 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 				    _M_get_Tp_allocator()); }
 
       /// Move constructor with alternative allocator
+      _GLIBCXX_CEST_CONSTEXPR
       deque(deque&& __x, const __type_identity_t<allocator_type>& __a)
       : deque(std::move(__x), __a, typename _Alloc_traits::is_always_equal{})
       { }
 
     private:
+      _GLIBCXX_CEST_CONSTEXPR
       deque(deque&& __x, const allocator_type& __a, true_type)
       : _Base(std::move(__x), __a)
       { }
 
+      _GLIBCXX_CEST_CONSTEXPR
       deque(deque&& __x, const allocator_type& __a, false_type)
       : _Base(std::move(__x), __a, __x.size())
       {
@@ -973,6 +1058,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  This will call the element type's copy constructor N times
        *  (where N is __l.size()) and do no memory reallocation.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       deque(initializer_list<value_type> __l,
 	    const allocator_type& __a = allocator_type())
       : _Base(__a)
@@ -1000,6 +1086,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 #if __cplusplus >= 201103L
       template<typename _InputIterator,
 	       typename = std::_RequireInputIter<_InputIterator>>
+	_GLIBCXX_CEST_CONSTEXPR
 	deque(_InputIterator __first, _InputIterator __last,
 	      const allocator_type& __a = allocator_type())
 	: _Base(__a)
@@ -1024,6 +1111,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  themselves are pointers, the pointed-to memory is not touched in any
        *  way.  Managing the pointer is the user's responsibility.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       ~deque()
       { _M_destroy_data(begin(), end(), _M_get_Tp_allocator()); }
 
@@ -1036,6 +1124,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  The newly-created %deque uses a copy of the allocator object used
        *  by @a __x (unless the allocator traits dictate a different object).
        */
+      _GLIBCXX_CEST_CONSTEXPR
       deque&
       operator=(const deque& __x);
 
@@ -1048,6 +1137,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  if the allocators permit it).
        *  @a __x is a valid, but unspecified %deque.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       deque&
       operator=(deque&& __x) noexcept(_Alloc_traits::_S_always_equal())
       {
@@ -1067,6 +1157,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  resulting %deque's size is the same as the number of elements
        *  assigned.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       deque&
       operator=(initializer_list<value_type> __l)
       {
@@ -1086,6 +1177,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  %deque and that the resulting %deque's size is the same as
        *  the number of elements assigned.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       void
       assign(size_type __n, const value_type& __val)
       { _M_fill_assign(__n, __val); }
@@ -1105,6 +1197,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 #if __cplusplus >= 201103L
       template<typename _InputIterator,
 	       typename = std::_RequireInputIter<_InputIterator>>
+	_GLIBCXX_CEST_CONSTEXPR
 	void
 	assign(_InputIterator __first, _InputIterator __last)
 	{ _M_assign_aux(__first, __last, std::__iterator_category(__first)); }
@@ -1130,6 +1223,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  resulting %deque's size is the same as the number of elements
        *  assigned.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       void
       assign(initializer_list<value_type> __l)
       { _M_assign_aux(__l.begin(), __l.end(), random_access_iterator_tag()); }
@@ -1137,6 +1231,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 
       /// Get a copy of the memory allocation object.
       _GLIBCXX_NODISCARD
+      _GLIBCXX_CEST_CONSTEXPR
       allocator_type
       get_allocator() const _GLIBCXX_NOEXCEPT
       { return _Base::get_allocator(); }
@@ -1147,6 +1242,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  %deque.  Iteration is done in ordinary element order.
        */
       _GLIBCXX_NODISCARD
+      _GLIBCXX_CEST_CONSTEXPR
       iterator
       begin() _GLIBCXX_NOEXCEPT
       { return this->_M_impl._M_start; }
@@ -1156,6 +1252,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  element in the %deque.  Iteration is done in ordinary element order.
        */
       _GLIBCXX_NODISCARD
+      _GLIBCXX_CEST_CONSTEXPR
       const_iterator
       begin() const _GLIBCXX_NOEXCEPT
       { return this->_M_impl._M_start; }
@@ -1166,6 +1263,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  element order.
        */
       _GLIBCXX_NODISCARD
+      _GLIBCXX_CEST_CONSTEXPR
       iterator
       end() _GLIBCXX_NOEXCEPT
       { return this->_M_impl._M_finish; }
@@ -1176,6 +1274,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  ordinary element order.
        */
       _GLIBCXX_NODISCARD
+      _GLIBCXX_CEST_CONSTEXPR
       const_iterator
       end() const _GLIBCXX_NOEXCEPT
       { return this->_M_impl._M_finish; }
@@ -1186,6 +1285,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  element order.
        */
       _GLIBCXX_NODISCARD
+      _GLIBCXX_CEST_CONSTEXPR
       reverse_iterator
       rbegin() _GLIBCXX_NOEXCEPT
       { return reverse_iterator(this->_M_impl._M_finish); }
@@ -1196,6 +1296,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  reverse element order.
        */
       _GLIBCXX_NODISCARD
+      _GLIBCXX_CEST_CONSTEXPR
       const_reverse_iterator
       rbegin() const _GLIBCXX_NOEXCEPT
       { return const_reverse_iterator(this->_M_impl._M_finish); }
@@ -1206,6 +1307,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  in reverse element order.
        */
       _GLIBCXX_NODISCARD
+      _GLIBCXX_CEST_CONSTEXPR
       reverse_iterator
       rend() _GLIBCXX_NOEXCEPT
       { return reverse_iterator(this->_M_impl._M_start); }
@@ -1216,6 +1318,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  done in reverse element order.
        */
       _GLIBCXX_NODISCARD
+      _GLIBCXX_CEST_CONSTEXPR
       const_reverse_iterator
       rend() const _GLIBCXX_NOEXCEPT
       { return const_reverse_iterator(this->_M_impl._M_start); }
@@ -1226,6 +1329,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  element in the %deque.  Iteration is done in ordinary element order.
        */
       [[__nodiscard__]]
+      _GLIBCXX_CEST_CONSTEXPR
       const_iterator
       cbegin() const noexcept
       { return this->_M_impl._M_start; }
@@ -1236,6 +1340,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  ordinary element order.
        */
       [[__nodiscard__]]
+      _GLIBCXX_CEST_CONSTEXPR
       const_iterator
       cend() const noexcept
       { return this->_M_impl._M_finish; }
@@ -1246,6 +1351,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  reverse element order.
        */
       [[__nodiscard__]]
+      _GLIBCXX_CEST_CONSTEXPR
       const_reverse_iterator
       crbegin() const noexcept
       { return const_reverse_iterator(this->_M_impl._M_finish); }
@@ -1256,6 +1362,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  done in reverse element order.
        */
       [[__nodiscard__]]
+      _GLIBCXX_CEST_CONSTEXPR
       const_reverse_iterator
       crend() const noexcept
       { return const_reverse_iterator(this->_M_impl._M_start); }
@@ -1264,12 +1371,14 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
       // [23.2.1.2] capacity
       /**  Returns the number of elements in the %deque.  */
       _GLIBCXX_NODISCARD
+      _GLIBCXX_CEST_CONSTEXPR
       size_type
       size() const _GLIBCXX_NOEXCEPT
       { return this->_M_impl._M_finish - this->_M_impl._M_start; }
 
       /**  Returns the size() of the largest possible %deque.  */
       _GLIBCXX_NODISCARD
+      _GLIBCXX_CEST_CONSTEXPR
       size_type
       max_size() const _GLIBCXX_NOEXCEPT
       { return _S_max_size(_M_get_Tp_allocator()); }
@@ -1284,6 +1393,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  %deque's current size the %deque is truncated, otherwise
        *  default constructed elements are appended.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       void
       resize(size_type __new_size)
       {
@@ -1306,6 +1416,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  %deque is extended and new elements are populated with given
        *  data.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       void
       resize(size_type __new_size, const value_type& __x)
 #else
@@ -1334,6 +1445,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 
 #if __cplusplus >= 201103L
       /**  A non-binding request to reduce memory use.  */
+      _GLIBCXX_CEST_CONSTEXPR
       void
       shrink_to_fit() noexcept
       { _M_shrink_to_fit(); }
@@ -1343,7 +1455,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  Returns true if the %deque is empty.  (Thus begin() would
        *  equal end().)
        */
-      _GLIBCXX_NODISCARD bool
+      _GLIBCXX_NODISCARD _GLIBCXX_CEST_CONSTEXPR bool
       empty() const _GLIBCXX_NOEXCEPT
       { return this->_M_impl._M_finish == this->_M_impl._M_start; }
 
@@ -1360,6 +1472,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  see at().)
        */
       _GLIBCXX_NODISCARD
+      _GLIBCXX_CEST_CONSTEXPR
       reference
       operator[](size_type __n) _GLIBCXX_NOEXCEPT
       {
@@ -1379,6 +1492,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  see at().)
        */
       _GLIBCXX_NODISCARD
+      _GLIBCXX_CEST_CONSTEXPR
       const_reference
       operator[](size_type __n) const _GLIBCXX_NOEXCEPT
       {
@@ -1388,6 +1502,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 
     protected:
       /// Safety check used only from at().
+      _GLIBCXX_CEST_CONSTEXPR
       void
       _M_range_check(size_type __n) const
       {
@@ -1410,6 +1525,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  is first checked that it is in the range of the deque.  The
        *  function throws out_of_range if the check fails.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       reference
       at(size_type __n)
       {
@@ -1428,6 +1544,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  checked that it is in the range of the deque.  The function throws
        *  out_of_range if the check fails.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       const_reference
       at(size_type __n) const
       {
@@ -1440,6 +1557,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  element of the %deque.
        */
       _GLIBCXX_NODISCARD
+      _GLIBCXX_CEST_CONSTEXPR
       reference
       front() _GLIBCXX_NOEXCEPT
       {
@@ -1452,6 +1570,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  element of the %deque.
        */
       _GLIBCXX_NODISCARD
+      _GLIBCXX_CEST_CONSTEXPR
       const_reference
       front() const _GLIBCXX_NOEXCEPT
       {
@@ -1464,6 +1583,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  %deque.
        */
       _GLIBCXX_NODISCARD
+      _GLIBCXX_CEST_CONSTEXPR
       reference
       back() _GLIBCXX_NOEXCEPT
       {
@@ -1478,6 +1598,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  element of the %deque.
        */
       _GLIBCXX_NODISCARD
+      _GLIBCXX_CEST_CONSTEXPR
       const_reference
       back() const _GLIBCXX_NOEXCEPT
       {
@@ -1497,6 +1618,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  data to it.  Due to the nature of a %deque this operation
        *  can be done in constant time.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       void
       push_front(const value_type& __x)
       {
@@ -1512,12 +1634,14 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
       }
 
 #if __cplusplus >= 201103L
+      _GLIBCXX_CEST_CONSTEXPR
       void
       push_front(value_type&& __x)
       { emplace_front(std::move(__x)); }
 
       template<typename... _Args>
 #if __cplusplus > 201402L
+	_GLIBCXX_CEST_CONSTEXPR
 	reference
 #else
 	void
@@ -1534,6 +1658,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  to it.  Due to the nature of a %deque this operation can be
        *  done in constant time.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       void
       push_back(const value_type& __x)
       {
@@ -1549,12 +1674,14 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
       }
 
 #if __cplusplus >= 201103L
+      _GLIBCXX_CEST_CONSTEXPR
       void
       push_back(value_type&& __x)
       { emplace_back(std::move(__x)); }
 
       template<typename... _Args>
 #if __cplusplus > 201402L
+	_GLIBCXX_CEST_CONSTEXPR
 	reference
 #else
 	void
@@ -1570,6 +1697,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  Note that no data is returned, and if the first element's data is
        *  needed, it should be retrieved before pop_front() is called.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       void
       pop_front() _GLIBCXX_NOEXCEPT
       {
@@ -1593,6 +1721,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  Note that no data is returned, and if the last element's data is
        *  needed, it should be retrieved before pop_back() is called.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       void
       pop_back() _GLIBCXX_NOEXCEPT
       {
@@ -1619,6 +1748,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  with T(std::forward<Args>(args)...) before the specified location.
        */
       template<typename... _Args>
+	_GLIBCXX_CEST_CONSTEXPR
 	iterator
 	emplace(const_iterator __position, _Args&&... __args);
 
@@ -1631,6 +1761,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  This function will insert a copy of the given value before the
        *  specified location.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       iterator
       insert(const_iterator __position, const value_type& __x);
 #else
@@ -1657,6 +1788,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  This function will insert a copy of the given rvalue before the
        *  specified location.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       iterator
       insert(const_iterator __position, value_type&& __x)
       { return emplace(__position, std::move(__x)); }
@@ -1671,6 +1803,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  initializer_list @a __l into the %deque before the location
        *  specified by @a __p.  This is known as <em>list insert</em>.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       iterator
       insert(const_iterator __p, initializer_list<value_type> __l)
       {
@@ -1690,6 +1823,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  This function will insert a specified number of copies of the given
        *  data before the location specified by @a __position.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       iterator
       insert(const_iterator __position, size_type __n, const value_type& __x)
       {
@@ -1726,6 +1860,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        */
       template<typename _InputIterator,
 	       typename = std::_RequireInputIter<_InputIterator>>
+	_GLIBCXX_CEST_CONSTEXPR
 	iterator
 	insert(const_iterator __position, _InputIterator __first,
 	       _InputIterator __last)
@@ -1772,6 +1907,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        */
       iterator
 #if __cplusplus >= 201103L
+      _GLIBCXX_CEST_CONSTEXPR
       erase(const_iterator __position)
 #else
       erase(iterator __position)
@@ -1794,6 +1930,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  themselves are pointers, the pointed-to memory is not touched in any
        *  way.  Managing the pointer is the user's responsibility.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       iterator
 #if __cplusplus >= 201103L
       erase(const_iterator __first, const_iterator __last)
@@ -1813,6 +1950,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *
        *  Whether the allocators are swapped depends on the allocator traits.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       void
       swap(deque& __x) _GLIBCXX_NOEXCEPT
       {
@@ -1831,6 +1969,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  pointed-to memory is not touched in any way.  Managing the pointer is
        *  the user's responsibility.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       void
       clear() _GLIBCXX_NOEXCEPT
       { _M_erase_at_end(begin()); }
@@ -1863,6 +2002,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 	}
 #endif
 
+      _GLIBCXX_CEST_CONSTEXPR
       static size_t
       _S_check_init_len(size_t __n, const allocator_type& __a)
       {
@@ -1872,6 +2012,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 	return __n;
       }
 
+      _GLIBCXX_CEST_CONSTEXPR
       static size_type
       _S_max_size(const _Tp_alloc_type& __a) _GLIBCXX_NOEXCEPT
       {
@@ -1893,12 +2034,14 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  push_back on each value from the iterator.
        */
       template<typename _InputIterator>
+	_GLIBCXX_CEST_CONSTEXPR
 	void
 	_M_range_initialize(_InputIterator __first, _InputIterator __last,
 			    std::input_iterator_tag);
 
       // called by the second initialize_dispatch above
       template<typename _ForwardIterator>
+	_GLIBCXX_CEST_CONSTEXPR
 	void
 	_M_range_initialize(_ForwardIterator __first, _ForwardIterator __last,
 			    std::forward_iterator_tag);
@@ -1914,11 +2057,13 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  This function is called only when the user provides an explicit size
        *  (with or without an explicit exemplar value).
        */
+      _GLIBCXX_CEST_CONSTEXPR
       void
       _M_fill_initialize(const value_type& __value);
 
 #if __cplusplus >= 201103L
       // called by deque(n).
+      _GLIBCXX_CEST_CONSTEXPR
       void
       _M_default_initialize();
 #endif
@@ -1946,12 +2091,14 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 
       // called by the second assign_dispatch above
       template<typename _InputIterator>
+	_GLIBCXX_CEST_CONSTEXPR
 	void
 	_M_assign_aux(_InputIterator __first, _InputIterator __last,
 		      std::input_iterator_tag);
 
       // called by the second assign_dispatch above
       template<typename _ForwardIterator>
+	_GLIBCXX_CEST_CONSTEXPR
 	void
 	_M_assign_aux(_ForwardIterator __first, _ForwardIterator __last,
 		      std::forward_iterator_tag)
@@ -1971,6 +2118,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 
       // Called by assign(n,t), and the range assign when it turns out
       // to be the same thing.
+      _GLIBCXX_CEST_CONSTEXPR
       void
       _M_fill_assign(size_type __n, const value_type& __val)
       {
@@ -1994,14 +2142,18 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
       void _M_push_front_aux(const value_type&);
 #else
       template<typename... _Args>
+	_GLIBCXX_CEST_CONSTEXPR
 	void _M_push_back_aux(_Args&&... __args);
 
       template<typename... _Args>
+	_GLIBCXX_CEST_CONSTEXPR
 	void _M_push_front_aux(_Args&&... __args);
 #endif
 
+      _GLIBCXX_CEST_CONSTEXPR
       void _M_pop_back_aux();
 
+      _GLIBCXX_CEST_CONSTEXPR
       void _M_pop_front_aux();
       ///@}
 
@@ -2033,12 +2185,14 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 
       // called by the second insert_dispatch above
       template<typename _InputIterator>
+	_GLIBCXX_CEST_CONSTEXPR
 	void
 	_M_range_insert_aux(iterator __pos, _InputIterator __first,
 			    _InputIterator __last, std::input_iterator_tag);
 
       // called by the second insert_dispatch above
       template<typename _ForwardIterator>
+	_GLIBCXX_CEST_CONSTEXPR
 	void
 	_M_range_insert_aux(iterator __pos, _ForwardIterator __first,
 			    _ForwardIterator __last, std::forward_iterator_tag);
@@ -2046,6 +2200,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
       // Called by insert(p,n,x), and the range insert when it turns out to be
       // the same thing.  Can use fill functions in optimal situations,
       // otherwise passes off to insert_aux(p,n,x).
+      _GLIBCXX_CEST_CONSTEXPR
       void
       _M_fill_insert(iterator __pos, size_type __n, const value_type& __x);
 
@@ -2055,16 +2210,19 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
       _M_insert_aux(iterator __pos, const value_type& __x);
 #else
       template<typename... _Args>
+	_GLIBCXX_CEST_CONSTEXPR
 	iterator
 	_M_insert_aux(iterator __pos, _Args&&... __args);
 #endif
 
       // called by insert(p,n,x) via fill_insert
+      _GLIBCXX_CEST_CONSTEXPR
       void
       _M_insert_aux(iterator __pos, size_type __n, const value_type& __x);
 
       // called by range_insert_aux for forward iterators
       template<typename _ForwardIterator>
+	_GLIBCXX_CEST_CONSTEXPR
 	void
 	_M_insert_aux(iterator __pos,
 		      _ForwardIterator __first, _ForwardIterator __last,
@@ -2073,17 +2231,20 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 
       // Internal erase functions follow.
 
+      _GLIBCXX_CEST_CONSTEXPR
       void
       _M_destroy_data_aux(iterator __first, iterator __last);
 
       // Called by ~deque().
       // NB: Doesn't deallocate the nodes.
       template<typename _Alloc1>
+	_GLIBCXX_CEST_CONSTEXPR
 	void
 	_M_destroy_data(iterator __first, iterator __last, const _Alloc1&)
 	{ _M_destroy_data_aux(__first, __last); }
 
       void
+      _GLIBCXX_CEST_CONSTEXPR
       _M_destroy_data(iterator __first, iterator __last,
 		      const std::allocator<_Tp>&)
       {
@@ -2092,6 +2253,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
       }
 
       // Called by erase(q1, q2).
+      _GLIBCXX_CEST_CONSTEXPR
       void
       _M_erase_at_begin(iterator __pos)
       {
@@ -2102,6 +2264,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 
       // Called by erase(q1, q2), resize(), clear(), _M_assign_aux,
       // _M_fill_assign, operator=.
+      _GLIBCXX_CEST_CONSTEXPR
       void
       _M_erase_at_end(iterator __pos)
       {
@@ -2111,23 +2274,28 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 	this->_M_impl._M_finish = __pos;
       }
 
+      _GLIBCXX_CEST_CONSTEXPR
       iterator
       _M_erase(iterator __pos);
 
+      _GLIBCXX_CEST_CONSTEXPR
       iterator
       _M_erase(iterator __first, iterator __last);
 
 #if __cplusplus >= 201103L
       // Called by resize(sz).
+      _GLIBCXX_CEST_CONSTEXPR
       void
       _M_default_append(size_type __n);
 
+      _GLIBCXX_CEST_CONSTEXPR
       bool
       _M_shrink_to_fit();
 #endif
 
       ///@{
       /// Memory-handling helpers for the previous internal insert functions.
+      _GLIBCXX_CEST_CONSTEXPR
       iterator
       _M_reserve_elements_at_front(size_type __n)
       {
@@ -2138,6 +2306,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 	return this->_M_impl._M_start - difference_type(__n);
       }
 
+      _GLIBCXX_CEST_CONSTEXPR
       iterator
       _M_reserve_elements_at_back(size_type __n)
       {
@@ -2148,9 +2317,11 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 	return this->_M_impl._M_finish + difference_type(__n);
       }
 
+      _GLIBCXX_CEST_CONSTEXPR
       void
       _M_new_elements_at_front(size_type __new_elements);
 
+      _GLIBCXX_CEST_CONSTEXPR
       void
       _M_new_elements_at_back(size_type __new_elements);
       ///@}
@@ -2164,6 +2335,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  actually add the nodes.  Can invalidate _M_map pointers.
        *  (And consequently, %deque iterators.)
        */
+      _GLIBCXX_CEST_CONSTEXPR
       void
       _M_reserve_map_at_back(size_type __nodes_to_add = 1)
       {
@@ -2172,6 +2344,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 	  _M_reallocate_map(__nodes_to_add, false);
       }
 
+      _GLIBCXX_CEST_CONSTEXPR
       void
       _M_reserve_map_at_front(size_type __nodes_to_add = 1)
       {
@@ -2180,6 +2353,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 	  _M_reallocate_map(__nodes_to_add, true);
       }
 
+      _GLIBCXX_CEST_CONSTEXPR
       void
       _M_reallocate_map(size_type __nodes_to_add, bool __add_at_front);
       ///@}
@@ -2187,6 +2361,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 #if __cplusplus >= 201103L
       // Constant-time, nothrow move assignment when source object's memory
       // can be moved because the allocators are equal.
+      _GLIBCXX_CEST_CONSTEXPR
       void
       _M_move_assign1(deque&& __x, /* always equal: */ true_type) noexcept
       {
@@ -2198,6 +2373,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
       // When the allocators are not equal the operation could throw, because
       // we might need to allocate a new map for __x after moving from it
       // or we might need to allocate new elements for *this.
+      _GLIBCXX_CEST_CONSTEXPR
       void
       _M_move_assign1(deque&& __x, /* always equal: */ false_type)
       {
@@ -2212,6 +2388,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
       // Destroy all elements and deallocate all memory, then replace
       // with elements created from __args.
       template<typename... _Args>
+      _GLIBCXX_CEST_CONSTEXPR
       void
       _M_replace_map(_Args&&... __args)
       {
@@ -2228,6 +2405,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
       }
 
       // Do move assignment when the allocator propagates.
+      _GLIBCXX_CEST_CONSTEXPR
       void
       _M_move_assign2(deque&& __x, /* propagate: */ true_type)
       {
@@ -2242,6 +2420,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 
       // Do move assignment when it may not be possible to move source
       // object's memory, resulting in a linear-time operation.
+      _GLIBCXX_CEST_CONSTEXPR
       void
       _M_move_assign2(deque&& __x, /* propagate: */ false_type)
       {
@@ -2286,6 +2465,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
   */
   template<typename _Tp, typename _Alloc>
     _GLIBCXX_NODISCARD
+    _GLIBCXX_CEST_CONSTEXPR
     inline bool
     operator==(const deque<_Tp, _Alloc>& __x, const deque<_Tp, _Alloc>& __y)
     { return __x.size() == __y.size()
@@ -2305,6 +2485,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
   */
   template<typename _Tp, typename _Alloc>
     [[nodiscard]]
+    _GLIBCXX_CEST_CONSTEXPR
     inline __detail::__synth3way_t<_Tp>
     operator<=>(const deque<_Tp, _Alloc>& __x, const deque<_Tp, _Alloc>& __y)
     {
@@ -2362,6 +2543,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 
   /// See std::deque::swap().
   template<typename _Tp, typename _Alloc>
+    _GLIBCXX_CEST_CONSTEXPR
     inline void
     swap(deque<_Tp,_Alloc>& __x, deque<_Tp,_Alloc>& __y)
     _GLIBCXX_NOEXCEPT_IF(noexcept(__x.swap(__y)))

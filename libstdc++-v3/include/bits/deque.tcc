@@ -65,6 +65,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 
 #if __cplusplus >= 201103L
   template <typename _Tp, typename _Alloc>
+    _GLIBCXX_CEST_CONSTEXPR
     void
     deque<_Tp, _Alloc>::
     _M_default_initialize()
@@ -91,6 +92,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 #endif
 
   template <typename _Tp, typename _Alloc>
+    _GLIBCXX_CEST_CONSTEXPR
     deque<_Tp, _Alloc>&
     deque<_Tp, _Alloc>::
     operator=(const deque& __x)
@@ -133,6 +135,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
   template<typename _Tp, typename _Alloc>
     template<typename... _Args>
 #if __cplusplus > 201402L
+      _GLIBCXX_CEST_CONSTEXPR
       typename deque<_Tp, _Alloc>::reference
 #else
       void
@@ -157,6 +160,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
   template<typename _Tp, typename _Alloc>
     template<typename... _Args>
 #if __cplusplus > 201402L
+      _GLIBCXX_CEST_CONSTEXPR
       typename deque<_Tp, _Alloc>::reference
 #else
       void
@@ -183,6 +187,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 #if __cplusplus >= 201103L
   template<typename _Tp, typename _Alloc>
     template<typename... _Args>
+      _GLIBCXX_CEST_CONSTEXPR
       typename deque<_Tp, _Alloc>::iterator
       deque<_Tp, _Alloc>::
       emplace(const_iterator __position, _Args&&... __args)
@@ -206,6 +211,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 #endif
 
   template <typename _Tp, typename _Alloc>
+    _GLIBCXX_CEST_CONSTEXPR
     typename deque<_Tp, _Alloc>::iterator
     deque<_Tp, _Alloc>::
 #if __cplusplus >= 201103L
@@ -231,6 +237,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
    }
 
   template <typename _Tp, typename _Alloc>
+    _GLIBCXX_CEST_CONSTEXPR
     typename deque<_Tp, _Alloc>::iterator
     deque<_Tp, _Alloc>::
     _M_erase(iterator __position)
@@ -254,6 +261,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
     }
 
   template <typename _Tp, typename _Alloc>
+    _GLIBCXX_CEST_CONSTEXPR
     typename deque<_Tp, _Alloc>::iterator
     deque<_Tp, _Alloc>::
     _M_erase(iterator __first, iterator __last)
@@ -287,6 +295,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 
   template <typename _Tp, class _Alloc>
     template <typename _InputIterator>
+      _GLIBCXX_CEST_CONSTEXPR
       void
       deque<_Tp, _Alloc>::
       _M_assign_aux(_InputIterator __first, _InputIterator __last,
@@ -303,6 +312,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
       }
 
   template <typename _Tp, typename _Alloc>
+    _GLIBCXX_CEST_CONSTEXPR
     void
     deque<_Tp, _Alloc>::
     _M_fill_insert(iterator __pos, size_type __n, const value_type& __x)
@@ -346,6 +356,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 
 #if __cplusplus >= 201103L
   template <typename _Tp, typename _Alloc>
+    _GLIBCXX_CEST_CONSTEXPR
     void
     deque<_Tp, _Alloc>::
     _M_default_append(size_type __n)
@@ -370,6 +381,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
     }
 
   template <typename _Tp, typename _Alloc>
+    _GLIBCXX_CEST_CONSTEXPR
     bool
     deque<_Tp, _Alloc>::
     _M_shrink_to_fit()
@@ -389,6 +401,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 #endif
 
   template <typename _Tp, typename _Alloc>
+    _GLIBCXX_CEST_CONSTEXPR
     void
     deque<_Tp, _Alloc>::
     _M_fill_initialize(const value_type& __value)
@@ -415,6 +428,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 
   template <typename _Tp, typename _Alloc>
     template <typename _InputIterator>
+      _GLIBCXX_CEST_CONSTEXPR
       void
       deque<_Tp, _Alloc>::
       _M_range_initialize(_InputIterator __first, _InputIterator __last,
@@ -439,6 +453,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 
   template <typename _Tp, typename _Alloc>
     template <typename _ForwardIterator>
+      _GLIBCXX_CEST_CONSTEXPR
       void
       deque<_Tp, _Alloc>::
       _M_range_initialize(_ForwardIterator __first, _ForwardIterator __last,
@@ -480,6 +495,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
   template<typename _Tp, typename _Alloc>
 #if __cplusplus >= 201103L
     template<typename... _Args>
+      _GLIBCXX_CEST_CONSTEXPR
       void
       deque<_Tp, _Alloc>::
       _M_push_back_aux(_Args&&... __args)
@@ -519,6 +535,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
   template<typename _Tp, typename _Alloc>
 #if __cplusplus >= 201103L
     template<typename... _Args>
+      _GLIBCXX_CEST_CONSTEXPR
       void
       deque<_Tp, _Alloc>::
       _M_push_front_aux(_Args&&... __args)
@@ -557,6 +574,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 
   // Called only if _M_impl._M_finish._M_cur == _M_impl._M_finish._M_first.
   template <typename _Tp, typename _Alloc>
+    _GLIBCXX_CEST_CONSTEXPR
     void deque<_Tp, _Alloc>::
     _M_pop_back_aux()
     {
@@ -573,6 +591,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
   //   _M_impl._M_start._M_cur == _M_impl._M_start._M_last,
   // then the deque must have at least two nodes.
   template <typename _Tp, typename _Alloc>
+    _GLIBCXX_CEST_CONSTEXPR
     void deque<_Tp, _Alloc>::
     _M_pop_front_aux()
     {
@@ -585,6 +604,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 
   template <typename _Tp, typename _Alloc>
     template <typename _InputIterator>
+      _GLIBCXX_CEST_CONSTEXPR
       void
       deque<_Tp, _Alloc>::
       _M_range_insert_aux(iterator __pos,
@@ -594,6 +614,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 
   template <typename _Tp, typename _Alloc>
     template <typename _ForwardIterator>
+      _GLIBCXX_CEST_CONSTEXPR
       void
       deque<_Tp, _Alloc>::
       _M_range_insert_aux(iterator __pos,
@@ -641,6 +662,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
   template<typename _Tp, typename _Alloc>
 #if __cplusplus >= 201103L
     template<typename... _Args>
+      _GLIBCXX_CEST_CONSTEXPR
       typename deque<_Tp, _Alloc>::iterator
       deque<_Tp, _Alloc>::
       _M_insert_aux(iterator __pos, _Args&&... __args)
@@ -681,6 +703,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
       }
 
   template <typename _Tp, typename _Alloc>
+    _GLIBCXX_CEST_CONSTEXPR
     void
     deque<_Tp, _Alloc>::
     _M_insert_aux(iterator __pos, size_type __n, const value_type& __x)
@@ -767,6 +790,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 
   template <typename _Tp, typename _Alloc>
     template <typename _ForwardIterator>
+      _GLIBCXX_CEST_CONSTEXPR
       void
       deque<_Tp, _Alloc>::
       _M_insert_aux(iterator __pos,
@@ -855,6 +879,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
       }
 
    template<typename _Tp, typename _Alloc>
+     _GLIBCXX_CEST_CONSTEXPR
      void
      deque<_Tp, _Alloc>::
      _M_destroy_data_aux(iterator __first, iterator __last)
@@ -877,6 +902,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
      }
 
   template <typename _Tp, typename _Alloc>
+    _GLIBCXX_CEST_CONSTEXPR
     void
     deque<_Tp, _Alloc>::
     _M_new_elements_at_front(size_type __new_elems)
@@ -902,6 +928,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
     }
 
   template <typename _Tp, typename _Alloc>
+    _GLIBCXX_CEST_CONSTEXPR
     void
     deque<_Tp, _Alloc>::
     _M_new_elements_at_back(size_type __new_elems)
@@ -927,6 +954,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
     }
 
   template <typename _Tp, typename _Alloc>
+    _GLIBCXX_CEST_CONSTEXPR
     void
     deque<_Tp, _Alloc>::
     _M_reallocate_map(size_type __nodes_to_add, bool __add_at_front)
@@ -977,6 +1005,7 @@ _GLIBCXX_END_NAMESPACE_CONTAINER
   // Overload for deque::iterators, exploiting the "segmented-iterator
   // optimization".
   template<typename _Tp, typename _VTp>
+    _GLIBCXX_CEST_CONSTEXPR
     void
     __fill_a1(const _GLIBCXX_STD_C::_Deque_iterator<_Tp, _Tp&, _Tp*>& __first,
 	      const _GLIBCXX_STD_C::_Deque_iterator<_Tp, _Tp&, _Tp*>& __last,
@@ -999,6 +1028,7 @@ _GLIBCXX_END_NAMESPACE_CONTAINER
 
   template<bool _IsMove,
 	   typename _Tp, typename _Ref, typename _Ptr, typename _OI>
+    _GLIBCXX_CEST_CONSTEXPR
     _OI
     __copy_move_dit(_GLIBCXX_STD_C::_Deque_iterator<_Tp, _Ref, _Ptr> __first,
 		    _GLIBCXX_STD_C::_Deque_iterator<_Tp, _Ref, _Ptr> __last,
@@ -1028,6 +1058,7 @@ _GLIBCXX_END_NAMESPACE_CONTAINER
 
   template<bool _IsMove,
 	   typename _Tp, typename _Ref, typename _Ptr, typename _OI>
+    _GLIBCXX_CEST_CONSTEXPR
     _OI
     __copy_move_a1(_GLIBCXX_STD_C::_Deque_iterator<_Tp, _Ref, _Ptr> __first,
 		   _GLIBCXX_STD_C::_Deque_iterator<_Tp, _Ref, _Ptr> __last,
@@ -1036,6 +1067,7 @@ _GLIBCXX_END_NAMESPACE_CONTAINER
 
   template<bool _IsMove,
 	   typename _ITp, typename _IRef, typename _IPtr, typename _OTp>
+    _GLIBCXX_CEST_CONSTEXPR
     _GLIBCXX_STD_C::_Deque_iterator<_OTp, _OTp&, _OTp*>
     __copy_move_a1(_GLIBCXX_STD_C::_Deque_iterator<_ITp, _IRef, _IPtr> __first,
 		   _GLIBCXX_STD_C::_Deque_iterator<_ITp, _IRef, _IPtr> __last,
@@ -1043,6 +1075,7 @@ _GLIBCXX_END_NAMESPACE_CONTAINER
     { return __copy_move_dit<_IsMove>(__first, __last, __result); }
 
   template<bool _IsMove, typename _II, typename _Tp>
+    _GLIBCXX_CEST_CONSTEXPR
     typename __gnu_cxx::__enable_if<
       __is_random_access_iter<_II>::__value,
       _GLIBCXX_STD_C::_Deque_iterator<_Tp, _Tp&, _Tp*> >::__type
@@ -1069,6 +1102,7 @@ _GLIBCXX_END_NAMESPACE_CONTAINER
     }
 
   template<bool _IsMove, typename _CharT>
+    _GLIBCXX_CEST_CONSTEXPR
     typename __gnu_cxx::__enable_if<
       __is_char<_CharT>::__value,
       _GLIBCXX_STD_C::_Deque_iterator<_CharT, _CharT&, _CharT*> >::__type
@@ -1096,6 +1130,7 @@ _GLIBCXX_END_NAMESPACE_CONTAINER
     }
 
   template<typename _CharT, typename _Size>
+    _GLIBCXX_CEST_CONSTEXPR
     typename __gnu_cxx::__enable_if<
       __is_char<_CharT>::__value,
       _GLIBCXX_STD_C::_Deque_iterator<_CharT, _CharT&, _CharT*> >::__type
@@ -1121,6 +1156,7 @@ _GLIBCXX_END_NAMESPACE_CONTAINER
 
   template<bool _IsMove,
 	   typename _Tp, typename _Ref, typename _Ptr, typename _OI>
+    _GLIBCXX_CEST_CONSTEXPR
     _OI
     __copy_move_backward_dit(
 		_GLIBCXX_STD_C::_Deque_iterator<_Tp, _Ref, _Ptr> __first,
@@ -1148,6 +1184,7 @@ _GLIBCXX_END_NAMESPACE_CONTAINER
 
   template<bool _IsMove,
 	   typename _Tp, typename _Ref, typename _Ptr, typename _OI>
+    _GLIBCXX_CEST_CONSTEXPR
     _OI
     __copy_move_backward_a1(
 		_GLIBCXX_STD_C::_Deque_iterator<_Tp, _Ref, _Ptr> __first,
@@ -1157,6 +1194,7 @@ _GLIBCXX_END_NAMESPACE_CONTAINER
 
   template<bool _IsMove,
 	   typename _ITp, typename _IRef, typename _IPtr, typename _OTp>
+    _GLIBCXX_CEST_CONSTEXPR
     _GLIBCXX_STD_C::_Deque_iterator<_OTp, _OTp&, _OTp*>
     __copy_move_backward_a1(
 		_GLIBCXX_STD_C::_Deque_iterator<_ITp, _IRef, _IPtr> __first,
@@ -1165,6 +1203,7 @@ _GLIBCXX_END_NAMESPACE_CONTAINER
     { return __copy_move_backward_dit<_IsMove>(__first, __last, __result); }
 
   template<bool _IsMove, typename _II, typename _Tp>
+    _GLIBCXX_CEST_CONSTEXPR
     typename __gnu_cxx::__enable_if<
       __is_random_access_iter<_II>::__value,
       _GLIBCXX_STD_C::_Deque_iterator<_Tp, _Tp&, _Tp*> >::__type
@@ -1197,6 +1236,7 @@ _GLIBCXX_END_NAMESPACE_CONTAINER
     }
 
   template<typename _Tp, typename _Ref, typename _Ptr, typename _II>
+    _GLIBCXX_CEST_CONSTEXPR
     bool
     __equal_dit(
 	const _GLIBCXX_STD_C::_Deque_iterator<_Tp, _Ref, _Ptr>& __first1,
@@ -1224,6 +1264,7 @@ _GLIBCXX_END_NAMESPACE_CONTAINER
     }
 
   template<typename _Tp, typename _Ref, typename _Ptr, typename _II>
+    _GLIBCXX_CEST_CONSTEXPR
     typename __gnu_cxx::__enable_if<
       __is_random_access_iter<_II>::__value, bool>::__type
     __equal_aux1(_GLIBCXX_STD_C::_Deque_iterator<_Tp, _Ref, _Ptr> __first1,
@@ -1233,6 +1274,7 @@ _GLIBCXX_END_NAMESPACE_CONTAINER
 
   template<typename _Tp1, typename _Ref1, typename _Ptr1,
 	   typename _Tp2, typename _Ref2, typename _Ptr2>
+    _GLIBCXX_CEST_CONSTEXPR
     bool
     __equal_aux1(_GLIBCXX_STD_C::_Deque_iterator<_Tp1, _Ref1, _Ptr1> __first1,
 		 _GLIBCXX_STD_C::_Deque_iterator<_Tp1, _Ref1, _Ptr1> __last1,
@@ -1240,6 +1282,7 @@ _GLIBCXX_END_NAMESPACE_CONTAINER
     { return std::__equal_dit(__first1, __last1, __first2); }
 
   template<typename _II, typename _Tp, typename _Ref, typename _Ptr>
+    _GLIBCXX_CEST_CONSTEXPR
     typename __gnu_cxx::__enable_if<
       __is_random_access_iter<_II>::__value, bool>::__type
     __equal_aux1(_II __first1, _II __last1,
@@ -1265,6 +1308,7 @@ _GLIBCXX_END_NAMESPACE_CONTAINER
     }
 
   template<typename _Tp1, typename _Ref, typename _Ptr, typename _Tp2>
+    _GLIBCXX_CEST_CONSTEXPR
     int
     __lex_cmp_dit(
 	_GLIBCXX_STD_C::_Deque_iterator<_Tp1, _Ref, _Ptr> __first1,
@@ -1303,6 +1347,7 @@ _GLIBCXX_END_NAMESPACE_CONTAINER
 
   template<typename _Tp1, typename _Ref1, typename _Ptr1,
 	   typename _Tp2>
+    _GLIBCXX_CEST_CONSTEXPR
     inline bool
     __lexicographical_compare_aux1(
 	_GLIBCXX_STD_C::_Deque_iterator<_Tp1, _Ref1, _Ptr1> __first1,
@@ -1312,6 +1357,7 @@ _GLIBCXX_END_NAMESPACE_CONTAINER
 
   template<typename _Tp1,
 	   typename _Tp2, typename _Ref2, typename _Ptr2>
+    _GLIBCXX_CEST_CONSTEXPR
     inline  bool
     __lexicographical_compare_aux1(_Tp1* __first1, _Tp1* __last1,
 	_GLIBCXX_STD_C::_Deque_iterator<_Tp2, _Ref2, _Ptr2> __first2,
@@ -1320,6 +1366,7 @@ _GLIBCXX_END_NAMESPACE_CONTAINER
 
   template<typename _Tp1, typename _Ref1, typename _Ptr1,
 	   typename _Tp2, typename _Ref2, typename _Ptr2>
+    _GLIBCXX_CEST_CONSTEXPR
     inline bool
     __lexicographical_compare_aux1(
 		_GLIBCXX_STD_C::_Deque_iterator<_Tp1, _Ref1, _Ptr1> __first1,
