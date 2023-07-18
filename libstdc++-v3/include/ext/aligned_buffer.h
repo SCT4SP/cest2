@@ -91,7 +91,7 @@ namespace __gnu_cxx
 
       _GLIBCXX_CEST_CONSTEXPR
       __constexpr_buffer()
-        : _M_storage_ptr{std::allocator<_Tp>().allocate(1)} { }
+        : _M_storage_ptr{ std::allocator<_Tp>().allocate(1) } {}
 
       // Can be used to avoid value-initialization
       _GLIBCXX_CEST_CONSTEXPR
@@ -100,7 +100,7 @@ namespace __gnu_cxx
       _GLIBCXX_CEST_CONSTEXPR
       ~__constexpr_buffer()
       {
-        std::allocator<_Tp>().deallocate(_M_storage_ptr,1);
+        std::allocator<_Tp>().deallocate(_M_storage_ptr, 1);
       }
 
       _GLIBCXX_CEST_CONSTEXPR

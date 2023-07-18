@@ -83,19 +83,24 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       _List_node_base* _M_next;
       _List_node_base* _M_prev;
 
+      _GLIBCXX_CEST_CONSTEXPR
       static void
       swap(_List_node_base& __x, _List_node_base& __y) _GLIBCXX_USE_NOEXCEPT;
 
+      _GLIBCXX_CEST_CONSTEXPR
       void
       _M_transfer(_List_node_base* const __first,
 		  _List_node_base* const __last) _GLIBCXX_USE_NOEXCEPT;
 
+      _GLIBCXX_CEST_CONSTEXPR
       void
       _M_reverse() _GLIBCXX_USE_NOEXCEPT;
 
+      _GLIBCXX_CEST_CONSTEXPR
       void
       _M_hook(_List_node_base* const __position) _GLIBCXX_USE_NOEXCEPT;
 
+      _GLIBCXX_CEST_CONSTEXPR
       void
       _M_unhook() _GLIBCXX_USE_NOEXCEPT;
     };
@@ -107,10 +112,12 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       std::size_t _M_size;
 #endif
 
+      _GLIBCXX_CEST_CONSTEXPR
       _List_node_header() _GLIBCXX_NOEXCEPT
       { _M_init(); }
 
 #if __cplusplus >= 201103L
+      _GLIBCXX_CEST_CONSTEXPR
       _List_node_header(_List_node_header&& __x) noexcept
       : _List_node_base{ __x._M_next, __x._M_prev }
 # if _GLIBCXX_USE_CXX11_ABI
@@ -146,6 +153,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       }
 #endif
 
+      _GLIBCXX_CEST_CONSTEXPR
       void
       _M_init() _GLIBCXX_NOEXCEPT
       {
@@ -234,8 +242,14 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
     struct _List_node : public __detail::_List_node_base
     {
 #if __cplusplus >= 201103L
+# if _GLIBCXX_CEST_VERSION
+      __gnu_cxx::__aligned_buffer<_Tp> _M_storage;
+# else
       __gnu_cxx::__aligned_membuf<_Tp> _M_storage;
+# endif
+      _GLIBCXX_CEST_CONSTEXPR
       _Tp*       _M_valptr()       { return _M_storage._M_ptr(); }
+      _GLIBCXX_CEST_CONSTEXPR
       _Tp const* _M_valptr() const { return _M_storage._M_ptr(); }
 #else
       _Tp _M_data;
@@ -261,28 +275,34 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
       typedef _Tp*				pointer;
       typedef _Tp&				reference;
 
+      _GLIBCXX_CEST_CONSTEXPR
       _List_iterator() _GLIBCXX_NOEXCEPT
       : _M_node() { }
 
       explicit
+      _GLIBCXX_CEST_CONSTEXPR
       _List_iterator(__detail::_List_node_base* __x) _GLIBCXX_NOEXCEPT
       : _M_node(__x) { }
 
+      _GLIBCXX_CEST_CONSTEXPR
       _Self
       _M_const_cast() const _GLIBCXX_NOEXCEPT
       { return *this; }
 
       // Must downcast from _List_node_base to _List_node to get to value.
       _GLIBCXX_NODISCARD
+      _GLIBCXX_CEST_CONSTEXPR
       reference
       operator*() const _GLIBCXX_NOEXCEPT
       { return *static_cast<_Node*>(_M_node)->_M_valptr(); }
 
       _GLIBCXX_NODISCARD
+      _GLIBCXX_CEST_CONSTEXPR
       pointer
       operator->() const _GLIBCXX_NOEXCEPT
       { return static_cast<_Node*>(_M_node)->_M_valptr(); }
 
+      _GLIBCXX_CEST_CONSTEXPR
       _Self&
       operator++() _GLIBCXX_NOEXCEPT
       {
@@ -290,6 +310,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 	return *this;
       }
 
+      _GLIBCXX_CEST_CONSTEXPR
       _Self
       operator++(int) _GLIBCXX_NOEXCEPT
       {
@@ -298,6 +319,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 	return __tmp;
       }
 
+      _GLIBCXX_CEST_CONSTEXPR
       _Self&
       operator--() _GLIBCXX_NOEXCEPT
       {
@@ -305,6 +327,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 	return *this;
       }
 
+      _GLIBCXX_CEST_CONSTEXPR
       _Self
       operator--(int) _GLIBCXX_NOEXCEPT
       {
@@ -314,12 +337,14 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
       }
 
       _GLIBCXX_NODISCARD
+      _GLIBCXX_CEST_CONSTEXPR
       friend bool
       operator==(const _Self& __x, const _Self& __y) _GLIBCXX_NOEXCEPT
       { return __x._M_node == __y._M_node; }
 
 #if __cpp_impl_three_way_comparison < 201907L
       _GLIBCXX_NODISCARD
+      _GLIBCXX_CEST_CONSTEXPR
       friend bool
       operator!=(const _Self& __x, const _Self& __y) _GLIBCXX_NOEXCEPT
       { return __x._M_node != __y._M_node; }
@@ -347,32 +372,39 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
       typedef const _Tp*			pointer;
       typedef const _Tp&			reference;
 
+      _GLIBCXX_CEST_CONSTEXPR
       _List_const_iterator() _GLIBCXX_NOEXCEPT
       : _M_node() { }
 
       explicit
+      _GLIBCXX_CEST_CONSTEXPR
       _List_const_iterator(const __detail::_List_node_base* __x)
       _GLIBCXX_NOEXCEPT
       : _M_node(__x) { }
 
+      _GLIBCXX_CEST_CONSTEXPR
       _List_const_iterator(const iterator& __x) _GLIBCXX_NOEXCEPT
       : _M_node(__x._M_node) { }
 
+      _GLIBCXX_CEST_CONSTEXPR
       iterator
       _M_const_cast() const _GLIBCXX_NOEXCEPT
       { return iterator(const_cast<__detail::_List_node_base*>(_M_node)); }
 
       // Must downcast from List_node_base to _List_node to get to value.
       _GLIBCXX_NODISCARD
+      _GLIBCXX_CEST_CONSTEXPR
       reference
       operator*() const _GLIBCXX_NOEXCEPT
       { return *static_cast<_Node*>(_M_node)->_M_valptr(); }
 
       _GLIBCXX_NODISCARD
+      _GLIBCXX_CEST_CONSTEXPR
       pointer
       operator->() const _GLIBCXX_NOEXCEPT
       { return static_cast<_Node*>(_M_node)->_M_valptr(); }
 
+      _GLIBCXX_CEST_CONSTEXPR
       _Self&
       operator++() _GLIBCXX_NOEXCEPT
       {
@@ -380,6 +412,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 	return *this;
       }
 
+      _GLIBCXX_CEST_CONSTEXPR
       _Self
       operator++(int) _GLIBCXX_NOEXCEPT
       {
@@ -388,6 +421,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 	return __tmp;
       }
 
+      _GLIBCXX_CEST_CONSTEXPR
       _Self&
       operator--() _GLIBCXX_NOEXCEPT
       {
@@ -395,6 +429,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 	return *this;
       }
 
+      _GLIBCXX_CEST_CONSTEXPR
       _Self
       operator--(int) _GLIBCXX_NOEXCEPT
       {
@@ -404,12 +439,14 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
       }
 
       _GLIBCXX_NODISCARD
+      _GLIBCXX_CEST_CONSTEXPR
       friend bool
       operator==(const _Self& __x, const _Self& __y) _GLIBCXX_NOEXCEPT
       { return __x._M_node == __y._M_node; }
 
 #if __cpp_impl_three_way_comparison < 201907L
       _GLIBCXX_NODISCARD
+      _GLIBCXX_CEST_CONSTEXPR
       friend bool
       operator!=(const _Self& __x, const _Self& __y) _GLIBCXX_NOEXCEPT
       { return __x._M_node != __y._M_node; }
@@ -452,11 +489,13 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
       {
 	__detail::_List_node_header _M_node;
 
+	_GLIBCXX_CEST_CONSTEXPR
 	_List_impl() _GLIBCXX_NOEXCEPT_IF(
 	    is_nothrow_default_constructible<_Node_alloc_type>::value)
 	: _Node_alloc_type()
 	{ }
 
+	_GLIBCXX_CEST_CONSTEXPR
 	_List_impl(const _Node_alloc_type& __a) _GLIBCXX_NOEXCEPT
 	: _Node_alloc_type(__a)
 	{ }
@@ -464,10 +503,12 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
 #if __cplusplus >= 201103L
 	_List_impl(_List_impl&&) = default;
 
+	_GLIBCXX_CEST_CONSTEXPR
 	_List_impl(_Node_alloc_type&& __a, _List_impl&& __x)
 	: _Node_alloc_type(std::move(__a)), _M_node(std::move(__x._M_node))
 	{ }
 
+	_GLIBCXX_CEST_CONSTEXPR
 	_List_impl(_Node_alloc_type&& __a) noexcept
 	: _Node_alloc_type(std::move(__a))
 	{ }
@@ -477,12 +518,16 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
       _List_impl _M_impl;
 
 #if _GLIBCXX_USE_CXX11_ABI
+      _GLIBCXX_CEST_CONSTEXPR
       size_t _M_get_size() const { return _M_impl._M_node._M_size; }
 
+      _GLIBCXX_CEST_CONSTEXPR
       void _M_set_size(size_t __n) { _M_impl._M_node._M_size = __n; }
 
+      _GLIBCXX_CEST_CONSTEXPR
       void _M_inc_size(size_t __n) { _M_impl._M_node._M_size += __n; }
 
+      _GLIBCXX_CEST_CONSTEXPR
       void _M_dec_size(size_t __n) { _M_impl._M_node._M_size -= __n; }
 
 # if !_GLIBCXX_INLINE_VERSION
@@ -513,21 +558,37 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
 # endif
 #endif
 
+      _GLIBCXX_CEST_CONSTEXPR
       typename _Node_alloc_traits::pointer
       _M_get_node()
-      { return _Node_alloc_traits::allocate(_M_impl, 1); }
+      {
+        typename _Node_alloc_traits::pointer __p =
+          _Node_alloc_traits::allocate(_M_impl, 1);
+#if _GLIBCXX_CEST_VERSION
+        _Node_alloc_traits::construct(_M_impl, __p);
+#endif
+        return __p;
+      }
 
+      _GLIBCXX_CEST_CONSTEXPR
       void
       _M_put_node(typename _Node_alloc_traits::pointer __p) _GLIBCXX_NOEXCEPT
-      { _Node_alloc_traits::deallocate(_M_impl, __p, 1); }
+      {
+#if _GLIBCXX_CEST_VERSION
+        _Node_alloc_traits::destroy(_M_impl, __p);
+#endif
+        _Node_alloc_traits::deallocate(_M_impl, __p, 1);
+      }
 
   public:
       typedef _Alloc allocator_type;
 
+      _GLIBCXX_CEST_CONSTEXPR
       _Node_alloc_type&
       _M_get_Node_allocator() _GLIBCXX_NOEXCEPT
       { return _M_impl; }
 
+      _GLIBCXX_CEST_CONSTEXPR
       const _Node_alloc_type&
       _M_get_Node_allocator() const _GLIBCXX_NOEXCEPT
       { return _M_impl; }
@@ -538,6 +599,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
       _List_base() { }
 #endif
 
+      _GLIBCXX_CEST_CONSTEXPR
       _List_base(const _Node_alloc_type& __a) _GLIBCXX_NOEXCEPT
       : _M_impl(__a)
       { }
@@ -556,27 +618,33 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
 # endif
 
       // Used when allocator is_always_equal.
+      _GLIBCXX_CEST_CONSTEXPR
       _List_base(_Node_alloc_type&& __a, _List_base&& __x)
       : _M_impl(std::move(__a), std::move(__x._M_impl))
       { }
 
       // Used when allocator !is_always_equal.
+      _GLIBCXX_CEST_CONSTEXPR
       _List_base(_Node_alloc_type&& __a)
       : _M_impl(std::move(__a))
       { }
 
+      _GLIBCXX_CEST_CONSTEXPR
       void
       _M_move_nodes(_List_base&& __x)
       { _M_impl._M_node._M_move_nodes(std::move(__x._M_impl._M_node)); }
 #endif
 
       // This is what actually destroys the list.
+      _GLIBCXX_CEST_CONSTEXPR
       ~_List_base() _GLIBCXX_NOEXCEPT
       { _M_clear(); }
 
+      _GLIBCXX_CEST_CONSTEXPR
       void
       _M_clear() _GLIBCXX_NOEXCEPT;
 
+      _GLIBCXX_CEST_CONSTEXPR
       void
       _M_init() _GLIBCXX_NOEXCEPT
       { this->_M_impl._M_node._M_init(); }
@@ -704,6 +772,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
       }
 #else
       template<typename... _Args>
+	_GLIBCXX_CEST_CONSTEXPR
 	_Node*
 	_M_create_node(_Args&&... __args)
 	{
@@ -723,6 +792,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
       { return std::distance(__first, __last); }
 
       // return the stored size
+      _GLIBCXX_CEST_CONSTEXPR
       size_t
       _M_node_count() const
       { return this->_M_get_size(); }
@@ -756,6 +826,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        *  @param  __a  An allocator object.
        */
       explicit
+      _GLIBCXX_CEST_CONSTEXPR
       list(const allocator_type& __a) _GLIBCXX_NOEXCEPT
       : _Base(_Node_alloc_type(__a)) { }
 
@@ -769,6 +840,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        *  constructed elements.
        */
       explicit
+      _GLIBCXX_CEST_CONSTEXPR
       list(size_type __n, const allocator_type& __a = allocator_type())
       : _Base(_Node_alloc_type(__a))
       { _M_default_initialize(__n); }
@@ -781,6 +853,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        *
        *  This constructor fills the %list with @a __n copies of @a __value.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       list(size_type __n, const value_type& __value,
 	   const allocator_type& __a = allocator_type())
       : _Base(_Node_alloc_type(__a))
@@ -795,6 +868,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        *  This constructor fills the %list with @a __n copies of @a __value.
        */
       explicit
+      _GLIBCXX_CEST_CONSTEXPR
       list(size_type __n, const value_type& __value = value_type(),
 	   const allocator_type& __a = allocator_type())
       : _Base(_Node_alloc_type(__a))
@@ -808,6 +882,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        *  The newly-created %list uses a copy of the allocation object used
        *  by @a __x (unless the allocator traits dictate a different object).
        */
+      _GLIBCXX_CEST_CONSTEXPR
       list(const list& __x)
       : _Base(_Node_alloc_traits::
 	      _S_select_on_copy(__x._M_get_Node_allocator()))
@@ -831,20 +906,24 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        *  Create a %list consisting of copies of the elements in the
        *  initializer_list @a __l.  This is linear in __l.size().
        */
+      _GLIBCXX_CEST_CONSTEXPR
       list(initializer_list<value_type> __l,
 	   const allocator_type& __a = allocator_type())
       : _Base(_Node_alloc_type(__a))
       { _M_initialize_dispatch(__l.begin(), __l.end(), __false_type()); }
 
+      _GLIBCXX_CEST_CONSTEXPR
       list(const list& __x, const __type_identity_t<allocator_type>& __a)
       : _Base(_Node_alloc_type(__a))
       { _M_initialize_dispatch(__x.begin(), __x.end(), __false_type()); }
 
     private:
+      _GLIBCXX_CEST_CONSTEXPR
       list(list&& __x, const allocator_type& __a, true_type) noexcept
       : _Base(_Node_alloc_type(__a), std::move(__x))
       { }
 
+      _GLIBCXX_CEST_CONSTEXPR
       list(list&& __x, const allocator_type& __a, false_type)
       : _Base(_Node_alloc_type(__a))
       {
@@ -856,6 +935,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
       }
 
     public:
+      _GLIBCXX_CEST_CONSTEXPR
       list(list&& __x, const __type_identity_t<allocator_type>& __a)
       noexcept(_Node_alloc_traits::_S_always_equal())
       : list(std::move(__x), __a,
@@ -876,6 +956,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
 #if __cplusplus >= 201103L
       template<typename _InputIterator,
 	       typename = std::_RequireInputIter<_InputIterator>>
+	_GLIBCXX_CEST_CONSTEXPR
 	list(_InputIterator __first, _InputIterator __last,
 	     const allocator_type& __a = allocator_type())
 	: _Base(_Node_alloc_type(__a))
@@ -911,6 +992,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        *
        *  Whether the allocator is copied depends on the allocator traits.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       list&
       operator=(const list& __x);
 
@@ -925,6 +1007,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        *
        *  Whether the allocator is moved depends on the allocator traits.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       list&
       operator=(list&& __x)
       noexcept(_Node_alloc_traits::_S_nothrow_move())
@@ -943,6 +1026,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        *  Replace the contents of the %list with copies of the elements
        *  in the initializer_list @a __l.  This is linear in l.size().
        */
+      _GLIBCXX_CEST_CONSTEXPR
       list&
       operator=(initializer_list<value_type> __l)
       {
@@ -961,6 +1045,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        *  and that the resulting %list's size is the same as the number
        *  of elements assigned.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       void
       assign(size_type __n, const value_type& __val)
       { _M_fill_assign(__n, __val); }
@@ -980,6 +1065,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
 #if __cplusplus >= 201103L
       template<typename _InputIterator,
 	       typename = std::_RequireInputIter<_InputIterator>>
+	_GLIBCXX_CEST_CONSTEXPR
 	void
 	assign(_InputIterator __first, _InputIterator __last)
 	{ _M_assign_dispatch(__first, __last, __false_type()); }
@@ -1002,12 +1088,14 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        *  Replace the contents of the %list with copies of the elements
        *  in the initializer_list @a __l.  This is linear in __l.size().
        */
+      _GLIBCXX_CEST_CONSTEXPR
       void
       assign(initializer_list<value_type> __l)
       { this->_M_assign_dispatch(__l.begin(), __l.end(), __false_type()); }
 #endif
 
       /// Get a copy of the memory allocation object.
+      _GLIBCXX_CEST_CONSTEXPR
       allocator_type
       get_allocator() const _GLIBCXX_NOEXCEPT
       { return allocator_type(_Base::_M_get_Node_allocator()); }
@@ -1018,6 +1106,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        *  %list.  Iteration is done in ordinary element order.
        */
       _GLIBCXX_NODISCARD
+      _GLIBCXX_CEST_CONSTEXPR
       iterator
       begin() _GLIBCXX_NOEXCEPT
       { return iterator(this->_M_impl._M_node._M_next); }
@@ -1028,6 +1117,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        *  element order.
        */
       _GLIBCXX_NODISCARD
+      _GLIBCXX_CEST_CONSTEXPR
       const_iterator
       begin() const _GLIBCXX_NOEXCEPT
       { return const_iterator(this->_M_impl._M_node._M_next); }
@@ -1038,6 +1128,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        *  order.
        */
       _GLIBCXX_NODISCARD
+      _GLIBCXX_CEST_CONSTEXPR
       iterator
       end() _GLIBCXX_NOEXCEPT
       { return iterator(&this->_M_impl._M_node); }
@@ -1048,6 +1139,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        *  element order.
        */
       _GLIBCXX_NODISCARD
+      _GLIBCXX_CEST_CONSTEXPR
       const_iterator
       end() const _GLIBCXX_NOEXCEPT
       { return const_iterator(&this->_M_impl._M_node); }
@@ -1058,6 +1150,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        *  order.
        */
       _GLIBCXX_NODISCARD
+      _GLIBCXX_CEST_CONSTEXPR
       reverse_iterator
       rbegin() _GLIBCXX_NOEXCEPT
       { return reverse_iterator(end()); }
@@ -1068,6 +1161,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        *  element order.
        */
       _GLIBCXX_NODISCARD
+      _GLIBCXX_CEST_CONSTEXPR
       const_reverse_iterator
       rbegin() const _GLIBCXX_NOEXCEPT
       { return const_reverse_iterator(end()); }
@@ -1078,6 +1172,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        *  reverse element order.
        */
       _GLIBCXX_NODISCARD
+      _GLIBCXX_CEST_CONSTEXPR
       reverse_iterator
       rend() _GLIBCXX_NOEXCEPT
       { return reverse_iterator(begin()); }
@@ -1088,6 +1183,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        *  element order.
        */
       _GLIBCXX_NODISCARD
+      _GLIBCXX_CEST_CONSTEXPR
       const_reverse_iterator
       rend() const _GLIBCXX_NOEXCEPT
       { return const_reverse_iterator(begin()); }
@@ -1099,6 +1195,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        *  element order.
        */
       [[__nodiscard__]]
+      _GLIBCXX_CEST_CONSTEXPR
       const_iterator
       cbegin() const noexcept
       { return const_iterator(this->_M_impl._M_node._M_next); }
@@ -1109,6 +1206,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        *  element order.
        */
       [[__nodiscard__]]
+      _GLIBCXX_CEST_CONSTEXPR
       const_iterator
       cend() const noexcept
       { return const_iterator(&this->_M_impl._M_node); }
@@ -1119,6 +1217,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        *  element order.
        */
       [[__nodiscard__]]
+      _GLIBCXX_CEST_CONSTEXPR
       const_reverse_iterator
       crbegin() const noexcept
       { return const_reverse_iterator(end()); }
@@ -1129,6 +1228,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        *  element order.
        */
       [[__nodiscard__]]
+      _GLIBCXX_CEST_CONSTEXPR
       const_reverse_iterator
       crend() const noexcept
       { return const_reverse_iterator(begin()); }
@@ -1139,18 +1239,20 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        *  Returns true if the %list is empty.  (Thus begin() would equal
        *  end().)
        */
-      _GLIBCXX_NODISCARD bool
+      _GLIBCXX_NODISCARD _GLIBCXX_CEST_CONSTEXPR bool
       empty() const _GLIBCXX_NOEXCEPT
       { return this->_M_impl._M_node._M_next == &this->_M_impl._M_node; }
 
       /**  Returns the number of elements in the %list.  */
       _GLIBCXX_NODISCARD
+      _GLIBCXX_CEST_CONSTEXPR
       size_type
       size() const _GLIBCXX_NOEXCEPT
       { return _M_node_count(); }
 
       /**  Returns the size() of the largest possible %list.  */
       _GLIBCXX_NODISCARD
+      _GLIBCXX_CEST_CONSTEXPR
       size_type
       max_size() const _GLIBCXX_NOEXCEPT
       { return _Node_alloc_traits::max_size(_M_get_Node_allocator()); }
@@ -1201,6 +1303,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        *  element of the %list.
        */
       _GLIBCXX_NODISCARD
+      _GLIBCXX_CEST_CONSTEXPR
       reference
       front() _GLIBCXX_NOEXCEPT
       { return *begin(); }
@@ -1210,6 +1313,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        *  element of the %list.
        */
       _GLIBCXX_NODISCARD
+      _GLIBCXX_CEST_CONSTEXPR
       const_reference
       front() const _GLIBCXX_NOEXCEPT
       { return *begin(); }
@@ -1219,6 +1323,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        *  of the %list.
        */
       _GLIBCXX_NODISCARD
+      _GLIBCXX_CEST_CONSTEXPR
       reference
       back() _GLIBCXX_NOEXCEPT
       {
@@ -1232,6 +1337,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        *  element of the %list.
        */
       _GLIBCXX_NODISCARD
+      _GLIBCXX_CEST_CONSTEXPR
       const_reference
       back() const _GLIBCXX_NOEXCEPT
       {
@@ -1251,16 +1357,19 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        *  done in constant time, and does not invalidate iterators and
        *  references.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       void
       push_front(const value_type& __x)
       { this->_M_insert(begin(), __x); }
 
 #if __cplusplus >= 201103L
+      _GLIBCXX_CEST_CONSTEXPR
       void
       push_front(value_type&& __x)
       { this->_M_insert(begin(), std::move(__x)); }
 
       template<typename... _Args>
+	_GLIBCXX_CEST_CONSTEXPR
 #if __cplusplus > 201402L
 	reference
 #else
@@ -1287,6 +1396,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        *  is needed, it should be retrieved before pop_front() is
        *  called.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       void
       pop_front() _GLIBCXX_NOEXCEPT
       { this->_M_erase(begin()); }
@@ -1301,16 +1411,19 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        *  in constant time, and does not invalidate iterators and
        *  references.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       void
       push_back(const value_type& __x)
       { this->_M_insert(end(), __x); }
 
 #if __cplusplus >= 201103L
+      _GLIBCXX_CEST_CONSTEXPR
       void
       push_back(value_type&& __x)
       { this->_M_insert(end(), std::move(__x)); }
 
       template<typename... _Args>
+	_GLIBCXX_CEST_CONSTEXPR
 #if __cplusplus > 201402L
 	reference
 #else
@@ -1336,6 +1449,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        *  Note that no data is returned, and if the last element's data
        *  is needed, it should be retrieved before pop_back() is called.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       void
       pop_back() _GLIBCXX_NOEXCEPT
       { this->_M_erase(iterator(this->_M_impl._M_node._M_prev)); }
@@ -1354,6 +1468,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        *  and references.
        */
       template<typename... _Args>
+	_GLIBCXX_CEST_CONSTEXPR
 	iterator
 	emplace(const_iterator __position, _Args&&... __args);
 
@@ -1368,6 +1483,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        *  operation can be done in constant time, and does not
        *  invalidate iterators and references.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       iterator
       insert(const_iterator __position, const value_type& __x);
 #else
@@ -1398,6 +1514,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        *  operation can be done in constant time, and does not
        *  invalidate iterators and references.
 	*/
+      _GLIBCXX_CEST_CONSTEXPR
       iterator
       insert(const_iterator __position, value_type&& __x)
       { return emplace(__position, std::move(__x)); }
@@ -1417,6 +1534,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        *  This operation is linear in the number of elements inserted and
        *  does not invalidate iterators and references.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       iterator
       insert(const_iterator __p, initializer_list<value_type> __l)
       { return this->insert(__p, __l.begin(), __l.end()); }
@@ -1437,6 +1555,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        *  This operation is linear in the number of elements inserted and
        *  does not invalidate iterators and references.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       iterator
       insert(const_iterator __position, size_type __n, const value_type& __x);
 #else
@@ -1478,6 +1597,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        */
       template<typename _InputIterator,
 	       typename = std::_RequireInputIter<_InputIterator>>
+	_GLIBCXX_CEST_CONSTEXPR
 	iterator
 	insert(const_iterator __position, _InputIterator __first,
 	       _InputIterator __last);
@@ -1520,6 +1640,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        *  is itself a pointer, the pointed-to memory is not touched in
        *  any way.  Managing the pointer is the user's responsibility.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       iterator
 #if __cplusplus >= 201103L
       erase(const_iterator __position) noexcept;
@@ -1545,6 +1666,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        *  pointed-to memory is not touched in any way.  Managing the pointer
        *  is the user's responsibility.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       iterator
 #if __cplusplus >= 201103L
       erase(const_iterator __first, const_iterator __last) noexcept
@@ -1588,6 +1710,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        *  pointers, the pointed-to memory is not touched in any way.
        *  Managing the pointer is the user's responsibility.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       void
       clear() _GLIBCXX_NOEXCEPT
       {
@@ -1607,6 +1730,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        *
        *  Requires this != @a __x.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       void
 #if __cplusplus >= 201103L
       splice(const_iterator __position, list&& __x) noexcept
@@ -1627,6 +1751,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
       }
 
 #if __cplusplus >= 201103L
+      _GLIBCXX_CEST_CONSTEXPR
       void
       splice(const_iterator __position, list& __x) noexcept
       { splice(__position, std::move(__x)); }
@@ -1643,6 +1768,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        *  Removes the element in list @a __x referenced by @a __i and
        *  inserts it into the current list before @a __position.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       void
       splice(const_iterator __position, list&& __x, const_iterator __i) noexcept
 #else
@@ -1685,6 +1811,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        *  Removes the element in list @a __x referenced by @a __i and
        *  inserts it into the current list before @a __position.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       void
       splice(const_iterator __position, list& __x, const_iterator __i) noexcept
       { splice(__position, std::move(__x), __i); }
@@ -1704,6 +1831,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        *
        *  Undefined if @a __position is in [__first,__last).
        */
+      _GLIBCXX_CEST_CONSTEXPR
       void
       splice(const_iterator __position, list&& __x, const_iterator __first,
 	     const_iterator __last) noexcept
@@ -1754,6 +1882,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        *
        *  Undefined if @a __position is in [__first,__last).
        */
+      _GLIBCXX_CEST_CONSTEXPR
       void
       splice(const_iterator __position, list& __x, const_iterator __first,
 	     const_iterator __last) noexcept
@@ -1919,12 +2048,14 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
       // _GLIBCXX_RESOLVE_LIB_DEFECTS
       // 438. Ambiguity in the "do the right thing" clause
       template<typename _Integer>
+	_GLIBCXX_CEST_CONSTEXPR
 	void
 	_M_initialize_dispatch(_Integer __n, _Integer __x, __true_type)
 	{ _M_fill_initialize(static_cast<size_type>(__n), __x); }
 
       // Called by the range constructor to implement [23.1.1]/9
       template<typename _InputIterator>
+	_GLIBCXX_CEST_CONSTEXPR
 	void
 	_M_initialize_dispatch(_InputIterator __first, _InputIterator __last,
 			       __false_type)
@@ -1967,12 +2098,14 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
       // _GLIBCXX_RESOLVE_LIB_DEFECTS
       // 438. Ambiguity in the "do the right thing" clause
       template<typename _Integer>
+	_GLIBCXX_CEST_CONSTEXPR
 	void
 	_M_assign_dispatch(_Integer __n, _Integer __val, __true_type)
 	{ _M_fill_assign(__n, __val); }
 
       // Called by the range assign to implement [23.1.1]/9
       template<typename _InputIterator>
+	_GLIBCXX_CEST_CONSTEXPR
 	void
 	_M_assign_dispatch(_InputIterator __first, _InputIterator __last,
 			   __false_type);
@@ -1984,6 +2117,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
 
 
       // Moves the elements from [first,last) before position.
+      _GLIBCXX_CEST_CONSTEXPR
       void
       _M_transfer(iterator __position, iterator __first, iterator __last)
       { __position._M_node->_M_transfer(__first._M_node, __last._M_node); }
@@ -1999,6 +2133,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
       }
 #else
      template<typename... _Args>
+       _GLIBCXX_CEST_CONSTEXPR
        void
        _M_insert(iterator __position, _Args&&... __args)
        {
@@ -2009,6 +2144,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
 #endif
 
       // Erases element at position given.
+      _GLIBCXX_CEST_CONSTEXPR
       void
       _M_erase(iterator __position) _GLIBCXX_NOEXCEPT
       {
@@ -2025,6 +2161,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
       }
 
       // To implement the splice (and merge) bits of N1599.
+      _GLIBCXX_CEST_CONSTEXPR
       void
       _M_check_equal_allocators(const list& __x) _GLIBCXX_NOEXCEPT
       {
@@ -2223,6 +2360,7 @@ _GLIBCXX_END_NAMESPACE_CONTAINER
 
   // Detect when distance is used to compute the size of the whole list.
   template<typename _Tp>
+    _GLIBCXX_CEST_CONSTEXPR
     inline ptrdiff_t
     __distance(_GLIBCXX_STD_C::_List_iterator<_Tp> __first,
 	       _GLIBCXX_STD_C::_List_iterator<_Tp> __last,
@@ -2233,6 +2371,7 @@ _GLIBCXX_END_NAMESPACE_CONTAINER
     }
 
   template<typename _Tp>
+    _GLIBCXX_CEST_CONSTEXPR
     inline ptrdiff_t
     __distance(_GLIBCXX_STD_C::_List_const_iterator<_Tp> __first,
 	       _GLIBCXX_STD_C::_List_const_iterator<_Tp> __last,
@@ -2254,6 +2393,112 @@ _GLIBCXX_END_NAMESPACE_CONTAINER
       return __n;
     }
 #endif
+
+_GLIBCXX_END_NAMESPACE_VERSION
+} // namespace std
+
+// From src/c++98/list.cc with additional constexpr
+#include <list>
+
+namespace std _GLIBCXX_VISIBILITY(default)
+{
+_GLIBCXX_BEGIN_NAMESPACE_VERSION
+
+  namespace __detail
+  {
+    _GLIBCXX_CEST_CONSTEXPR
+    void
+    _List_node_base::swap(_List_node_base& __x,
+			  _List_node_base& __y) _GLIBCXX_USE_NOEXCEPT
+    {
+      if ( __x._M_next != &__x )
+	{
+	  if ( __y._M_next != &__y )
+	    {
+	      // Both __x and __y are not empty.
+	      std::swap(__x._M_next,__y._M_next);
+	      std::swap(__x._M_prev,__y._M_prev);
+	      __x._M_next->_M_prev = __x._M_prev->_M_next = &__x;
+	      __y._M_next->_M_prev = __y._M_prev->_M_next = &__y;
+	    }
+	  else
+	    {
+	      // __x is not empty, __y is empty.
+	      __y._M_next = __x._M_next;
+	      __y._M_prev = __x._M_prev;
+	      __y._M_next->_M_prev = __y._M_prev->_M_next = &__y;
+	      __x._M_next = __x._M_prev = &__x;
+	    }
+	}
+      else if ( __y._M_next != &__y )
+	{
+	  // __x is empty, __y is not empty.
+	  __x._M_next = __y._M_next;
+	  __x._M_prev = __y._M_prev;
+	  __x._M_next->_M_prev = __x._M_prev->_M_next = &__x;
+	  __y._M_next = __y._M_prev = &__y;
+	}
+    }
+
+    _GLIBCXX_CEST_CONSTEXPR
+    void
+    _List_node_base::
+    _M_transfer(_List_node_base * const __first,
+		_List_node_base * const __last) _GLIBCXX_USE_NOEXCEPT
+    {
+      __glibcxx_assert(__first != __last);
+
+      if (this != __last)
+	{
+	  // Remove [first, last) from its old position.
+	  __last->_M_prev->_M_next  = this;
+	  __first->_M_prev->_M_next = __last;
+	  this->_M_prev->_M_next    = __first;
+
+	  // Splice [first, last) into its new position.
+	  _List_node_base* const __tmp = this->_M_prev;
+	  this->_M_prev                = __last->_M_prev;
+	  __last->_M_prev              = __first->_M_prev;
+	  __first->_M_prev             = __tmp;
+	}
+    }
+
+    _GLIBCXX_CEST_CONSTEXPR
+    void
+    _List_node_base::_M_reverse() _GLIBCXX_USE_NOEXCEPT
+    {
+      _List_node_base* __tmp = this;
+      do
+	{
+	  std::swap(__tmp->_M_next, __tmp->_M_prev);
+
+	  // Old next node is now prev.
+	  __tmp = __tmp->_M_prev;
+	}
+      while (__tmp != this);
+    }
+
+    _GLIBCXX_CEST_CONSTEXPR
+    void
+    _List_node_base::
+    _M_hook(_List_node_base* const __position) _GLIBCXX_USE_NOEXCEPT
+    {
+      this->_M_next = __position;
+      this->_M_prev = __position->_M_prev;
+      __position->_M_prev->_M_next = this;
+      __position->_M_prev = this;
+    }
+
+    _GLIBCXX_CEST_CONSTEXPR
+    void
+    _List_node_base::_M_unhook() _GLIBCXX_USE_NOEXCEPT
+    {
+      _List_node_base* const __next_node = this->_M_next;
+      _List_node_base* const __prev_node = this->_M_prev;
+      __prev_node->_M_next = __next_node;
+      __next_node->_M_prev = __prev_node;
+    }
+  } // namespace __detail
 
 _GLIBCXX_END_NAMESPACE_VERSION
 } // namespace std
