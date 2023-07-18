@@ -92,7 +92,12 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
       emplace(const_iterator __position, _Args&&... __args)
       {
 	_Node* __tmp = _M_create_node(std::forward<_Args>(__args)...);
+#if _GLIBCXX_CEST_VERSION && !defined(__clang__)
+  // workaround for GCC constexpr bug 110714
+	__tmp->_M_hook2(__position._M_const_cast()._M_node, __tmp);
+#else
 	__tmp->_M_hook(__position._M_const_cast()._M_node);
+#endif
 	this->_M_inc_size(1);
 	return iterator(__tmp);
       }
@@ -109,7 +114,12 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 #endif
     {
       _Node* __tmp = _M_create_node(__x);
+#if _GLIBCXX_CEST_VERSION && !defined(__clang__)
+      // workaround for GCC constexpr bug 110714
+      __tmp->_M_hook2(__position._M_const_cast()._M_node, __tmp);
+#else
       __tmp->_M_hook(__position._M_const_cast()._M_node);
+#endif
       this->_M_inc_size(1);
       return iterator(__tmp);
     }

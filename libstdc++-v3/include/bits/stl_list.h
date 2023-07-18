@@ -100,6 +100,13 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       void
       _M_hook(_List_node_base* const __position) _GLIBCXX_USE_NOEXCEPT;
 
+#if _GLIBCXX_CEST_VERSION && !defined(__clang__)
+      _GLIBCXX_CEST_CONSTEXPR
+      void
+      _M_hook2(_List_node_base* const __position,
+               _List_node_base* const __this) _GLIBCXX_USE_NOEXCEPT;
+#endif
+
       _GLIBCXX_CEST_CONSTEXPR
       void
       _M_unhook() _GLIBCXX_USE_NOEXCEPT;
@@ -2128,7 +2135,12 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
       _M_insert(iterator __position, const value_type& __x)
       {
 	_Node* __tmp = _M_create_node(__x);
+#if _GLIBCXX_CEST_VERSION && !defined(__clang__)
+  // workaround for GCC constexpr bug 110714
+  __tmp->_M_hook2(__position._M_node, __tmp);
+#else
 	__tmp->_M_hook(__position._M_node);
+#endif
 	this->_M_inc_size(1);
       }
 #else
@@ -2138,7 +2150,12 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        _M_insert(iterator __position, _Args&&... __args)
        {
 	 _Node* __tmp = _M_create_node(std::forward<_Args>(__args)...);
+#if _GLIBCXX_CEST_VERSION && !defined(__clang__)
+  // workaround for GCC constexpr bug 110714
+	 __tmp->_M_hook2(__position._M_node, __tmp);
+#else
 	 __tmp->_M_hook(__position._M_node);
+#endif
 	 this->_M_inc_size(1);
        }
 #endif
@@ -2488,6 +2505,20 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       __position->_M_prev->_M_next = this;
       __position->_M_prev = this;
     }
+
+#if _GLIBCXX_CEST_VERSION && !defined(__clang__)
+    _GLIBCXX_CEST_CONSTEXPR
+    void
+    _List_node_base::
+    _M_hook2(_List_node_base* const __position,
+             _List_node_base* const __this) _GLIBCXX_USE_NOEXCEPT
+    {
+      __this->_M_next = __position;
+      __this->_M_prev = __position->_M_prev;
+      __position->_M_prev->_M_next = __this;
+      __position->_M_prev = __this;
+    }
+#endif
 
     _GLIBCXX_CEST_CONSTEXPR
     void
