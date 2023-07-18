@@ -109,12 +109,14 @@ _GLIBCXX_END_NAMESPACE_CONTAINER
 #if _GLIBCXX_USE_CXX11_ABI
   // Forward declaration because of the qualified call in distance.
   template<typename _Tp>
+    _GLIBCXX_CEST_CONSTEXPR
     ptrdiff_t
     __distance(_GLIBCXX_STD_C::_List_iterator<_Tp>,
 	       _GLIBCXX_STD_C::_List_iterator<_Tp>,
 	       input_iterator_tag);
 
   template<typename _Tp>
+    _GLIBCXX_CEST_CONSTEXPR
     ptrdiff_t
     __distance(_GLIBCXX_STD_C::_List_const_iterator<_Tp>,
 	       _GLIBCXX_STD_C::_List_const_iterator<_Tp>,
