@@ -106,9 +106,14 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *  functions in constructs like "std::cout << std::endl".  For more
        *  information, see the iomanip header.
       */
+      _GLIBCXX_CEST_CONSTEXPR
       __ostream_type&
       operator<<(__ostream_type& (*__pf)(__ostream_type&))
       {
+#if _GLIBCXX_CEST_VERSION
+	if (__builtin_is_constant_evaluated())
+	  return *this;
+#endif
 	// _GLIBCXX_RESOLVE_LIB_DEFECTS
 	// DR 60. What is a formatted input function?
 	// The inserters for manipulators are *not* formatted output functions.
@@ -125,9 +130,14 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	return *this;
       }
 
+      _GLIBCXX_CEST_CONSTEXPR
       __ostream_type&
       operator<<(ios_base& (*__pf) (ios_base&))
       {
+#if _GLIBCXX_CEST_VERSION
+	if (__builtin_is_constant_evaluated())
+	  return *this;
+#endif
 	// _GLIBCXX_RESOLVE_LIB_DEFECTS
 	// DR 60. What is a formatted input function?
 	// The inserters for manipulators are *not* formatted output functions.
@@ -187,12 +197,18 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	return _M_insert(static_cast<unsigned long>(__n));
       }
 
+      _GLIBCXX_CEST_CONSTEXPR
       __ostream_type&
       operator<<(int __n);
 
+      _GLIBCXX_CEST_CONSTEXPR
       __ostream_type&
       operator<<(unsigned int __n)
       {
+#if _GLIBCXX_CEST_VERSION
+	if (__builtin_is_constant_evaluated())
+	  return *this;
+#endif
 	// _GLIBCXX_RESOLVE_LIB_DEFECTS
 	// 117. basic_ostream uses nonexistent num_put member functions.
 	return _M_insert(static_cast<unsigned long>(__n));
@@ -359,6 +375,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *  @note  This function is not overloaded on signed char and
        *         unsigned char.
       */
+      _GLIBCXX_CEST_CONSTEXPR
       __ostream_type&
       put(char_type __c);
 
@@ -391,6 +408,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *  Otherwise, calls @c rdbuf()->pubsync(), and if that returns -1,
        *  sets badbit.
       */
+      _GLIBCXX_CEST_CONSTEXPR
       __ostream_type&
       flush();
 
@@ -567,9 +585,13 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
   // Specialization
   template<typename _Traits>
-    inline basic_ostream<char, _Traits>&
+    _GLIBCXX_CEST_CONSTEXPR inline basic_ostream<char, _Traits>&
     operator<<(basic_ostream<char, _Traits>& __out, char __c)
     {
+#if _GLIBCXX_CEST_VERSION
+      if (__builtin_is_constant_evaluated())
+        return __out;
+#endif
       if (__out.width() != 0)
 	return __ostream_insert(__out, &__c, 1);
       __out.put(__c);
@@ -659,9 +681,13 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
   // Partial specializations
   template<typename _Traits>
-    inline basic_ostream<char, _Traits>&
+    _GLIBCXX_CEST_CONSTEXPR inline basic_ostream<char, _Traits>&
     operator<<(basic_ostream<char, _Traits>& __out, const char* __s)
     {
+#if _GLIBCXX_CEST_VERSION
+      if (__builtin_is_constant_evaluated())
+        return __out;
+#endif
       if (!__s)
 	__out.setstate(ios_base::badbit);
       else
@@ -732,7 +758,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
    *  for more on this subject.
   */
   template<typename _CharT, typename _Traits>
-    inline basic_ostream<_CharT, _Traits>&
+    _GLIBCXX_CEST_CONSTEXPR inline basic_ostream<_CharT, _Traits>&
     endl(basic_ostream<_CharT, _Traits>& __os)
     { return flush(__os.put(__os.widen('\n'))); }
 
@@ -754,7 +780,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
    *  This manipulator simply calls the stream's @c flush() member function.
   */
   template<typename _CharT, typename _Traits>
-    inline basic_ostream<_CharT, _Traits>&
+    _GLIBCXX_CEST_CONSTEXPR inline basic_ostream<_CharT, _Traits>&
     flush(basic_ostream<_CharT, _Traits>& __os)
     { return __os.flush(); }
 

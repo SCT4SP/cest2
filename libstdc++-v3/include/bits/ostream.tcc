@@ -106,10 +106,15 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     }
 
   template<typename _CharT, typename _Traits>
+    _GLIBCXX_CEST_CONSTEXPR
     basic_ostream<_CharT, _Traits>&
     basic_ostream<_CharT, _Traits>::
     operator<<(int __n)
     {
+#if _GLIBCXX_CEST_VERSION
+      if (__builtin_is_constant_evaluated())
+        return *this;
+#endif
       // _GLIBCXX_RESOLVE_LIB_DEFECTS
       // 117. basic_ostream uses nonexistent num_put member functions.
       const ios_base::fmtflags __fmt = this->flags() & ios_base::basefield;
@@ -149,10 +154,15 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     }
 
   template<typename _CharT, typename _Traits>
+    _GLIBCXX_CEST_CONSTEXPR
     basic_ostream<_CharT, _Traits>&
     basic_ostream<_CharT, _Traits>::
     put(char_type __c)
     {
+#if _GLIBCXX_CEST_VERSION
+      if (__builtin_is_constant_evaluated())
+        return *this;
+#endif
       // _GLIBCXX_RESOLVE_LIB_DEFECTS
       // DR 60. What is a formatted input function?
       // basic_ostream::put(char_type) is an unformatted output function.
@@ -217,10 +227,15 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     }
 
   template<typename _CharT, typename _Traits>
+    _GLIBCXX_CEST_CONSTEXPR
     basic_ostream<_CharT, _Traits>&
     basic_ostream<_CharT, _Traits>::
     flush()
     {
+#if _GLIBCXX_CEST_VERSION
+      if (__builtin_is_constant_evaluated())
+        return *this;
+#endif
       // _GLIBCXX_RESOLVE_LIB_DEFECTS
       // DR 60. What is a formatted input function?
       // basic_ostream::flush() is *not* an unformatted output function.

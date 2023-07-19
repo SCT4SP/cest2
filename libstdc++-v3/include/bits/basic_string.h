@@ -4022,10 +4022,14 @@ _GLIBCXX_END_NAMESPACE_CXX11
    *  writing a C string.
    */
   template<typename _CharT, typename _Traits, typename _Alloc>
-    inline basic_ostream<_CharT, _Traits>&
+    _GLIBCXX_CEST_CONSTEXPR inline basic_ostream<_CharT, _Traits>&
     operator<<(basic_ostream<_CharT, _Traits>& __os,
 	       const basic_string<_CharT, _Traits, _Alloc>& __str)
     {
+#if _GLIBCXX_CEST_VERSION
+      if (__builtin_is_constant_evaluated())
+        return __os;
+#endif
       // _GLIBCXX_RESOLVE_LIB_DEFECTS
       // 586. string inserter not a formatted function
       return __ostream_insert(__os, __str.data(), __str.size());
