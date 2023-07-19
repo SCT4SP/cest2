@@ -1606,7 +1606,10 @@ record_group_use (struct ivopts_data *data, tree *use_p,
     {
       unsigned int i;
 
-      addr_base = strip_offset (iv->base, &addr_offset);
+      gcc_assert (POINTER_TYPE_P (TREE_TYPE (iv->base)));
+      tree addr_toffset;
+      split_constant_offset (iv->base, &addr_base, &addr_toffset);
+      addr_offset = int_cst_value (addr_toffset);
       for (i = 0; i < data->vgroups.length (); i++)
 	{
 	  struct iv_use *use;
@@ -2439,6 +2442,7 @@ get_mem_type_for_internal_fn (gcall *call, tree *op_p)
     case IFN_MASK_LOAD:
     case IFN_MASK_LOAD_LANES:
     case IFN_LEN_LOAD:
+    case IFN_LEN_MASK_LOAD:
       if (op_p == gimple_call_arg_ptr (call, 0))
 	return TREE_TYPE (gimple_call_lhs (call));
       return NULL_TREE;
@@ -2446,9 +2450,16 @@ get_mem_type_for_internal_fn (gcall *call, tree *op_p)
     case IFN_MASK_STORE:
     case IFN_MASK_STORE_LANES:
     case IFN_LEN_STORE:
-      if (op_p == gimple_call_arg_ptr (call, 0))
-	return TREE_TYPE (gimple_call_arg (call, 3));
-      return NULL_TREE;
+    case IFN_LEN_MASK_STORE:
+      {
+	if (op_p == gimple_call_arg_ptr (call, 0))
+	  {
+	    internal_fn ifn = gimple_call_internal_fn (call);
+	    int index = internal_fn_stored_value_index (ifn);
+	    return TREE_TYPE (gimple_call_arg (call, index));
+	  }
+	return NULL_TREE;
+      }
 
     default:
       return NULL_TREE;
@@ -2942,7 +2953,7 @@ strip_offset_1 (tree expr, bool inside_addr, bool top_compref,
 
 /* Strips constant offsets from EXPR and stores them to OFFSET.  */
 
-tree
+static tree
 strip_offset (tree expr, poly_uint64_pod *offset)
 {
   poly_int64 off;
@@ -3582,9 +3593,10 @@ add_iv_candidate_for_use (struct ivopts_data *data, struct iv_use *use)
       step = fold_convert (sizetype, step);
       record_common_cand (data, base, step, use);
       /* Also record common candidate with offset stripped.  */
-      base = strip_offset (base, &offset);
-      if (maybe_ne (offset, 0U))
-	record_common_cand (data, base, step, use);
+      tree alt_base, alt_offset;
+      split_constant_offset (base, &alt_base, &alt_offset);
+      if (!integer_zerop (alt_offset))
+	record_common_cand (data, alt_base, step, use);
     }
 
   /* At last, add auto-incremental candidates.  Make such variables
@@ -7555,6 +7567,8 @@ get_alias_ptr_type_for_ptr_address (iv_use *use)
     case IFN_MASK_STORE_LANES:
     case IFN_LEN_LOAD:
     case IFN_LEN_STORE:
+    case IFN_LEN_MASK_LOAD:
+    case IFN_LEN_MASK_STORE:
       /* The second argument contains the correct alias type.  */
       gcc_assert (use->op_p = gimple_call_arg_ptr (call, 0));
       return TREE_TYPE (gimple_call_arg (call, 1));

@@ -305,6 +305,8 @@ Plugin			Le-Chun Wu		<lcwu@google.com>
 register allocation	Peter Bergner		<bergner@linux.ibm.com>
 register allocation	Kenneth Zadeck		<zadeck@naturalbridge.com>
 register allocation	Seongbae Park		<seongbae.park@gmail.com>
+riscv port		Robin Dapp		<rdapp.gcc@gmail.com>
+riscv port		Juzhe Zhong		<juzhe.zhong@rivai.ai>
 RTL optimizers		Steven Bosscher		<steven@gcc.gnu.org>
 selective scheduling	Andrey Belevantsev	<abel@ispras.ru>
 selective scheduling	Alexander Monakov	<amonakov@ispras.ru>
@@ -385,8 +387,6 @@ Lawrence Crowl					<crowl@google.com>
 Lili Cui					<lili.cui@intel.com>
 Ian Dall					<ian@beware.dropbear.id.au>
 David Daney					<david.daney@caviumnetworks.com>
-Robin Dapp					<rdapp.gcc@gmail.com>
-Robin Dapp					<rdapp@ventanamicro.com>
 Simon Dardis					<simon.dardis@gmail.com>
 Sudakshina Das					<sudi.das@arm.com>
 Bud Davis					<jmdavis@link.com>
@@ -394,6 +394,7 @@ Chris Demetriou					<cgd@google.com>
 Sameera Deshpande				<sameera.deshpande@linaro.org>
 Wilco Dijkstra					<wdijkstr@arm.com>
 Benoit Dupont de Dinechin			<benoit.dupont-de-dinechin@st.com>
+Lehua Ding					<lehua.ding@rivai.ai>
 Jason Eckhardt					<jle@rice.edu>
 Bernd Edlinger					<bernd.edlinger@hotmail.de>
 Phil Edwards					<pme@gcc.gnu.org>
@@ -527,6 +528,7 @@ Renlin Li					<renlin.li@arm.com>
 Xinliang David Li				<davidxl@google.com>
 Chen Liqin					<liqin.gcc@gmail.com>
 Martin Liska					<mliska@suse.cz>
+Hao Liu					<hliu@os.amperecomputing.com>
 Jiangning Liu					<jiangning.liu@arm.com>
 Sa Liu						<saliu@de.ibm.com>
 Ralph Loader					<rcl@ihug.co.nz>
@@ -550,6 +552,7 @@ Simon Martin					<simartin@users.sourceforge.net>
 Alejandro Martinez				<alejandro.martinezvicente@arm.com>
 Ranjit Mathew					<rmathew@hotmail.com>
 Paulo Matos					<pmatos@linki.tools>
+Ken Matsui					<kmatsui@gcc.gnu.org>
 Michael Matz					<matz@suse.de>
 Greg McGary					<gkm@gnu.org>
 Roland McGrath					<roland@hack.frob.com>
@@ -609,6 +612,7 @@ Hafiz Abid Qadeer				<abidh@codesourcery.com>
 Yao Qi						<yao@codesourcery.com>
 Jerry Quinn					<jlquinn@optonline.net>
 Navid Rahimi					<navidrahimi@microsoft.com>
+Rishi Raj						<rishiraj45035@gmail.com>
 Easwaran Raman					<eraman@google.com>
 Joe Ramsay					<joe.ramsay@arm.com>
 Rolf Rasmussen					<rolfwr@gcc.gnu.org>
@@ -718,7 +722,6 @@ Dennis Zhang					<dennis.zhang@arm.com>
 Yufeng Zhang					<yufeng.zhang@arm.com>
 Qing Zhao					<qing.zhao@oracle.com>
 Shujing Zhao					<pearly.zhao@oracle.com>
-Juzhe Zhong					<juzhe.zhong@rivai.ai>
 Jon Ziegler					<jonz@apple.com>
 Roman Zippel					<zippel@linux-m68k.org>
 Josef Zlomek					<josef.zlomek@email.cz>
@@ -748,6 +751,7 @@ Immad Mir					<mir@sourceware.org>
 Gaius Mulley					<gaiusmod2@gmail.com>
 Siddhesh Poyarekar				<siddhesh@gotplt.org>
 Navid Rahimi					<navidrahimi@microsoft.com>
+Rishi Raj						<rishiraj45035@gmail.com>
 Trevor Saunders					<tbsaunde+gcc@tbsaunde.org>
 Bill Schmidt					<bill.schmidt@fastmail.com>
 Nathan Sidwell					<nathan@acm.org>

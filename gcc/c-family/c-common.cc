@@ -1338,6 +1338,10 @@ shorten_binary_op (tree result_type, tree op0, tree op1, bool bitwise)
   int uns;
   tree type;
 
+  /* Do not shorten vector operations.  */
+  if (VECTOR_TYPE_P (result_type))
+    return result_type;
+
   /* Cast OP0 and OP1 to RESULT_TYPE.  Doing so prevents
      excessive narrowing when we call get_narrower below.  For
      example, suppose that OP0 is of unsigned int extended
@@ -2454,7 +2458,7 @@ c_common_type_for_mode (machine_mode mode, int unsignedp)
   else if (GET_MODE_CLASS (mode) == MODE_VECTOR_BOOL
 	   && valid_vector_subparts_p (GET_MODE_NUNITS (mode)))
     {
-      unsigned int elem_bits = vector_element_size (GET_MODE_BITSIZE (mode),
+      unsigned int elem_bits = vector_element_size (GET_MODE_PRECISION (mode),
 						    GET_MODE_NUNITS (mode));
       tree bool_type = build_nonstandard_boolean_type (elem_bits);
       return build_vector_type_for_mode (bool_type, mode);

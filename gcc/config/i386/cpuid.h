@@ -132,6 +132,9 @@
 
 /* Extended Features Sub-leaf (%eax == 7, %ecx == 1) */
 /* %eax */
+#define bit_SHA512	(1 << 0)
+#define bit_SM3		(1 << 1)
+#define bit_SM4		(1 << 2)
 #define bit_RAOINT      (1 << 3)
 #define bit_AVXVNNI     (1 << 4)
 #define bit_AVX512BF16  (1 << 5)
@@ -144,6 +147,7 @@
 /* %edx */
 #define bit_AVXVNNIINT8 (1 << 4)
 #define bit_AVXNECONVERT	(1 << 5)
+#define bit_AVXVNNIINT16	(1 << 10)
 #define bit_PREFETCHI	(1 << 14)
 
 /* Extended State Enumeration Sub-leaf (%eax == 0xd, %ecx == 1) */

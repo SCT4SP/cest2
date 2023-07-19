@@ -102,6 +102,23 @@ static const riscv_implied_info_t riscv_implied_info[] =
   {"zvl32768b", "zvl16384b"},
   {"zvl65536b", "zvl32768b"},
 
+  {"zvkn", "zvkned"},
+  {"zvkn", "zvknhb"},
+  {"zvkn", "zvbb"},
+  {"zvkn", "zvkt"},
+  {"zvknc", "zvkn"},
+  {"zvknc", "zvbc"},
+  {"zvkng", "zvkn"},
+  {"zvkng", "zvkg"},
+  {"zvks", "zvksed"},
+  {"zvks", "zvksh"},
+  {"zvks", "zvbb"},
+  {"zvks", "zvkt"},
+  {"zvksc", "zvks"},
+  {"zvksc", "zvbc"},
+  {"zvksg", "zvks"},
+  {"zvksg", "zvkg"},
+
   {"zfh", "zfhmin"},
   {"zfhmin", "f"},
   {"zvfhmin", "zve32f"},
@@ -189,6 +206,8 @@ static const struct riscv_ext_version riscv_ext_version_table[] =
   {"zksh",  ISA_SPEC_CLASS_NONE, 1, 0},
   {"zkt",   ISA_SPEC_CLASS_NONE, 1, 0},
 
+  {"zihintntl", ISA_SPEC_CLASS_NONE, 1, 0},
+
   {"zicboz",ISA_SPEC_CLASS_NONE, 1, 0},
   {"zicbom",ISA_SPEC_CLASS_NONE, 1, 0},
   {"zicbop",ISA_SPEC_CLASS_NONE, 1, 0},
@@ -203,6 +222,22 @@ static const struct riscv_ext_version riscv_ext_version_table[] =
   {"zve64x", ISA_SPEC_CLASS_NONE, 1, 0},
   {"zve64f", ISA_SPEC_CLASS_NONE, 1, 0},
   {"zve64d", ISA_SPEC_CLASS_NONE, 1, 0},
+
+  {"zvbb", ISA_SPEC_CLASS_NONE, 1, 0},
+  {"zvbc", ISA_SPEC_CLASS_NONE, 1, 0},
+  {"zvkg", ISA_SPEC_CLASS_NONE, 1, 0},
+  {"zvkned", ISA_SPEC_CLASS_NONE, 1, 0},
+  {"zvknha", ISA_SPEC_CLASS_NONE, 1, 0},
+  {"zvknhb", ISA_SPEC_CLASS_NONE, 1, 0},
+  {"zvksed", ISA_SPEC_CLASS_NONE, 1, 0},
+  {"zvksh", ISA_SPEC_CLASS_NONE, 1, 0},
+  {"zvkn", ISA_SPEC_CLASS_NONE, 1, 0},
+  {"zvknc", ISA_SPEC_CLASS_NONE, 1, 0},
+  {"zvkng", ISA_SPEC_CLASS_NONE, 1, 0},
+  {"zvks", ISA_SPEC_CLASS_NONE, 1, 0},
+  {"zvksc", ISA_SPEC_CLASS_NONE, 1, 0},
+  {"zvksg", ISA_SPEC_CLASS_NONE, 1, 0},
+  {"zvkt", ISA_SPEC_CLASS_NONE, 1, 0},
 
   {"zvl32b", ISA_SPEC_CLASS_NONE, 1, 0},
   {"zvl64b", ISA_SPEC_CLASS_NONE, 1, 0},
@@ -250,6 +285,12 @@ static const struct riscv_ext_version riscv_combine_info[] =
   {"zk",  ISA_SPEC_CLASS_NONE, 1, 0},
   {"zkn",  ISA_SPEC_CLASS_NONE, 1, 0},
   {"zks",  ISA_SPEC_CLASS_NONE, 1, 0},
+  {"zvkn", ISA_SPEC_CLASS_NONE, 1, 0},
+  {"zvknc", ISA_SPEC_CLASS_NONE, 1, 0},
+  {"zvkng", ISA_SPEC_CLASS_NONE, 1, 0},
+  {"zvks", ISA_SPEC_CLASS_NONE, 1, 0},
+  {"zvksc", ISA_SPEC_CLASS_NONE, 1, 0},
+  {"zvksg", ISA_SPEC_CLASS_NONE, 1, 0},
   /* Terminate the list.  */
   {NULL, ISA_SPEC_CLASS_NONE, 0, 0}
 };
@@ -271,6 +312,8 @@ static const char *riscv_tunes[] =
 };
 
 static const char *riscv_supported_std_ext (void);
+
+bool riscv_subset_list::parse_failed = false;
 
 static riscv_subset_list *current_subset_list = NULL;
 
@@ -479,6 +522,18 @@ subset_cmp (const std::string &a, const std::string &b)
     }
 }
 
+/* Return true if EXT is a standard extension.  */
+
+static bool
+standard_extensions_p (const char *ext)
+{
+  const riscv_ext_version *ext_ver;
+  for (ext_ver = &riscv_ext_version_table[0]; ext_ver->name != NULL; ++ext_ver)
+    if (strcmp (ext, ext_ver->name) == 0)
+      return true;
+  return false;
+}
+
 /* Add new subset to list.  */
 
 void
@@ -505,6 +560,38 @@ riscv_subset_list::add (const char *subset, int major_version,
 	  m_arch,
 	  subset);
 
+      return;
+    }
+  else if (strlen (subset) == 1 && !standard_extensions_p (subset))
+    {
+      error_at (m_loc,
+		"%<-march=%s%>: extension %qs is unsupported standard single "
+		"letter extension",
+		m_arch, subset);
+      return;
+    }
+  else if (subset[0] == 'z' && !standard_extensions_p (subset))
+    {
+      error_at (m_loc,
+		"%<-march=%s%>: extension %qs starts with `z` but is "
+		"unsupported standard extension",
+		m_arch, subset);
+      return;
+    }
+  else if (subset[0] == 's' && !standard_extensions_p (subset))
+    {
+      error_at (m_loc,
+		"%<-march=%s%>: extension %qs starts with `s` but is "
+		"unsupported standard supervisor extension",
+		m_arch, subset);
+      return;
+    }
+  else if (subset[0] == 'x' && !standard_extensions_p (subset))
+    {
+      error_at (m_loc,
+		"%<-march=%s%>: extension %qs starts with `x` but is "
+		"unsupported non-standard extension",
+		m_arch, subset);
       return;
     }
 
@@ -880,22 +967,16 @@ riscv_subset_list::parse_std_ext (const char *p)
       while (*std_exts && std_ext != *std_exts)
 	std_exts++;
 
-      if (std_ext != *std_exts)
-	{
-	  if (strchr (all_std_exts, std_ext) == NULL)
-	    error_at (m_loc, "%<-march=%s%>: unsupported ISA subset %<%c%>",
-		      m_arch, *p);
-	  else
-	    error_at (m_loc,
-		      "%<-march=%s%>: ISA string is not in canonical order. "
-		      "%<%c%>", m_arch, *p);
-	  return NULL;
-	}
+      subset[0] = std_ext;
+      if (std_ext != *std_exts && standard_extensions_p (subset))
+	error_at (m_loc,
+		  "%<-march=%s%>: ISA string is not in canonical order. "
+		  "%<%c%>",
+		  m_arch, *p);
 
       std_exts++;
 
       p++;
-      subset[0] = std_ext;
 
       p = parsing_subset_version (subset, p, &major_version, &minor_version,
 				  /* std_ext_p= */ true, &explicit_version_p);
@@ -908,14 +989,14 @@ riscv_subset_list::parse_std_ext (const char *p)
 
 /* Check any implied extensions for EXT.  */
 void
-riscv_subset_list::handle_implied_ext (riscv_subset_t *ext)
+riscv_subset_list::handle_implied_ext (const char *ext)
 {
   const riscv_implied_info_t *implied_info;
   for (implied_info = &riscv_implied_info[0];
        implied_info->ext;
        ++implied_info)
     {
-      if (strcmp (ext->name.c_str (), implied_info->ext) != 0)
+      if (strcmp (ext, implied_info->ext) != 0)
 	continue;
 
       /* Skip if implied extension already present.  */
@@ -925,6 +1006,9 @@ riscv_subset_list::handle_implied_ext (riscv_subset_t *ext)
       /* Version of implied extension will get from current ISA spec
 	 version.  */
       add (implied_info->implied_ext, true);
+
+      /* Recursively add implied extension by implied_info->implied_ext.  */
+      handle_implied_ext (implied_info->implied_ext);
     }
 
   /* For RISC-V ISA version 2.2 or earlier version, zicsr and zifence is
@@ -937,6 +1021,27 @@ riscv_subset_list::handle_implied_ext (riscv_subset_t *ext)
       if (lookup ("zifencei") == NULL)
 	add ("zifencei", true);
     }
+}
+
+/* Check that all implied extensions are included.  */
+bool
+riscv_subset_list::check_implied_ext ()
+{
+  riscv_subset_t *itr;
+  for (itr = m_head; itr != NULL; itr = itr->next)
+    {
+      const riscv_implied_info_t *implied_info;
+      for (implied_info = &riscv_implied_info[0]; implied_info->ext;
+	   ++implied_info)
+	{
+	  if (strcmp (itr->name.c_str(), implied_info->ext) != 0)
+	    continue;
+
+	  if (!lookup (implied_info->implied_ext))
+	    return false;
+	}
+    }
+  return true;
 }
 
 /* Check any combine extensions for EXT.  */
@@ -1100,6 +1205,9 @@ riscv_subset_list::parse_multiletter_ext (const char *p,
 riscv_subset_list *
 riscv_subset_list::parse (const char *arch, location_t loc)
 {
+  if (riscv_subset_list::parse_failed)
+    return NULL;
+
   riscv_subset_list *subset_list = new riscv_subset_list (arch, loc);
   riscv_subset_t *itr;
   const char *p = arch;
@@ -1153,8 +1261,11 @@ riscv_subset_list::parse (const char *arch, location_t loc)
 
   for (itr = subset_list->m_head; itr != NULL; itr = itr->next)
     {
-      subset_list->handle_implied_ext (itr);
+      subset_list->handle_implied_ext (itr->name.c_str ());
     }
+
+  /* Make sure all implied extensions are included. */
+  gcc_assert (subset_list->check_implied_ext ());
 
   subset_list->handle_combine_ext ();
 
@@ -1166,6 +1277,7 @@ riscv_subset_list::parse (const char *arch, location_t loc)
 
 fail:
   delete subset_list;
+  riscv_subset_list::parse_failed = true;
   return NULL;
 }
 
@@ -1228,6 +1340,8 @@ static const riscv_ext_flag_table_t riscv_ext_flag_table[] =
   {"zksh",   &gcc_options::x_riscv_zk_subext, MASK_ZKSH},
   {"zkt",    &gcc_options::x_riscv_zk_subext, MASK_ZKT},
 
+  {"zihintntl", &gcc_options::x_riscv_zi_subext, MASK_ZIHINTNTL},
+
   {"zicboz", &gcc_options::x_riscv_zicmo_subext, MASK_ZICBOZ},
   {"zicbom", &gcc_options::x_riscv_zicmo_subext, MASK_ZICBOM},
   {"zicbop", &gcc_options::x_riscv_zicmo_subext, MASK_ZICBOP},
@@ -1250,6 +1364,22 @@ static const riscv_ext_flag_table_t riscv_ext_flag_table[] =
   {"zve64d",   &gcc_options::x_riscv_vector_elen_flags, MASK_VECTOR_ELEN_FP_64},
   {"zvfhmin",  &gcc_options::x_riscv_vector_elen_flags, MASK_VECTOR_ELEN_FP_16},
   {"zvfh",     &gcc_options::x_riscv_vector_elen_flags, MASK_VECTOR_ELEN_FP_16},
+
+  {"zvbb",     &gcc_options::x_riscv_zvb_subext, MASK_ZVBB},
+  {"zvbc",     &gcc_options::x_riscv_zvb_subext, MASK_ZVBC},
+  {"zvkg",     &gcc_options::x_riscv_zvk_subext, MASK_ZVKG},
+  {"zvkned",   &gcc_options::x_riscv_zvk_subext, MASK_ZVKNED},
+  {"zvknha",   &gcc_options::x_riscv_zvk_subext, MASK_ZVKNHA},
+  {"zvknhb",   &gcc_options::x_riscv_zvk_subext, MASK_ZVKNHB},
+  {"zvksed",   &gcc_options::x_riscv_zvk_subext, MASK_ZVKSED},
+  {"zvksh",    &gcc_options::x_riscv_zvk_subext, MASK_ZVKSH},
+  {"zvkn",     &gcc_options::x_riscv_zvk_subext, MASK_ZVKN},
+  {"zvknc",    &gcc_options::x_riscv_zvk_subext, MASK_ZVKNC},
+  {"zvkng",    &gcc_options::x_riscv_zvk_subext, MASK_ZVKNG},
+  {"zvks",     &gcc_options::x_riscv_zvk_subext, MASK_ZVKS},
+  {"zvksc",    &gcc_options::x_riscv_zvk_subext, MASK_ZVKSC},
+  {"zvksg",    &gcc_options::x_riscv_zvk_subext, MASK_ZVKSG},
+  {"zvkt",     &gcc_options::x_riscv_zvk_subext, MASK_ZVKT},
 
   {"zvl32b",    &gcc_options::x_riscv_zvl_flags, MASK_ZVL32B},
   {"zvl64b",    &gcc_options::x_riscv_zvl_flags, MASK_ZVL64B},

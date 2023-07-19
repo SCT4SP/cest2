@@ -12272,32 +12272,25 @@ package body Sem_Util is
    begin
       --  For selected components, the subtype of the selector must be a
       --  constrained Unchecked_Union. If the component is subject to a
-      --  per-object constraint, then the enclosing object must have inferable
-      --  discriminants.
+      --  per-object constraint, then the enclosing object must either be
+      --  a regular discriminated type or must have inferable discriminants.
 
       if Nkind (N) = N_Selected_Component then
-         if Has_Per_Object_Constraint (Entity (Selector_Name (N))) then
-
-            --  A small hack. If we have a per-object constrained selected
-            --  component of a formal parameter, return True since we do not
-            --  know the actual parameter association yet.
-
-            if Prefix_Is_Formal_Parameter (N) then
-               return True;
-
-            --  Otherwise, check the enclosing object and the selector
-
-            else
-               return Has_Inferable_Discriminants (Prefix (N))
-                 and then Has_Inferable_Discriminants (Selector_Name (N));
-            end if;
-
          --  The call to Has_Inferable_Discriminants will determine whether
          --  the selector has a constrained Unchecked_Union nominal type.
 
-         else
-            return Has_Inferable_Discriminants (Selector_Name (N));
+         if not Has_Inferable_Discriminants (Selector_Name (N)) then
+            return False;
          end if;
+
+         --  A small hack. If we have a per-object constrained selected
+         --  component of a formal parameter, return True since we do not
+         --  know the actual parameter association yet.
+
+         return not Has_Per_Object_Constraint (Entity (Selector_Name (N)))
+           or else not Is_Unchecked_Union (Etype (Prefix (N)))
+           or else Has_Inferable_Discriminants (Prefix (N))
+           or else Prefix_Is_Formal_Parameter (N);
 
       --  A qualified expression has inferable discriminants if its subtype
       --  mark is a constrained Unchecked_Union subtype.
@@ -12310,7 +12303,7 @@ package body Sem_Util is
       --  Unchecked_Union nominal subtype.
 
       else
-         return Is_Unchecked_Union (Base_Type (Etype (N)))
+         return Is_Unchecked_Union (Etype (N))
            and then Is_Constrained (Etype (N));
       end if;
    end Has_Inferable_Discriminants;
@@ -17340,7 +17333,7 @@ package body Sem_Util is
                   declare
                      Init : constant Entity_Id :=
                               (Find_Optional_Prim_Op
-                                 (Underlying_Type (Typ), Name_Initialize));
+                                 (Utyp, Name_Initialize));
 
                   begin
                      if Present (Init)
@@ -29238,6 +29231,13 @@ package body Sem_Util is
             return Typ;
          end if;
 
+      elsif From_Limited_With (Typ) then
+         if Has_Non_Limited_View (Typ) then
+            return Validated_View (Non_Limited_View (Typ));
+         else
+            return Typ;
+         end if;
+
       else
          return Typ;
       end if;
@@ -29398,7 +29398,11 @@ package body Sem_Util is
    -- Wrong_Type --
    ----------------
 
-   procedure Wrong_Type (Expr : Node_Id; Expected_Type : Entity_Id) is
+   procedure Wrong_Type
+     (Expr          : Node_Id;
+      Expected_Type : Entity_Id;
+      Multiple      : Boolean := False)
+   is
       Found_Type : constant Entity_Id := First_Subtype (Etype (Expr));
       Expec_Type : constant Entity_Id := First_Subtype (Expected_Type);
 
@@ -29485,13 +29489,14 @@ package body Sem_Util is
 
    begin
       --  Don't output message if either type is Any_Type, or if a message
-      --  has already been posted for this node. We need to do the latter
-      --  check explicitly (it is ordinarily done in Errout), because we
-      --  are using ! to force the output of the error messages.
+      --  has already been posted for this node and we do not want multiple
+      --  error messages. We need to do the latter check explicitly (it is
+      --  ordinarily done in Errout) because we are using '!' to force the
+      --  output of the error messages.
 
       if Expec_Type = Any_Type
         or else Found_Type = Any_Type
-        or else Error_Posted (Expr)
+        or else (Error_Posted (Expr) and then not Multiple)
       then
          return;
 

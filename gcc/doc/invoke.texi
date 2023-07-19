@@ -317,7 +317,8 @@ Objective-C and Objective-C++ Dialects}.
 -fno-show-column
 -fdiagnostics-column-unit=@r{[}display@r{|}byte@r{]}
 -fdiagnostics-column-origin=@var{origin}
--fdiagnostics-escape-format=@r{[}unicode@r{|}bytes@r{]}}
+-fdiagnostics-escape-format=@r{[}unicode@r{|}bytes@r{]}
+-fdiagnostics-text-art-charset=@r{[}none@r{|}ascii@r{|}unicode@r{|}emoji@r{]}}
 
 @item Warning Options
 @xref{Warning Options,,Options to Request or Suppress Warnings}.
@@ -1432,7 +1433,7 @@ See RS/6000 and PowerPC Options.
 -mrdseed  -msgx -mavx512vp2intersect -mserialize -mtsxldtrk
 -mamx-tile  -mamx-int8  -mamx-bf16 -muintr -mhreset -mavxvnni
 -mavx512fp16 -mavxifma -mavxvnniint8 -mavxneconvert -mcmpccxadd -mamx-fp16
--mprefetchi -mraoint -mamx-complex
+-mprefetchi -mraoint -mamx-complex -mavxvnniint16 -msm3 -msha512 -msm4
 -mcldemote  -mms-bitfields  -mno-align-stringops  -minline-all-stringops
 -minline-stringops-dynamically  -mstringop-strategy=@var{alg}
 -mkl -mwidekl
@@ -2504,6 +2505,18 @@ change in incompatible ways in future releases.
 @item gnu++2b
 @itemx gnu++23
 GNU dialect of @option{-std=c++2b}.  Support is highly experimental,
+and will almost certainly change in incompatible ways in future
+releases.
+
+@item c++2c
+@itemx c++26
+The next revision of the ISO C++ standard, planned for
+2026.  Support is highly experimental, and will almost certainly
+change in incompatible ways in future releases.
+
+@item gnu++2c
+@itemx gnu++26
+GNU dialect of @option{-std=c++2c}.  Support is highly experimental,
 and will almost certainly change in incompatible ways in future
 releases.
 @end table
@@ -4817,10 +4830,12 @@ and Objective-C++ programs:
 Use @var{class-name} as the name of the class to instantiate for each
 literal string specified with the syntax @code{@@"@dots{}"}.  The default
 class name is @code{NXConstantString} if the GNU runtime is being used, and
-@code{NSConstantString} if the NeXT runtime is being used (see below).  The
-@option{-fconstant-cfstrings} option, if also present, overrides the
-@option{-fconstant-string-class} setting and cause @code{@@"@dots{}"} literals
-to be laid out as constant CoreFoundation strings.
+@code{NSConstantString} if the NeXT runtime is being used (see below).  On
+Darwin (macOS, MacOS X) platforms, the @option{-fconstant-cfstrings} option, if
+also present, overrides the @option{-fconstant-string-class} setting and cause
+@code{@@"@dots{}"} literals to be laid out as constant CoreFoundation strings.
+Note that @option{-fconstant-cfstrings} is an alias for the target-specific
+@option{-mconstant-cfstrings} equivalent.
 
 @opindex fgnu-runtime
 @item -fgnu-runtime
@@ -5078,7 +5093,8 @@ options:
 -fno-diagnostics-show-line-numbers
 -fdiagnostics-color=never
 -fdiagnostics-urls=never
--fdiagnostics-path-format=separate-events}
+-fdiagnostics-path-format=separate-events
+-fdiagnostics-text-art-charset=none}
 In the future, if GCC changes the default appearance of its diagnostics, the
 corresponding option to disable the new behavior will be added to this list.
 
@@ -5603,6 +5619,25 @@ Unicode characters.  For the example above, the following will be printed:
 @smallexample
  before<CF><80><BF>after
 @end smallexample
+
+@opindex fdiagnostics-text-art-charset
+@item -fdiagnostics-text-art-charset=@var{CHARSET}
+Some diagnostics can contain ``text art'' diagrams: visualizations created
+from text, intended to be viewed in a monospaced font.
+
+This option selects which characters should be used for printing such
+diagrams, if any.  @var{CHARSET} is @samp{none}, @samp{ascii}, @samp{unicode},
+or @samp{emoji}.
+
+The @samp{none} value suppresses the printing of such diagrams.
+The @samp{ascii} value will ensure that such diagrams are pure ASCII
+(``ASCII art'').  The @samp{unicode} value will allow for conservative use of
+unicode drawing characters (such as box-drawing characters).  The @samp{emoji}
+value further adds the possibility of emoji in the output (such as emitting
+U+26A0 WARNING SIGN followed by U+FE0F VARIATION SELECTOR-16 to select the
+emoji variant of the character).
+
+The default is @samp{emoji}.
 
 @opindex fdiagnostics-format
 @item -fdiagnostics-format=@var{FORMAT}
@@ -6695,7 +6730,7 @@ Warn if the compiler does not elide the copy from a local variable to
 the return value of a function in a context where it is allowed by
 [class.copy.elision].  This elision is commonly known as the Named
 Return Value Optimization.  For instance, in the example below the
-compiler cannot elide copies from both v1 and b2, so it elides neither.
+compiler cannot elide copies from both v1 and v2, so it elides neither.
 
 @smallexample
 std::vector<int> f()
@@ -7051,7 +7086,7 @@ This warning is enabled by @option{-Wall}.
 @opindex Wmissing-include-dirs
 @opindex Wno-missing-include-dirs
 @item -Wmissing-include-dirs @r{(C, C++, Objective-C, Objective-C++ and Fortran only)}
-Warn if a user-supplied include directory does not exist. This opions is disabled
+Warn if a user-supplied include directory does not exist. This option is disabled
 by default for C, C++, Objective-C and Objective-C++. For Fortran, it is partially
 enabled by default by warning for -I and -J, only.
 
@@ -10591,6 +10626,15 @@ offset as well as the capacity is symbolic.
 
 See @uref{https://cwe.mitre.org/data/definitions/119.html, CWE-119: Improper Restriction of Operations within the Bounds of a Memory Buffer}.
 
+For cases where the analyzer is able, it will emit a text art diagram
+visualizing the spatial relationship between the memory region that the
+analyzer predicts would be accessed, versus the range of memory that is
+valid to access: whether they overlap, are touching, are close or far
+apart; which one is before or after in memory, the relative sizes
+involved, the direction of the access (read vs write), and, in some
+cases, the values of data involved.  This diagram can be suppressed
+using @option{-fdiagnostics-text-art-charset=none}.
+
 @opindex Wanalyzer-possible-null-argument
 @opindex Wno-analyzer-possible-null-argument
 @item -Wno-analyzer-possible-null-argument
@@ -11100,6 +11144,12 @@ following warnings from @option{-fanalyzer}:
 -Wanalyzer-va-list-leak
 -Wanalyzer-va-list-use-after-va-end
 }
+
+@opindex fanalyzer-debug-text-art
+@opindex fno-analyzer-debug-text-art
+@item -fanalyzer-debug-text-art-headings
+This option is intended for analyzer developers.  If enabled,
+the analyzer will add extra annotations to any diagrams it generates.
 
 @opindex fanalyzer-feasibility
 @opindex fno-analyzer-feasibility
@@ -12077,10 +12127,12 @@ This option is enabled by default at optimization levels @option{-O1},
 such as forming of fused multiply-add operations if the target has
 native support for them.
 @option{-ffp-contract=on} enables floating-point expression contraction
-if allowed by the language standard.  This is currently not implemented
-and treated equal to @option{-ffp-contract=off}.
+if allowed by the language standard.  This is implemented for C and C++,
+where it enables contraction within one expression, but not across
+different statements.
 
-The default is @option{-ffp-contract=fast}.
+The default is @option{-ffp-contract=off} for C in a standards compliant mode
+(@option{-std=c11} or similar), @option{-ffp-contract=fast} otherwise.
 
 @opindex fomit-frame-pointer
 @item -fomit-frame-pointer
@@ -24068,10 +24120,21 @@ This is by default ON@.
 @item -gfull
 Emit debugging information for all symbols and types.
 
+@opindex fconstant-cfstrings
+@item -fconstant-cfstrings
+The @option{-fconstant-cfstrings} is an alias for @option{-mconstant-cfstrings}.
+
+@opindex mconstant-cfstrings
+@item -mconstant-cfstrings
+When the NeXT runtime is being used (the default on these systems), override
+any @option{-fconstant-string-class} setting and cause @code{@@"@dots{}"}
+literals to be laid out as constant CoreFoundation strings.
+
+@opindex mmacosx-version-min
 @item -mmacosx-version-min=@var{version}
-The earliest version of MacOS X that this executable will run on
-is @var{version}.  Typical values of @var{version} include @code{10.1},
-@code{10.2}, and @code{10.3.9}.
+The earliest version of MacOS X that this executable will run on is
+@var{version}.  Typical values supported for @var{version} include @code{12},
+@code{10.12}, and @code{10.5.8}.
 
 If the compiler was built to use the system's headers by default,
 then the default for this option is the system version on which the
@@ -26831,6 +26894,13 @@ MIPS32 or MIPS64 architecture, it makes use of the MIPS16e ASE@.
 MIPS16 code generation can also be controlled on a per-function basis
 by means of @code{mips16} and @code{nomips16} attributes.
 @xref{Function Attributes}, for more information.
+
+@opindex mmips16e2
+@opindex mno-mips16e2
+@item -mmips16e2
+@itemx -mno-mips16e2
+Use (do not use) the MIPS16e2 ASE.  This option modifies the behavior
+of the @option{-mips16} option such that it targets the MIPS16e2 ASE@.
 
 @opindex mflip-mips16
 @item -mflip-mips16
@@ -32496,7 +32566,8 @@ SSSE3, SSE4.1, SSE4.2, POPCNT, AES, PREFETCHW, PCLMUL, RDRND, XSAVE, XSAVEC,
 XSAVES, XSAVEOPT, FSGSBASE, PTWRITE, RDPID, SGX, GFNI-SSE, CLWB, MOVDIRI,
 MOVDIR64B, CLDEMOTE, WAITPKG, ADCX, AVX, AVX2, BMI, BMI2, F16C, FMA, LZCNT,
 PCONFIG, PKU, VAES, VPCLMULQDQ, SERIALIZE, HRESET, KL, WIDEKL, AVX-VNNI,
-AVXIFMA, AVXVNNIINT8, AVXNECONVERT and CMPCCXADD instruction set support.
+AVXIFMA, AVXVNNIINT8, AVXNECONVERT, CMPCCXADD, ENQCMD and UINTR instruction set
+support.
 
 @item grandridge
 Intel Grand Ridge CPU with 64-bit extensions, MOVBE, MMX, SSE, SSE2, SSE3,
@@ -32504,8 +32575,25 @@ SSSE3, SSE4.1, SSE4.2, POPCNT, AES, PREFETCHW, PCLMUL, RDRND, XSAVE, XSAVEC,
 XSAVES, XSAVEOPT, FSGSBASE, PTWRITE, RDPID, SGX, GFNI-SSE, CLWB, MOVDIRI,
 MOVDIR64B, CLDEMOTE, WAITPKG, ADCX, AVX, AVX2, BMI, BMI2, F16C, FMA, LZCNT,
 PCONFIG, PKU, VAES, VPCLMULQDQ, SERIALIZE, HRESET, KL, WIDEKL, AVX-VNNI,
-AVXIFMA, AVXVNNIINT8, AVXNECONVERT, CMPCCXADD and RAOINT instruction set
-support.
+AVXIFMA, AVXVNNIINT8, AVXNECONVERT, CMPCCXADD, ENQCMD, UINTR and RAOINT
+instruction set support.
+
+@item arrowlake
+Intel Arrow Lake CPU with 64-bit extensions, MOVBE, MMX, SSE, SSE2, SSE3,
+SSSE3, SSE4.1, SSE4.2, POPCNT, AES, PREFETCHW, PCLMUL, RDRND, XSAVE, XSAVEC,
+XSAVES, XSAVEOPT, FSGSBASE, PTWRITE, RDPID, SGX, GFNI-SSE, CLWB, MOVDIRI,
+MOVDIR64B, CLDEMOTE, WAITPKG, ADCX, AVX, AVX2, BMI, BMI2, F16C, FMA, LZCNT,
+PCONFIG, PKU, VAES, VPCLMULQDQ, SERIALIZE, HRESET, KL, WIDEKL, AVX-VNNI,
+AVXIFMA, AVXVNNIINT8, AVXNECONVERT and CMPCCXADD instruction set support.
+
+@item arrowlake-s
+Intel Arrow Lake S CPU with 64-bit extensions, MOVBE, MMX, SSE, SSE2, SSE3,
+SSSE3, SSE4.1, SSE4.2, POPCNT, AES, PREFETCHW, PCLMUL, RDRND, XSAVE, XSAVEC,
+XSAVES, XSAVEOPT, FSGSBASE, PTWRITE, RDPID, SGX, GFNI-SSE, CLWB, MOVDIRI,
+MOVDIR64B, CLDEMOTE, WAITPKG, ADCX, AVX, AVX2, BMI, BMI2, F16C, FMA, LZCNT,
+PCONFIG, PKU, VAES, VPCLMULQDQ, SERIALIZE, HRESET, KL, WIDEKL, AVX-VNNI,
+AVXIFMA, AVXVNNIINT8, AVXNECONVERT, CMPCCXADD, AVXVNNIINT16, SHA512, SM3
+and SM4 instruction set support.
 
 @item knl
 Intel Knight's Landing CPU with 64-bit extensions, MOVBE, MMX, SSE, SSE2, SSE3,
@@ -32612,6 +32700,17 @@ VPCLMULQDQ, AVX512BITALG, RDPID, AVX512VPOPCNTDQ, PCONFIG, WBNOINVD, CLWB,
 MOVDIRI, MOVDIR64B, AVX512VP2INTERSECT, ENQCMD, CLDEMOTE, PTWRITE, WAITPKG,
 SERIALIZE, TSXLDTRK, UINTR, AMX-BF16, AMX-TILE, AMX-INT8, AVX-VNNI, AVX512-FP16,
 AVX512BF16, AMX-FP16 and PREFETCHI instruction set support.
+
+@item graniterapids-d
+Intel graniterapids D CPU with 64-bit extensions, MOVBE, MMX, SSE, SSE2, SSE3,
+SSSE3, SSE4.1, SSE4.2, POPCNT, CX16, SAHF, FXSR, AVX, XSAVE, PCLMUL, FSGSBASE,
+RDRND, F16C, AVX2, BMI, BMI2, LZCNT, FMA, MOVBE, HLE, RDSEED, ADCX, PREFETCHW,
+AES, CLFLUSHOPT, XSAVEC, XSAVES, SGX, AVX512F, AVX512VL, AVX512BW, AVX512DQ,
+AVX512CD, PKU, AVX512VBMI, AVX512IFMA, SHA, AVX512VNNI, GFNI, VAES, AVX512VBMI2,
+VPCLMULQDQ, AVX512BITALG, RDPID, AVX512VPOPCNTDQ, PCONFIG, WBNOINVD, CLWB,
+MOVDIRI, MOVDIR64B, AVX512VP2INTERSECT, ENQCMD, CLDEMOTE, PTWRITE, WAITPKG,
+SERIALIZE, TSXLDTRK, UINTR, AMX-BF16, AMX-TILE, AMX-INT8, AVX-VNNI, AVX512FP16,
+AVX512BF16, AMX-FP16, PREFETCHI and AMX-COMPLEX instruction set support.
 
 @item k6
 AMD K6 CPU with MMX instruction set support.
@@ -33470,8 +33569,19 @@ preferred alignment to @option{-mpreferred-stack-boundary=2}.
 @need 200
 @opindex mamx-complex
 @itemx -mamx-complex
+@need 200
+@opindex mavxvnniint16
+@itemx -mavxvnniint16
+@need 200
+@opindex msm3
+@itemx -msm3
+@need 200
+@opindex msha512
+@itemx -msha512
+@need 200
+@opindex msm4
+@itemx -msm4
 These switches enable the use of instructions in the MMX, SSE,
-SSE2, SSE3, SSSE3, SSE4, SSE4A, SSE4.1, SSE4.2, AVX, AVX2, AVX512F, AVX512PF,
 AVX512ER, AVX512CD, AVX512VL, AVX512BW, AVX512DQ, AVX512IFMA, AVX512VBMI, SHA,
 AES, PCLMUL, CLFLUSHOPT, CLWB, FSGSBASE, PTWRITE, RDRND, F16C, FMA, PCONFIG,
 WBNOINVD, FMA4, PREFETCHW, RDPID, PREFETCHWT1, RDSEED, SGX, XOP, LWP,
@@ -33481,8 +33591,9 @@ GFNI, VAES, WAITPKG, VPCLMULQDQ, AVX512BITALG, MOVDIRI, MOVDIR64B, AVX512BF16,
 ENQCMD, AVX512VPOPCNTDQ, AVX5124FMAPS, AVX512VNNI, AVX5124VNNIW, SERIALIZE,
 UINTR, HRESET, AMXTILE, AMXINT8, AMXBF16, KL, WIDEKL, AVXVNNI, AVX512-FP16,
 AVXIFMA, AVXVNNIINT8, AVXNECONVERT, CMPCCXADD, AMX-FP16, PREFETCHI, RAOINT,
-AMX-COMPLEX or CLDEMOTE extended instruction sets. Each has a corresponding
-@option{-mno-} option to disable use of these instructions.
+AMX-COMPLEX, AVXVNNIINT16, SM3, SHA512, SM4 or CLDEMOTE extended instruction
+sets. Each has a corresponding @option{-mno-} option to disable use of these
+instructions.
 
 These extensions are also available as built-in functions: see
 @ref{x86 Built-in Functions}, for details of the functions enabled and

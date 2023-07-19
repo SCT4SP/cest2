@@ -1368,6 +1368,7 @@ typedef struct gfc_omp_namelist
 	  bool old_modifier;
 	} linear;
       struct gfc_common_head *common;
+      struct gfc_symbol *memspace_sym;
       bool lastprivate_conditional;
       bool present_modifier;
     } u;
@@ -1376,6 +1377,7 @@ typedef struct gfc_omp_namelist
       struct gfc_omp_namelist_udr *udr;
       gfc_namespace *ns;
       gfc_expr *allocator;
+      struct gfc_symbol *traits_sym;
     } u2;
   struct gfc_omp_namelist *next;
   locus where;
@@ -1419,6 +1421,7 @@ enum
   OMP_LIST_ALLOCATE,
   OMP_LIST_HAS_DEVICE_ADDR,
   OMP_LIST_ENTER,
+  OMP_LIST_USES_ALLOCATORS,
   OMP_LIST_NUM /* Must be the last.  */
 };
 
@@ -3600,7 +3603,7 @@ void gfc_free_iterator (gfc_iterator *, int);
 void gfc_free_forall_iterator (gfc_forall_iterator *);
 void gfc_free_alloc_list (gfc_alloc *);
 void gfc_free_namelist (gfc_namelist *);
-void gfc_free_omp_namelist (gfc_omp_namelist *, bool, bool);
+void gfc_free_omp_namelist (gfc_omp_namelist *, bool, bool, bool);
 void gfc_free_equiv (gfc_equiv *);
 void gfc_free_equiv_until (gfc_equiv *, gfc_equiv *);
 void gfc_free_data (gfc_data *);
@@ -3659,6 +3662,7 @@ bool gfc_is_constant_expr (gfc_expr *);
 bool gfc_simplify_expr (gfc_expr *, int);
 bool gfc_try_simplify_expr (gfc_expr *, int);
 bool gfc_has_vector_index (gfc_expr *);
+bool gfc_is_ptr_fcn (gfc_expr *);
 
 gfc_expr *gfc_get_expr (void);
 gfc_expr *gfc_get_array_expr (bt type, int kind, locus *);
@@ -3726,6 +3730,7 @@ gfc_expr* gfc_find_stat_co (gfc_expr *);
 gfc_expr* gfc_build_intrinsic_call (gfc_namespace *, gfc_isym_id, const char*,
 				    locus, unsigned, ...);
 bool gfc_check_vardef_context (gfc_expr*, bool, bool, bool, const char*);
+gfc_expr* gfc_pdt_find_component_copy_initializer (gfc_symbol *, const char *);
 
 
 /* st.cc */

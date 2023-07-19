@@ -98,6 +98,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "lcm.h"
 #include "predict.h"
 #include "profile-count.h"
+#include "gcse.h"
 #include "riscv-vsetvl.h"
 
 using namespace rtl_ssa;
@@ -645,7 +646,8 @@ gen_vsetvl_pat (enum vsetvl_type insn_type, const vl_vtype_info &info, rtx vl)
 }
 
 static rtx
-gen_vsetvl_pat (rtx_insn *rinsn, const vector_insn_info &info)
+gen_vsetvl_pat (rtx_insn *rinsn, const vector_insn_info &info,
+		rtx vl = NULL_RTX)
 {
   rtx new_pat;
   vl_vtype_info new_info = info;
@@ -653,15 +655,17 @@ gen_vsetvl_pat (rtx_insn *rinsn, const vector_insn_info &info)
       && fault_first_load_p (info.get_insn ()->rtl ()))
     new_info.set_avl_info (
       avl_info (get_avl (info.get_insn ()->rtl ()), nullptr));
-  if (vsetvl_insn_p (rinsn) || vlmax_avl_p (info.get_avl ()))
-    {
-      rtx dest = get_vl (rinsn);
-      new_pat = gen_vsetvl_pat (VSETVL_NORMAL, new_info, dest);
-    }
-  else if (INSN_CODE (rinsn) == CODE_FOR_vsetvl_vtype_change_only)
-    new_pat = gen_vsetvl_pat (VSETVL_VTYPE_CHANGE_ONLY, new_info, NULL_RTX);
+  if (vl)
+    new_pat = gen_vsetvl_pat (VSETVL_NORMAL, new_info, vl);
   else
-    new_pat = gen_vsetvl_pat (VSETVL_DISCARD_RESULT, new_info, NULL_RTX);
+    {
+      if (vsetvl_insn_p (rinsn) || vlmax_avl_p (info.get_avl ()))
+	new_pat = gen_vsetvl_pat (VSETVL_NORMAL, new_info, get_vl (rinsn));
+      else if (INSN_CODE (rinsn) == CODE_FOR_vsetvl_vtype_change_only)
+	new_pat = gen_vsetvl_pat (VSETVL_VTYPE_CHANGE_ONLY, new_info, NULL_RTX);
+      else
+	new_pat = gen_vsetvl_pat (VSETVL_DISCARD_RESULT, new_info, NULL_RTX);
+    }
   return new_pat;
 }
 
@@ -763,127 +767,6 @@ insert_vsetvl (enum emit_type emit_type, rtx_insn *rinsn,
   return VSETVL_DISCARD_RESULT;
 }
 
-/* If X contains any LABEL_REF's, add REG_LABEL_OPERAND notes for them
-   to INSN.  If such notes are added to an insn which references a
-   CODE_LABEL, the LABEL_NUSES count is incremented.  We have to add
-   that note, because the following loop optimization pass requires
-   them.  */
-
-/* ??? If there was a jump optimization pass after gcse and before loop,
-   then we would not need to do this here, because jump would add the
-   necessary REG_LABEL_OPERAND and REG_LABEL_TARGET notes.  */
-
-static void
-add_label_notes (rtx x, rtx_insn *rinsn)
-{
-  enum rtx_code code = GET_CODE (x);
-  int i, j;
-  const char *fmt;
-
-  if (code == LABEL_REF && !LABEL_REF_NONLOCAL_P (x))
-    {
-      /* This code used to ignore labels that referred to dispatch tables to
-	 avoid flow generating (slightly) worse code.
-
-	 We no longer ignore such label references (see LABEL_REF handling in
-	 mark_jump_label for additional information).  */
-
-      /* There's no reason for current users to emit jump-insns with
-	 such a LABEL_REF, so we don't have to handle REG_LABEL_TARGET
-	 notes.  */
-      gcc_assert (!JUMP_P (rinsn));
-      add_reg_note (rinsn, REG_LABEL_OPERAND, label_ref_label (x));
-
-      if (LABEL_P (label_ref_label (x)))
-	LABEL_NUSES (label_ref_label (x))++;
-
-      return;
-    }
-
-  for (i = GET_RTX_LENGTH (code) - 1, fmt = GET_RTX_FORMAT (code); i >= 0; i--)
-    {
-      if (fmt[i] == 'e')
-	add_label_notes (XEXP (x, i), rinsn);
-      else if (fmt[i] == 'E')
-	for (j = XVECLEN (x, i) - 1; j >= 0; j--)
-	  add_label_notes (XVECEXP (x, i, j), rinsn);
-    }
-}
-
-/* Add EXPR to the end of basic block BB.
-
-   This is used by both the PRE and code hoisting.  */
-
-static void
-insert_insn_end_basic_block (rtx_insn *rinsn, basic_block cfg_bb)
-{
-  rtx_insn *end_rinsn = BB_END (cfg_bb);
-  rtx_insn *new_insn;
-  rtx_insn *pat, *pat_end;
-
-  pat = rinsn;
-  gcc_assert (pat && INSN_P (pat));
-
-  pat_end = pat;
-  while (NEXT_INSN (pat_end) != NULL_RTX)
-    pat_end = NEXT_INSN (pat_end);
-
-  /* If the last end_rinsn is a jump, insert EXPR in front.  Similarly we need
-     to take care of trapping instructions in presence of non-call exceptions.
-   */
-
-  if (JUMP_P (end_rinsn)
-      || (NONJUMP_INSN_P (end_rinsn)
-	  && (!single_succ_p (cfg_bb)
-	      || single_succ_edge (cfg_bb)->flags & EDGE_ABNORMAL)))
-    {
-      /* FIXME: What if something in jump uses value set in new end_rinsn?  */
-      new_insn = emit_insn_before_noloc (pat, end_rinsn, cfg_bb);
-    }
-
-  /* Likewise if the last end_rinsn is a call, as will happen in the presence
-     of exception handling.  */
-  else if (CALL_P (end_rinsn)
-	   && (!single_succ_p (cfg_bb)
-	       || single_succ_edge (cfg_bb)->flags & EDGE_ABNORMAL))
-    {
-      /* Keeping in mind targets with small register classes and parameters
-	 in registers, we search backward and place the instructions before
-	 the first parameter is loaded.  Do this for everyone for consistency
-	 and a presumption that we'll get better code elsewhere as well.  */
-
-      /* Since different machines initialize their parameter registers
-	 in different orders, assume nothing.  Collect the set of all
-	 parameter registers.  */
-      end_rinsn = find_first_parameter_load (end_rinsn, BB_HEAD (cfg_bb));
-
-      /* If we found all the parameter loads, then we want to insert
-	 before the first parameter load.
-
-	 If we did not find all the parameter loads, then we might have
-	 stopped on the head of the block, which could be a CODE_LABEL.
-	 If we inserted before the CODE_LABEL, then we would be putting
-	 the end_rinsn in the wrong basic block.  In that case, put the
-	 end_rinsn after the CODE_LABEL.  Also, respect NOTE_INSN_BASIC_BLOCK.
-       */
-      while (LABEL_P (end_rinsn) || NOTE_INSN_BASIC_BLOCK_P (end_rinsn))
-	end_rinsn = NEXT_INSN (end_rinsn);
-
-      new_insn = emit_insn_before_noloc (pat, end_rinsn, cfg_bb);
-    }
-  else
-    new_insn = emit_insn_after_noloc (pat, end_rinsn, cfg_bb);
-
-  while (1)
-    {
-      if (INSN_P (pat))
-	add_label_notes (PATTERN (pat), new_insn);
-      if (pat == pat_end)
-	break;
-      pat = NEXT_INSN (pat);
-    }
-}
-
 /* Get VL/VTYPE information for INSN.  */
 static vl_vtype_info
 get_vl_vtype_info (const insn_info *insn)
@@ -925,6 +808,14 @@ get_vl_vtype_info (const insn_info *insn)
   return info;
 }
 
+/* Change insn and Assert the change always happens.  */
+static void
+validate_change_or_fail (rtx object, rtx *loc, rtx new_rtx, bool in_group)
+{
+  bool change_p = validate_change (object, loc, new_rtx, in_group);
+  gcc_assert (change_p);
+}
+
 static void
 change_insn (rtx_insn *rinsn, rtx new_pat)
 {
@@ -938,7 +829,7 @@ change_insn (rtx_insn *rinsn, rtx new_pat)
       print_rtl_single (dump_file, PATTERN (rinsn));
     }
 
-  validate_change (rinsn, &PATTERN (rinsn), new_pat, false);
+  validate_change_or_fail (rinsn, &PATTERN (rinsn), new_pat, false);
 
   if (dump_file)
     {
@@ -994,7 +885,7 @@ change_insn (function_info *ssa, insn_change change, insn_info *insn,
     }
 
   insn_change_watermark watermark;
-  validate_change (rinsn, &PATTERN (rinsn), new_pat, true);
+  validate_change_or_fail (rinsn, &PATTERN (rinsn), new_pat, true);
 
   /* These routines report failures themselves.  */
   if (!recog (attempt, change) || !change_is_worthwhile (change, false))
@@ -1051,7 +942,8 @@ change_insn (function_info *ssa, insn_change change, insn_info *insn,
 }
 
 static void
-change_vsetvl_insn (const insn_info *insn, const vector_insn_info &info)
+change_vsetvl_insn (const insn_info *insn, const vector_insn_info &info,
+		    rtx vl = NULL_RTX)
 {
   rtx_insn *rinsn;
   if (vector_config_insn_p (insn->rtl ()))
@@ -1065,7 +957,7 @@ change_vsetvl_insn (const insn_info *insn, const vector_insn_info &info)
       rinsn = PREV_INSN (insn->rtl ());
       gcc_assert (vector_config_insn_p (rinsn));
     }
-  rtx new_pat = gen_vsetvl_pat (rinsn, info);
+  rtx new_pat = gen_vsetvl_pat (rinsn, info, vl);
   change_insn (rinsn, new_pat);
 }
 
@@ -2003,9 +1895,73 @@ vector_insn_info::parse_insn (insn_info *insn)
   new_info.parse_insn (def_insn);
   if (!same_vlmax_p (new_info) && !scalar_move_insn_p (insn->rtl ()))
     return;
-  /* TODO: Currently, we don't forward AVL for non-VLMAX vsetvl.  */
-  if (vlmax_avl_p (new_info.get_avl ()))
-    set_avl_info (avl_info (new_info.get_avl (), get_avl_source ()));
+
+  if (new_info.has_avl ())
+    {
+      if (new_info.has_avl_imm ())
+	set_avl_info (avl_info (new_info.get_avl (), nullptr));
+      else
+	{
+	  if (vlmax_avl_p (new_info.get_avl ()))
+	    set_avl_info (avl_info (new_info.get_avl (), get_avl_source ()));
+	  else
+	    {
+	      /* Conservatively propagate non-VLMAX AVL of user vsetvl:
+		 1. The user vsetvl should be same block with the rvv insn.
+		 2. The user vsetvl is the only def insn of rvv insn.
+		 3. The AVL is not modified between def-use chain.
+		 4. The VL is only used by insn within EBB.
+	       */
+	      bool modified_p = false;
+	      for (insn_info *i = def_insn->next_nondebug_insn ();
+		   real_insn_and_same_bb_p (i, get_insn ()->bb ());
+		   i = i->next_nondebug_insn ())
+		{
+		  /* Consider this following sequence:
+
+		       insn 1: vsetvli a5,a3,e8,mf4,ta,mu
+		       insn 2: vsetvli zero,a5,e32,m1,ta,ma
+		       ...
+		       vle32.v v1,0(a1)
+		       vsetvli a2,zero,e32,m1,ta,ma
+		       vadd.vv v1,v1,v1
+		       vsetvli zero,a5,e32,m1,ta,ma
+		       vse32.v v1,0(a0)
+		       ...
+		       insn 3: sub     a3,a3,a5
+		       ...
+
+		       We can local AVL propagate "a3" from insn 1 to insn 2
+		       if no insns between insn 1 and insn 2 modify "a3 even
+		       though insn 3 modifies "a3".
+		       Otherwise, we can't perform local AVL propagation.
+
+		       Early break if we reach the insn 2.  */
+		  if (!before_p (i, insn))
+		    break;
+		  if (find_access (i->defs (), REGNO (new_info.get_avl ())))
+		    {
+		      modified_p = true;
+		      break;
+		    }
+		}
+
+	      bool has_live_out_use = false;
+	      for (use_info *use : m_avl.get_source ()->all_uses ())
+		{
+		  if (use->is_live_out_use ())
+		    {
+		      has_live_out_use = true;
+		      break;
+		    }
+		}
+	      if (!modified_p && !has_live_out_use
+		  && def_insn == m_avl.get_source ()->insn ()
+		  && m_insn->bb () == def_insn->bb ())
+		set_avl_info (new_info.get_avl_info ());
+	    }
+	}
+    }
 
   if (scalar_move_insn_p (insn->rtl ()) && m_avl.has_non_zero_avl ())
     m_demands[DEMAND_NONZERO_AVL] = true;
@@ -3433,7 +3389,20 @@ pass_vsetvl::backward_demand_fusion (void)
 				       new_info))
 		continue;
 
-	      change_vsetvl_insn (new_info.get_insn (), new_info);
+	      rtx vl = NULL_RTX;
+	      /* Backward VLMAX VL:
+		   bb 3:
+		     vsetivli zero, 1 ... -> vsetvli t1, zero
+		     vmv.s.x
+		   bb 5:
+		     vsetvli t1, zero ... -> to be elided.
+		     vlse16.v
+
+		   We should forward "t1".  */
+	      if (!block_info.reaching_out.has_avl_reg ()
+		  && vlmax_avl_p (new_info.get_avl ()))
+		vl = get_vl (prop.get_insn ()->rtl ());
+	      change_vsetvl_insn (new_info.get_insn (), new_info, vl);
 	      if (block_info.local_dem == block_info.reaching_out)
 		block_info.local_dem = new_info;
 	      block_info.reaching_out = new_info;
@@ -4062,13 +4031,13 @@ pass_vsetvl::commit_vsetvls (void)
       emit_insn (new_pat);
       rtx_insn *rinsn = get_insns ();
       end_sequence ();
-      insert_insn_end_basic_block (rinsn, cfg_bb);
+      rtx_insn *new_insn = insert_insn_end_basic_block (rinsn, cfg_bb);
       if (dump_file)
 	{
 	  fprintf (dump_file,
 		   "\nInsert vsetvl insn %d at the end of <bb %d>:\n",
-		   INSN_UID (rinsn), cfg_bb->index);
-	  print_rtl_single (dump_file, rinsn);
+		   INSN_UID (new_insn), cfg_bb->index);
+	  print_rtl_single (dump_file, new_insn);
 	}
     }
 
@@ -4580,13 +4549,15 @@ pass_vsetvl::df_post_optimization (void) const
 		    {
 		      rtx new_pat = gen_vsetvl_pat (VSETVL_VTYPE_CHANGE_ONLY,
 						    info, NULL_RTX);
-		      validate_change (rinsn, &PATTERN (rinsn), new_pat, false);
+		      validate_change_or_fail (rinsn, &PATTERN (rinsn), new_pat,
+					       false);
 		    }
 		  else if (!vlmax_avl_p (info.get_avl ()))
 		    {
 		      rtx new_pat = gen_vsetvl_pat (VSETVL_DISCARD_RESULT, info,
 						    NULL_RTX);
-		      validate_change (rinsn, &PATTERN (rinsn), new_pat, false);
+		      validate_change_or_fail (rinsn, &PATTERN (rinsn), new_pat,
+					       false);
 		    }
 		}
 	    }

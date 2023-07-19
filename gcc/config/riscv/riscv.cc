@@ -90,28 +90,6 @@ along with GCC; see the file COPYING3.  If not see
 /* True if bit BIT is set in VALUE.  */
 #define BITSET_P(VALUE, BIT) (((VALUE) & (1ULL << (BIT))) != 0)
 
-/* Classifies an address.
-
-   ADDRESS_REG
-       A natural register + offset address.  The register satisfies
-       riscv_valid_base_register_p and the offset is a const_arith_operand.
-
-   ADDRESS_LO_SUM
-       A LO_SUM rtx.  The first operand is a valid base register and
-       the second operand is a symbolic address.
-
-   ADDRESS_CONST_INT
-       A signed 16-bit constant address.
-
-   ADDRESS_SYMBOLIC:
-       A constant symbolic address.  */
-enum riscv_address_type {
-  ADDRESS_REG,
-  ADDRESS_LO_SUM,
-  ADDRESS_CONST_INT,
-  ADDRESS_SYMBOLIC
-};
-
 /* Information about a function's frame layout.  */
 struct GTY(())  riscv_frame_info {
   /* The size of the frame in bytes.  */
@@ -170,6 +148,9 @@ struct GTY(())  machine_function {
      not be considered by the prologue and epilogue.  */
   bool reg_is_wrapped_separately[FIRST_PSEUDO_REGISTER];
 
+  /* The RTL variable which stores the dynamic FRM value.  We always use this
+     RTX to restore dynamic FRM rounding mode in mode switching.  */
+  rtx dynamic_frm;
 };
 
 /* Information about a single argument.  */
@@ -189,27 +170,6 @@ struct riscv_arg_info {
 
   /* The offset of the first register used, provided num_fprs is nonzero.  */
   unsigned int fpr_offset;
-};
-
-/* Information about an address described by riscv_address_type.
-
-   ADDRESS_CONST_INT
-       No fields are used.
-
-   ADDRESS_REG
-       REG is the base register and OFFSET is the constant offset.
-
-   ADDRESS_LO_SUM
-       REG and OFFSET are the operands to the LO_SUM and SYMBOL_TYPE
-       is the type of symbol it references.
-
-   ADDRESS_SYMBOLIC
-       SYMBOL_TYPE is the type of symbol that the address references.  */
-struct riscv_address_info {
-  enum riscv_address_type type;
-  rtx reg;
-  rtx offset;
-  enum riscv_symbol_type symbol_type;
 };
 
 /* One stage in a constant building sequence.  These sequences have
@@ -887,6 +847,26 @@ riscv_regno_mode_ok_for_base_p (int regno,
     return true;
 
   return GP_REG_P (regno);
+}
+
+/* Get valid index register class.
+   The RISC-V base instructions don't support index registers,
+   but extensions might support that.  */
+
+enum reg_class
+riscv_index_reg_class ()
+{
+  return NO_REGS;
+}
+
+/* Return true if register REGNO is a valid index register.
+   The RISC-V base instructions don't support index registers,
+   but extensions might support that.  */
+
+int
+riscv_regno_ok_for_index_p (int)
+{
+  return 0;
 }
 
 /* Return true if X is a valid base register for mode MODE.
@@ -2060,7 +2040,14 @@ riscv_legitimize_poly_move (machine_mode mode, rtx dest, rtx tmp, rtx src)
      (m, n) = base * magn + constant.
      This calculation doesn't need div operation.  */
 
-  emit_move_insn (tmp, gen_int_mode (BYTES_PER_RISCV_VECTOR, mode));
+  if (known_le (GET_MODE_SIZE (mode), GET_MODE_SIZE (Pmode)))
+    emit_move_insn (tmp, gen_int_mode (BYTES_PER_RISCV_VECTOR, mode));
+  else
+    {
+      emit_move_insn (gen_highpart (Pmode, tmp), CONST0_RTX (Pmode));
+      emit_move_insn (gen_lowpart (Pmode, tmp),
+		      gen_int_mode (BYTES_PER_RISCV_VECTOR, Pmode));
+    }
 
   if (BYTES_PER_RISCV_VECTOR.is_constant ())
     {
@@ -2068,18 +2055,21 @@ riscv_legitimize_poly_move (machine_mode mode, rtx dest, rtx tmp, rtx src)
       riscv_emit_move (dest, GEN_INT (value.to_constant ()));
       return;
     }
-  else if ((factor % vlenb) == 0)
-    div_factor = 1;
-  else if ((factor % (vlenb / 2)) == 0)
-    div_factor = 2;
-  else if ((factor % (vlenb / 4)) == 0)
-    div_factor = 4;
-  else if ((factor % (vlenb / 8)) == 0)
-    div_factor = 8;
-  else if ((factor % (vlenb / 16)) == 0)
-    div_factor = 16;
   else
-    gcc_unreachable ();
+    {
+      /* FIXME: We currently DON'T support TARGET_MIN_VLEN > 4096.  */
+      int max_power = exact_log2 (4096 / 128);
+      for (int i = 0; i < max_power; i++)
+	{
+	  int possible_div_factor = 1 << i;
+	  if (factor % (vlenb / possible_div_factor) == 0)
+	    {
+	      div_factor = possible_div_factor;
+	      break;
+	    }
+	}
+      gcc_assert (div_factor != 0);
+    }
 
   if (div_factor != 1)
     riscv_expand_op (LSHIFTRT, mode, tmp, tmp,
@@ -2167,7 +2157,7 @@ riscv_legitimize_move (machine_mode mode, rtx dest, rtx src)
 	  return false;
 	}
 
-      if (satisfies_constraint_vp (src))
+      if (satisfies_constraint_vp (src) && GET_MODE (src) == Pmode)
 	return false;
 
       if (GET_MODE_SIZE (mode).to_constant () < GET_MODE_SIZE (Pmode))
@@ -4801,7 +4791,7 @@ riscv_print_operand_address (FILE *file, machine_mode mode ATTRIBUTE_UNUSED, rtx
     switch (addr.type)
       {
       case ADDRESS_REG:
-	riscv_print_operand (file, addr.offset, 0);
+	output_addr_const (file, riscv_strip_unspec_address (addr.offset));
 	fprintf (file, "(%s)", reg_names[REGNO (addr.reg)]);
 	return;
 
@@ -6492,6 +6482,7 @@ riscv_init_machine_status (void)
 static poly_uint16
 riscv_convert_vector_bits (void)
 {
+  int chunk_num = 1;
   if (TARGET_MIN_VLEN >= 128)
     {
       /* We have Full 'V' extension for application processors. It's specified
@@ -6499,6 +6490,15 @@ riscv_convert_vector_bits (void)
 	 and Zve64d extensions. Thus the number of bytes in a vector is 16 + 16
 	 * x1 which is riscv_vector_chunks * 16 = poly_int (16, 16).  */
       riscv_bytes_per_vector_chunk = 16;
+      /* Adjust BYTES_PER_RISCV_VECTOR according to TARGET_MIN_VLEN:
+	   - TARGET_MIN_VLEN = 128bit: [16,16]
+	   - TARGET_MIN_VLEN = 256bit: [32,32]
+	   - TARGET_MIN_VLEN = 512bit: [64,64]
+	   - TARGET_MIN_VLEN = 1024bit: [128,128]
+	   - TARGET_MIN_VLEN = 2048bit: [256,256]
+	   - TARGET_MIN_VLEN = 4096bit: [512,512]
+	   FIXME: We currently DON'T support TARGET_MIN_VLEN > 4096bit.  */
+      chunk_num = TARGET_MIN_VLEN / 128;
     }
   else if (TARGET_MIN_VLEN > 32)
     {
@@ -6531,7 +6531,7 @@ riscv_convert_vector_bits (void)
       if (riscv_autovec_preference == RVV_FIXED_VLMAX)
 	return (int) TARGET_MIN_VLEN / (riscv_bytes_per_vector_chunk * 8);
       else
-	return poly_uint16 (1, 1);
+	return poly_uint16 (chunk_num, chunk_num);
     }
   else
     return 1;
@@ -6687,6 +6687,14 @@ riscv_option_override (void)
 
       riscv_stack_protector_guard_offset = offs;
     }
+
+  /* FIXME: We don't allow TARGET_MIN_VLEN > 4096 since the datatypes of
+     both GET_MODE_SIZE and GET_MODE_BITSIZE are poly_uint16.
+
+     We can only allow TARGET_MIN_VLEN * 8 (LMUL) < 65535.  */
+  if (TARGET_MIN_VLEN > 4096)
+    sorry (
+      "Current RISC-V GCC can not support VLEN > 4096bit for 'V' Extension");
 
   /* Convert -march to a chunks count.  */
   riscv_vector_chunks = riscv_convert_vector_bits ();
@@ -7364,6 +7372,11 @@ riscv_regmode_natural_size (machine_mode mode)
      anything smaller than that.  */
   /* ??? For now, only do this for variable-width RVV registers.
      Doing it for constant-sized registers breaks lower-subreg.c.  */
+
+  /* RVV mask modes always consume a single register.  */
+  if (GET_MODE_CLASS (mode) == MODE_VECTOR_BOOL)
+    return BYTES_PER_RISCV_VECTOR;
+
   if (!riscv_vector_chunks.is_constant () && riscv_v_ext_mode_p (mode))
     {
       if (riscv_v_ext_tuple_mode_p (mode))
@@ -7652,6 +7665,55 @@ riscv_vectorize_preferred_vector_alignment (const_tree type)
   return TYPE_ALIGN (type);
 }
 
+/* Return true if it is static FRM rounding mode.  */
+
+static bool
+riscv_static_frm_mode_p (int mode)
+{
+  switch (mode)
+    {
+    case FRM_MODE_RDN:
+    case FRM_MODE_RUP:
+    case FRM_MODE_RTZ:
+    case FRM_MODE_RMM:
+    case FRM_MODE_RNE:
+      return true;
+    default:
+      return false;
+    }
+
+  gcc_unreachable ();
+}
+
+/* Implement the floating-point Mode Switching.  */
+
+static void
+riscv_emit_frm_mode_set (int mode, int prev_mode)
+{
+  if (mode != prev_mode)
+    {
+      rtx backup_reg = cfun->machine->dynamic_frm;
+      /* TODO: By design, FRM_MODE_xxx used by mode switch which is
+	 different from the FRM value like FRM_RTZ defined in
+	 riscv-protos.h.  When mode switching we actually need a conversion
+	 function to convert the mode of mode switching to the actual
+	 FRM value like FRM_RTZ.  For now, the value between the mode of
+	 mode swith and the FRM value in riscv-protos.h take the same value,
+	 and then we leverage this assumption when emit.  */
+      rtx frm = gen_int_mode (mode, SImode);
+
+      if (mode == FRM_MODE_DYN_EXIT && prev_mode != FRM_MODE_DYN)
+	/* No need to emit when prev mode is DYN already.  */
+	emit_insn (gen_fsrmsi_restore_exit (backup_reg));
+      else if (mode == FRM_MODE_DYN)
+	/* Restore frm value from backup when switch to DYN mode.  */
+	emit_insn (gen_fsrmsi_restore (backup_reg));
+      else if (riscv_static_frm_mode_p (mode))
+	/* Set frm value when switch to static mode.  */
+	emit_insn (gen_fsrmsi_restore (frm));
+    }
+}
+
 /* Implement Mode switching.  */
 
 static void
@@ -7664,6 +7726,9 @@ riscv_emit_mode_set (int entity, int mode, int prev_mode,
       if (mode != VXRM_MODE_NONE && mode != prev_mode)
 	emit_insn (gen_vxrmsi (gen_int_mode (mode, SImode)));
       break;
+    case RISCV_FRM:
+      riscv_emit_frm_mode_set (mode, prev_mode);
+      break;
     default:
       gcc_unreachable ();
     }
@@ -7675,27 +7740,37 @@ riscv_emit_mode_set (int entity, int mode, int prev_mode,
 static int
 riscv_mode_needed (int entity, rtx_insn *insn)
 {
+  int code = recog_memoized (insn);
+
   switch (entity)
     {
     case RISCV_VXRM:
-      return recog_memoized (insn) >= 0 ? get_attr_vxrm_mode (insn)
-					: VXRM_MODE_NONE;
+      return code >= 0 ? get_attr_vxrm_mode (insn) : VXRM_MODE_NONE;
+    case RISCV_FRM:
+      return code >= 0 ? get_attr_frm_mode (insn) : FRM_MODE_NONE;
     default:
       gcc_unreachable ();
     }
 }
 
-/* Return true if the VXRM/FRM status of the INSN is unknown.  */
-static bool
-global_state_unknown_p (rtx_insn *insn, unsigned int regno)
-{
-  struct df_insn_info *insn_info = DF_INSN_INFO_GET (insn);
-  df_ref ref;
+/* Return TRUE that an insn is asm.  */
 
+static bool
+asm_insn_p (rtx_insn *insn)
+{
+  extract_insn (insn);
+
+  return recog_data.is_asm;
+}
+
+/* Return TRUE that an insn is unknown for VXRM.  */
+
+static bool
+vxrm_unknown_p (rtx_insn *insn)
+{
   /* Return true if there is a definition of VXRM.  */
-  for (ref = DF_INSN_INFO_DEFS (insn_info); ref; ref = DF_REF_NEXT_LOC (ref))
-    if (DF_REF_REGNO (ref) == regno)
-      return true;
+  if (reg_set_p (gen_rtx_REG (SImode, VXRM_REGNUM), insn))
+    return true;
 
   /* A CALL function may contain an instruction that modifies the VXRM,
      return true in this situation.  */
@@ -7704,10 +7779,61 @@ global_state_unknown_p (rtx_insn *insn, unsigned int regno)
 
   /* Return true for all assembly since users may hardcode a assembly
      like this: asm volatile ("csrwi vxrm, 0").  */
-  extract_insn (insn);
-  if (recog_data.is_asm)
+  if (asm_insn_p (insn))
     return true;
+
   return false;
+}
+
+/* Return TRUE that an insn is unknown dynamic for FRM.  */
+
+static bool
+frm_unknown_dynamic_p (rtx_insn *insn)
+{
+  /* Return true if there is a definition of FRM.  */
+  if (reg_set_p (gen_rtx_REG (SImode, FRM_REGNUM), insn))
+    return true;
+
+  /* A CALL function may contain an instruction that modifies the FRM,
+     return true in this situation.  */
+  if (CALL_P (insn))
+    return true;
+
+  return false;
+}
+
+/* Return the mode that an insn results in for VXRM.  */
+
+static int
+riscv_vxrm_mode_after (rtx_insn *insn, int mode)
+{
+  if (vxrm_unknown_p (insn))
+    return VXRM_MODE_NONE;
+
+  if (recog_memoized (insn) < 0)
+    return mode;
+
+  if (reg_mentioned_p (gen_rtx_REG (SImode, VXRM_REGNUM), PATTERN (insn)))
+    return get_attr_vxrm_mode (insn);
+  else
+    return mode;
+}
+
+/* Return the mode that an insn results in for FRM.  */
+
+static int
+riscv_frm_mode_after (rtx_insn *insn, int mode)
+{
+  if (frm_unknown_dynamic_p (insn))
+    return FRM_MODE_DYN;
+
+  if (recog_memoized (insn) < 0)
+    return mode;
+
+  if (reg_mentioned_p (gen_rtx_REG (SImode, FRM_REGNUM), PATTERN (insn)))
+    return get_attr_frm_mode (insn);
+  else
+    return mode;
 }
 
 /* Return the mode that an insn results in.  */
@@ -7718,15 +7844,9 @@ riscv_mode_after (int entity, int mode, rtx_insn *insn)
   switch (entity)
     {
     case RISCV_VXRM:
-      if (global_state_unknown_p (insn, VXRM_REGNUM))
-	return VXRM_MODE_NONE;
-      else if (recog_memoized (insn) >= 0)
-	return reg_mentioned_p (gen_rtx_REG (SImode, VXRM_REGNUM),
-				PATTERN (insn))
-		 ? get_attr_vxrm_mode (insn)
-		 : mode;
-      else
-	return mode;
+      return riscv_vxrm_mode_after (insn, mode);
+    case RISCV_FRM:
+      return riscv_frm_mode_after (insn, mode);
     default:
       gcc_unreachable ();
     }
@@ -7742,6 +7862,19 @@ riscv_mode_entry (int entity)
     {
     case RISCV_VXRM:
       return VXRM_MODE_NONE;
+    case RISCV_FRM:
+      {
+	if (!cfun->machine->dynamic_frm)
+	  {
+	    cfun->machine->dynamic_frm = gen_reg_rtx (SImode);
+	    emit_insn_at_entry (gen_frrmsi (cfun->machine->dynamic_frm));
+	  }
+
+	  /* According to RVV 1.0 spec, all vector floating-point operations use
+	     the dynamic rounding mode in the frm register.  Likewise in other
+	     similar places.  */
+	return FRM_MODE_DYN;
+      }
     default:
       gcc_unreachable ();
     }
@@ -7757,6 +7890,8 @@ riscv_mode_exit (int entity)
     {
     case RISCV_VXRM:
       return VXRM_MODE_NONE;
+    case RISCV_FRM:
+      return FRM_MODE_DYN_EXIT;
     default:
       gcc_unreachable ();
     }
@@ -7801,6 +7936,24 @@ riscv_vectorize_vec_perm_const (machine_mode vmode, machine_mode op_mode,
 						op1, sel);
 
   return false;
+}
+
+/* Implement TARGET_PREFERRED_ELSE_VALUE.  For binary operations,
+   prefer to use the first arithmetic operand as the else value if
+   the else value doesn't matter, since that exactly matches the RVV
+   destructive merging form.  For ternary operations we could either
+   pick the first operand and use VMADD-like instructions or the last
+   operand and use VMACC-like instructions; the latter seems more
+   natural.
+
+   TODO: Currently, the return value is not ideal for RVV since it will
+   let VSETVL PASS use MU or TU. We will suport undefine value that allows
+   VSETVL PASS use TA/MA in the future.  */
+
+static tree
+riscv_preferred_else_value (unsigned, tree, unsigned int nops, tree *ops)
+{
+  return nops == 3 ? ops[2] : ops[0];
 }
 
 /* Initialize the GCC target structure.  */
@@ -8103,6 +8256,9 @@ riscv_vectorize_vec_perm_const (machine_mode vmode, machine_mode op_mode,
 
 #undef TARGET_VECTORIZE_VEC_PERM_CONST
 #define TARGET_VECTORIZE_VEC_PERM_CONST riscv_vectorize_vec_perm_const
+
+#undef TARGET_PREFERRED_ELSE_VALUE
+#define TARGET_PREFERRED_ELSE_VALUE riscv_preferred_else_value
 
 struct gcc_target targetm = TARGET_INITIALIZER;
 

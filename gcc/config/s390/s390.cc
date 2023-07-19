@@ -7381,11 +7381,12 @@ s390_expand_vec_init (rtx target, rtx vals)
       if (!general_operand (elem, GET_MODE (elem)))
 	elem = force_reg (inner_mode, elem);
 
-      emit_insn (gen_rtx_SET (target,
-			      gen_rtx_UNSPEC (mode,
-					      gen_rtvec (3, elem,
-							 GEN_INT (i), target),
-					      UNSPEC_VEC_SET)));
+      if (elem != const0_rtx)
+	emit_insn (gen_rtx_SET (target,
+				gen_rtx_UNSPEC (mode,
+						gen_rtvec (3, elem,
+							   GEN_INT (i), target),
+						UNSPEC_VEC_SET)));
     }
 }
 
@@ -13706,8 +13707,10 @@ s390_encode_section_info (tree decl, rtx rtl, int first)
     {
       /* Store the alignment to be able to check if we can use
 	 a larl/load-relative instruction.  We only handle the cases
-	 that can go wrong (i.e. no FUNC_DECLs).  */
-      if (DECL_ALIGN (decl) == 0 || DECL_ALIGN (decl) % 16)
+	 that can go wrong (i.e. no FUNC_DECLs).
+	 All symbols without an explicit alignment are assumed to be 2
+	 byte aligned as mandated by our ABI.  */
+      if (DECL_USER_ALIGN (decl) && DECL_ALIGN (decl) % 16)
 	SYMBOL_FLAG_SET_NOTALIGN2 (XEXP (rtl, 0));
       else if (DECL_ALIGN (decl) % 32)
 	SYMBOL_FLAG_SET_NOTALIGN4 (XEXP (rtl, 0));

@@ -61,6 +61,7 @@ with Sem_Ch13;       use Sem_Ch13;
 with Sem_Eval;       use Sem_Eval;
 with Sem_Mech;       use Sem_Mech;
 with Sem_Res;        use Sem_Res;
+with Sem_Type;       use Sem_Type;
 with Sem_Util;       use Sem_Util;
                      use Sem_Util.Storage_Model_Support;
 with Sinfo;          use Sinfo;
@@ -2760,19 +2761,21 @@ package body Exp_Aggr is
 
       function Replace_Type (Expr : Node_Id) return Traverse_Result is
       begin
-         --  Note regarding the Root_Type test below: Aggregate components for
+         --  Note about the Is_Ancestor test below: aggregate components for
          --  self-referential types include attribute references to the current
-         --  instance, of the form: Typ'access, etc.. These references are
+         --  instance, of the form: Typ'access, etc. These references are
          --  rewritten as references to the target of the aggregate: the
          --  left-hand side of an assignment, the entity in a declaration,
-         --  or a temporary. Without this test, we would improperly extended
-         --  this rewriting to attribute references whose prefix was not the
+         --  or a temporary. Without this test, we would improperly extend
+         --  this rewriting to attribute references whose prefix is not the
          --  type of the aggregate.
 
          if Nkind (Expr) = N_Attribute_Reference
            and then Is_Entity_Name (Prefix (Expr))
            and then Is_Type (Entity (Prefix (Expr)))
-           and then Root_Type (Etype (N)) = Root_Type (Entity (Prefix (Expr)))
+           and then
+             Is_Ancestor
+               (Entity (Prefix (Expr)), Etype (N), Use_Full_View => True)
          then
             if Is_Entity_Name (Lhs) then
                Rewrite (Prefix (Expr), New_Occurrence_Of (Entity (Lhs), Loc));
@@ -6463,6 +6466,7 @@ package body Exp_Aggr is
 
       if Is_Record_Type (T)
         and then not Is_Private_Type (T)
+        and then not Is_Homogeneous_Aggregate (N)
       then
          Expand_Record_Aggregate (N);
 
@@ -7255,8 +7259,11 @@ package body Exp_Aggr is
                      --  Iterated component association. Discard
                      --  positional insertion procedure.
 
-                     Add_Named_Subp := Assign_Indexed_Subp;
-                     Add_Unnamed_Subp := Empty;
+                     if not Present (Iterator_Specification (Comp)) then
+                        Add_Named_Subp := Assign_Indexed_Subp;
+                        Add_Unnamed_Subp := Empty;
+                     end if;
+
                      Expand_Iterated_Component (Comp);
                   end if;
 
