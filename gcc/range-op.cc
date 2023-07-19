@@ -367,23 +367,6 @@ range_op_handler::op1_op2_relation (const vrange &lhs) const
 }
 
 
-// Convert irange bitmasks into a VALUE MASK pair suitable for calling CCP.
-
-static void
-irange_to_masked_value (const irange &r, widest_int &value, widest_int &mask)
-{
-  if (r.singleton_p ())
-    {
-      mask = 0;
-      value = widest_int::from (r.lower_bound (), TYPE_SIGN (r.type ()));
-    }
-  else
-    {
-      mask = widest_int::from (r.get_nonzero_bits (), TYPE_SIGN (r.type ()));
-      value = 0;
-    }
-}
-
 // Update the known bitmasks in R when applying the operation CODE to
 // LH and RH.
 
@@ -391,25 +374,33 @@ void
 update_known_bitmask (irange &r, tree_code code,
 		      const irange &lh, const irange &rh)
 {
-  if (r.undefined_p () || lh.undefined_p () || rh.undefined_p ())
+  if (r.undefined_p () || lh.undefined_p () || rh.undefined_p ()
+      || r.singleton_p ())
     return;
 
-  widest_int value, mask, lh_mask, rh_mask, lh_value, rh_value;
+  widest_int widest_value, widest_mask;
   tree type = r.type ();
   signop sign = TYPE_SIGN (type);
   int prec = TYPE_PRECISION (type);
-  signop lh_sign = TYPE_SIGN (lh.type ());
-  signop rh_sign = TYPE_SIGN (rh.type ());
-  int lh_prec = TYPE_PRECISION (lh.type ());
-  int rh_prec = TYPE_PRECISION (rh.type ());
+  irange_bitmask lh_bits = lh.get_bitmask ();
+  irange_bitmask rh_bits = rh.get_bitmask ();
 
-  irange_to_masked_value (lh, lh_value, lh_mask);
-  irange_to_masked_value (rh, rh_value, rh_mask);
-  bit_value_binop (code, sign, prec, &value, &mask,
-		   lh_sign, lh_prec, lh_value, lh_mask,
-		   rh_sign, rh_prec, rh_value, rh_mask);
-  wide_int tmp = wide_int::from (value | mask, prec, sign);
-  r.set_nonzero_bits (tmp);
+  bit_value_binop (code, sign, prec, &widest_value, &widest_mask,
+		   TYPE_SIGN (lh.type ()),
+		   TYPE_PRECISION (lh.type ()),
+		   widest_int::from (lh_bits.value (), sign),
+		   widest_int::from (lh_bits.mask (), sign),
+		   TYPE_SIGN (rh.type ()),
+		   TYPE_PRECISION (rh.type ()),
+		   widest_int::from (rh_bits.value (), sign),
+		   widest_int::from (rh_bits.mask (), sign));
+
+  wide_int mask = wide_int::from (widest_mask, prec, sign);
+  wide_int value = wide_int::from (widest_value, prec, sign);
+  // Bitmasks must have the unknown value bits cleared.
+  value &= ~mask;
+  irange_bitmask bm (value, mask);
+  r.update_bitmask (bm);
 }
 
 // Return the upper limit for a type.
@@ -2876,16 +2867,20 @@ operator_cast::fold_range (irange &r, tree type ATTRIBUTE_UNUSED,
 	return true;
     }
 
-  // Update the nonzero mask.  Truncating casts are problematic unless
+  // Update the bitmask.  Truncating casts are problematic unless
   // the conversion fits in the resulting outer type.
-  wide_int nz = inner.get_nonzero_bits ();
+  irange_bitmask bm = inner.get_bitmask ();
   if (truncating_cast_p (inner, outer)
-      && wi::rshift (nz, wi::uhwi (TYPE_PRECISION (outer.type ()),
-				   TYPE_PRECISION (inner.type ())),
+      && wi::rshift (bm.mask (),
+		     wi::uhwi (TYPE_PRECISION (outer.type ()),
+			       TYPE_PRECISION (inner.type ())),
 		     TYPE_SIGN (inner.type ())) != 0)
     return true;
-  nz = wide_int::from (nz, TYPE_PRECISION (type), TYPE_SIGN (inner.type ()));
-  r.set_nonzero_bits (nz);
+  unsigned prec = TYPE_PRECISION (type);
+  signop sign = TYPE_SIGN (inner.type ());
+  bm = irange_bitmask (wide_int::from (bm.value (), prec, sign),
+		       wide_int::from (bm.mask (), prec, sign));
+  r.update_bitmask (bm);
 
   return true;
 }
@@ -3467,6 +3462,14 @@ operator_bitwise_and::op1_range (irange &r, tree type,
     }
   if (r.undefined_p ())
     set_nonzero_range_from_mask (r, type, lhs);
+
+  // For MASK == op1 & MASK, all the bits in MASK must be set in op1.
+  wide_int mask;
+  if (lhs == op2 && lhs.singleton_p (mask))
+    {
+      r.update_bitmask (irange_bitmask (mask, ~mask));
+      return true;
+    }
 
   // For 0 = op1 & MASK, op1 is ~MASK.
   if (lhs.zero_p () && op2.singleton_p ())

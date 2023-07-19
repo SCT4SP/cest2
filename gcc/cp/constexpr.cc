@@ -1440,6 +1440,8 @@ enum value_cat {
 
 static tree cxx_eval_constant_expression (const constexpr_ctx *, tree,
 					  value_cat, bool *, bool *, tree * = NULL);
+static tree cxx_eval_bare_aggregate (const constexpr_ctx *, tree,
+				     value_cat, bool *, bool *);
 static tree cxx_fold_indirect_ref (const constexpr_ctx *, location_t, tree, tree,
 				   bool * = NULL);
 static tree find_heap_var_refs (tree *, int *, void *);
@@ -3033,7 +3035,7 @@ cxx_eval_call_expression (const constexpr_ctx *ctx, tree t,
     }
   else
     {
-      bool cacheable = true;
+      bool cacheable = !!entry;
       if (result && result != error_mark_node)
 	/* OK */;
       else if (!DECL_SAVED_TREE (fun))
@@ -3185,7 +3187,7 @@ cxx_eval_call_expression (const constexpr_ctx *ctx, tree t,
 	     for the constexpr evaluation and should not be cached.
 	     It is fine if the call allocates something and deallocates it
 	     too.  */
-	  if (entry
+	  if (cacheable
 	      && (save_heap_alloc_count != ctx->global->heap_vars.length ()
 		  || (save_heap_dealloc_count
 		      != ctx->global->heap_dealloc_count)))
@@ -3204,10 +3206,6 @@ cxx_eval_call_expression (const constexpr_ctx *ctx, tree t,
 		      cacheable = false;
 		      break;
 		    }
-	      /* Also don't cache a call that returns a deallocated pointer.  */
-	      if (cacheable && (cp_walk_tree_without_duplicates
-				(&result, find_heap_var_refs, NULL)))
-		cacheable = false;
 	    }
 
 	    /* Rewrite all occurrences of the function's RESULT_DECL with the
@@ -3217,6 +3215,10 @@ cxx_eval_call_expression (const constexpr_ctx *ctx, tree t,
 		&& !is_empty_class (TREE_TYPE (res)))
 	      if (replace_decl (&result, res, ctx->object))
 		cacheable = false;
+
+	  /* Only cache a permitted result of a constant expression.  */
+	  if (cacheable && !reduced_constant_expression_p (result))
+	    cacheable = false;
 	}
       else
 	/* Couldn't get a function copy to evaluate.  */
@@ -3268,8 +3270,9 @@ reduced_constant_expression_p (tree t)
     case CONSTRUCTOR:
       /* And we need to handle PTRMEM_CST wrapped in a CONSTRUCTOR.  */
       tree field;
-      if (TREE_CODE (TREE_TYPE (t)) == VECTOR_TYPE)
-	/* An initialized vector would have a VECTOR_CST.  */
+      if (!AGGREGATE_TYPE_P (TREE_TYPE (t)))
+	/* A constant vector would be folded to VECTOR_CST.
+	   A CONSTRUCTOR of scalar type means uninitialized.  */
 	return false;
       if (CONSTRUCTOR_NO_CLEARING (t))
 	{
@@ -4802,6 +4805,13 @@ cxx_eval_bit_cast (const constexpr_ctx *ctx, tree t, bool *non_constant_p,
 	{
 	  clear_type_padding_in_mask (TREE_TYPE (t), mask);
 	  clear_uchar_or_std_byte_in_mask (loc, r, mask);
+	  if (CHECKING_P)
+	    {
+	      tree e = cxx_eval_bare_aggregate (ctx, r, vc_prvalue,
+						non_constant_p, overflow_p);
+	      gcc_checking_assert (e == r);
+	      r = e;
+	    }
 	}
     }
 
@@ -7085,7 +7095,7 @@ cxx_eval_constant_expression (const constexpr_ctx *ctx, tree t,
     case PARM_DECL:
       if (lval && !TYPE_REF_P (TREE_TYPE (t)))
 	/* glvalue use.  */;
-      else if (tree v = ctx->global->get_value (r))
+      else if (tree v = ctx->global->get_value (t))
 	r = v;
       else if (lval)
 	/* Defer in case this is only used for its type.  */;
@@ -7688,6 +7698,16 @@ cxx_eval_constant_expression (const constexpr_ctx *ctx, tree t,
 		&& VAR_P (TREE_OPERAND (sop, 0))
 		&& DECL_ARTIFICIAL (TREE_OPERAND (sop, 0)))
 	      /* OK */;
+	    /* P2738 (C++26): a conversion from a prvalue P of type "pointer to
+	       cv void" to a pointer-to-object type T unless P points to an
+	       object whose type is similar to T.  */
+	    else if (cxx_dialect > cxx23
+		     && (sop = cxx_fold_indirect_ref (ctx, loc,
+						      TREE_TYPE (type), sop)))
+	      {
+		r = build1 (ADDR_EXPR, type, sop);
+		break;
+	      }
 	    else
 	      {
 		if (!ctx->quiet)

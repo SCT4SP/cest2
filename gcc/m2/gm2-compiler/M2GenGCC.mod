@@ -395,7 +395,7 @@ BEGIN
          THEN
             RETURN FALSE
          END ;
-         scope := GetScope(scope)
+         scope := GetScope (scope)
       END ;
       InternalError ('expecting scope to eventually reach a module or defimp symbol')
    ELSE
@@ -410,7 +410,7 @@ END IsExportedGcc ;
                         the GCC tree structure.
 *)
 
-PROCEDURE ConvertQuadsToTree (Start, End: CARDINAL) ;
+PROCEDURE ConvertQuadsToTree (Scope: CARDINAL; Start, End: CARDINAL) ;
 BEGIN
    REPEAT
       CodeStatement (Start) ;
@@ -1362,7 +1362,9 @@ BEGIN
    (* now assign  param.Addr := ADR(NewArray) *)
 
    BuildAssignmentStatement (location,
-                             BuildComponentRef (location, Mod2Gcc (param), Mod2Gcc (GetUnboundedAddressOffset (UnboundedType))),
+                             BuildComponentRef (location,
+                                                Mod2Gcc (param),
+                                                Mod2Gcc (GetUnboundedAddressOffset (UnboundedType))),
                              NewArray)
 END MakeCopyUse ;
 
@@ -1842,13 +1844,14 @@ END CodeProcedureScope ;
 PROCEDURE CodeReturnValue (quad: CARDINAL) ;
 VAR
    op                                  : QuadOperator ;
+   overflowChecking                    : BOOLEAN ;
    expr, none, procedure               : CARDINAL ;
    combinedpos,
    returnpos, exprpos, nonepos, procpos: CARDINAL ;
    value, length                       : Tree ;
    location                            : location_t ;
 BEGIN
-   GetQuadOtok (quad, returnpos, op, expr, none, procedure,
+   GetQuadOtok (quad, returnpos, op, expr, none, procedure, overflowChecking,
                 exprpos, nonepos, procpos) ;
    combinedpos := MakeVirtualTok (returnpos, returnpos, exprpos) ;
    location := TokenToLocation (combinedpos) ;
@@ -3079,18 +3082,19 @@ END checkDeclare ;
 
 PROCEDURE CodeBecomes (quad: CARDINAL) ;
 VAR
-   op        : QuadOperator ;
-   op1, op2,
-   op3       : CARDINAL ;
+   overflowChecking: BOOLEAN ;
+   op              : QuadOperator ;
+   op1, op2, op3   : CARDINAL ;
    becomespos,
    op1pos,
    op2pos,
-   op3pos    : CARDINAL ;
+   op3pos          : CARDINAL ;
    length,
-   op3t      : Tree ;
-   location  : location_t ;
+   op3t            : Tree ;
+   location        : location_t ;
 BEGIN
-   GetQuadOtok (quad, becomespos, op, op1, op2, op3, op1pos, op2pos, op3pos) ;
+   GetQuadOtok (quad, becomespos, op, op1, op2, op3, overflowChecking,
+                op1pos, op2pos, op3pos) ;
    Assert (op2pos = UnknownTokenNo) ;
    DeclareConstant (CurrentQuadToken, op3) ;  (* Check to see whether op3 is a constant and declare it.  *)
    DeclareConstructor (CurrentQuadToken, quad, op3) ;
@@ -7177,7 +7181,8 @@ END CodeIndrX ;
 
 PROCEDURE CodeXIndr (quad: CARDINAL) ;
 VAR
-   op      : QuadOperator ;
+   overflowChecking: BOOLEAN ;
+   op              : QuadOperator ;
    tokenno,
    op1,
    type,
@@ -7185,12 +7190,13 @@ VAR
    op1pos,
    op3pos,
    typepos,
-   xindrpos: CARDINAL ;
+   xindrpos        : CARDINAL ;
    length,
-   newstr  : Tree ;
-   location: location_t ;
+   newstr          : Tree ;
+   location        : location_t ;
 BEGIN
-   GetQuadOtok (quad, xindrpos, op, op1, type, op3, op1pos, typepos, op3pos) ;
+   GetQuadOtok (quad, xindrpos, op, op1, type, op3, overflowChecking,
+                op1pos, typepos, op3pos) ;
    tokenno := MakeVirtualTok (xindrpos, op1pos, op3pos) ;
    location := TokenToLocation (tokenno) ;
 

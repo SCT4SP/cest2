@@ -1350,6 +1350,9 @@ resolve_structure_cons (gfc_expr *expr, int init)
 	  && CLASS_DATA (comp)->as)
  	rank = CLASS_DATA (comp)->as->rank;
 
+      if (comp->ts.type == BT_CLASS && cons->expr->ts.type != BT_CLASS)
+	  gfc_find_vtab (&cons->expr->ts);
+
       if (cons->expr->expr_type != EXPR_NULL && rank != cons->expr->rank
 	  && (comp->attr.allocatable || cons->expr->rank))
 	{
@@ -1381,7 +1384,7 @@ resolve_structure_cons (gfc_expr *expr, int init)
 			 gfc_basic_typename (comp->ts.type));
 	      t = false;
 	    }
-	  else
+	  else if (!UNLIMITED_POLY (comp))
 	    {
 	      bool t2 = gfc_convert_type (cons->expr, &comp->ts, 1);
 	      if (t)
@@ -9254,9 +9257,10 @@ resolve_assoc_var (gfc_symbol* sym, bool resolve_target)
   gcc_assert (sym->ts.type != BT_UNKNOWN);
 
   /* See if this is a valid association-to-variable.  */
-  sym->assoc->variable = (target->expr_type == EXPR_VARIABLE
-			  && !parentheses
-			  && !gfc_has_vector_subscript (target));
+  sym->assoc->variable = ((target->expr_type == EXPR_VARIABLE
+			   && !parentheses
+			   && !gfc_has_vector_subscript (target))
+			  || gfc_is_ptr_fcn (target));
 
   /* Finally resolve if this is an array or not.  */
   if (sym->attr.dimension && target->rank == 0)
@@ -13506,7 +13510,8 @@ resolve_fl_variable (gfc_symbol *sym, int mp_flag)
 	}
     }
 
-  if (sym->value == NULL && sym->attr.referenced)
+  if (sym->value == NULL && sym->attr.referenced
+      && !(sym->as && sym->as->type == AS_ASSUMED_RANK))
     apply_default_init_local (sym); /* Try to apply a default initialization.  */
 
   /* Determine if the symbol may not have an initializer.  */

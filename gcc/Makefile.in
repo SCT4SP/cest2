@@ -976,7 +976,7 @@ READ_MD_H = $(OBSTACK_H) $(HASHTAB_H) read-md.h
 BUILTINS_DEF = builtins.def sync-builtins.def omp-builtins.def \
 	gtm-builtins.def sanitizer.def
 INTERNAL_FN_DEF = internal-fn.def
-INTERNAL_FN_H = internal-fn.h $(INTERNAL_FN_DEF)
+INTERNAL_FN_H = internal-fn.h $(INTERNAL_FN_DEF) insn-opinit.h
 TREE_CORE_H = tree-core.h $(CORETYPES_H) all-tree.def tree.def \
 	c-family/c-common.def $(lang_tree_files) \
 	$(BUILTINS_DEF) $(INPUT_H) statistics.h \
@@ -1281,6 +1281,7 @@ C_COMMON_OBJS = c-family/c-common.o c-family/c-cppbuiltin.o c-family/c-dump.o \
 
 # Analyzer object files
 ANALYZER_OBJS = \
+	analyzer/access-diagram.o \
 	analyzer/analysis-plan.o \
 	analyzer/analyzer.o \
 	analyzer/analyzer-language.o \
@@ -1788,7 +1789,16 @@ OBJS-libcommon = diagnostic-spec.o diagnostic.o diagnostic-color.o \
 	json.o \
 	sbitmap.o \
 	vec.o input.o hash-table.o ggc-none.o memory-block.o \
-	selftest.o selftest-diagnostic.o sort.o
+	selftest.o selftest-diagnostic.o sort.o \
+	text-art/box-drawing.o \
+	text-art/canvas.o \
+	text-art/ruler.o \
+	text-art/selftests.o \
+	text-art/style.o \
+	text-art/styled-string.o \
+	text-art/table.o \
+	text-art/theme.o \
+	text-art/widget.o
 
 # Objects in libcommon-target.a, used by drivers and by the core
 # compiler and containing target-dependent code.

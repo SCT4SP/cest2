@@ -188,13 +188,15 @@ The OpenMP 4.5 specification is fully supported.
 @item @code{metadirective} directive @tab N @tab
 @item @code{declare variant} directive
       @tab P @tab @emph{simd} traits not handled correctly
-@item @emph{target-offload-var} ICV and @code{OMP_TARGET_OFFLOAD}
+@item @var{target-offload-var} ICV and @code{OMP_TARGET_OFFLOAD}
       env variable @tab Y @tab
-@item Nested-parallel changes to @emph{max-active-levels-var} ICV @tab Y @tab
+@item Nested-parallel changes to @var{max-active-levels-var} ICV @tab Y @tab
 @item @code{requires} directive @tab P
-      @tab complete but no non-host devices provides @code{unified_shared_memory}
+      @tab complete but no non-host device provides @code{unified_shared_memory}
 @item @code{teams} construct outside an enclosing target region @tab Y @tab
-@item Non-rectangular loop nests @tab P @tab Full support for C/C++, partial for Fortran
+@item Non-rectangular loop nests @tab P
+      @tab Full support for C/C++, partial for Fortran
+           (@uref{https://gcc.gnu.org/PR110735,PR110735})
 @item @code{!=} as relational-op in canonical loop form for C/C++ @tab Y @tab
 @item @code{nonmonotonic} as default loop schedule modifier for worksharing-loop
       constructs @tab Y @tab
@@ -221,7 +223,7 @@ The OpenMP 4.5 specification is fully supported.
 @item @code{mutexinoutset} @emph{dependence-type} for @code{depend} clause
       @tab Y @tab
 @item Predefined memory spaces, memory allocators, allocator traits
-      @tab Y @tab Some are only stubs
+      @tab Y @tab See also @ref{Memory allocation}
 @item Memory management routines @tab Y @tab
 @item @code{allocate} directive @tab N @tab
 @item @code{allocate} clause @tab P @tab Initial support
@@ -364,7 +366,7 @@ to address of matching mapped list item per 5.1, Sect. 2.21.7.2 @tab N @tab
 
 @multitable @columnfractions .60 .10 .25
 @headitem Description @tab Status @tab Comments
-@item @code{omp_in_explicit_task} routine and @emph{explicit-task-var} ICV
+@item @code{omp_in_explicit_task} routine and @var{explicit-task-var} ICV
       @tab Y @tab
 @item @code{omp}/@code{ompx}/@code{omx} sentinels and @code{omp_}/@code{ompx_}
       namespaces @tab N/A
@@ -422,7 +424,7 @@ to address of matching mapped list item per 5.1, Sect. 2.21.7.2 @tab N @tab
 @item For Fortran, optional comma between directive and clause @tab N @tab
 @item Conforming device numbers and @code{omp_initial_device} and
       @code{omp_invalid_device} enum/PARAMETER @tab Y @tab
-@item Initial value of @emph{default-device-var} ICV with
+@item Initial value of @var{default-device-var} ICV with
       @code{OMP_TARGET_OFFLOAD=mandatory} @tab Y @tab
 @item @emph{interop_types} in any position of the modifier list for the @code{init} clause
       of the @code{interop} construct @tab N @tab
@@ -486,8 +488,6 @@ Technical Report (TR) 11 is the first preview for OpenMP 6.0.
 @item Relaxed Fortran restrictions to the @code{aligned} clause @tab N @tab
 @item Mapping lambda captures @tab N @tab
 @item For Fortran, atomic compare with storing the comparison result
-      @tab N @tab
-@item @code{aligned} clause changes for @code{simd} and @code{declare simd}
       @tab N @tab
 @end multitable
 
@@ -912,6 +912,9 @@ Nested parallel regions can be enabled or disabled at runtime using
 regions with @code{omp_set_max_active_levels} to one to disable, or
 above one to enable.
 
+Note that the @code{omp_get_nested} API routine was deprecated
+in the OpenMP specification 5.2 in favor of @code{omp_get_max_active_levels}.
+
 @item @emph{C/C++}:
 @multitable @columnfractions .20 .80
 @item @emph{Prototype}: @tab @code{int omp_get_nested(void);}
@@ -923,7 +926,7 @@ above one to enable.
 @end multitable
 
 @item @emph{See also}:
-@ref{omp_set_max_active_levels}, @ref{omp_set_nested},
+@ref{omp_get_max_active_levels}, @ref{omp_set_nested},
 @ref{OMP_MAX_ACTIVE_LEVELS}, @ref{OMP_NESTED}
 
 @item @emph{Reference}:
@@ -1415,6 +1418,9 @@ dynamic adjustment of team sizes and @code{false} disables it.
 Enabling nested parallel regions will also set the maximum number of
 active nested regions to the maximum supported.  Disabling nested parallel
 regions will set the maximum number of active nested regions to one.
+
+Note that the @code{omp_set_nested} API routine was deprecated
+in the OpenMP specification 5.2 in favor of @code{omp_set_max_active_levels}.
 
 @item @emph{C/C++}:
 @multitable @columnfractions .20 .80
@@ -1933,8 +1939,21 @@ event handle that has already been fulfilled is also undefined.
 @chapter OpenMP Environment Variables
 
 The environment variables which beginning with @env{OMP_} are defined by
-section 4 of the OpenMP specification in version 4.5, while those
-beginning with @env{GOMP_} are GNU extensions.
+section 4 of the OpenMP specification in version 4.5 or in a later version
+of the specification, while those beginning with @env{GOMP_} are GNU extensions.
+Most @env{OMP_} environment variables have an associated internal control
+variable (ICV).
+
+For any OpenMP environment variable that sets an ICV and is neither
+@code{OMP_DEFAULT_DEVICE} nor has global ICV scope, associated
+device-specific environment variables exist.  For them, the environment
+variable without suffix affects the host.  The suffix @code{_DEV_} followed
+by a non-negative device number less that the number of available devices sets
+the ICV for the corresponding device.  The suffix @code{_DEV} sets the ICV
+of all non-host devices for which a device-specific corresponding environment
+variable has not been set while the @code{_ALL} suffix sets the ICV of all
+host and non-host devices for which a more specific corresponding environment
+variable is not set.
 
 @menu
 * OMP_ALLOCATOR::           Set the default allocator
@@ -1969,6 +1988,8 @@ beginning with @env{GOMP_} are GNU extensions.
 @section @env{OMP_ALLOCATOR} -- Set the default allocator
 @cindex Environment Variable
 @table @asis
+@item @emph{ICV:} @var{available-devices-var}
+@item @emph{Scope:} data environment
 @item @emph{Description}:
 Sets the default allocator that is used when no allocator has been specified
 in the @code{allocate} or @code{allocator} clause or if an OpenMP memory
@@ -1979,8 +2000,14 @@ The value can either be a predefined allocator or a predefined memory space
 or a predefined memory space followed by a colon and a comma-separated list
 of memory trait and value pairs, separated by @code{=}.
 
+Note: The corresponding device environment variables are currently not
+supported.  Therefore, the non-host @var{def-allocator-var} ICVs are always
+initialized to @code{omp_default_mem_alloc}.  However, on all devices,
+the @code{omp_set_default_allocator} API routine can be used to change
+value.
+
 @multitable @columnfractions .45 .45
-@headitem Predefined allocators @tab Predefined memory spaces
+@headitem Predefined allocators @tab Associated predefined memory spaces
 @item omp_default_mem_alloc     @tab omp_default_mem_space
 @item omp_large_cap_mem_alloc   @tab omp_large_cap_mem_space
 @item omp_const_mem_alloc       @tab omp_const_mem_space
@@ -1991,21 +2018,39 @@ of memory trait and value pairs, separated by @code{=}.
 @item omp_thread_mem_alloc      @tab --
 @end multitable
 
-@multitable @columnfractions .30 .60
-@headitem Trait @tab Allowed values
+The predefined allocators use the default values for the traits,
+as listed below.  Except that the last three allocators have the
+@code{access} trait set to @code{cgroup}, @code{pteam}, and
+@code{thread}, respectively.
+
+@multitable @columnfractions .25 .40 .25
+@headitem Trait @tab Allowed values @tab Default value
 @item @code{sync_hint} @tab @code{contended}, @code{uncontended},
                             @code{serialized}, @code{private}
+                       @tab @code{contended}
 @item @code{alignment} @tab Positive integer being a power of two
+                       @tab 1 byte
 @item @code{access}    @tab @code{all}, @code{cgroup},
                             @code{pteam}, @code{thread}
+                       @tab @code{all}
 @item @code{pool_size} @tab Positive integer
+                       @tab See @ref{Memory allocation}
 @item @code{fallback}  @tab @code{default_mem_fb}, @code{null_fb},
                             @code{abort_fb}, @code{allocator_fb}
+                       @tab See below
 @item @code{fb_data}   @tab @emph{unsupported as it needs an allocator handle}
+                       @tab (none)
 @item @code{pinned}    @tab @code{true}, @code{false}
+                       @tab @code{false}
 @item @code{partition} @tab @code{environment}, @code{nearest},
                             @code{blocked}, @code{interleaved}
+                       @tab @code{environment}
 @end multitable
+
+For the @code{fallback} trait, the default value is @code{null_fb} for the
+@code{omp_default_mem_alloc} allocator and any allocator that is associated
+with device memory; for all other other allocators, it is @code{default_mem_fb}
+by default.
 
 Examples:
 @smallexample
@@ -2014,7 +2059,8 @@ OMP_ALLOCATOR=omp_large_cap_mem_space
 OMP_ALLOCATR=omp_low_lat_mem_space:pinned=true,partition=nearest
 @end smallexample
 
-@c @item @emph{See also}:
+@item @emph{See also}:
+@ref{Memory allocation}
 
 @item @emph{Reference}:
 @uref{https://www.openmp.org, OpenMP specification v5.0}, Section 6.21
@@ -2026,13 +2072,15 @@ OMP_ALLOCATR=omp_low_lat_mem_space:pinned=true,partition=nearest
 @section @env{OMP_AFFINITY_FORMAT} -- Set the format string used for affinity display
 @cindex Environment Variable
 @table @asis
+@item @emph{ICV:} @var{affinity-format-var}
+@item @emph{Scope:} device
 @item @emph{Description}:
 Sets the format string used when displaying OpenMP thread affinity information.
 Special values are output using @code{%} followed by an optional size
 specification and then either the single-character field type or its long
 name enclosed in curly braces; using @code{%%} will display a literal percent.
 The size specification consists of an optional @code{0.} or @code{.} followed
-by a positive integer, specifing the minimal width of the output.  With
+by a positive integer, specifying the minimal width of the output.  With
 @code{0.} and numerical values, the output is padded with zeros on the left;
 with @code{.}, the output is padded by spaces on the left; otherwise, the
 output is padded by spaces on the right.  If unset, the value is
@@ -2050,8 +2098,8 @@ Supported field types are:
       @tab value returned by
            @code{omp_get_ancestor_thread_num(omp_get_level()-1)}
 @item H @tab host @tab name of the host that executes the thread
-@item P @tab process_id @tab process identiﬁer
-@item i @tab native_thread_id @tab native thread identiﬁer
+@item P @tab process_id @tab process identifier
+@item i @tab native_thread_id @tab native thread identifier
 @item A @tab thread_affinity
       @tab comma separated list of integer values or ranges, representing the
            processors on which a process might execute, subject to affinity
@@ -2088,6 +2136,8 @@ might display the following:
 @section @env{OMP_CANCELLATION} -- Set whether cancellation is activated
 @cindex Environment Variable
 @table @asis
+@item @emph{ICV:} @var{cancel-var}
+@item @emph{Scope:} global
 @item @emph{Description}:
 If set to @code{TRUE}, the cancellation is activated.  If set to @code{FALSE} or
 if unset, cancellation is disabled and the @code{cancel} construct is ignored.
@@ -2105,6 +2155,8 @@ if unset, cancellation is disabled and the @code{cancel} construct is ignored.
 @section @env{OMP_DISPLAY_AFFINITY} -- Display thread affinity information
 @cindex Environment Variable
 @table @asis
+@item @emph{ICV:} @var{display-affinity-var}
+@item @emph{Scope:} global
 @item @emph{Description}:
 If set to @code{FALSE} or if unset, affinity displaying is disabled.
 If set to @code{TRUE}, the runtime will display affinity information about
@@ -2125,6 +2177,8 @@ any change occurs.
 @section @env{OMP_DISPLAY_ENV} -- Show OpenMP version and environment variables
 @cindex Environment Variable
 @table @asis
+@item @emph{ICV:} none
+@item @emph{Scope:} not applicable
 @item @emph{Description}:
 If set to @code{TRUE}, the OpenMP version number and the values
 associated with the OpenMP environment variables are printed to @code{stderr}.
@@ -2143,6 +2197,8 @@ this information will not be shown.
 @section @env{OMP_DEFAULT_DEVICE} -- Set the device used in target regions
 @cindex Environment Variable
 @table @asis
+@item @emph{ICV:} @var{default-device-var}
+@item @emph{Scope:} data environment
 @item @emph{Description}:
 Set to choose the device which is used in a @code{target} region, unless the
 value is overridden by @code{omp_set_default_device} or by a @code{device}
@@ -2166,6 +2222,8 @@ device number 0 will be used.
 @section @env{OMP_DYNAMIC} -- Dynamic adjustment of threads
 @cindex Environment Variable
 @table @asis
+@item @emph{ICV:} @var{dyn-var}
+@item @emph{Scope:} global
 @item @emph{Description}:
 Enable or disable the dynamic adjustment of the number of threads 
 within a team.  The value of this environment variable shall be 
@@ -2185,6 +2243,8 @@ disabled by default.
 @section @env{OMP_MAX_ACTIVE_LEVELS} -- Set the maximum number of nested parallel regions
 @cindex Environment Variable
 @table @asis
+@item @emph{ICV:} @var{max-active-levels-var}
+@item @emph{Scope:} data environment
 @item @emph{Description}:
 Specifies the initial value for the maximum number of nested parallel
 regions.  The value of this variable shall be a positive integer.
@@ -2195,7 +2255,9 @@ regions will be initialized to the largest number supported, otherwise
 it will be set to one.
 
 @item @emph{See also}:
-@ref{omp_set_max_active_levels}, @ref{OMP_NESTED}
+@ref{omp_set_max_active_levels}, @ref{OMP_NESTED}, @ref{OMP_PROC_BIND},
+@ref{OMP_NUM_THREADS}
+
 
 @item @emph{Reference}: 
 @uref{https://www.openmp.org, OpenMP specification v4.5}, Section 4.9
@@ -2208,6 +2270,8 @@ it will be set to one.
 number that can be set for a task.
 @cindex Environment Variable
 @table @asis
+@item @emph{ICV:} @var{max-task-priority-var}
+@item @emph{Scope:} global
 @item @emph{Description}:
 Specifies the initial value for the maximum priority value that can be
 set for a task.  The value of this variable shall be a non-negative
@@ -2228,6 +2292,8 @@ integer, and zero is allowed.  If undefined, the default priority is
 @cindex Environment Variable
 @cindex Implementation specific setting
 @table @asis
+@item @emph{ICV:} @var{max-active-levels-var}
+@item @emph{Scope:} data environment
 @item @emph{Description}:
 Enable or disable nested parallel regions, i.e., whether team members
 are allowed to create new teams.  The value of this environment variable 
@@ -2239,8 +2305,12 @@ setting.  If both are undefined, nested parallel regions are enabled if
 @env{OMP_NUM_THREADS} or @env{OMP_PROC_BINDS} are defined to a list with
 more than one item, otherwise they are disabled by default.
 
+Note that the @code{OMP_NESTED} environment variable was deprecated in
+the OpenMP specification 5.2 in favor of @code{OMP_MAX_ACTIVE_LEVELS}.
+
 @item @emph{See also}:
-@ref{omp_set_max_active_levels}, @ref{omp_set_nested}
+@ref{omp_set_max_active_levels}, @ref{omp_set_nested},
+@ref{OMP_MAX_ACTIVE_LEVELS}
 
 @item @emph{Reference}: 
 @uref{https://www.openmp.org, OpenMP specification v4.5}, Section 4.6
@@ -2252,6 +2322,8 @@ more than one item, otherwise they are disabled by default.
 @section @env{OMP_NUM_TEAMS} -- Specifies the number of teams to use by teams region
 @cindex Environment Variable
 @table @asis
+@item @emph{ICV:} @var{nteams-var}
+@item @emph{Scope:} device
 @item @emph{Description}:
 Specifies the upper bound for number of teams to use in teams regions
 without explicit @code{num_teams} clause.  The value of this variable shall
@@ -2272,6 +2344,8 @@ implementation defined upper bound.
 @cindex Environment Variable
 @cindex Implementation specific setting
 @table @asis
+@item @emph{ICV:} @var{nthreads-var}
+@item @emph{Scope:} data environment
 @item @emph{Description}:
 Specifies the default number of threads to use in parallel regions.  The 
 value of this variable shall be a comma-separated list of positive integers;
@@ -2279,8 +2353,11 @@ the value specifies the number of threads to use for the corresponding nested
 level.  Specifying more than one item in the list will automatically enable
 nesting by default.  If undefined one thread per CPU is used.
 
+When a list with more than value is specified, it also affects the
+@var{max-active-levels-var} ICV as described in @ref{OMP_MAX_ACTIVE_LEVELS}.
+
 @item @emph{See also}:
-@ref{omp_set_num_threads}, @ref{OMP_NESTED}
+@ref{omp_set_num_threads}, @ref{OMP_MAX_ACTIVE_LEVELS}
 
 @item @emph{Reference}: 
 @uref{https://www.openmp.org, OpenMP specification v4.5}, Section 4.2
@@ -2292,6 +2369,8 @@ nesting by default.  If undefined one thread per CPU is used.
 @section @env{OMP_PROC_BIND} -- Whether threads may be moved between CPUs
 @cindex Environment Variable
 @table @asis
+@item @emph{ICV:} @var{bind-var}
+@item @emph{Scope:} data environment
 @item @emph{Description}:
 Specifies whether threads may be moved between processors.  If set to
 @code{TRUE}, OpenMP threads should not be moved; if set to @code{FALSE}
@@ -2305,12 +2384,15 @@ with @code{SPREAD} a sparse distribution
 across the place partitions is used.  Specifying more than one item in the
 list will automatically enable nesting by default.
 
+When a list is specified, it also affects the @var{max-active-levels-var} ICV
+as described in @ref{OMP_MAX_ACTIVE_LEVELS}.
+
 When undefined, @env{OMP_PROC_BIND} defaults to @code{TRUE} when
 @env{OMP_PLACES} or @env{GOMP_CPU_AFFINITY} is set and @code{FALSE} otherwise.
 
 @item @emph{See also}:
-@ref{omp_get_proc_bind}, @ref{GOMP_CPU_AFFINITY},
-@ref{OMP_NESTED}, @ref{OMP_PLACES}
+@ref{omp_get_proc_bind}, @ref{GOMP_CPU_AFFINITY}, @ref{OMP_PLACES},
+@ref{OMP_MAX_ACTIVE_LEVELS}
 
 @item @emph{Reference}:
 @uref{https://www.openmp.org, OpenMP specification v4.5}, Section 4.4
@@ -2322,6 +2404,8 @@ When undefined, @env{OMP_PROC_BIND} defaults to @code{TRUE} when
 @section @env{OMP_PLACES} -- Specifies on which CPUs the threads should be placed
 @cindex Environment Variable
 @table @asis
+@item @emph{ICV:} @var{place-partition-var}
+@item @emph{Scope:} implicit tasks
 @item @emph{Description}:
 The thread placement can be either specified using an abstract name or by an
 explicit list of the places.  The abstract names @code{threads}, @code{cores},
@@ -2372,6 +2456,8 @@ between CPUs following no placement policy.
 @section @env{OMP_STACKSIZE} -- Set default thread stack size
 @cindex Environment Variable
 @table @asis
+@item @emph{ICV:} @var{stacksize-var}
+@item @emph{Scope:} device
 @item @emph{Description}:
 Set the default thread stack size in kilobytes, unless the number
 is suffixed by @code{B}, @code{K}, @code{M} or @code{G}, in which
@@ -2381,6 +2467,9 @@ which gets the number of bytes as an argument.  If the stack size cannot
 be set due to system constraints, an error is reported and the initial
 stack size is left unchanged.  If undefined, the stack size is system
 dependent.
+
+@item @emph{See also}:
+@ref{GOMP_STACKSIZE}
 
 @item @emph{Reference}: 
 @uref{https://www.openmp.org, OpenMP specification v4.5}, Section 4.7
@@ -2393,6 +2482,8 @@ dependent.
 @cindex Environment Variable
 @cindex Implementation specific setting
 @table @asis
+@item @emph{ICV:} @var{run-sched-var}
+@item @emph{Scope:} data environment
 @item @emph{Description}:
 Allows to specify @code{schedule type} and @code{chunk size}. 
 The value of the variable shall have the form: @code{type[,chunk]} where
@@ -2414,6 +2505,8 @@ dynamic scheduling and a chunk size of 1 is used.
 @cindex Environment Variable
 @cindex Implementation specific setting
 @table @asis
+@item @emph{ICV:} @var{target-offload-var}
+@item @emph{Scope:} global
 @item @emph{Description}:
 Specifies the behaviour with regard to offloading code to a device.  This
 variable can be set to one of three values - @code{MANDATORY}, @code{DISABLED}
@@ -2437,6 +2530,8 @@ If undefined, then the program will behave as if @code{DEFAULT} was set.
 @section @env{OMP_TEAMS_THREAD_LIMIT} -- Set the maximum number of threads imposed by teams
 @cindex Environment Variable
 @table @asis
+@item @emph{ICV:} @var{teams-thread-limit-var}
+@item @emph{Scope:} device
 @item @emph{Description}:
 Specifies an upper bound for the number of threads to use by each contention
 group created by a teams construct without explicit @code{thread_limit}
@@ -2457,6 +2552,8 @@ limit.
 @section @env{OMP_THREAD_LIMIT} -- Set the maximum number of threads
 @cindex Environment Variable
 @table @asis
+@item @emph{ICV:} @var{thread-limit-var}
+@item @emph{Scope:} data environment
 @item @emph{Description}:
 Specifies the number of threads to use for the whole program.  The
 value of this variable shall be a positive integer.  If undefined,
@@ -4504,9 +4601,34 @@ offloading devices (it's not clear if they should be):
 @chapter OpenMP-Implementation Specifics
 
 @menu
+* Implementation-defined ICV Initialization::
 * OpenMP Context Selectors::
-* Memory allocation with libmemkind::
+* Memory allocation::
 @end menu
+
+@node Implementation-defined ICV Initialization
+@section Implementation-defined ICV Initialization
+@cindex Implementation specific setting
+
+@multitable @columnfractions .30 .70
+@item @var{affinity-format-var} @tab See @ref{OMP_AFFINITY_FORMAT}.
+@item @var{def-allocator-var} @tab See @ref{OMP_ALLOCATOR}.
+@item @var{max-active-levels-var} @tab See @ref{OMP_MAX_ACTIVE_LEVELS}.
+@item @var{dyn-var} @tab See @ref{OMP_DYNAMIC}.
+@item @var{nthreads-var} @tab See @code{OMP_NUM_THREADS}.
+@item @var{num-devices-var} @tab Number of non-host devices found
+by GCC's run-time library
+@item @var{num-procs-var} @tab The number of CPU cores on the
+initial device, except that affinity settings might lead to a
+smaller number.  On non-host devices, the value of the
+@var{nthreads-var} ICV.
+@item @var{place-partition-var} @tab See @ref{OMP_PLACES}.
+@item @var{run-sched-var} @tab See @ref{OMP_SCHEDULE}.
+@item @var{stacksize-var} @tab See @ref{OMP_STACKSIZE}.
+@item @var{thread-limit-var} @tab See @ref{OMP_TEAMS_THREAD_LIMIT}
+@item @var{wait-policy-var} @tab See @ref{OMP_WAIT_POLICY} and
+@ref{GOMP_SPINCOUNT}
+@end multitable
 
 @node OpenMP Context Selectors
 @section OpenMP Context Selectors
@@ -4528,8 +4650,24 @@ offloading devices (it's not clear if they should be):
       @tab See @code{-march=} in ``Nvidia PTX Options''
 @end multitable
 
-@node Memory allocation with libmemkind
-@section Memory allocation with libmemkind
+@node Memory allocation
+@section Memory allocation
+
+For the available predefined allocators and, as applicable, their associated
+predefined memory spaces and for the available traits and their default values,
+see @ref{OMP_ALLOCATOR}.  Predefined allocators without an associated memory
+space use the @code{omp_default_mem_space} memory space.
+
+For the memory spaces, the following applies:
+@itemize
+@item @code{omp_default_mem_space} is supported
+@item @code{omp_const_mem_space} maps to @code{omp_default_mem_space}
+@item @code{omp_low_lat_mem_space} maps to @code{omp_default_mem_space}
+@item @code{omp_large_cap_mem_space} maps to @code{omp_default_mem_space},
+      unless the memkind library is available
+@item @code{omp_high_bw_mem_space} maps to @code{omp_default_mem_space},
+      unless the memkind library is available
+@end itemize
 
 On Linux systems, where the @uref{https://github.com/memkind/memkind, memkind
 library} (@code{libmemkind.so.0}) is available at runtime, it is used when
@@ -4538,9 +4676,47 @@ creating memory allocators requesting
 @itemize
 @item the memory space @code{omp_high_bw_mem_space}
 @item the memory space @code{omp_large_cap_mem_space}
-@item the partition trait @code{omp_atv_interleaved}
+@item the @code{partition} trait @code{interleaved}; note that for
+      @code{omp_large_cap_mem_space} the allocation will not be interleaved
 @end itemize
 
+On Linux systems, where the @uref{https://github.com/numactl/numactl, numa
+library} (@code{libnuma.so.1}) is available at runtime, it used when creating
+memory allocators requesting
+
+@itemize
+@item the @code{partition} trait @code{nearest}, except when both the
+libmemkind library is available and the memory space is either
+@code{omp_large_cap_mem_space} or @code{omp_high_bw_mem_space}
+@end itemize
+
+Note that the numa library will round up the allocation size to a multiple of
+the system page size; therefore, consider using it only with large data or
+by sharing allocations via the @code{pool_size} trait.  Furthermore, the Linux
+kernel does not guarantee that an allocation will always be on the nearest NUMA
+node nor that after reallocation the same node will be used.  Note additionally
+that, on Linux, the default setting of the memory placement policy is to use the
+current node; therefore, unless the memory placement policy has been overridden,
+the @code{partition} trait @code{environment} (the default) will be effectively
+a @code{nearest} allocation.
+
+Additional notes regarding the traits:
+@itemize
+@item The @code{pinned} trait is unsupported.
+@item The default for the @code{pool_size} trait is no pool and for every
+      (re)allocation the associated library routine is called, which might
+      internally use a memory pool.
+@item For the @code{partition} trait, the partition part size will be the same
+      as the requested size (i.e. @code{interleaved} or @code{blocked} has no
+      effect), except for @code{interleaved} when the memkind library is
+      available.  Furthermore, for @code{nearest} and unless the numa library
+      is available, the memory might not be on the same NUMA node as thread
+      that allocated the memory; on Linux, this is in particular the case when
+      the memory placement policy is set to preferred.
+@item The @code{access} trait has no effect such that memory is always
+      accessible by all threads.
+@item The @code{sync_hint} trait has no effect.
+@end itemize
 
 @c ---------------------------------------------------------------------
 @c Offload-Target Specifics
@@ -4668,6 +4844,8 @@ The implementation remark:
 @item OpenMP code that has a @code{requires} directive with
       @code{unified_shared_memory} will remove any nvptx device from the
       list of available devices (``host fallback'').
+@item The default per-warp stack size is 128 kiB; see also @code{-msoft-stack}
+      in the GCC manual.
 @end itemize
 
 

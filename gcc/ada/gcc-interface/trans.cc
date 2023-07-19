@@ -814,7 +814,7 @@ lvalue_required_p (Node_Id gnat_node, tree gnu_type, bool constant,
     case N_Pragma:
       if (Is_Pragma_Name (Chars (Pragma_Identifier (gnat_parent))))
 	{
-	  const unsigned char id
+	  const Pragma_Id id
 	    = Get_Pragma_Id (Chars (Pragma_Identifier (gnat_parent)));
 	  return id == Pragma_Inspection_Point;
 	}
@@ -1331,7 +1331,7 @@ Pragma_to_gnu (Node_Id gnat_node)
   if (!Is_Pragma_Name (Chars (Pragma_Identifier (gnat_node))))
     return gnu_result;
 
-  const unsigned char id
+  const Pragma_Id id
     = Get_Pragma_Id (Chars (Pragma_Identifier (gnat_node)));
 
   /* Save the expression of pragma Compile_Time_{Error|Warning} for later.  */
@@ -1670,7 +1670,8 @@ get_type_length (tree type, tree result_type)
    should place the result type.  ATTRIBUTE is the attribute ID.  */
 
 static tree
-Attribute_to_gnu (Node_Id gnat_node, tree *gnu_result_type_p, int attribute)
+Attribute_to_gnu (Node_Id gnat_node, tree *gnu_result_type_p,
+		  Attribute_Id attribute)
 {
   const Node_Id gnat_prefix = Prefix (gnat_node);
   tree gnu_prefix = gnat_to_gnu (gnat_prefix);
@@ -2370,6 +2371,10 @@ Attribute_to_gnu (Node_Id gnat_node, tree *gnu_result_type_p, int attribute)
 	  case Attr_Bit_Position:
 	    gnu_result = gnu_field_bitpos;
 	    break;
+
+	    /* -Wswitch warning avoidance.  */
+	  default:
+	    break;
 	  }
 
 	/* If this has a PLACEHOLDER_EXPR, qualify it by the object we are
@@ -2700,11 +2705,9 @@ Case_Statement_to_gnu (Node_Id gnat_node)
 	 never been problematic, but not for case expressions in Ada 2012.  */
       if (choices_added_p)
 	{
-	  const bool is_case_expression
-	    = (Nkind (Parent (gnat_node)) == N_Expression_With_Actions);
-	  tree group
-	    = build_stmt_group (Statements (gnat_when), !is_case_expression);
-	  bool group_may_fallthru = block_may_fallthru (group);
+	  const bool case_expr_p = From_Conditional_Expression (gnat_node);
+	  tree group = build_stmt_group (Statements (gnat_when), !case_expr_p);
+	  const bool group_may_fallthru = block_may_fallthru (group);
 	  add_stmt (group);
 	  if (group_may_fallthru)
 	    {
@@ -3904,8 +3907,11 @@ Subprogram_Body_to_gnu (Node_Id gnat_node)
     gnu_return_var_elmt = NULL_TREE;
 
   /* If the function returns by invisible reference, make it explicit in the
-     function body.  See gnat_to_gnu_subprog_type for more details.  */
-  if (TREE_ADDRESSABLE (gnu_subprog_type))
+     function body, but beware that maybe_make_gnu_thunk may already have done
+     it if the function is inlined across units.  See gnat_to_gnu_subprog_type
+     for more details.  */
+  if (TREE_ADDRESSABLE (gnu_subprog_type)
+      && TREE_CODE (TREE_TYPE (gnu_result_decl)) != REFERENCE_TYPE)
     {
       TREE_TYPE (gnu_result_decl)
 	= build_reference_type (TREE_TYPE (gnu_result_decl));
@@ -4291,7 +4297,7 @@ static void
 get_atomic_access (Node_Id gnat_node, atomic_acces_t *type, bool *sync)
 {
   Node_Id gnat_parent, gnat_temp;
-  unsigned char attr_id;
+  Attribute_Id attr_id;
 
   /* First, scan the parent to filter out irrelevant cases.  */
   gnat_parent = Parent (gnat_node);
@@ -6853,7 +6859,7 @@ gnat_to_gnu (Node_Id gnat_node)
     case N_Attribute_Reference:
       {
 	/* The attribute designator.  */
-	const int attr = Get_Attribute_Id (Attribute_Name (gnat_node));
+	const Attribute_Id attr = Get_Attribute_Id (Attribute_Name (gnat_node));
 
 	/* The Elab_Spec and Elab_Body attributes are special in that Prefix
 	   is a unit, not an object with a GCC equivalent.  */
@@ -11017,7 +11023,7 @@ maybe_make_gnu_thunk (Entity_Id gnat_thunk, tree gnu_thunk)
      same transformation as Subprogram_Body_to_gnu here.  */
   if (TREE_ADDRESSABLE (TREE_TYPE (gnu_target))
       && DECL_EXTERNAL (gnu_target)
-      && !POINTER_TYPE_P (TREE_TYPE (DECL_RESULT (gnu_target))))
+      && TREE_CODE (TREE_TYPE (DECL_RESULT (gnu_target))) != REFERENCE_TYPE)
     {
       TREE_TYPE (DECL_RESULT (gnu_target))
 	= build_reference_type (TREE_TYPE (DECL_RESULT (gnu_target)));

@@ -542,7 +542,7 @@ enum reg_class
    factor or added to another register (as well as added to a
    displacement).  */
 
-#define INDEX_REG_CLASS NO_REGS
+#define INDEX_REG_CLASS riscv_index_reg_class()
 
 /* We generally want to put call-clobbered registers ahead of
    call-saved ones.  (IRA expects this.)  */
@@ -714,7 +714,9 @@ typedef struct {
 
 /* Addressing modes, and classification of registers for them.  */
 
-#define REGNO_OK_FOR_INDEX_P(REGNO) 0
+#define REGNO_OK_FOR_INDEX_P(REGNO) \
+  riscv_regno_ok_for_index_p (REGNO)
+
 #define REGNO_MODE_OK_FOR_BASE_P(REGNO, MODE) \
   riscv_regno_mode_ok_for_base_p (REGNO, MODE, 1)
 
@@ -800,6 +802,10 @@ typedef struct {
 
 #define Pmode word_mode
 
+/* Specify the machine mode that registers have.  */
+
+#define Xmode (TARGET_64BIT ? DImode : SImode)
+
 /* Give call MEMs SImode since it is the "most permissive" mode
    for both 32-bit and 64-bit targets.  */
 
@@ -849,7 +855,7 @@ typedef struct {
   "fs0", "fs1", "fa0", "fa1", "fa2", "fa3", "fa4", "fa5",	\
   "fa6", "fa7", "fs2", "fs3", "fs4", "fs5", "fs6", "fs7",	\
   "fs8", "fs9", "fs10","fs11","ft8", "ft9", "ft10","ft11",	\
-  "arg", "frame", "vl", "vtype", "vxrm", "N/A", "N/A", "N/A",   \
+  "arg", "frame", "vl", "vtype", "vxrm", "frm", "N/A", "N/A",   \
   "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A",	\
   "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A",	\
   "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A",	\
@@ -1113,6 +1119,6 @@ extern void riscv_remove_unneeded_save_restore_calls (void);
 
 /* Mode switching (Lazy code motion) for RVV rounding mode instructions.  */
 #define OPTIMIZE_MODE_SWITCHING(ENTITY) (TARGET_VECTOR)
-#define NUM_MODES_FOR_MODE_SWITCHING {VXRM_MODE_NONE}
+#define NUM_MODES_FOR_MODE_SWITCHING {VXRM_MODE_NONE, FRM_MODE_NONE}
 
 #endif /* ! GCC_RISCV_H */

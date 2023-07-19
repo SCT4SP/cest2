@@ -462,7 +462,8 @@ GM2_G=-g -fm2-g
 GM2_CPP=
 # GM2_DEBUG_STRMEM=-fcpp
 GM2_DEBUG_STRMEM=
-GM2_FLAGS=-Wunused-variable -fsoft-check-all \
+GM2_FLAGS=-Wunused-variable -Wuninit-variable-checking \
+ -fsoft-check-all \
  -fno-return -Wreturn-type \
  $(GM2_G) $(GM2_O) \
  -funbounded-by-reference -fpim -fextended-opaque \
@@ -750,6 +751,7 @@ GM2-COMP-BOOT-DEFS = \
    M2StackWord.def \
    M2Students.def \
    M2Swig.def \
+   M2SymInit.def \
    M2System.def \
    NameKey.def \
    ObjectFiles.def \
@@ -822,6 +824,7 @@ GM2-COMP-BOOT-MODS = \
    M2StackWord.mod \
    M2Students.mod \
    M2Swig.mod \
+   M2SymInit.mod \
    M2System.mod \
    NameKey.mod \
    NameKey.mod \
@@ -1027,6 +1030,7 @@ GM2-COMP-DEFS = \
    M2StackWord.def \
    M2Students.def \
    M2Swig.def \
+   M2SymInit.def \
    M2System.def \
    NameKey.def \
    ObjectFiles.def \
@@ -1096,6 +1100,7 @@ GM2-COMP-MODS = \
    M2StackWord.mod \
    M2Students.mod \
    M2Swig.mod \
+   M2SymInit.mod \
    M2System.mod \
    NameKey.mod \
    ObjectFiles.mod \
@@ -1649,7 +1654,7 @@ m2/gm2-compiler-boot/gm2.a: m2/boot-bin/mc$(exeext)
 
 m2/boot-bin/mklink$(exeext): $(srcdir)/m2/tools-src/mklink.c
 	-test -d $(@D) || $(mkinstalldirs) $(@D)
-	$(CXX) $(CFLAGS) -I$(srcdir)/m2 -Im2/gm2-libs-boot -Im2/gm2-compiler-boot -I$(srcdir)/m2/mc-boot-ch $(INCLUDES) $< -o $@
+	$(CXX) $(CFLAGS) $(LDFLAGS) -I$(srcdir)/m2 -Im2/gm2-libs-boot -Im2/gm2-compiler-boot -I$(srcdir)/m2/mc-boot-ch $(INCLUDES) $< -o $@
 
 m2/gm2-compiler-boot/$(SRC_PREFIX)%.h: $(srcdir)/m2/gm2-compiler-boot/%.def $(MCDEPS)
 	-test -d $(@D) || $(mkinstalldirs) $(@D)

@@ -2144,14 +2144,69 @@ vect_analyze_loop_costing (loop_vec_info loop_vinfo,
 
   /* Only loops that can handle partially-populated vectors can have iteration
      counts less than the vectorization factor.  */
-  if (!LOOP_VINFO_USING_PARTIAL_VECTORS_P (loop_vinfo))
+  if (!LOOP_VINFO_USING_PARTIAL_VECTORS_P (loop_vinfo)
+      && vect_known_niters_smaller_than_vf (loop_vinfo))
     {
-      if (vect_known_niters_smaller_than_vf (loop_vinfo))
+      if (dump_enabled_p ())
+	dump_printf_loc (MSG_MISSED_OPTIMIZATION, vect_location,
+			 "not vectorized: iteration count smaller than "
+			 "vectorization factor.\n");
+      return 0;
+    }
+
+  /* If we know the number of iterations we can do better, for the
+     epilogue we can also decide whether the main loop leaves us
+     with enough iterations, prefering a smaller vector epilog then
+     also possibly used for the case we skip the vector loop.  */
+  if (!LOOP_VINFO_USING_PARTIAL_VECTORS_P (loop_vinfo)
+      && LOOP_VINFO_NITERS_KNOWN_P (loop_vinfo))
+    {
+      widest_int scalar_niters
+	= wi::to_widest (LOOP_VINFO_NITERSM1 (loop_vinfo)) + 1;
+      if (LOOP_VINFO_EPILOGUE_P (loop_vinfo))
+	{
+	  loop_vec_info orig_loop_vinfo
+	    = LOOP_VINFO_ORIG_LOOP_INFO (loop_vinfo);
+	  unsigned lowest_vf
+	    = constant_lower_bound (LOOP_VINFO_VECT_FACTOR (orig_loop_vinfo));
+	  int prolog_peeling = 0;
+	  if (!vect_use_loop_mask_for_alignment_p (loop_vinfo))
+	    prolog_peeling = LOOP_VINFO_PEELING_FOR_ALIGNMENT (orig_loop_vinfo);
+	  if (prolog_peeling >= 0
+	      && known_eq (LOOP_VINFO_VECT_FACTOR (orig_loop_vinfo),
+			   lowest_vf))
+	    {
+	      unsigned gap
+		= LOOP_VINFO_PEELING_FOR_GAPS (orig_loop_vinfo) ? 1 : 0;
+	      scalar_niters = ((scalar_niters - gap - prolog_peeling)
+			       % lowest_vf + gap);
+	    }
+	}
+
+      /* Check that the loop processes at least one full vector.  */
+      poly_uint64 vf = LOOP_VINFO_VECT_FACTOR (loop_vinfo);
+      if (known_lt (scalar_niters, vf))
 	{
 	  if (dump_enabled_p ())
 	    dump_printf_loc (MSG_MISSED_OPTIMIZATION, vect_location,
-			     "not vectorized: iteration count smaller than "
-			     "vectorization factor.\n");
+			     "loop does not have enough iterations "
+			     "to support vectorization.\n");
+	  return 0;
+	}
+
+      /* If we need to peel an extra epilogue iteration to handle data
+	 accesses with gaps, check that there are enough scalar iterations
+	 available.
+
+	 The check above is redundant with this one when peeling for gaps,
+	 but the distinction is useful for diagnostics.  */
+      if (LOOP_VINFO_PEELING_FOR_GAPS (loop_vinfo)
+	  && known_le (scalar_niters, vf))
+	{
+	  if (dump_enabled_p ())
+	    dump_printf_loc (MSG_MISSED_OPTIMIZATION, vect_location,
+			     "loop does not have enough iterations "
+			     "to support peeling for gaps.\n");
 	  return 0;
 	}
     }
@@ -2439,16 +2494,10 @@ vect_dissolve_slp_only_groups (loop_vec_info loop_vinfo)
 	    In this case:
 
 	      LOOP_VINFO_EPIL_USING_PARTIAL_VECTORS_P == false
-
-   When FOR_EPILOGUE_P is true, make this determination based on the
-   assumption that LOOP_VINFO is an epilogue loop, otherwise make it
-   based on the assumption that LOOP_VINFO is the main loop.  The caller
-   has made sure that the number of iterations is set appropriately for
-   this value of FOR_EPILOGUE_P.  */
+ */
 
 opt_result
-vect_determine_partial_vectors_and_peeling (loop_vec_info loop_vinfo,
-					    bool for_epilogue_p)
+vect_determine_partial_vectors_and_peeling (loop_vec_info loop_vinfo)
 {
   /* Determine whether there would be any scalar iterations left over.  */
   bool need_peeling_or_partial_vectors_p
@@ -2482,50 +2531,12 @@ vect_determine_partial_vectors_and_peeling (loop_vec_info loop_vinfo,
     }
 
   if (dump_enabled_p ())
-    {
-      if (LOOP_VINFO_USING_PARTIAL_VECTORS_P (loop_vinfo))
-	dump_printf_loc (MSG_NOTE, vect_location,
-			 "operating on partial vectors%s.\n",
-			 for_epilogue_p ? " for epilogue loop" : "");
-      else
-	dump_printf_loc (MSG_NOTE, vect_location,
-			 "operating only on full vectors%s.\n",
-			 for_epilogue_p ? " for epilogue loop" : "");
-    }
-
-  if (for_epilogue_p)
-    {
-      loop_vec_info orig_loop_vinfo = LOOP_VINFO_ORIG_LOOP_INFO (loop_vinfo);
-      gcc_assert (orig_loop_vinfo);
-      if (!LOOP_VINFO_USING_PARTIAL_VECTORS_P (loop_vinfo))
-	gcc_assert (known_lt (LOOP_VINFO_VECT_FACTOR (loop_vinfo),
-			      LOOP_VINFO_VECT_FACTOR (orig_loop_vinfo)));
-    }
-
-  if (LOOP_VINFO_NITERS_KNOWN_P (loop_vinfo)
-      && !LOOP_VINFO_USING_PARTIAL_VECTORS_P (loop_vinfo))
-    {
-      /* Check that the loop processes at least one full vector.  */
-      poly_uint64 vf = LOOP_VINFO_VECT_FACTOR (loop_vinfo);
-      tree scalar_niters = LOOP_VINFO_NITERS (loop_vinfo);
-      if (known_lt (wi::to_widest (scalar_niters), vf))
-	return opt_result::failure_at (vect_location,
-				       "loop does not have enough iterations"
-				       " to support vectorization.\n");
-
-      /* If we need to peel an extra epilogue iteration to handle data
-	 accesses with gaps, check that there are enough scalar iterations
-	 available.
-
-	 The check above is redundant with this one when peeling for gaps,
-	 but the distinction is useful for diagnostics.  */
-      tree scalar_nitersm1 = LOOP_VINFO_NITERSM1 (loop_vinfo);
-      if (LOOP_VINFO_PEELING_FOR_GAPS (loop_vinfo)
-	  && known_lt (wi::to_widest (scalar_nitersm1), vf))
-	return opt_result::failure_at (vect_location,
-				       "loop does not have enough iterations"
-				       " to support peeling for gaps.\n");
-    }
+    dump_printf_loc (MSG_NOTE, vect_location,
+		     "operating on %s vectors%s.\n",
+		     LOOP_VINFO_USING_PARTIAL_VECTORS_P (loop_vinfo)
+		     ? "partial" : "full",
+		     LOOP_VINFO_EPILOGUE_P (loop_vinfo)
+		     ? " for epilogue loop" : "");
 
   LOOP_VINFO_PEELING_FOR_NITER (loop_vinfo)
     = (!LOOP_VINFO_USING_PARTIAL_VECTORS_P (loop_vinfo)
@@ -2987,24 +2998,28 @@ start_over:
 	LOOP_VINFO_USING_SELECT_VL_P (loop_vinfo) = true;
     }
 
-  /* If we're vectorizing an epilogue loop, the vectorized loop either needs
-     to be able to handle fewer than VF scalars, or needs to have a lower VF
-     than the main loop.  */
-  if (LOOP_VINFO_EPILOGUE_P (loop_vinfo)
-      && !LOOP_VINFO_CAN_USE_PARTIAL_VECTORS_P (loop_vinfo)
-      && maybe_ge (LOOP_VINFO_VECT_FACTOR (loop_vinfo),
-		   LOOP_VINFO_VECT_FACTOR (orig_loop_vinfo)))
-    return opt_result::failure_at (vect_location,
-				   "Vectorization factor too high for"
-				   " epilogue loop.\n");
-
   /* Decide whether this loop_vinfo should use partial vectors or peeling,
      assuming that the loop will be used as a main loop.  We will redo
      this analysis later if we instead decide to use the loop as an
      epilogue loop.  */
-  ok = vect_determine_partial_vectors_and_peeling (loop_vinfo, false);
+  ok = vect_determine_partial_vectors_and_peeling (loop_vinfo);
   if (!ok)
     return ok;
+
+  /* If we're vectorizing an epilogue loop, the vectorized loop either needs
+     to be able to handle fewer than VF scalars, or needs to have a lower VF
+     than the main loop.  */
+  if (LOOP_VINFO_EPILOGUE_P (loop_vinfo)
+      && !LOOP_VINFO_USING_PARTIAL_VECTORS_P (loop_vinfo))
+    {
+      poly_uint64 unscaled_vf
+	= exact_div (LOOP_VINFO_VECT_FACTOR (orig_loop_vinfo),
+		     orig_loop_vinfo->suggested_unroll_factor);
+      if (maybe_ge (LOOP_VINFO_VECT_FACTOR (loop_vinfo), unscaled_vf))
+	return opt_result::failure_at (vect_location,
+				       "Vectorization factor too high for"
+				       " epilogue loop.\n");
+    }
 
   /* Check the costings of the loop make vectorizing worthwhile.  */
   res = vect_analyze_loop_costing (loop_vinfo, suggested_unroll_factor);
@@ -3295,7 +3310,7 @@ vect_analyze_loop_1 (class loop *loop, vec_info_shared *shared,
   machine_mode vector_mode = vector_modes[mode_i];
   loop_vinfo->vector_mode = vector_mode;
   unsigned int suggested_unroll_factor = 1;
-  bool slp_done_for_suggested_uf;
+  bool slp_done_for_suggested_uf = false;
 
   /* Run the main analysis.  */
   opt_result res = vect_analyze_loop_2 (loop_vinfo, fatal,
@@ -10083,7 +10098,7 @@ vectorizable_induction (loop_vec_info loop_vinfo,
 				   new_vec, step_vectype, NULL);
 
       vec_def = induc_def;
-      for (i = 1; i < ncopies; i++)
+      for (i = 1; i < ncopies + 1; i++)
 	{
 	  /* vec_i = vec_prev + vec_step  */
 	  gimple_seq stmts = NULL;
@@ -10093,8 +10108,23 @@ vectorizable_induction (loop_vec_info loop_vinfo,
 	  vec_def = gimple_convert (&stmts, vectype, vec_def);
  
 	  gsi_insert_seq_before (&si, stmts, GSI_SAME_STMT);
-	  new_stmt = SSA_NAME_DEF_STMT (vec_def);
-	  STMT_VINFO_VEC_STMTS (stmt_info).safe_push (new_stmt);
+	  if (i < ncopies)
+	    {
+	      new_stmt = SSA_NAME_DEF_STMT (vec_def);
+	      STMT_VINFO_VEC_STMTS (stmt_info).safe_push (new_stmt);
+	    }
+	  else
+	    {
+	      /* vec_1 = vec_iv + (VF/n * S)
+		 vec_2 = vec_1 + (VF/n * S)
+		 ...
+		 vec_n = vec_prev + (VF/n * S) = vec_iv + VF * S = vec_loop
+
+		 vec_n is used as vec_loop to save the large step register and
+		 related operations.  */
+	      add_phi_arg (induction_phi, vec_def, loop_latch_edge (iv_loop),
+			   UNKNOWN_LOCATION);
+	    }
 	}
     }
 
@@ -10812,31 +10842,30 @@ vect_get_loop_len (loop_vec_info loop_vinfo, gimple_stmt_iterator *gsi,
 static void
 scale_profile_for_vect_loop (class loop *loop, unsigned vf)
 {
-  edge preheader = loop_preheader_edge (loop);
-  /* Reduce loop iterations by the vectorization factor.  */
-  gcov_type new_est_niter = niter_for_unrolled_loop (loop, vf);
-  profile_count freq_h = loop->header->count, freq_e = preheader->count ();
-
-  if (freq_h.nonzero_p ())
-    {
-      profile_probability p;
-
-      /* Avoid dropping loop body profile counter to 0 because of zero count
-	 in loop's preheader.  */
-      if (!(freq_e == profile_count::zero ()))
-        freq_e = freq_e.force_nonzero ();
-      p = (freq_e * (new_est_niter + 1)).probability_in (freq_h);
-      scale_loop_frequencies (loop, p);
-    }
-
+  /* Loop body executes VF fewer times and exit increases VF times.  */
   edge exit_e = single_exit (loop);
-  exit_e->probability = profile_probability::always () / (new_est_niter + 1);
+  profile_count entry_count = loop_preheader_edge (loop)->count ();
 
-  edge exit_l = single_pred_edge (loop->latch);
-  profile_probability prob = exit_l->probability;
-  exit_l->probability = exit_e->probability.invert ();
-  if (prob.initialized_p () && exit_l->probability.initialized_p ())
-    scale_bbs_frequencies (&loop->latch, 1, exit_l->probability / prob);
+  /* If we have unreliable loop profile avoid dropping entry
+     count bellow header count.  This can happen since loops
+     has unrealistically low trip counts.  */
+  while (vf > 1
+	 && loop->header->count > entry_count
+	 && loop->header->count < entry_count * vf)
+    vf /= 2;
+
+  if (entry_count.nonzero_p ())
+    set_edge_probability_and_rescale_others
+	    (exit_e,
+	     entry_count.probability_in (loop->header->count / vf));
+  /* Avoid producing very large exit probability when we do not have
+     sensible profile.  */
+  else if (exit_e->probability < profile_probability::always () / (vf * 2))
+    set_edge_probability_and_rescale_others (exit_e, exit_e->probability * vf);
+  loop->latch->count = single_pred_edge (loop->latch)->count ();
+
+  scale_loop_profile (loop, profile_probability::always () / vf,
+		      get_likely_max_loop_iterations_int (loop));
 }
 
 /* For a vectorized stmt DEF_STMT_INFO adjust all vectorized PHI
@@ -11446,7 +11475,6 @@ vect_transform_loop (loop_vec_info loop_vinfo, gimple *loop_vectorized_call)
 			   niters_vector_mult_vf, !niters_no_overflow);
 
   unsigned int assumed_vf = vect_vf_for_cost (loop_vinfo);
-  scale_profile_for_vect_loop (loop, assumed_vf);
 
   /* True if the final iteration might not handle a full vector's
      worth of scalar iterations.  */
@@ -11517,6 +11545,7 @@ vect_transform_loop (loop_vec_info loop_vinfo, gimple *loop_vectorized_call)
 			  assumed_vf) - 1
 	 : wi::udiv_floor (loop->nb_iterations_estimate + bias_for_assumed,
 			   assumed_vf) - 1);
+  scale_profile_for_vect_loop (loop, assumed_vf);
 
   if (dump_enabled_p ())
     {
@@ -11650,6 +11679,7 @@ optimize_mask_stores (class loop *loop)
       efalse = make_edge (bb, store_bb, EDGE_FALSE_VALUE);
       /* Put STORE_BB to likely part.  */
       efalse->probability = profile_probability::unlikely ();
+      e->probability = efalse->probability.invert ();
       store_bb->count = efalse->count ();
       make_single_succ_edge (store_bb, join_bb, EDGE_FALLTHRU);
       if (dom_info_available_p (CDI_DOMINATORS))

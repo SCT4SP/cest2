@@ -407,7 +407,7 @@ MAKEINFO = @MAKEINFO@
 EXPECT = @EXPECT@
 RUNTEST = @RUNTEST@
 
-AUTO_PROFILE = gcc-auto-profile -c 10000000
+AUTO_PROFILE = gcc-auto-profile --all -c 10000000
 
 # This just becomes part of the MAKEINFO definition passed down to
 # sub-makes.  It lets flags be given on the command line while still
@@ -558,7 +558,7 @@ STAGEtrain_TFLAGS = $(filter-out -fchecking=1,$(STAGE3_TFLAGS))
 STAGEfeedback_CFLAGS = $(STAGE4_CFLAGS) -fprofile-use -fprofile-reproducible=parallel-runs
 STAGEfeedback_TFLAGS = $(STAGE4_TFLAGS)
 
-STAGEautoprofile_CFLAGS = $(STAGE2_CFLAGS) -g
+STAGEautoprofile_CFLAGS = $(filter-out -gtoggle,$(STAGE2_CFLAGS)) -g
 STAGEautoprofile_TFLAGS = $(STAGE2_TFLAGS)
 
 STAGEautofeedback_CFLAGS = $(STAGE3_CFLAGS)

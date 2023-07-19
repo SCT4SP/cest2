@@ -6642,6 +6642,36 @@ xxspltib_constant_p (rtx op,
   return true;
 }
 
+/* Return true if OP mode is V2DI and can be synthesized with ISA 2.07
+   instructions vupkhsw and vspltisw.
+
+   Return the constant that is being split via CONSTANT_PTR.  */
+
+bool
+vspltisw_vupkhsw_constant_p (rtx op, machine_mode mode, int *constant_ptr)
+{
+  HOST_WIDE_INT value;
+  rtx elt;
+
+  if (!TARGET_P8_VECTOR)
+    return false;
+
+  if (mode != V2DImode)
+    return false;
+
+  if (!const_vec_duplicate_p (op, &elt))
+    return false;
+
+  value = INTVAL (elt);
+  if (value == 0 || value == 1
+      || !EASY_VECTOR_15 (value))
+    return false;
+
+  if (constant_ptr)
+    *constant_ptr = (int) value;
+  return true;
+}
+
 const char *
 output_vec_const_move (rtx *operands)
 {
@@ -7664,12 +7694,11 @@ rs6000_expand_vector_extract (rtx target, rtx vec, rtx elt)
     {
       unsigned int ele_size = GET_MODE_SIZE (inner_mode);
       rtx num_ele_m1 = GEN_INT (GET_MODE_NUNITS (mode) - 1);
-      rtx new_addr = gen_reg_rtx (Pmode);
 
       elt = gen_rtx_AND (Pmode, elt, num_ele_m1);
       if (ele_size > 1)
 	elt = gen_rtx_MULT (Pmode, elt, GEN_INT (ele_size));
-      new_addr = gen_rtx_PLUS (Pmode, XEXP (mem, 0), elt);
+      rtx new_addr = gen_rtx_PLUS (Pmode, XEXP (mem, 0), elt);
       new_addr = change_address (mem, inner_mode, new_addr);
       emit_move_insn (target, new_addr);
     }

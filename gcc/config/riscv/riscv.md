@@ -287,6 +287,7 @@
 ;; rdvlenb     vector byte length vlenb csrr read
 ;; rdvl        vector length vl csrr read
 ;; wrvxrm      vector fixed-point rounding mode write
+;; wrfrm       vector floating-point rounding mode write
 ;; vsetvl      vector configuration-setting instrucions
 ;; 7. Vector Loads and Stores
 ;; vlde        vector unit-stride load instructions
@@ -390,7 +391,8 @@
    mtc,mfc,const,arith,logical,shift,slt,imul,idiv,move,fmove,fadd,fmul,
    fmadd,fdiv,fcmp,fcvt,fsqrt,multi,auipc,sfb_alu,nop,ghost,bitmanip,rotate,
    clmul,min,max,minu,maxu,clz,ctz,cpop,
-   atomic,condmove,crypto,rdvlenb,rdvl,wrvxrm,vsetvl,vlde,vste,vldm,vstm,vlds,vsts,
+   atomic,condmove,crypto,rdvlenb,rdvl,wrvxrm,wrfrm,rdfrm,vsetvl,
+   vlde,vste,vldm,vstm,vlds,vsts,
    vldux,vldox,vstux,vstox,vldff,vldr,vstr,
    vlsegde,vssegte,vlsegds,vssegts,vlsegdux,vlsegdox,vssegtux,vssegtox,vlsegdff,
    vialu,viwalu,vext,vicalu,vshift,vnshift,vicmp,viminmax,
@@ -1489,11 +1491,6 @@
 	  DONE;
 	}
     }
-  else
-    {
-      emit_move_insn (operands[0], gen_rtx_AND (<MODE>mode, operands[1], operands[2]));
-      DONE;
-    }
 })
 
 (define_insn "*and<mode>3"
@@ -1592,7 +1589,7 @@
   [(set (match_operand:DI     0 "register_operand"     "=r,r")
 	(zero_extend:DI
 	    (match_operand:SI 1 "nonimmediate_operand" " r,m")))]
-  "TARGET_64BIT && !TARGET_ZBA
+  "TARGET_64BIT && !TARGET_ZBA && !TARGET_XTHEADBB
    && !(register_operand (operands[1], SImode)
         && reg_or_subregno (operands[1]) == VL_REGNUM)"
   "@
@@ -1619,7 +1616,7 @@
   [(set (match_operand:GPR    0 "register_operand"     "=r,r")
 	(zero_extend:GPR
 	    (match_operand:HI 1 "nonimmediate_operand" " r,m")))]
-  "!TARGET_ZBB"
+  "!TARGET_ZBB && !TARGET_XTHEADBB"
   "@
    #
    lhu\t%0,%1"
@@ -1675,7 +1672,7 @@
   [(set (match_operand:SUPERQI   0 "register_operand"     "=r,r")
 	(sign_extend:SUPERQI
 	    (match_operand:SHORT 1 "nonimmediate_operand" " r,m")))]
-  "!TARGET_ZBB"
+  "!TARGET_ZBB && !TARGET_XTHEADBB"
   "@
    #
    l<SHORT:size>\t%0,%1"
