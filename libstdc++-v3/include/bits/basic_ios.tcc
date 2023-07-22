@@ -37,6 +37,7 @@ namespace std _GLIBCXX_VISIBILITY(default)
 _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
   template<typename _CharT, typename _Traits>
+    _GLIBCXX_CEST_CONSTEXPR
     void
     basic_ios<_CharT, _Traits>::clear(iostate __state)
     {
@@ -123,6 +124,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
   template<typename _CharT, typename _Traits>
     void
+    _GLIBCXX_CEST_CONSTEXPR
     basic_ios<_CharT, _Traits>::init(basic_streambuf<_CharT, _Traits>* __sb)
     {
       // NB: This may be called more than once on the same object.
@@ -154,8 +156,13 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
   template<typename _CharT, typename _Traits>
     void
+    _GLIBCXX_CEST_CONSTEXPR
     basic_ios<_CharT, _Traits>::_M_cache_locale(const locale& __loc)
     {
+#if _GLIBCXX_CEST_VERSION
+      if (__builtin_is_constant_evaluated())
+        return;
+#endif
       _M_ctype = std::__try_use_facet<__ctype_type>(__loc);
       _M_num_put = std::__try_use_facet<__num_put_type>(__loc);
       _M_num_get = std::__try_use_facet<__num_get_type>(__loc);

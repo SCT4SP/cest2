@@ -200,6 +200,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
   public:
       /// Destructor deallocates no buffer space.
+      _GLIBCXX_CEST_CONSTEXPR
       virtual
       ~basic_streambuf()
       { }
@@ -319,6 +320,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *  and increments the read pointer, otherwise calls and returns
        *  @c uflow().
       */
+      _GLIBCXX_CEST_CONSTEXPR
       int_type
       sbumpc()
       {
@@ -360,6 +362,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *  Returns xsgetn(__s,__n).  The effect is to fill @a __s[0] through
        *  @a __s[__n-1] with characters from the input sequence, if possible.
       */
+      _GLIBCXX_CEST_CONSTEXPR
       streamsize
       sgetn(char_type* __s, streamsize __n)
       { return this->xsgetn(__s, __n); }
@@ -400,6 +403,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *  calls and returns pbackfail().  The effect is to @a unget
        *  the last character @a gotten.
       */
+      _GLIBCXX_CEST_CONSTEXPR
       int_type
       sungetc()
       {
@@ -467,6 +471,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *  - the class starts with no read nor write positions available,
        *  - this is not an error
       */
+      _GLIBCXX_CEST_CONSTEXPR
       basic_streambuf()
       : _M_in_beg(0), _M_in_cur(0), _M_in_end(0),
       _M_out_beg(0), _M_out_cur(0), _M_out_end(0),
@@ -485,12 +490,15 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *  - gptr() returns the next pointer for the input sequence
        *  - egptr() returns the end pointer for the input sequence
       */
+      _GLIBCXX_CEST_CONSTEXPR
       char_type*
       eback() const { return _M_in_beg; }
 
+      _GLIBCXX_CEST_CONSTEXPR
       char_type*
       gptr()  const { return _M_in_cur;  }
 
+      _GLIBCXX_CEST_CONSTEXPR
       char_type*
       egptr() const { return _M_in_end; }
       ///@}
@@ -501,6 +509,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *
        *  This just advances the read position without returning any data.
       */
+      _GLIBCXX_CEST_CONSTEXPR
       void
       gbump(int __n) { _M_in_cur += __n; }
 
@@ -513,6 +522,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *         @a __gend == @c egptr()
       */
       void
+      _GLIBCXX_CEST_CONSTEXPR
       setg(char_type* __gbeg, char_type* __gnext, char_type* __gend)
       {
 	_M_in_beg = __gbeg;
@@ -532,12 +542,15 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *  - pptr() returns the next pointer for the output sequence
        *  - epptr() returns the end pointer for the output sequence
       */
+      _GLIBCXX_CEST_CONSTEXPR
       char_type*
       pbase() const { return _M_out_beg; }
 
+      _GLIBCXX_CEST_CONSTEXPR
       char_type*
       pptr() const { return _M_out_cur; }
 
+      _GLIBCXX_CEST_CONSTEXPR
       char_type*
       epptr() const { return _M_out_end; }
       ///@}
@@ -668,6 +681,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *  It is expected that derived classes provide a more efficient
        *  implementation by overriding this definition.
       */
+      _GLIBCXX_CEST_CONSTEXPR
       virtual streamsize
       xsgetn(char_type* __s, streamsize __n);
 
@@ -703,6 +717,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *  the new character, like @c underflow() does.  However, this
        *  function also moves the read position forward by one.
       */
+      _GLIBCXX_CEST_CONSTEXPR
       virtual int_type
       uflow()
       {
@@ -798,9 +813,11 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 #endif
 
       // Also used by specializations for char and wchar_t in src.
+      _GLIBCXX_CEST_CONSTEXPR
       void
       __safe_gbump(streamsize __n) { _M_in_cur += __n; }
 
+      _GLIBCXX_CEST_CONSTEXPR
       void
       __safe_pbump(streamsize __n) { _M_out_cur += __n; }
 

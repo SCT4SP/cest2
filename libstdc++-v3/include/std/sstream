@@ -118,6 +118,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        *  The default constructor initializes the parent class using its
        *  own default ctor.
       */
+      _GLIBCXX_CEST_CONSTEXPR
       basic_stringbuf()
       : __streambuf_type(), _M_mode(ios_base::in | ios_base::out), _M_string()
       { }
@@ -129,6 +130,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        *  The default constructor initializes the parent class using its
        *  own default ctor.
       */
+      _GLIBCXX_CEST_CONSTEXPR
       explicit
       basic_stringbuf(ios_base::openmode __mode)
       : __streambuf_type(), _M_mode(__mode), _M_string()
@@ -143,6 +145,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        *  own default ctor.
       */
       explicit
+      _GLIBCXX_CEST_CONSTEXPR
       basic_stringbuf(const __string_type& __str,
 		      ios_base::openmode __mode = ios_base::in | ios_base::out)
       : __streambuf_type(), _M_mode(),
@@ -168,6 +171,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
       { }
 
       explicit
+      _GLIBCXX_CEST_CONSTEXPR
       basic_stringbuf(__string_type&& __s,
 		      ios_base::openmode __mode = ios_base::in
 						  | ios_base::out)
@@ -322,6 +326,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
 	}
 #endif
 
+      _GLIBCXX_CEST_CONSTEXPR
       void
       str(__string_type&& __s)
       {
@@ -333,6 +338,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
     protected:
       // Common initialization code goes here.
       void
+      _GLIBCXX_CEST_CONSTEXPR
       _M_stringbuf_init(ios_base::openmode __mode)
       {
 	_M_mode = __mode;
@@ -354,6 +360,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
 	return __ret;
       }
 
+      _GLIBCXX_CEST_CONSTEXPR
       virtual int_type
       underflow();
 
@@ -405,10 +412,12 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
       // for a particular _M_string, due to initialization or re-sizing
       // of an existing _M_string.
       void
+      _GLIBCXX_CEST_CONSTEXPR
       _M_sync(char_type* __base, __size_type __i, __size_type __o);
 
       // Internal function for correctly updating egptr() to the actual
       // string end.
+      _GLIBCXX_CEST_CONSTEXPR
       void
       _M_update_egptr()
       {
@@ -577,6 +586,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        *  That's a lie.  We initialize the base class with NULL, because the
        *  string class does its own memory management.
       */
+      _GLIBCXX_CEST_CONSTEXPR
       basic_istringstream()
       : __istream_type(), _M_stringbuf(ios_base::in)
       { this->init(&_M_stringbuf); }
@@ -612,6 +622,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        *  string class does its own memory management.
       */
       explicit
+      _GLIBCXX_CEST_CONSTEXPR
       basic_istringstream(const __string_type& __str,
 			  ios_base::openmode __mode = ios_base::in)
       : __istream_type(), _M_stringbuf(__str, __mode | ios_base::in)
@@ -623,6 +634,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        *  The buffer is deallocated by the stringbuf object, not the
        *  formatting stream.
       */
+      _GLIBCXX_CEST_CONSTEXPR
       ~basic_istringstream()
       { }
 
@@ -640,6 +652,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
       { this->init(std::__addressof(_M_stringbuf)); }
 
       explicit
+      _GLIBCXX_CEST_CONSTEXPR
       basic_istringstream(__string_type&& __str,
 			  ios_base::openmode __mode = ios_base::in)
       : __istream_type(), _M_stringbuf(std::move(__str), __mode | ios_base::in)
@@ -745,6 +758,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
 	{ _M_stringbuf.str(__s); }
 #endif
 
+      _GLIBCXX_CEST_CONSTEXPR
       void
       str(__string_type&& __s)
       { _M_stringbuf.str(std::move(__s)); }

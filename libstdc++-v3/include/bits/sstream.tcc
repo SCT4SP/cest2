@@ -145,6 +145,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     }
 
   template <class _CharT, class _Traits, class _Alloc>
+    _GLIBCXX_CEST_CONSTEXPR
     typename basic_stringbuf<_CharT, _Traits, _Alloc>::int_type
     basic_stringbuf<_CharT, _Traits, _Alloc>::
     underflow()
@@ -242,6 +243,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
   template <class _CharT, class _Traits, class _Alloc>
     void
+    _GLIBCXX_CEST_CONSTEXPR
     basic_stringbuf<_CharT, _Traits, _Alloc>::
     _M_sync(char_type* __base, __size_type __i, __size_type __o)
     {

@@ -178,14 +178,17 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
   operator~(_Ios_Iostate __a)
   { return _Ios_Iostate(~static_cast<int>(__a)); }
 
+  _GLIBCXX_CEST_CONSTEXPR
   inline const _Ios_Iostate&
   operator|=(_Ios_Iostate& __a, _Ios_Iostate __b)
   { return __a = __a | __b; }
 
+  _GLIBCXX_CEST_CONSTEXPR
   inline const _Ios_Iostate&
   operator&=(_Ios_Iostate& __a, _Ios_Iostate __b)
   { return __a = __a & __b; }
 
+  _GLIBCXX_CEST_CONSTEXPR
   inline const  _Ios_Iostate&
   operator^=(_Ios_Iostate& __a, _Ios_Iostate __b)
   { return __a = __a ^ __b; }
@@ -595,9 +598,11 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
      _Callback_list*	_M_callbacks;
 
+    _GLIBCXX_CEST_CONSTEXPR
     void
     _M_call_callbacks(event __ev) throw();
 
+    _GLIBCXX_CEST_CONSTEXPR
     void
     _M_dispose_callbacks(void) throw();
 
@@ -606,6 +611,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     {
       void*	_M_pword;
       long	_M_iword;
+      _GLIBCXX_CEST_CONSTEXPR
       _Words() : _M_pword(0), _M_iword(0) { }
     };
 
@@ -628,6 +634,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     locale		_M_ios_locale;
 
     void
+    _GLIBCXX_CEST_CONSTEXPR
     _M_init() throw();
 
   public:
@@ -886,9 +893,11 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
      *  streams will not get invoked with erase_event (unless copyfmt is
      *  used).
     */
+    _GLIBCXX_CEST_CONSTEXPR
     virtual ~ios_base();
 
   protected:
+    _GLIBCXX_CEST_CONSTEXPR
     ios_base() throw ();
 
 #if __cplusplus < 201103L
@@ -1118,5 +1127,92 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
 _GLIBCXX_END_NAMESPACE_VERSION
 } // namespace
+
+#if _GLIBCXX_CEST_VERSION
+namespace std _GLIBCXX_VISIBILITY(default)
+{
+_GLIBCXX_BEGIN_NAMESPACE_VERSION
+
+  // from src/c++11/ios.cc with added constexpr
+
+  _GLIBCXX_CEST_CONSTEXPR
+  void
+  ios_base::_M_call_callbacks(event __e) throw()
+  {
+    _Callback_list* __p = _M_callbacks;
+    while (__p)
+      {
+	__try
+	  { (*__p->_M_fn) (__e, *this, __p->_M_index); }
+	__catch(...)
+	  { }
+	__p = __p->_M_next;
+      }
+  }
+
+  _GLIBCXX_CEST_CONSTEXPR
+  void
+  ios_base::_M_dispose_callbacks(void) throw()
+  {
+    _Callback_list* __p = _M_callbacks;
+    while (__p && __p->_M_remove_reference() == 0)
+      {
+	_Callback_list* __next = __p->_M_next;
+	delete __p;
+	__p = __next;
+      }
+    _M_callbacks = 0;
+  }
+
+  _GLIBCXX_CEST_CONSTEXPR
+  ios_base::ios_base() throw()
+  : _M_precision(), _M_width(), _M_flags(), _M_exception(),
+  _M_streambuf_state(), _M_callbacks(0), _M_word_zero(),
+  _M_word_size(_S_local_word_size), _M_word(_M_local_word), _M_ios_locale()
+  {
+    // Do nothing: basic_ios::init() does it.
+    // NB: _M_callbacks and _M_word must be zero for non-initialized
+    // ios_base to go through ~ios_base gracefully.
+  }
+
+  // 27.4.2.7  ios_base constructors/destructors
+  _GLIBCXX_CEST_CONSTEXPR
+  ios_base::~ios_base()
+  {
+    _M_call_callbacks(erase_event);
+    _M_dispose_callbacks();
+    if (_M_word != _M_local_word)
+      {
+	delete [] _M_word;
+	_M_word = 0;
+      }
+  }
+
+_GLIBCXX_END_NAMESPACE_VERSION
+} // namespace
+#endif // _GLIBCXX_CEST_VERSION
+
+#if _GLIBCXX_CEST_VERSION
+namespace std _GLIBCXX_VISIBILITY(default)
+{
+_GLIBCXX_BEGIN_NAMESPACE_VERSION
+
+  // from src/c++98/ios_locale.cc with additional constexpr
+
+  // Called only by basic_ios<>::init.
+  void
+  _GLIBCXX_CEST_CONSTEXPR
+  ios_base::_M_init() throw()
+  {
+    // NB: May be called more than once
+    _M_precision = 6;
+    _M_width = 0;
+    _M_flags = skipws | dec;
+    _M_ios_locale = locale();
+  }
+
+_GLIBCXX_END_NAMESPACE_VERSION
+} // namespace
+#endif // _GLIBCXX_CEST_VERSION
 
 #endif /* _IOS_BASE_H */

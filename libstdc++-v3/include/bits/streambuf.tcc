@@ -41,6 +41,7 @@ namespace std _GLIBCXX_VISIBILITY(default)
 _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
   template<typename _CharT, typename _Traits>
+    _GLIBCXX_CEST_CONSTEXPR
     streamsize
     basic_streambuf<_CharT, _Traits>::
     xsgetn(char_type* __s, streamsize __n)

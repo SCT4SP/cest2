@@ -103,6 +103,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *  This does very little apart from providing a virtual base dtor.
       */
       virtual
+      _GLIBCXX_CEST_CONSTEXPR
       ~basic_istream()
       { _M_gcount = streamsize(0); }
 
@@ -403,6 +404,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *  @note  This function is not overloaded on signed char and
        *         unsigned char.
       */
+      _GLIBCXX_CEST_CONSTEXPR
       __istream_type&
       get(char_type& __c);
 
@@ -573,6 +575,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *  @note  This function is not overloaded on signed char and
        *         unsigned char.
       */
+      _GLIBCXX_CEST_CONSTEXPR
       __istream_type&
       read(char_type* __s, streamsize __n);
 
@@ -625,6 +628,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *         are extracted, the next call to @c gcount() will return 0,
        *         as required by DR 60.
       */
+      _GLIBCXX_CEST_CONSTEXPR
       __istream_type&
       unget();
 
@@ -694,6 +698,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       ///@}
 
     protected:
+      _GLIBCXX_CEST_CONSTEXPR
       basic_istream()
       : _M_gcount(streamsize(0))
       { this->init(0); }
@@ -810,6 +815,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *  true (@a okay).
       */
       explicit
+      _GLIBCXX_CEST_CONSTEXPR
       sentry(basic_istream<_CharT, _Traits>& __is, bool __noskipws = false);
 
       /**
@@ -820,6 +826,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *  return value is that of the sentry state (true == okay).
       */
 #if __cplusplus >= 201103L
+      _GLIBCXX_CEST_CONSTEXPR
       explicit
 #endif
       operator bool() const

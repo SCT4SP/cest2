@@ -92,6 +92,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *  This does very little apart from providing a virtual base dtor.
       */
       virtual
+      _GLIBCXX_CEST_CONSTEXPR
       ~basic_ostream() { }
 
       /// Safe prefix/suffix operations.
@@ -446,6 +447,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       seekp(off_type, ios_base::seekdir);
 
     protected:
+      _GLIBCXX_CEST_CONSTEXPR
       basic_ostream()
       { this->init(0); }
 

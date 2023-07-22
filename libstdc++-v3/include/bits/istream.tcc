@@ -43,6 +43,7 @@ namespace std _GLIBCXX_VISIBILITY(default)
 _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
   template<typename _CharT, typename _Traits>
+    _GLIBCXX_CEST_CONSTEXPR
     basic_istream<_CharT, _Traits>::sentry::
     sentry(basic_istream<_CharT, _Traits>& __in, bool __noskip) : _M_ok(false)
     {
@@ -292,6 +293,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     }
 
   template<typename _CharT, typename _Traits>
+    _GLIBCXX_CEST_CONSTEXPR
     basic_istream<_CharT, _Traits>&
     basic_istream<_CharT, _Traits>::
     get(char_type& __c)
@@ -697,6 +699,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     }
 
   template<typename _CharT, typename _Traits>
+    _GLIBCXX_CEST_CONSTEXPR
     basic_istream<_CharT, _Traits>&
     basic_istream<_CharT, _Traits>::
     read(char_type* __s, streamsize __n)
@@ -793,6 +796,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     }
 
   template<typename _CharT, typename _Traits>
+    _GLIBCXX_CEST_CONSTEXPR
     basic_istream<_CharT, _Traits>&
     basic_istream<_CharT, _Traits>::
     unget(void)

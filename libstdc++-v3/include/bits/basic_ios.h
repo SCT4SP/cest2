@@ -137,6 +137,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *  See std::ios_base::iostate for the possible bit values.  Most
        *  users will call one of the interpreting wrappers, e.g., good().
       */
+      _GLIBCXX_CEST_CONSTEXPR
       iostate
       rdstate() const
       { return _M_streambuf_state; }
@@ -148,6 +149,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *  See std::ios_base::iostate for the possible bit values.  Most
        *  users will not need to pass an argument.
       */
+      _GLIBCXX_CEST_CONSTEXPR
       void
       clear(iostate __state = goodbit);
 
@@ -157,6 +159,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *
        *  See std::ios_base::iostate for the possible bit values.
       */
+      _GLIBCXX_CEST_CONSTEXPR
       void
       setstate(iostate __state)
       { this->clear(this->rdstate() | __state); }
@@ -180,6 +183,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *
        *  A wrapper around rdstate.
       */
+      _GLIBCXX_CEST_CONSTEXPR
       bool
       good() const
       { return this->rdstate() == 0; }
@@ -190,6 +194,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *
        *  Note that other iostate flags may also be set.
       */
+      _GLIBCXX_CEST_CONSTEXPR
       bool
       eof() const
       { return (this->rdstate() & eofbit) != 0; }
@@ -201,6 +206,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *  Checking the badbit in fail() is historical practice.
        *  Note that other iostate flags may also be set.
       */
+      _GLIBCXX_CEST_CONSTEXPR
       bool
       fail() const
       { return (this->rdstate() & (badbit | failbit)) != 0; }
@@ -222,6 +228,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *  This changes nothing in the stream.  See the one-argument version
        *  of exceptions(iostate) for the meaning of the return value.
       */
+      _GLIBCXX_CEST_CONSTEXPR
       iostate
       exceptions() const
       { return _M_exception; }
@@ -283,6 +290,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *  destroy the streambuf held by rdbuf().
       */
       virtual
+      _GLIBCXX_CEST_CONSTEXPR
       ~basic_ios() { }
 
       // Members:
@@ -295,6 +303,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *  stream.  When this stream performs any I/O, the tied stream is
        *  first flushed.  For example, @c std::cin is tied to @c std::cout.
       */
+      _GLIBCXX_CEST_CONSTEXPR
       basic_ostream<_CharT, _Traits>*
       tie() const
       { return _M_tie; }
@@ -321,6 +330,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *
        *  This does not change the state of the stream.
       */
+      _GLIBCXX_CEST_CONSTEXPR
       basic_streambuf<_CharT, _Traits>*
       rdbuf() const
       { return _M_streambuf; }
@@ -461,6 +471,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *  The default constructor does nothing and is not normally
        *  accessible to users.
       */
+      _GLIBCXX_CEST_CONSTEXPR
       basic_ios()
       : ios_base(), _M_tie(0), _M_fill(char_type()), _M_fill_init(false), 
 	_M_streambuf(0), _M_ctype(0), _M_num_put(0), _M_num_get(0)
@@ -473,6 +484,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *  cannot be redefined.
       */
       void
+      _GLIBCXX_CEST_CONSTEXPR
       init(basic_streambuf<_CharT, _Traits>* __sb);
 
 #if __cplusplus >= 201103L
@@ -511,6 +523,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 #endif
 
       void
+      _GLIBCXX_CEST_CONSTEXPR
       _M_cache_locale(const locale& __loc);
     };
 

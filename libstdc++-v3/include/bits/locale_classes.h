@@ -39,6 +39,9 @@
 #include <bits/localefwd.h>
 #include <string>
 #include <ext/atomicity.h>
+#if _GLIBCXX_CEST_VERSION
+  #include <ext/concurrence.h>
+#endif
 
 namespace std _GLIBCXX_VISIBILITY(default)
 {
@@ -118,6 +121,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
      *  Constructs a copy of the global locale.  If no locale has been
      *  explicitly set, this is the C locale.
     */
+    _GLIBCXX_CEST_CONSTEXPR
     locale() throw();
 
     /**
@@ -210,6 +214,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       locale(const locale& __other, _Facet* __f);
 
     /// Locale destructor.
+    _GLIBCXX_CEST_CONSTEXPR
     ~locale() throw();
 
     /**
@@ -220,6 +225,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
      *  @param  __other  The locale to copy.
      *  @return  A reference to this locale.
     */
+    _GLIBCXX_CEST_CONSTEXPR
     const locale&
     operator=(const locale& __other) throw();
 
@@ -867,5 +873,71 @@ _GLIBCXX_END_NAMESPACE_VERSION
 } // namespace
 
 # include <bits/locale_classes.tcc>
+
+#if _GLIBCXX_CEST_VERSION
+namespace std _GLIBCXX_VISIBILITY(default)
+{
+_GLIBCXX_BEGIN_NAMESPACE_VERSION
+
+  // from src/c++98/locale_init.cc with added constexpr
+  __gnu_cxx::__mutex& get_locale_mutex();
+
+  _GLIBCXX_CEST_CONSTEXPR
+  locale::locale() throw() : _M_impl(0)
+  {
+#if _GLIBCXX_CEST_VERSION
+    if (__builtin_is_constant_evaluated())
+      return;
+#endif
+
+    _S_initialize();
+
+    // Checked locking to optimize the common case where _S_global
+    // still points to _S_classic (locale::_S_initialize_once()):
+    // - If they are the same, just increment the reference count and
+    //   we are done.  This effectively constructs a C locale object
+    //   identical to the static c_locale.
+    // - Otherwise, _S_global can and may be destroyed due to
+    //   locale::global() call on another thread, in which case we
+    //   fall back to lock protected access to both _S_global and
+    //   its reference count.
+    _M_impl = _S_global;
+    if (_M_impl != _S_classic)
+      {
+        __gnu_cxx::__scoped_lock sentry(get_locale_mutex());
+        _S_global->_M_add_reference();
+        _M_impl = _S_global;
+      }
+  }
+
+  // from src/c++98/locale.cc with added constexpr
+  _GLIBCXX_CEST_CONSTEXPR
+  locale::~locale() throw()
+  {
+    if (__builtin_is_constant_evaluated())
+      return;
+
+    if (_M_impl != _S_classic)
+      _M_impl->_M_remove_reference();
+  }
+
+  _GLIBCXX_CEST_CONSTEXPR
+  const locale&
+  locale::operator=(const locale& __other) throw()
+  {
+    if (__builtin_is_constant_evaluated())
+      return *this;
+
+    if (__other._M_impl != _S_classic)
+      __other._M_impl->_M_add_reference();
+    if (_M_impl != _S_classic)
+      _M_impl->_M_remove_reference();
+    _M_impl = __other._M_impl;
+    return *this;
+  }
+
+_GLIBCXX_END_NAMESPACE_VERSION
+} // namespace
+#endif // _GLIBCXX_CEST_VERSION
 
 #endif
