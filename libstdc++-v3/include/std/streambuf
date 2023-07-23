@@ -561,6 +561,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *
        *  This just advances the write position without returning any data.
       */
+      _GLIBCXX_CEST_CONSTEXPR
       void
       pbump(int __n) { _M_out_cur += __n; }
 
@@ -571,6 +572,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *  @post  @a __pbeg == @c pbase(), @a __pbeg == @c pptr(), and
        *         @a __pend == @c epptr()
       */
+      _GLIBCXX_CEST_CONSTEXPR
       void
       setp(char_type* __pbeg, char_type* __pend)
       {

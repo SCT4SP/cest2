@@ -436,6 +436,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
 
       // Works around the issue with pbump, part of the protected
       // interface of basic_streambuf, taking just an int.
+      _GLIBCXX_CEST_CONSTEXPR
       void
       _M_pbump(char_type* __pbeg, char_type* __pend, off_type __off);
 

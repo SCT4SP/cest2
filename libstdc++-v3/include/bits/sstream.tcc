@@ -274,6 +274,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     }
 
   template <class _CharT, class _Traits, class _Alloc>
+    _GLIBCXX_CEST_CONSTEXPR
     void
     basic_stringbuf<_CharT, _Traits, _Alloc>::
     _M_pbump(char_type* __pbeg, char_type* __pend, off_type __off)

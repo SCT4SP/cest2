@@ -675,6 +675,10 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
       {
 	if (__str._M_is_local())
 	  {
+#ifdef _GLIBCXX_CEST_CONSTEXPR
+      if (__builtin_is_constant_evaluated())
+        _M_use_local_data(); // explicates _M_local_buf union member as active
+#endif
 	    traits_type::copy(_M_local_buf, __str._M_local_buf,
 			      __str.length() + 1);
 	  }
