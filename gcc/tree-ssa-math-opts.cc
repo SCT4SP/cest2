@@ -3099,10 +3099,11 @@ convert_mult_to_fma_1 (tree mul_result, tree op1, tree op2)
 	  negate_p = true;
 	}
 
-      tree cond, else_value, ops[3];
+      tree cond, else_value, ops[3], len, bias;
       tree_code code;
       if (!can_interpret_as_conditional_op_p (use_stmt, &cond, &code,
-					      ops, &else_value))
+					      ops, &else_value,
+					      &len, &bias))
 	gcc_unreachable ();
       addop = ops[0] == result ? ops[1] : ops[0];
 
@@ -3122,7 +3123,11 @@ convert_mult_to_fma_1 (tree mul_result, tree op1, tree op2)
       if (seq)
 	gsi_insert_seq_before (&gsi, seq, GSI_SAME_STMT);
 
-      if (cond)
+      if (len)
+	fma_stmt
+	  = gimple_build_call_internal (IFN_COND_LEN_FMA, 7, cond, mulop1, op2,
+					addop, else_value, len, bias);
+      else if (cond)
 	fma_stmt = gimple_build_call_internal (IFN_COND_FMA, 5, cond, mulop1,
 					       op2, addop, else_value);
       else
@@ -3307,7 +3312,8 @@ last_fma_candidate_feeds_initial_phi (fma_deferring_state *state,
 
 static bool
 convert_mult_to_fma (gimple *mul_stmt, tree op1, tree op2,
-		     fma_deferring_state *state, tree mul_cond = NULL_TREE)
+		     fma_deferring_state *state, tree mul_cond = NULL_TREE,
+		     tree mul_len = NULL_TREE, tree mul_bias = NULL_TREE)
 {
   tree mul_result = gimple_get_lhs (mul_stmt);
   /* If there isn't a LHS then this can't be an FMA.  There can be no LHS
@@ -3420,10 +3426,10 @@ convert_mult_to_fma (gimple *mul_stmt, tree op1, tree op2,
 	  negate_p = seen_negate_p = true;
 	}
 
-      tree cond, else_value, ops[3];
+      tree cond, else_value, ops[3], len, bias;
       tree_code code;
       if (!can_interpret_as_conditional_op_p (use_stmt, &cond, &code, ops,
-					      &else_value))
+					      &else_value, &len, &bias))
 	return false;
 
       switch (code)
@@ -3439,15 +3445,49 @@ convert_mult_to_fma (gimple *mul_stmt, tree op1, tree op2,
 	  return false;
 	}
 
-      if (mul_cond && cond != mul_cond)
-	return false;
-
-      if (cond)
+      if (len)
 	{
-	  if (cond == result || else_value == result)
+	  /* For COND_LEN_* operations, we may have dummpy mask which is
+	     the all true mask.  Such TREE type may be mul_cond != cond
+	     but we still consider they are equal.  */
+	  if (mul_cond && cond != mul_cond
+	      && !(integer_truep (mul_cond) && integer_truep (cond)))
 	    return false;
-	  if (!direct_internal_fn_supported_p (IFN_COND_FMA, type, opt_type))
+
+	  if (else_value == result)
 	    return false;
+
+	  if (!direct_internal_fn_supported_p (IFN_COND_LEN_FMA, type,
+					       opt_type))
+	    return false;
+
+	  if (mul_len)
+	    {
+	      poly_int64 mul_value, value;
+	      if (poly_int_tree_p (mul_len, &mul_value)
+		  && poly_int_tree_p (len, &value)
+		  && maybe_ne (mul_value, value))
+		return false;
+	      else if (mul_len != len)
+		return false;
+
+	      if (wi::to_widest (mul_bias) != wi::to_widest (bias))
+		return false;
+	    }
+	}
+      else
+	{
+	  if (mul_cond && cond != mul_cond)
+	    return false;
+
+	  if (cond)
+	    {
+	      if (cond == result || else_value == result)
+		return false;
+	      if (!direct_internal_fn_supported_p (IFN_COND_FMA, type,
+						   opt_type))
+		return false;
+	    }
 	}
 
       /* If the subtrahend (OPS[1]) is computed by a MULT_EXPR that
@@ -4728,6 +4768,7 @@ match_uaddc_usubc (gimple_stmt_iterator *gsi, gimple *stmt, tree_code code)
   if (!types_compatible_p (type, TREE_TYPE (arg1)))
     return false;
   int kind[2] = { 0, 0 };
+  tree arg_im[2] = { NULL_TREE, NULL_TREE };
   /* At least one of arg2 and arg3 should have type compatible
      with arg1/rhs[0], and the other one should have value in [0, 1]
      range.  If both are in [0, 1] range and type compatible with
@@ -4758,6 +4799,7 @@ match_uaddc_usubc (gimple_stmt_iterator *gsi, gimple *stmt, tree_code code)
 	  g = uaddc_ne0 (g);
 	  if (!uaddc_is_cplxpart (g, IMAGPART_EXPR))
 	    continue;
+	  arg_im[i] = gimple_assign_lhs (g);
 	  g = SSA_NAME_DEF_STMT (TREE_OPERAND (gimple_assign_rhs1 (g), 0));
 	  if (!is_gimple_call (g) || !gimple_call_internal_p (g))
 	    continue;
@@ -4781,6 +4823,7 @@ match_uaddc_usubc (gimple_stmt_iterator *gsi, gimple *stmt, tree_code code)
     {
       std::swap (arg2, arg3);
       std::swap (kind[0], kind[1]);
+      std::swap (arg_im[0], arg_im[1]);
     }
   if ((kind[0] & 1) == 0 || (kind[1] & 6) == 0)
     return false;
@@ -4810,6 +4853,8 @@ match_uaddc_usubc (gimple_stmt_iterator *gsi, gimple *stmt, tree_code code)
   /* Build .UADDC/.USUBC call which will be placed before the stmt.  */
   gimple_stmt_iterator gsi2 = gsi_for_stmt (ovf2);
   gimple *g;
+  if ((kind[1] & 4) != 0 && types_compatible_p (type, TREE_TYPE (arg_im[1])))
+    arg3 = arg_im[1];
   if ((kind[1] & 1) == 0)
     {
       if (TREE_CODE (arg3) == INTEGER_CST)
@@ -4856,11 +4901,14 @@ match_uaddc_usubc (gimple_stmt_iterator *gsi, gimple *stmt, tree_code code)
   gsi_remove (&gsi2, true);
   /* Replace the re2 statement with __real__ of the newly added
      .UADDC/.USUBC call.  */
-  gsi2 = gsi_for_stmt (re2);
-  tree rlhs = gimple_assign_lhs (re2);
-  g = gimple_build_assign (rlhs, REALPART_EXPR,
-			   build1 (REALPART_EXPR, TREE_TYPE (rlhs), nlhs));
-  gsi_replace (&gsi2, g, true);
+  if (re2)
+    {
+      gsi2 = gsi_for_stmt (re2);
+      tree rlhs = gimple_assign_lhs (re2);
+      g = gimple_build_assign (rlhs, REALPART_EXPR,
+			       build1 (REALPART_EXPR, TREE_TYPE (rlhs), nlhs));
+      gsi_replace (&gsi2, g, true);
+    }
   if (rhs[2])
     {
       /* If this is the arg1 + arg2 + (ovf1 + ovf2) or
@@ -4990,8 +5038,8 @@ divmod_candidate_p (gassign *stmt)
       if (integer_pow2p (op2))
 	return false;
 
-      if (TYPE_PRECISION (type) <= HOST_BITS_PER_WIDE_INT
-	  && TYPE_PRECISION (type) <= BITS_PER_WORD)
+      if (element_precision (type) <= HOST_BITS_PER_WIDE_INT
+	  && element_precision (type) <= BITS_PER_WORD)
 	return false;
 
       /* If the divisor is not power of 2 and the precision wider than
@@ -5616,6 +5664,22 @@ math_opts_dom_walker::after_dom_children (basic_block bb)
 				       gimple_call_arg (stmt, 2),
 				       &fma_state,
 				       gimple_call_arg (stmt, 0)))
+
+		{
+		  gsi_remove (&gsi, true);
+		  release_defs (stmt);
+		  continue;
+		}
+	      break;
+
+	    case CFN_COND_LEN_MUL:
+	      if (convert_mult_to_fma (stmt,
+				       gimple_call_arg (stmt, 1),
+				       gimple_call_arg (stmt, 2),
+				       &fma_state,
+				       gimple_call_arg (stmt, 0),
+				       gimple_call_arg (stmt, 4),
+				       gimple_call_arg (stmt, 5)))
 
 		{
 		  gsi_remove (&gsi, true);

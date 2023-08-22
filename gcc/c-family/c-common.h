@@ -740,7 +740,9 @@ enum cxx_dialect {
   /* C++20 */
   cxx20,
   /* C++23 */
-  cxx23
+  cxx23,
+  /* C++26 */
+  cxx26
 };
 
 /* The C++ dialect being used. C++98 is the default.  */
@@ -987,6 +989,9 @@ extern HOST_WIDE_INT c_common_to_target_charset (HOST_WIDE_INT);
 extern void c_parse_file (void);
 
 extern void c_parse_final_cleanups (void);
+
+/* This initializes for preprocess-only mode.  */
+extern void c_init_preprocess (void);
 
 /* These macros provide convenient access to the various _STMT nodes.  */
 

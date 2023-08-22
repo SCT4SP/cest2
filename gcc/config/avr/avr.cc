@@ -644,9 +644,11 @@ avr_optimize_casesi (rtx_insn *insns[5], rtx *xop)
   emit_insn (gen_add (reg, reg, gen_int_mode (-low_idx, mode)));
   rtx op0 = reg; rtx op1 = gen_int_mode (num_idx, mode);
   rtx labelref = copy_rtx (xop[4]);
-  emit_jump_insn (gen_cbranch (gen_rtx_fmt_ee (GTU, VOIDmode, op0, op1),
-                               op0, op1,
-                               labelref));
+  rtx xbranch = gen_cbranch (gen_rtx_fmt_ee (GTU, VOIDmode, op0, op1),
+			     op0, op1, labelref);
+  rtx_insn *cbranch = emit_jump_insn (xbranch);
+  JUMP_LABEL (cbranch) = xop[4];
+  ++LABEL_NUSES (xop[4]);
 
   seq1 = get_insns();
   last1 = get_last_insn();
@@ -13431,8 +13433,8 @@ avr_reg_ok_for_pgm_addr (rtx reg, bool strict)
 /* Implement `TARGET_ADDR_SPACE_LEGITIMATE_ADDRESS_P'.  */
 
 static bool
-avr_addr_space_legitimate_address_p (machine_mode mode, rtx x,
-                                     bool strict, addr_space_t as)
+avr_addr_space_legitimate_address_p (machine_mode mode, rtx x, bool strict,
+				     addr_space_t as, code_helper = ERROR_MARK)
 {
   bool ok = false;
 

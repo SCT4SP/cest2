@@ -620,7 +620,7 @@ public:
   conlist (const char *ns, unsigned int len, bool numeric)
   {
     /* Trim leading whitespaces.  */
-    while (ISBLANK (*ns))
+    while (len > 0 && ISBLANK (*ns))
       {
 	ns++;
 	len--;
@@ -632,7 +632,7 @@ public:
 	break;
 
     /* Parse off any modifiers.  */
-    while (!ISALNUM (*ns))
+    while (len > 0 && !ISALNUM (*ns))
       {
 	con += *(ns++);
 	len--;
@@ -640,7 +640,7 @@ public:
 
     name.assign (ns, len);
     if (numeric)
-      idx = std::stoi (name);
+      idx = strtol (name.c_str (), (char **)NULL, 10);
   }
 
   /* Adds a character to the end of the string.  */
@@ -878,7 +878,8 @@ convert_syntax (rtx x, file_location loc)
   const char *templ;
   vec_conlist tconvec, convec, attrvec;
 
-  templ_index = GET_CODE (x) == DEFINE_INSN ? 3 : 2;
+  templ_index = 3;
+  gcc_assert (GET_CODE (x) == DEFINE_INSN);
 
   templ = XTMPL (x, templ_index);
 
@@ -1053,7 +1054,6 @@ process_rtx (rtx desc, file_location loc)
       break;
 
     case DEFINE_COND_EXEC:
-      convert_syntax (desc, loc);
       queue_pattern (desc, &define_cond_exec_tail, loc);
       break;
 
@@ -3806,7 +3806,7 @@ find_optab (optab_pattern *p, const char *name)
 	{
 	  p->name = name;
 	  p->op = optabs[pindex].op;
-	  p->sort_num = (p->op << 16) | (p->m2 << 8) | p->m1;
+	  p->sort_num = (p->op << 20) | (p->m2 << 10) | p->m1;
 	  return true;
 	}
     }

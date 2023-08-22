@@ -4214,10 +4214,8 @@ extern bool validate_subreg (machine_mode, machine_mode,
 			     const_rtx, poly_uint64);
 
 /* In combine.cc  */
-extern unsigned int extended_count (const_rtx, machine_mode, int);
+extern unsigned int extended_count (const_rtx, machine_mode, bool);
 extern rtx remove_death (unsigned int, rtx_insn *);
-extern void dump_combine_stats (FILE *);
-extern void dump_combine_total_stats (FILE *);
 extern rtx make_compound_operation (rtx, enum rtx_code);
 
 /* In sched-rgn.cc.  */
@@ -4508,7 +4506,7 @@ extern rtx canon_condition (rtx);
 extern void simplify_using_condition (rtx, rtx *, bitmap);
 
 /* In final.cc  */
-extern unsigned int compute_alignments (void);
+extern void compute_alignments (void);
 extern void update_alignments (vec<rtx> &);
 extern int asm_str_count (const char *templ);
 

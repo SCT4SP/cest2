@@ -27,6 +27,7 @@ along with GCC; see the file COPYING3.  If not see
    line numbers.  For example, the CONST_DECLs for enum values.  */
 
 #include "config.h"
+#define INCLUDE_MEMORY
 #include "system.h"
 #include "coretypes.h"
 #include "target.h"
@@ -46,6 +47,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "c-family/c-objc.h"
 #include "c-family/c-pragma.h"
 #include "c-family/c-ubsan.h"
+#include "cp/cp-name-hint.h"
 #include "debug.h"
 #include "plugin.h"
 #include "builtins.h"
@@ -3295,10 +3297,6 @@ redeclaration_error_message (tree newdecl, tree olddecl)
 	    }
 	}
 
-      if (deduction_guide_p (olddecl)
-	  && deduction_guide_p (newdecl))
-	return G_("deduction guide %q+D redeclared");
-
       /* [class.compare.default]: A definition of a comparison operator as
 	 defaulted that appears in a class shall be the first declaration of
 	 that function.  */
@@ -3352,10 +3350,6 @@ redeclaration_error_message (tree newdecl, tree olddecl)
 			  "%<gnu_inline%> attribute");
 	    }
 	}
-
-      if (deduction_guide_p (olddecl)
-	  && deduction_guide_p (newdecl))
-	return G_("deduction guide %q+D redeclared");
 
       /* Core issue #226 (C++11):
 
@@ -5995,7 +5989,11 @@ start_decl_1 (tree decl, bool initialized)
 	; 			/* An auto type is ok.  */
       else if (TREE_CODE (type) != ARRAY_TYPE)
 	{
+	  auto_diagnostic_group d;
 	  error ("variable %q#D has initializer but incomplete type", decl);
+	  maybe_suggest_missing_header (input_location,
+					TYPE_IDENTIFIER (type),
+					CP_TYPE_CONTEXT (type));
 	  type = TREE_TYPE (decl) = error_mark_node;
 	}
       else if (!COMPLETE_TYPE_P (complete_type (TREE_TYPE (type))))
@@ -6011,8 +6009,12 @@ start_decl_1 (tree decl, bool initialized)
 	gcc_assert (CLASS_PLACEHOLDER_TEMPLATE (type));
       else
 	{
+	  auto_diagnostic_group d;
 	  error ("aggregate %q#D has incomplete type and cannot be defined",
 		 decl);
+	  maybe_suggest_missing_header (input_location,
+					TYPE_IDENTIFIER (type),
+					CP_TYPE_CONTEXT (type));
 	  /* Change the type so that assemble_variable will give
 	     DECL an rtl we can live with: (mem (const_int 0)).  */
 	  type = TREE_TYPE (decl) = error_mark_node;
@@ -8190,7 +8192,6 @@ void
 cp_finish_decl (tree decl, tree init, bool init_const_expr_p,
 		tree asmspec_tree, int flags)
 {
-  tree type;
   vec<tree, va_gc> *cleanups = NULL;
   const char *asmspec = NULL;
   int was_readonly = 0;
@@ -8210,7 +8211,7 @@ cp_finish_decl (tree decl, tree init, bool init_const_expr_p,
   /* Parameters are handled by store_parm_decls, not cp_finish_decl.  */
   gcc_assert (TREE_CODE (decl) != PARM_DECL);
 
-  type = TREE_TYPE (decl);
+  tree type = TREE_TYPE (decl);
   if (type == error_mark_node)
     return;
 
@@ -8400,7 +8401,7 @@ cp_finish_decl (tree decl, tree init, bool init_const_expr_p,
 	  if (decl_maybe_constant_var_p (decl)
 	      /* FIXME setting TREE_CONSTANT on refs breaks the back end.  */
 	      && !TYPE_REF_P (type))
-	    TREE_CONSTANT (decl) = 1;
+	    TREE_CONSTANT (decl) = true;
 	}
       /* This is handled mostly by gimplify.cc, but we have to deal with
 	 not warning about int x = x; as it is a GCC extension to turn off
@@ -8411,6 +8412,14 @@ cp_finish_decl (tree decl, tree init, bool init_const_expr_p,
 	  && !warning_enabled_at (DECL_SOURCE_LOCATION (decl), OPT_Winit_self))
 	suppress_warning (decl, OPT_Winit_self);
     }
+  else if (VAR_P (decl)
+	   && COMPLETE_TYPE_P (type)
+	   && !TYPE_REF_P (type)
+	   && !dependent_type_p (type)
+	   && is_really_empty_class (type, /*ignore_vptr*/false))
+    /* We have no initializer but there's nothing to initialize anyway.
+       Treat DECL as constant due to c++/109876.  */
+    TREE_CONSTANT (decl) = true;
 
   if (flag_openmp
       && TREE_CODE (decl) == FUNCTION_DECL
@@ -8923,10 +8932,14 @@ get_tuple_size (tree type)
 				     /*context*/std_node,
 				     /*entering_scope*/false, tf_none);
   inst = complete_type (inst);
-  if (inst == error_mark_node || !COMPLETE_TYPE_P (inst))
+  if (inst == error_mark_node
+      || !COMPLETE_TYPE_P (inst)
+      || !CLASS_TYPE_P (type))
     return NULL_TREE;
   tree val = lookup_qualified_name (inst, value_identifier,
 				    LOOK_want::NORMAL, /*complain*/false);
+  if (val == error_mark_node)
+    return NULL_TREE;
   if (VAR_P (val) || TREE_CODE (val) == CONST_DECL)
     val = maybe_constant_value (val);
   if (TREE_CODE (val) == INTEGER_CST)
@@ -10334,6 +10347,12 @@ grokfndecl (tree ctype,
     case sfk_destructor:
       DECL_CXX_DESTRUCTOR_P (decl) = 1;
       DECL_NAME (decl) = dtor_identifier;
+      break;
+    case sfk_deduction_guide:
+      /* Give deduction guides a definition even though they don't really
+	 have one: the restriction that you can't repeat a deduction guide
+	 makes them more like a definition anyway.  */
+      DECL_INITIAL (decl) = void_node;
       break;
     default:
       break;
@@ -14422,7 +14441,16 @@ grokdeclarator (const cp_declarator *declarator,
 		/* C++ allows static class members.  All other work
 		   for this is done by grokfield.  */
 		decl = build_lang_decl_loc (id_loc, VAR_DECL,
-					    unqualified_id, type);
+					    dname, type);
+		if (unqualified_id
+		    && TREE_CODE (unqualified_id) == TEMPLATE_ID_EXPR)
+		  {
+		    decl = check_explicit_specialization (unqualified_id, decl,
+							  template_count,
+							  concept_p * 8);
+		    if (decl == error_mark_node)
+		      return error_mark_node;
+		  }
 		set_linkage_for_static_data_member (decl);
 		if (concept_p)
 		  error_at (declspecs->locations[ds_concept],

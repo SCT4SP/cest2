@@ -6731,6 +6731,8 @@ get_cxx_dialect_name (enum cxx_dialect dialect)
       return "C++20";
     case cxx23:
       return "C++23";
+    case cxx26:
+      return "C++26";
     }
 }
 
@@ -6796,7 +6798,7 @@ maybe_suggest_missing_std_header (location_t location, tree name)
    for NAME within SCOPE at LOCATION, or an empty name_hint if this isn't
    applicable.  */
 
-static name_hint
+name_hint
 maybe_suggest_missing_header (location_t location, tree name, tree scope)
 {
   if (scope == NULL_TREE)

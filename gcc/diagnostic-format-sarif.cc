@@ -20,6 +20,7 @@ along with GCC; see the file COPYING3.  If not see
 
 
 #include "config.h"
+#define INCLUDE_VECTOR
 #include "system.h"
 #include "coretypes.h"
 #include "diagnostic.h"
@@ -29,13 +30,16 @@ along with GCC; see the file COPYING3.  If not see
 #include "cpplib.h"
 #include "logical-location.h"
 #include "diagnostic-client-data-hooks.h"
+#include "diagnostic-diagram.h"
+#include "text-art/canvas.h"
+#include "diagnostic-format-sarif.h"
 
 class sarif_builder;
 
 /* Subclass of json::object for SARIF invocation objects
    (SARIF v2.1.0 section 3.20).  */
 
-class sarif_invocation : public json::object
+class sarif_invocation : public sarif_object
 {
 public:
   sarif_invocation ()
@@ -46,17 +50,17 @@ public:
   void add_notification_for_ice (diagnostic_context *context,
 				 diagnostic_info *diagnostic,
 				 sarif_builder *builder);
-  void prepare_to_flush ();
+  void prepare_to_flush (diagnostic_context *context);
 
 private:
   json::array *m_notifications_arr;
   bool m_success;
 };
 
-/* Subclass of json::object for SARIF result objects
+/* Subclass of sarif_object for SARIF result objects
    (SARIF v2.1.0 section 3.27).  */
 
-class sarif_result : public json::object
+class sarif_result : public sarif_object
 {
 public:
   sarif_result () : m_related_locations_arr (NULL) {}
@@ -66,18 +70,23 @@ public:
 			diagnostic_info *diagnostic,
 			diagnostic_t orig_diag_kind,
 			sarif_builder *builder);
+  void on_diagram (diagnostic_context *context,
+		   const diagnostic_diagram &diagram,
+		   sarif_builder *builder);
 
 private:
+  void add_related_location (json::object *location_obj);
+
   json::array *m_related_locations_arr;
 };
 
-/* Subclass of json::object for SARIF notification objects
+/* Subclass of sarif_object for SARIF notification objects
    (SARIF v2.1.0 section 3.58).
 
    This subclass is specifically for notifying when an
    internal compiler error occurs.  */
 
-class sarif_ice_notification : public json::object
+class sarif_ice_notification : public sarif_object
 {
 public:
   sarif_ice_notification (diagnostic_context *context,
@@ -135,7 +144,8 @@ public:
 
   void end_diagnostic (diagnostic_context *context, diagnostic_info *diagnostic,
 		       diagnostic_t orig_diag_kind);
-
+  void emit_diagram (diagnostic_context *context,
+		     const diagnostic_diagram &diagram);
   void end_group ();
 
   void flush_to_file (FILE *outf);
@@ -144,6 +154,9 @@ public:
   json::object *make_location_object (const rich_location &rich_loc,
 				      const logical_location *logical_loc);
   json::object *make_message_object (const char *msg) const;
+  json::object *
+  make_message_object_for_diagram (diagnostic_context *context,
+				   const diagnostic_diagram &diagram);
 
 private:
   sarif_result *make_result_object (diagnostic_context *context,
@@ -220,7 +233,24 @@ private:
 
 static sarif_builder *the_builder;
 
-/* class sarif_invocation : public json::object.  */
+/* class sarif_object : public json::object.  */
+
+sarif_property_bag &
+sarif_object::get_or_create_properties ()
+{
+  json::value *properties_val = get ("properties");
+  if (properties_val)
+    {
+      if (properties_val->get_kind () == json::JSON_OBJECT)
+	return *static_cast <sarif_property_bag *> (properties_val);
+    }
+
+  sarif_property_bag *bag = new sarif_property_bag ();
+  set ("properties", bag);
+  return *bag;
+}
+
+/* class sarif_invocation : public sarif_object.  */
 
 /* Handle an internal compiler error DIAGNOSTIC occurring on CONTEXT.
    Add an object representing the ICE to the notifications array.  */
@@ -238,16 +268,21 @@ sarif_invocation::add_notification_for_ice (diagnostic_context *context,
 }
 
 void
-sarif_invocation::prepare_to_flush ()
+sarif_invocation::prepare_to_flush (diagnostic_context *context)
 {
   /* "executionSuccessful" property (SARIF v2.1.0 section 3.20.14).  */
   set ("executionSuccessful", new json::literal (m_success));
 
   /* "toolExecutionNotifications" property (SARIF v2.1.0 section 3.20.21).  */
   set ("toolExecutionNotifications", m_notifications_arr);
+
+  /* Call client hook, allowing it to create a custom property bag for
+     this object (SARIF v2.1.0 section 3.8) e.g. for recording time vars.  */
+  if (context->m_client_data_hooks)
+    context->m_client_data_hooks->add_sarif_invocation_properties (*this);
 }
 
-/* class sarif_result : public json::object.  */
+/* class sarif_result : public sarif_object.  */
 
 /* Handle secondary diagnostics that occur within a diagnostic group.
    The closest SARIF seems to have to nested diagnostics is the
@@ -261,12 +296,6 @@ sarif_result::on_nested_diagnostic (diagnostic_context *context,
 				    diagnostic_t /*orig_diag_kind*/,
 				    sarif_builder *builder)
 {
-  if (!m_related_locations_arr)
-    {
-      m_related_locations_arr = new json::array ();
-      set ("relatedLocations", m_related_locations_arr);
-    }
-
   /* We don't yet generate meaningful logical locations for notes;
      sometimes these will related to current_function_decl, but
      often they won't.  */
@@ -277,10 +306,43 @@ sarif_result::on_nested_diagnostic (diagnostic_context *context,
   pp_clear_output_area (context->printer);
   location_obj->set ("message", message_obj);
 
+  add_related_location (location_obj);
+}
+
+/* Handle diagrams that occur within a diagnostic group.
+   The closest thing in SARIF seems to be to add a location to the
+   "releatedLocations" property  (SARIF v2.1.0 section 3.27.22),
+   and to put the diagram into the "message" property of that location
+   (SARIF v2.1.0 section 3.28.5).  */
+
+void
+sarif_result::on_diagram (diagnostic_context *context,
+			  const diagnostic_diagram &diagram,
+			  sarif_builder *builder)
+{
+  json::object *location_obj = new json::object ();
+  json::object *message_obj
+    = builder->make_message_object_for_diagram (context, diagram);
+  location_obj->set ("message", message_obj);
+
+  add_related_location (location_obj);
+}
+
+/* Add LOCATION_OBJ to this result's "relatedLocations" array,
+   creating it if it doesn't yet exist.  */
+
+void
+sarif_result::add_related_location (json::object *location_obj)
+{
+  if (!m_related_locations_arr)
+    {
+      m_related_locations_arr = new json::array ();
+      set ("relatedLocations", m_related_locations_arr);
+    }
   m_related_locations_arr->append (location_obj);
 }
 
-/* class sarif_ice_notification : public json::object.  */
+/* class sarif_ice_notification : public sarif_object.  */
 
 /* sarif_ice_notification's ctor.
    DIAGNOSTIC is an internal compiler error.  */
@@ -348,6 +410,18 @@ sarif_builder::end_diagnostic (diagnostic_context *context,
     }
 }
 
+/* Implementation of diagnostic_context::m_diagrams.m_emission_cb
+   for SARIF output.  */
+
+void
+sarif_builder::emit_diagram (diagnostic_context *context,
+			     const diagnostic_diagram &diagram)
+{
+  /* We must be within the emission of a top-level diagnostic.  */
+  gcc_assert (m_cur_group_result);
+  m_cur_group_result->on_diagram (context, diagram, this);
+}
+
 /* Implementation of "end_group_cb" for SARIF output.  */
 
 void
@@ -364,7 +438,7 @@ sarif_builder::end_group ()
 void
 sarif_builder::flush_to_file (FILE *outf)
 {
-  m_invocation_obj->prepare_to_flush ();
+  m_invocation_obj->prepare_to_flush (m_context);
   json::object *top = make_top_level_object (m_invocation_obj, m_results_array);
   top->dump (outf);
   m_invocation_obj = NULL;
@@ -1115,6 +1189,37 @@ sarif_builder::make_message_object (const char *msg) const
   return message_obj;
 }
 
+/* Make a message object (SARIF v2.1.0 section 3.11) for DIAGRAM.
+   We emit the diagram as a code block within the Markdown part
+   of the message.  */
+
+json::object *
+sarif_builder::make_message_object_for_diagram (diagnostic_context *context,
+						const diagnostic_diagram &diagram)
+{
+  json::object *message_obj = new json::object ();
+
+  /* "text" property (SARIF v2.1.0 section 3.11.8).  */
+  message_obj->set ("text", new json::string (diagram.get_alt_text ()));
+
+  char *saved_prefix = pp_take_prefix (context->printer);
+  pp_set_prefix (context->printer, NULL);
+
+  /* "To produce a code block in Markdown, simply indent every line of
+     the block by at least 4 spaces or 1 tab."
+     Here we use 4 spaces.  */
+  diagram.get_canvas ().print_to_pp (context->printer, "    ");
+  pp_set_prefix (context->printer, saved_prefix);
+
+  /* "markdown" property (SARIF v2.1.0 section 3.11.9).  */
+  message_obj->set ("markdown",
+		    new json::string (pp_formatted_text (context->printer)));
+
+  pp_clear_output_area (context->printer);
+
+  return message_obj;
+}
+
 /* Make a multiformatMessageString object (SARIF v2.1.0 section 3.12)
    for MSG.  */
 
@@ -1630,6 +1735,16 @@ sarif_ice_handler (diagnostic_context *context)
   fnotice (stderr, "Internal compiler error:\n");
 }
 
+/* Callback for diagnostic_context::m_diagrams.m_emission_cb.  */
+
+static void
+sarif_emit_diagram (diagnostic_context *context,
+		    const diagnostic_diagram &diagram)
+{
+  gcc_assert (the_builder);
+  the_builder->emit_diagram (context, diagram);
+}
+
 /* Populate CONTEXT in preparation for SARIF output (either to stderr, or
    to a file).  */
 
@@ -1645,6 +1760,7 @@ diagnostic_output_format_init_sarif (diagnostic_context *context)
   context->end_group_cb =  sarif_end_group;
   context->print_path = NULL; /* handled in sarif_end_diagnostic.  */
   context->ice_handler_cb = sarif_ice_handler;
+  context->m_diagrams.m_emission_cb = sarif_emit_diagram;
 
   /* The metadata is handled in SARIF format, rather than as text.  */
   context->show_cwe = false;

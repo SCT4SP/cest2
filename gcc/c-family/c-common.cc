@@ -420,6 +420,8 @@ const struct c_common_resword c_common_reswords[] =
   { "__transaction_cancel", RID_TRANSACTION_CANCEL, 0 },
   { "__typeof",		RID_TYPEOF,	0 },
   { "__typeof__",	RID_TYPEOF,	0 },
+  { "__typeof_unqual",	RID_TYPEOF_UNQUAL, D_CONLY },
+  { "__typeof_unqual__", RID_TYPEOF_UNQUAL, D_CONLY },
   { "__volatile",	RID_VOLATILE,	0 },
   { "__volatile__",	RID_VOLATILE,	0 },
   { "__GIMPLE",		RID_GIMPLE,	D_CONLY },
@@ -1337,6 +1339,10 @@ shorten_binary_op (tree result_type, tree op0, tree op1, bool bitwise)
   tree arg0, arg1;
   int uns;
   tree type;
+
+  /* Do not shorten vector operations.  */
+  if (VECTOR_TYPE_P (result_type))
+    return result_type;
 
   /* Cast OP0 and OP1 to RESULT_TYPE.  Doing so prevents
      excessive narrowing when we call get_narrower below.  For
@@ -2454,7 +2460,7 @@ c_common_type_for_mode (machine_mode mode, int unsignedp)
   else if (GET_MODE_CLASS (mode) == MODE_VECTOR_BOOL
 	   && valid_vector_subparts_p (GET_MODE_NUNITS (mode)))
     {
-      unsigned int elem_bits = vector_element_size (GET_MODE_BITSIZE (mode),
+      unsigned int elem_bits = vector_element_size (GET_MODE_PRECISION (mode),
 						    GET_MODE_NUNITS (mode));
       tree bool_type = build_nonstandard_boolean_type (elem_bits);
       return build_vector_type_for_mode (bool_type, mode);
@@ -6330,6 +6336,7 @@ check_builtin_function_arguments (location_t loc, vec<location_t> arg_loc,
     case BUILT_IN_ISLESSEQUAL:
     case BUILT_IN_ISLESSGREATER:
     case BUILT_IN_ISUNORDERED:
+    case BUILT_IN_ISEQSIG:
       if (builtin_function_validate_nargs (loc, fndecl, nargs, 2))
 	{
 	  enum tree_code code0, code1;

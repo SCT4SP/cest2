@@ -434,6 +434,11 @@ public:
 			     const svalue *new_ptr_sval,
 			     const extrinsic_state &ext_state) const;
 
+  void transition_ptr_sval_non_null (region_model *model,
+      sm_state_map *smap,
+      const svalue *new_ptr_sval,
+      const extrinsic_state &ext_state) const;
+
   standard_deallocator_set m_free;
   standard_deallocator_set m_scalar_delete;
   standard_deallocator_set m_vector_delete;
@@ -835,7 +840,7 @@ public:
     return OPT_Wanalyzer_mismatching_deallocation;
   }
 
-  bool emit (rich_location *rich_loc) final override
+  bool emit (rich_location *rich_loc, logger *) final override
   {
     auto_diagnostic_group d;
     diagnostic_metadata m;
@@ -914,7 +919,7 @@ public:
     return OPT_Wanalyzer_double_free;
   }
 
-  bool emit (rich_location *rich_loc) final override
+  bool emit (rich_location *rich_loc, logger *) final override
   {
     auto_diagnostic_group d;
     diagnostic_metadata m;
@@ -1010,7 +1015,7 @@ public:
     return OPT_Wanalyzer_possible_null_dereference;
   }
 
-  bool emit (rich_location *rich_loc) final override
+  bool emit (rich_location *rich_loc, logger *) final override
   {
     /* CWE-690: Unchecked Return Value to NULL Pointer Dereference.  */
     diagnostic_metadata m;
@@ -1099,7 +1104,7 @@ public:
     return OPT_Wanalyzer_possible_null_argument;
   }
 
-  bool emit (rich_location *rich_loc) final override
+  bool emit (rich_location *rich_loc, logger *) final override
   {
     /* CWE-690: Unchecked Return Value to NULL Pointer Dereference.  */
     auto_diagnostic_group d;
@@ -1152,7 +1157,7 @@ public:
 
   bool terminate_path_p () const final override { return true; }
 
-  bool emit (rich_location *rich_loc) final override
+  bool emit (rich_location *rich_loc, logger *) final override
   {
     /* CWE-476: NULL Pointer Dereference.  */
     diagnostic_metadata m;
@@ -1207,7 +1212,7 @@ public:
 
   bool terminate_path_p () const final override { return true; }
 
-  bool emit (rich_location *rich_loc) final override
+  bool emit (rich_location *rich_loc, logger *) final override
   {
     /* CWE-476: NULL Pointer Dereference.  */
     auto_diagnostic_group d;
@@ -1264,7 +1269,7 @@ public:
     return OPT_Wanalyzer_use_after_free;
   }
 
-  bool emit (rich_location *rich_loc) final override
+  bool emit (rich_location *rich_loc, logger *) final override
   {
     /* CWE-416: Use After Free.  */
     diagnostic_metadata m;
@@ -1358,7 +1363,7 @@ public:
     return OPT_Wanalyzer_malloc_leak;
   }
 
-  bool emit (rich_location *rich_loc) final override
+  bool emit (rich_location *rich_loc, logger *) final override
   {
     /* "CWE-401: Missing Release of Memory after Effective Lifetime".  */
     diagnostic_metadata m;
@@ -1432,7 +1437,7 @@ public:
     return OPT_Wanalyzer_free_of_non_heap;
   }
 
-  bool emit (rich_location *rich_loc) final override
+  bool emit (rich_location *rich_loc, logger *) final override
   {
     auto_diagnostic_group d;
     diagnostic_metadata m;
@@ -1511,7 +1516,7 @@ public:
     return OPT_Wanalyzer_deref_before_check;
   }
 
-  bool emit (rich_location *rich_loc) final override
+  bool emit (rich_location *rich_loc, logger *) final override
   {
     /* Don't emit the warning if we can't show where the deref
        and the check occur.  */
@@ -2504,6 +2509,17 @@ on_realloc_with_move (region_model *model,
 		   NULL, ext_state);
 }
 
+/*  Hook for get_or_create_region_for_heap_alloc for the case when we want
+   ptr_sval to mark a newly created region as assumed non null on malloc SM.  */
+void
+malloc_state_machine::transition_ptr_sval_non_null (region_model *model,
+    sm_state_map *smap,
+    const svalue *new_ptr_sval,
+    const extrinsic_state &ext_state) const
+{
+  smap->set_state (model, new_ptr_sval, m_free.m_nonnull, NULL, ext_state);
+}
+
 } // anonymous namespace
 
 /* Internal interface to this file. */
@@ -2546,6 +2562,32 @@ region_model::on_realloc_with_move (const call_details &cd,
 				  old_ptr_sval,
 				  new_ptr_sval,
 				  *ext_state);
+}
+
+/* Moves ptr_sval from start to assumed non-null, for use by
+   region_model::get_or_create_region_for_heap_alloc.  */
+void
+region_model::transition_ptr_sval_non_null (region_model_context *ctxt,
+const svalue *ptr_sval)
+{
+  if (!ctxt)
+    return;
+  const extrinsic_state *ext_state = ctxt->get_ext_state ();
+  if (!ext_state)
+    return;
+
+  sm_state_map *smap;
+  const state_machine *sm;
+  unsigned sm_idx;
+  if (!ctxt->get_malloc_map (&smap, &sm, &sm_idx))
+    return;
+
+  gcc_assert (smap);
+  gcc_assert (sm);
+
+  const malloc_state_machine &malloc_sm = (const malloc_state_machine &)*sm;
+
+  malloc_sm.transition_ptr_sval_non_null (this, smap, ptr_sval, *ext_state);
 }
 
 } // namespace ana

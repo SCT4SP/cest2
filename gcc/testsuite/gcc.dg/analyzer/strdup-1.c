@@ -38,3 +38,17 @@ void test_6 (const char *s)
   char *p = __builtin_strdup (s); /* { dg-message "this call could return NULL" } */
   requires_nonnull (p); /* { dg-warning "use of possibly-NULL 'p'" } */
 }
+
+char *test_unterminated (void)
+{
+  char buf[3] = "abc";
+  return strdup (buf); /* { dg-warning "stack-based buffer over-read" } */
+  /* { dg-message "while looking for null terminator for argument 1 \\('&buf'\\) of 'strdup'..." "event" { target *-*-* } .-1 } */
+}
+
+char *test_uninitialized (void)
+{
+  char buf[16];
+  return strdup (buf); /* { dg-warning "use of uninitialized value 'buf\\\[0\\\]'" } */
+  /* { dg-message "while looking for null terminator for argument 1 \\('&buf'\\) of 'strdup'..." "event" { target *-*-* } .-1 } */
+}

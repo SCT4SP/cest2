@@ -591,9 +591,15 @@ const char *host_detect_local_cpu (int argc, const char **argv)
 	      /* This is unknown family 0x6 CPU.  */
 	      if (has_feature (FEATURE_AVX))
 		{
+		  /* Assume Arrow Lake S.  */
+		  if (has_feature (FEATURE_SM3))
+		    cpu = "arrowlake-s";
 		  /* Assume Grand Ridge.  */
-		  if (has_feature (FEATURE_RAOINT))
+		  else if (has_feature (FEATURE_RAOINT))
 		    cpu = "grandridge";
+		  /* Assume Granite Rapids D.  */
+		  else if (has_feature (FEATURE_AMX_COMPLEX))
+		    cpu = "graniterapids-d";
 		  /* Assume Granite Rapids.  */
 		  else if (has_feature (FEATURE_AMX_FP16))
 		    cpu = "graniterapids";
@@ -848,7 +854,8 @@ const char *host_detect_local_cpu (int argc, const char **argv)
 		  options = concat (options, " ",
 				    isa_names_table[i].option, NULL);
 	      }
-	    else
+	    else if ((isa_names_table[i].feature != FEATURE_AVX10_1)
+		     && (isa_names_table[i].feature != FEATURE_AVX10_512BIT))
 	      options = concat (options, neg_option,
 				isa_names_table[i].option + 2, NULL);
 	  }

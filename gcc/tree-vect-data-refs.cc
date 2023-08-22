@@ -3873,16 +3873,24 @@ vect_gather_scatter_fn_p (vec_info *vinfo, bool read_p, bool masked_p,
     return false;
 
   /* Work out which function we need.  */
-  internal_fn ifn, alt_ifn;
+  internal_fn ifn, alt_ifn, alt_ifn2;
   if (read_p)
     {
       ifn = masked_p ? IFN_MASK_GATHER_LOAD : IFN_GATHER_LOAD;
       alt_ifn = IFN_MASK_GATHER_LOAD;
+      /* When target supports MASK_LEN_GATHER_LOAD, we always
+	 use MASK_LEN_GATHER_LOAD regardless whether len and
+	 mask are valid or not.  */
+      alt_ifn2 = IFN_MASK_LEN_GATHER_LOAD;
     }
   else
     {
       ifn = masked_p ? IFN_MASK_SCATTER_STORE : IFN_SCATTER_STORE;
       alt_ifn = IFN_MASK_SCATTER_STORE;
+      /* When target supports MASK_LEN_SCATTER_STORE, we always
+	 use MASK_LEN_SCATTER_STORE regardless whether len and
+	 mask are valid or not.  */
+      alt_ifn2 = IFN_MASK_LEN_SCATTER_STORE;
     }
 
   for (;;)
@@ -3906,6 +3914,14 @@ vect_gather_scatter_fn_p (vec_info *vinfo, bool read_p, bool masked_p,
 							  scale))
 	{
 	  *ifn_out = alt_ifn;
+	  *offset_vectype_out = offset_vectype;
+	  return true;
+	}
+      else if (internal_gather_scatter_fn_supported_p (alt_ifn2, vectype,
+						       memory_type,
+						       offset_vectype, scale))
+	{
+	  *ifn_out = alt_ifn2;
 	  *offset_vectype_out = offset_vectype;
 	  return true;
 	}
@@ -5422,22 +5438,31 @@ vect_grouped_store_supported (tree vectype, unsigned HOST_WIDE_INT count)
   return false;
 }
 
+/* Return FN if vec_{mask_,mask_len_}store_lanes is available for COUNT vectors
+   of type VECTYPE.  MASKED_P says whether the masked form is needed.  */
 
-/* Return TRUE if vec_{mask_}store_lanes is available for COUNT vectors of
-   type VECTYPE.  MASKED_P says whether the masked form is needed.  */
-
-bool
+internal_fn
 vect_store_lanes_supported (tree vectype, unsigned HOST_WIDE_INT count,
 			    bool masked_p)
 {
-  if (masked_p)
-    return vect_lanes_optab_supported_p ("vec_mask_store_lanes",
-					 vec_mask_store_lanes_optab,
-					 vectype, count);
+  if (vect_lanes_optab_supported_p ("vec_mask_len_store_lanes",
+				    vec_mask_len_store_lanes_optab, vectype,
+				    count))
+    return IFN_MASK_LEN_STORE_LANES;
+  else if (masked_p)
+    {
+      if (vect_lanes_optab_supported_p ("vec_mask_store_lanes",
+					vec_mask_store_lanes_optab, vectype,
+					count))
+	return IFN_MASK_STORE_LANES;
+    }
   else
-    return vect_lanes_optab_supported_p ("vec_store_lanes",
-					 vec_store_lanes_optab,
-					 vectype, count);
+    {
+      if (vect_lanes_optab_supported_p ("vec_store_lanes",
+					vec_store_lanes_optab, vectype, count))
+	return IFN_STORE_LANES;
+    }
+  return IFN_LAST;
 }
 
 
@@ -6040,21 +6065,31 @@ vect_grouped_load_supported (tree vectype, bool single_element_p,
   return false;
 }
 
-/* Return TRUE if vec_{masked_}load_lanes is available for COUNT vectors of
-   type VECTYPE.  MASKED_P says whether the masked form is needed.  */
+/* Return FN if vec_{masked_,mask_len_}load_lanes is available for COUNT vectors
+   of type VECTYPE.  MASKED_P says whether the masked form is needed.  */
 
-bool
+internal_fn
 vect_load_lanes_supported (tree vectype, unsigned HOST_WIDE_INT count,
 			   bool masked_p)
 {
-  if (masked_p)
-    return vect_lanes_optab_supported_p ("vec_mask_load_lanes",
-					 vec_mask_load_lanes_optab,
-					 vectype, count);
+  if (vect_lanes_optab_supported_p ("vec_mask_len_load_lanes",
+				    vec_mask_len_load_lanes_optab, vectype,
+				    count))
+    return IFN_MASK_LEN_LOAD_LANES;
+  else if (masked_p)
+    {
+      if (vect_lanes_optab_supported_p ("vec_mask_load_lanes",
+					vec_mask_load_lanes_optab, vectype,
+					count))
+	return IFN_MASK_LOAD_LANES;
+    }
   else
-    return vect_lanes_optab_supported_p ("vec_load_lanes",
-					 vec_load_lanes_optab,
-					 vectype, count);
+    {
+      if (vect_lanes_optab_supported_p ("vec_load_lanes", vec_load_lanes_optab,
+					vectype, count))
+	return IFN_LOAD_LANES;
+    }
+  return IFN_LAST;
 }
 
 /* Function vect_permute_load_chain.
@@ -6813,10 +6848,11 @@ vect_supportable_dr_alignment (vec_info *vinfo, dr_vec_info *dr_info,
 	     same alignment, instead it depends on the SLP group size.  */
 	  if (loop_vinfo
 	      && STMT_SLP_TYPE (stmt_info)
-	      && !multiple_p (LOOP_VINFO_VECT_FACTOR (loop_vinfo)
-			      * (DR_GROUP_SIZE
-				 (DR_GROUP_FIRST_ELEMENT (stmt_info))),
-			      TYPE_VECTOR_SUBPARTS (vectype)))
+	      && (!STMT_VINFO_GROUPED_ACCESS (stmt_info)
+		  || !multiple_p (LOOP_VINFO_VECT_FACTOR (loop_vinfo)
+				  * (DR_GROUP_SIZE
+				       (DR_GROUP_FIRST_ELEMENT (stmt_info))),
+				  TYPE_VECTOR_SUBPARTS (vectype))))
 	    ;
 	  else if (!loop_vinfo
 		   || (nested_in_vect_loop

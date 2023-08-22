@@ -150,6 +150,14 @@ impl_region_model_context::add_note (std::unique_ptr<pending_note> pn)
 }
 
 void
+impl_region_model_context::add_event (std::unique_ptr<checker_event> event)
+{
+  LOG_FUNC (get_logger ());
+  if (m_eg)
+    m_eg->get_diagnostic_manager ().add_event (std::move (event));
+}
+
+void
 impl_region_model_context::on_svalue_leak (const svalue *sval)
 
 {
@@ -1771,7 +1779,7 @@ public:
     return OPT_Wanalyzer_stale_setjmp_buffer;
   }
 
-  bool emit (rich_location *richloc) final override
+  bool emit (rich_location *richloc, logger *) final override
   {
     return warning_at
       (richloc, get_controlling_option (),
@@ -3925,7 +3933,7 @@ public:
     return OPT_Wanalyzer_jump_through_null;
   }
 
-  bool emit (rich_location *rich_loc) final override
+  bool emit (rich_location *rich_loc, logger *) final override
   {
     return warning_at (rich_loc, get_controlling_option (),
 		       "jump through null pointer");

@@ -4959,7 +4959,10 @@ package body Exp_Util is
    -- Component_May_Be_Bit_Aligned --
    ----------------------------------
 
-   function Component_May_Be_Bit_Aligned (Comp : Entity_Id) return Boolean is
+   function Component_May_Be_Bit_Aligned
+     (Comp      : Entity_Id;
+      For_Slice : Boolean := False) return Boolean
+   is
       UT : Entity_Id;
 
    begin
@@ -4980,11 +4983,12 @@ package body Exp_Util is
 
       --  If we know that we have a small (at most the maximum integer size)
       --  record or bit-packed array, then everything is fine, since the back
-      --  end can handle these cases correctly.
+      --  end can handle these cases correctly, except if a slice is involved.
 
       elsif Known_Esize (Comp)
         and then Esize (Comp) <= System_Max_Integer_Size
         and then (Is_Record_Type (UT) or else Is_Bit_Packed_Array (UT))
+        and then not For_Slice
       then
          return False;
 
@@ -6286,6 +6290,12 @@ package body Exp_Util is
       end if;
 
       Typ := Underlying_Type (Typ);
+
+      --  We cannot find the operation if there is no full view available
+
+      if No (Typ) then
+         return Empty;
+      end if;
 
       --  Loop through primitive operations
 
@@ -9918,11 +9928,16 @@ package body Exp_Util is
    -------------------------
 
    function Make_Invariant_Call (Expr : Node_Id) return Node_Id is
-      Loc : constant Source_Ptr := Sloc (Expr);
-      Typ : constant Entity_Id  := Base_Type (Etype (Expr));
+      Loc      : constant Source_Ptr := Sloc (Expr);
+      Typ      : constant Entity_Id  := Base_Type (Etype (Expr));
       pragma Assert (Has_Invariants (Typ));
-      Proc_Id : constant Entity_Id := Invariant_Procedure (Typ);
+      Proc_Id  : constant Entity_Id := Invariant_Procedure (Typ);
       pragma Assert (Present (Proc_Id));
+      Inv_Typ  : constant Entity_Id
+                   := Base_Type (Etype (First_Formal (Proc_Id)));
+
+      Arg : Node_Id;
+
    begin
       --  The invariant procedure has a null body if assertions are disabled or
       --  Assertion_Policy Ignore is in effect. In that case, generate a null
@@ -9930,11 +9945,21 @@ package body Exp_Util is
 
       if Has_Null_Body (Proc_Id) then
          return Make_Null_Statement (Loc);
+
       else
+         --  As done elsewhere, for example in Build_Initialization_Call, we
+         --  may need to bridge the gap between views of the type.
+
+         if Inv_Typ /= Typ then
+            Arg := OK_Convert_To (Inv_Typ, Expr);
+         else
+            Arg := Relocate_Node (Expr);
+         end if;
+
          return
            Make_Procedure_Call_Statement (Loc,
              Name                   => New_Occurrence_Of (Proc_Id, Loc),
-             Parameter_Associations => New_List (Relocate_Node (Expr)));
+             Parameter_Associations => New_List (Arg));
       end if;
    end Make_Invariant_Call;
 
@@ -11318,7 +11343,10 @@ package body Exp_Util is
    -- Possible_Bit_Aligned_Component --
    ------------------------------------
 
-   function Possible_Bit_Aligned_Component (N : Node_Id) return Boolean is
+   function Possible_Bit_Aligned_Component
+     (N         : Node_Id;
+      For_Slice : Boolean := False) return Boolean
+   is
    begin
       --  Do not process an unanalyzed node because it is not yet decorated and
       --  most checks performed below will fail.
@@ -11356,7 +11384,7 @@ package body Exp_Util is
                --  indexing from a possibly unaligned component.
 
                else
-                  return Possible_Bit_Aligned_Component (P);
+                  return Possible_Bit_Aligned_Component (P, For_Slice);
                end if;
             end;
 
@@ -11371,14 +11399,14 @@ package body Exp_Util is
                --  This is the crucial test: if the component itself causes
                --  trouble, then we can stop and return True.
 
-               if Component_May_Be_Bit_Aligned (Comp) then
+               if Component_May_Be_Bit_Aligned (Comp, For_Slice) then
                   return True;
 
                --  Otherwise, we need to test the prefix, to see if we are
                --  selecting from a possibly unaligned component.
 
                else
-                  return Possible_Bit_Aligned_Component (P);
+                  return Possible_Bit_Aligned_Component (P, For_Slice);
                end if;
             end;
 
@@ -11386,13 +11414,13 @@ package body Exp_Util is
          --  then for sure the slice is.
 
          when N_Slice =>
-            return Possible_Bit_Aligned_Component (Prefix (N));
+            return Possible_Bit_Aligned_Component (Prefix (N), True);
 
          --  For an unchecked conversion, check whether the expression may
          --  be bit aligned.
 
          when N_Unchecked_Type_Conversion =>
-            return Possible_Bit_Aligned_Component (Expression (N));
+            return Possible_Bit_Aligned_Component (Expression (N), For_Slice);
 
          --  If we have none of the above, it means that we have fallen off the
          --  top testing prefixes recursively, and we now have a stand alone
@@ -11400,15 +11428,11 @@ package body Exp_Util is
          --  in which case we need to look into the renamed object.
 
          when others =>
-            if Is_Entity_Name (N)
+            return Is_Entity_Name (N)
               and then Is_Object (Entity (N))
               and then Present (Renamed_Object (Entity (N)))
-            then
-               return
-                 Possible_Bit_Aligned_Component (Renamed_Object (Entity (N)));
-            else
-               return False;
-            end if;
+              and then Possible_Bit_Aligned_Component
+                         (Renamed_Object (Entity (N)), For_Slice);
       end case;
    end Possible_Bit_Aligned_Component;
 

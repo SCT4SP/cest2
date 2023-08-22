@@ -224,6 +224,7 @@ HOST_EXPORTS = \
 	OBJCOPY="$(OBJCOPY)"; export OBJCOPY; \
 	OBJDUMP="$(OBJDUMP)"; export OBJDUMP; \
 	OTOOL="$(OTOOL)"; export OTOOL; \
+	PKG_CONFIG_PATH="$(PKG_CONFIG_PATH)"; export PKG_CONFIG_PATH; \
 	READELF="$(READELF)"; export READELF; \
 	AR_FOR_TARGET="$(AR_FOR_TARGET)"; export AR_FOR_TARGET; \
 	AS_FOR_TARGET="$(AS_FOR_TARGET)"; export AS_FOR_TARGET; \
@@ -407,7 +408,7 @@ MAKEINFO = @MAKEINFO@
 EXPECT = @EXPECT@
 RUNTEST = @RUNTEST@
 
-AUTO_PROFILE = gcc-auto-profile -c 10000000
+AUTO_PROFILE = gcc-auto-profile --all -c 10000000
 
 # This just becomes part of the MAKEINFO definition passed down to
 # sub-makes.  It lets flags be given on the command line while still
@@ -420,7 +421,7 @@ MAKEINFOFLAGS = --split-size=5000000
 # ---------------------------------------------
 
 AS = @AS@
-AR = @AR@
+AR = @AR@ @AR_PLUGIN_OPTION@
 AR_FLAGS = rc
 CC = @CC@
 CXX = @CXX@
@@ -431,7 +432,7 @@ LIPO = @LIPO@
 NM = @NM@
 OBJDUMP = @OBJDUMP@
 OTOOL = @OTOOL@
-RANLIB = @RANLIB@
+RANLIB = @RANLIB@ @RANLIB_PLUGIN_OPTION@
 READELF = @READELF@
 STRIP = @STRIP@
 WINDRES = @WINDRES@
@@ -447,8 +448,10 @@ LIBCFLAGS = $(CFLAGS)
 CXXFLAGS = @CXXFLAGS@
 LIBCXXFLAGS = $(CXXFLAGS) -fno-implicit-templates
 GOCFLAGS = $(CFLAGS)
-GDCFLAGS = $(CFLAGS)
+GDCFLAGS = @GDCFLAGS@
 GM2FLAGS = $(CFLAGS)
+
+PKG_CONFIG_PATH = @PKG_CONFIG_PATH@
 
 # Pass additional PGO and LTO compiler options to the PGO build.
 BUILD_CFLAGS = $(PGO_BUILD_CFLAGS) $(PGO_BUILD_LTO_CFLAGS)
@@ -558,7 +561,7 @@ STAGEtrain_TFLAGS = $(filter-out -fchecking=1,$(STAGE3_TFLAGS))
 STAGEfeedback_CFLAGS = $(STAGE4_CFLAGS) -fprofile-use -fprofile-reproducible=parallel-runs
 STAGEfeedback_TFLAGS = $(STAGE4_TFLAGS)
 
-STAGEautoprofile_CFLAGS = $(STAGE2_CFLAGS) -g
+STAGEautoprofile_CFLAGS = $(filter-out -gtoggle,$(STAGE2_CFLAGS)) -g
 STAGEautoprofile_TFLAGS = $(STAGE2_TFLAGS)
 
 STAGEautofeedback_CFLAGS = $(STAGE3_CFLAGS)
@@ -2106,6 +2109,7 @@ AUTOCONF = autoconf
 $(srcdir)/configure: @MAINT@ $(srcdir)/configure.ac $(srcdir)/config/acx.m4 \
 	$(srcdir)/config/override.m4 $(srcdir)/config/proginstall.m4 \
 	$(srcdir)/config/elf.m4 $(srcdir)/config/isl.m4 \
+	$(srcdir)/config/gcc-plugin.m4 \
 	$(srcdir)/libtool.m4 $(srcdir)/ltoptions.m4 $(srcdir)/ltsugar.m4 \
 	$(srcdir)/ltversion.m4 $(srcdir)/lt~obsolete.m4
 	cd $(srcdir) && $(AUTOCONF)

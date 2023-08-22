@@ -5340,6 +5340,7 @@ start_decl (struct c_declarator *declarator, struct c_declspecs *declspecs,
 	    location_t *lastloc /* = NULL */)
 {
   tree decl;
+  tree old_decl;
   tree tem;
   tree expr = NULL_TREE;
   enum deprecated_states deprecated_state = DEPRECATED_NORMAL;
@@ -5360,7 +5361,9 @@ start_decl (struct c_declarator *declarator, struct c_declspecs *declspecs,
   if (!decl || decl == error_mark_node)
     return NULL_TREE;
 
-  if (tree lastdecl = lastloc ? lookup_last_decl (decl) : NULL_TREE)
+  old_decl = lookup_last_decl (decl);
+
+  if (tree lastdecl = lastloc ? old_decl : NULL_TREE)
     if (lastdecl != error_mark_node)
       *lastloc = DECL_SOURCE_LOCATION (lastdecl);
 
@@ -5371,6 +5374,11 @@ start_decl (struct c_declarator *declarator, struct c_declspecs *declspecs,
   if (TREE_CODE (decl) != FUNCTION_DECL && MAIN_NAME_P (DECL_NAME (decl))
       && TREE_PUBLIC (decl))
     warning (OPT_Wmain, "%q+D is usually a function", decl);
+
+  if (warn_missing_variable_declarations && VAR_P (decl)
+      && !DECL_EXTERNAL (decl) && TREE_PUBLIC (decl) && old_decl == NULL_TREE)
+    warning_at (DECL_SOURCE_LOCATION (decl), OPT_Wmissing_variable_declarations,
+		"no previous declaration for %qD", decl);
 
   if (initialized)
     /* Is it valid for this decl to have an initializer at all?
@@ -9266,6 +9274,26 @@ finish_struct (location_t loc, tree t, tree fieldlist, tree attributes,
 
       /* Set DECL_NOT_FLEXARRAY flag for FIELD_DECL x.  */
       DECL_NOT_FLEXARRAY (x) = !is_flexible_array_member_p (is_last_field, x);
+
+      /* Set TYPE_INCLUDES_FLEXARRAY for the context of x, t.
+	 when x is an array and is the last field.  */
+      if (TREE_CODE (TREE_TYPE (x)) == ARRAY_TYPE)
+	TYPE_INCLUDES_FLEXARRAY (t)
+	  = is_last_field && flexible_array_member_type_p (TREE_TYPE (x));
+      /* Recursively set TYPE_INCLUDES_FLEXARRAY for the context of x, t
+	 when x is an union or record and is the last field.  */
+      else if (RECORD_OR_UNION_TYPE_P (TREE_TYPE (x)))
+	TYPE_INCLUDES_FLEXARRAY (t)
+	  = is_last_field && TYPE_INCLUDES_FLEXARRAY (TREE_TYPE (x));
+
+      if (warn_flex_array_member_not_at_end
+	  && !is_last_field
+	  && RECORD_OR_UNION_TYPE_P (TREE_TYPE (x))
+	  && TYPE_INCLUDES_FLEXARRAY (TREE_TYPE (x)))
+	warning_at (DECL_SOURCE_LOCATION (x),
+		    OPT_Wflex_array_member_not_at_end,
+		    "structure containing a flexible array member"
+		    " is not at the end of another structure");
 
       if (DECL_NAME (x)
 	  || RECORD_OR_UNION_TYPE_P (TREE_TYPE (x)))

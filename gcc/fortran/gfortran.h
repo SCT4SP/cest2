@@ -1334,6 +1334,7 @@ enum gfc_omp_defaultmap
 enum gfc_omp_defaultmap_category
 {
   OMP_DEFAULTMAP_CAT_UNCATEGORIZED,
+  OMP_DEFAULTMAP_CAT_ALL,
   OMP_DEFAULTMAP_CAT_SCALAR,
   OMP_DEFAULTMAP_CAT_AGGREGATE,
   OMP_DEFAULTMAP_CAT_ALLOCATABLE,
@@ -1368,6 +1369,7 @@ typedef struct gfc_omp_namelist
 	  bool old_modifier;
 	} linear;
       struct gfc_common_head *common;
+      struct gfc_symbol *memspace_sym;
       bool lastprivate_conditional;
       bool present_modifier;
     } u;
@@ -1376,6 +1378,7 @@ typedef struct gfc_omp_namelist
       struct gfc_omp_namelist_udr *udr;
       gfc_namespace *ns;
       gfc_expr *allocator;
+      struct gfc_symbol *traits_sym;
     } u2;
   struct gfc_omp_namelist *next;
   locus where;
@@ -1419,6 +1422,7 @@ enum
   OMP_LIST_ALLOCATE,
   OMP_LIST_HAS_DEVICE_ADDR,
   OMP_LIST_ENTER,
+  OMP_LIST_USES_ALLOCATORS,
   OMP_LIST_NUM /* Must be the last.  */
 };
 
@@ -1572,6 +1576,7 @@ typedef struct gfc_omp_clauses
   unsigned order_unconstrained:1, order_reproducible:1, capture:1;
   unsigned grainsize_strict:1, num_tasks_strict:1, compare:1, weak:1;
   unsigned non_rectangular:1, order_concurrent:1;
+  unsigned contains_teams_construct:1, target_first_st_is_teams:1;
   ENUM_BITFIELD (gfc_omp_sched_kind) sched_kind:3;
   ENUM_BITFIELD (gfc_omp_device_type) device_type:2;
   ENUM_BITFIELD (gfc_omp_memorder) memorder:3;
@@ -3178,6 +3183,21 @@ gfc_finalizer;
 
 /************************ Function prototypes *************************/
 
+
+/* Returns true if the type specified in TS is a character type whose length
+   is the constant one.  Otherwise returns false.  */
+
+inline bool
+gfc_length_one_character_type_p (gfc_typespec *ts)
+{
+  return ts->type == BT_CHARACTER
+	 && ts->u.cl
+	 && ts->u.cl->length
+	 && ts->u.cl->length->expr_type == EXPR_CONSTANT
+	 && ts->u.cl->length->ts.type == BT_INTEGER
+	 && mpz_cmp_ui (ts->u.cl->length->value.integer, 1) == 0;
+}
+
 /* decl.cc */
 bool gfc_in_match_data (void);
 match gfc_match_char_spec (gfc_typespec *);
@@ -3600,7 +3620,7 @@ void gfc_free_iterator (gfc_iterator *, int);
 void gfc_free_forall_iterator (gfc_forall_iterator *);
 void gfc_free_alloc_list (gfc_alloc *);
 void gfc_free_namelist (gfc_namelist *);
-void gfc_free_omp_namelist (gfc_omp_namelist *, bool, bool);
+void gfc_free_omp_namelist (gfc_omp_namelist *, bool, bool, bool);
 void gfc_free_equiv (gfc_equiv *);
 void gfc_free_equiv_until (gfc_equiv *, gfc_equiv *);
 void gfc_free_data (gfc_data *);
@@ -3659,6 +3679,7 @@ bool gfc_is_constant_expr (gfc_expr *);
 bool gfc_simplify_expr (gfc_expr *, int);
 bool gfc_try_simplify_expr (gfc_expr *, int);
 bool gfc_has_vector_index (gfc_expr *);
+bool gfc_is_ptr_fcn (gfc_expr *);
 
 gfc_expr *gfc_get_expr (void);
 gfc_expr *gfc_get_array_expr (bt type, int kind, locus *);
@@ -3726,6 +3747,7 @@ gfc_expr* gfc_find_stat_co (gfc_expr *);
 gfc_expr* gfc_build_intrinsic_call (gfc_namespace *, gfc_isym_id, const char*,
 				    locus, unsigned, ...);
 bool gfc_check_vardef_context (gfc_expr*, bool, bool, bool, const char*);
+gfc_expr* gfc_pdt_find_component_copy_initializer (gfc_symbol *, const char *);
 
 
 /* st.cc */

@@ -3071,7 +3071,7 @@ simplify_context::simplify_binary_operation_1 (rtx_code code,
       /* (-1 - a) is ~a, unless the expression contains symbolic
 	 constants, in which case not retaining additions and
 	 subtractions could cause invalid assembly to be produced.  */
-      if (trueop0 == constm1_rtx
+      if (trueop0 == CONSTM1_RTX (mode)
 	  && !contains_symbolic_reference_p (op1))
 	return simplify_gen_unary (NOT, mode, op1, mode);
 
@@ -7076,7 +7076,7 @@ native_encode_rtx (machine_mode mode, rtx x, vec<target_unit> &bytes,
       /* CONST_VECTOR_ELT follows target memory order, so no shuffling
 	 is necessary.  The only complication is that MODE_VECTOR_BOOL
 	 vectors can have several elements per byte.  */
-      unsigned int elt_bits = vector_element_size (GET_MODE_BITSIZE (mode),
+      unsigned int elt_bits = vector_element_size (GET_MODE_PRECISION (mode),
 						   GET_MODE_NUNITS (mode));
       unsigned int elt = first_byte * BITS_PER_UNIT / elt_bits;
       if (elt_bits < BITS_PER_UNIT)
@@ -7222,7 +7222,7 @@ native_decode_vector_rtx (machine_mode mode, const vec<target_unit> &bytes,
 {
   rtx_vector_builder builder (mode, npatterns, nelts_per_pattern);
 
-  unsigned int elt_bits = vector_element_size (GET_MODE_BITSIZE (mode),
+  unsigned int elt_bits = vector_element_size (GET_MODE_PRECISION (mode),
 					       GET_MODE_NUNITS (mode));
   if (elt_bits < BITS_PER_UNIT)
     {
@@ -7359,7 +7359,7 @@ simplify_const_vector_byte_offset (rtx x, poly_uint64 byte)
 {
   /* Cope with MODE_VECTOR_BOOL by operating on bits rather than bytes.  */
   machine_mode mode = GET_MODE (x);
-  unsigned int elt_bits = vector_element_size (GET_MODE_BITSIZE (mode),
+  unsigned int elt_bits = vector_element_size (GET_MODE_PRECISION (mode),
 					       GET_MODE_NUNITS (mode));
   /* The number of bits needed to encode one element from each pattern.  */
   unsigned int sequence_bits = CONST_VECTOR_NPATTERNS (x) * elt_bits;
@@ -7414,10 +7414,10 @@ simplify_const_vector_subreg (machine_mode outermode, rtx x,
 
   /* Cope with MODE_VECTOR_BOOL by operating on bits rather than bytes.  */
   unsigned int x_elt_bits
-    = vector_element_size (GET_MODE_BITSIZE (innermode),
+    = vector_element_size (GET_MODE_PRECISION (innermode),
 			   GET_MODE_NUNITS (innermode));
   unsigned int out_elt_bits
-    = vector_element_size (GET_MODE_BITSIZE (outermode),
+    = vector_element_size (GET_MODE_PRECISION (outermode),
 			   GET_MODE_NUNITS (outermode));
 
   /* The number of bits needed to encode one element from every pattern
@@ -7756,6 +7756,38 @@ simplify_context::simplify_subreg (machine_mode outermode, rtx op,
       poly_uint64 bitpos = subreg_lsb_1 (outermode, innermode, byte);
       if (known_ge (bitpos, GET_MODE_PRECISION (GET_MODE (XEXP (op, 0)))))
 	return CONST0_RTX (outermode);
+    }
+
+  /* Optimize SUBREGS of scalar integral ASHIFT by a valid constant.  */
+  if (GET_CODE (op) == ASHIFT
+      && SCALAR_INT_MODE_P (innermode)
+      && CONST_INT_P (XEXP (op, 1))
+      && INTVAL (XEXP (op, 1)) > 0
+      && known_gt (GET_MODE_BITSIZE (innermode), INTVAL (XEXP (op, 1))))
+    {
+      HOST_WIDE_INT val = INTVAL (XEXP (op, 1));
+      /* A lowpart SUBREG of a ASHIFT by a constant may fold to zero.  */
+      if (known_eq (subreg_lowpart_offset (outermode, innermode), byte)
+	  && known_le (GET_MODE_BITSIZE (outermode), val))
+        return CONST0_RTX (outermode);
+      /* Optimize the highpart SUBREG of a suitable ASHIFT (ZERO_EXTEND).  */
+      if (GET_CODE (XEXP (op, 0)) == ZERO_EXTEND
+	  && GET_MODE (XEXP (XEXP (op, 0), 0)) == outermode
+	  && known_eq (GET_MODE_BITSIZE (outermode), val)
+	  && known_eq (GET_MODE_BITSIZE (innermode), 2 * val)
+	  && known_eq (subreg_highpart_offset (outermode, innermode), byte))
+	return XEXP (XEXP (op, 0), 0);
+    }
+
+  /* Attempt to simplify WORD_MODE SUBREGs of bitwise expressions.  */
+  if (outermode == word_mode
+      && (GET_CODE (op) == IOR || GET_CODE (op) == XOR || GET_CODE (op) == AND)
+      && SCALAR_INT_MODE_P (innermode))
+    {
+      rtx op0 = simplify_subreg (outermode, XEXP (op, 0), innermode, byte);
+      rtx op1 = simplify_subreg (outermode, XEXP (op, 1), innermode, byte);
+      if (op0 && op1)
+	return simplify_gen_binary (GET_CODE (op), outermode, op0, op1);
     }
 
   scalar_int_mode int_outermode, int_innermode;

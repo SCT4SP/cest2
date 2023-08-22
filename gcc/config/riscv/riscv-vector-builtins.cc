@@ -109,10 +109,8 @@ const char *const operand_suffixes[NUM_OP_TYPES] = {
 
 /* Static information about type suffix for each RVV type.  */
 const rvv_builtin_suffixes type_suffixes[NUM_VECTOR_TYPES + 1] = {
-#define DEF_RVV_TYPE(NAME, NCHARS, ABI_NAME, SCALAR_TYPE,                      \
-		     VECTOR_MODE_MIN_VLEN_128, VECTOR_MODE_MIN_VLEN_64,        \
-		     VECTOR_MODE_MIN_VLEN_32, VECTOR_SUFFIX, SCALAR_SUFFIX,    \
-		     VSETVL_SUFFIX)                                            \
+#define DEF_RVV_TYPE(NAME, NCHARS, ABI_NAME, SCALAR_TYPE, VECTOR_MODE,         \
+		     VECTOR_SUFFIX, SCALAR_SUFFIX, VSETVL_SUFFIX)              \
   {#VECTOR_SUFFIX, #SCALAR_SUFFIX, #VSETVL_SUFFIX},
 #define DEF_RVV_TUPLE_TYPE(NAME, NCHARS, ABI_NAME, SUBPART_TYPE, SCALAR_TYPE,  \
 			   NF, VECTOR_SUFFIX)                                  \
@@ -2802,12 +2800,9 @@ register_builtin_types ()
   tree int64_type_node = get_typenode_from_name (INT64_TYPE);
 
   machine_mode mode;
-#define DEF_RVV_TYPE(NAME, NCHARS, ABI_NAME, SCALAR_TYPE,                      \
-		     VECTOR_MODE_MIN_VLEN_128, VECTOR_MODE_MIN_VLEN_64,        \
-		     VECTOR_MODE_MIN_VLEN_32, ARGS...)                         \
-  mode = TARGET_MIN_VLEN >= 128	 ? VECTOR_MODE_MIN_VLEN_128##mode              \
-	 : TARGET_MIN_VLEN >= 64 ? VECTOR_MODE_MIN_VLEN_64##mode               \
-				 : VECTOR_MODE_MIN_VLEN_32##mode;              \
+#define DEF_RVV_TYPE(NAME, NCHARS, ABI_NAME, SCALAR_TYPE, VECTOR_MODE,         \
+		     ARGS...)                                                  \
+  mode = VECTOR_MODE##mode;                                                    \
   register_builtin_type (VECTOR_TYPE_##NAME, SCALAR_TYPE##_type_node, mode);
 #define DEF_RVV_TUPLE_TYPE(NAME, NCHARS, ABI_NAME, SUBPART_TYPE, SCALAR_TYPE,  \
 			   NF, VECTOR_SUFFIX)                                  \
@@ -3569,11 +3564,10 @@ function_expander::use_exact_insn (insn_code icode)
   if (base->has_rounding_mode_operand_p ())
     add_input_operand (call_expr_nargs (exp) - 2);
 
-  /* TODO: Currently, we don't support intrinsic that is modeling rounding mode.
-     We add default rounding mode for the intrinsics that didn't model rounding
-     mode yet.  */
+  /* The RVV floating-point only support dynamic rounding mode in the
+     FRM register.  */
   if (opno != insn_data[icode].n_generator_args)
-    add_input_operand (Pmode, const0_rtx);
+    add_input_operand (Pmode, gen_int_mode (riscv_vector::FRM_DYN, Pmode));
 
   return generate_insn (icode);
 }
@@ -3636,6 +3630,7 @@ function_expander::use_contiguous_store_insn (insn_code icode)
   for (int argno = arg_offset; argno < call_expr_nargs (exp); argno++)
     add_input_operand (argno);
 
+  add_input_operand (Pmode, get_avl_type_rtx (avl_type::NONVLMAX));
   return generate_insn (icode);
 }
 
@@ -3735,17 +3730,29 @@ function_expander::use_ternop_insn (bool vd_accum_p, insn_code icode)
     }
 
   for (int argno = arg_offset; argno < call_expr_nargs (exp); argno++)
-    add_input_operand (argno);
+    {
+      if (base->has_rounding_mode_operand_p ()
+	  && argno == call_expr_nargs (exp) - 2)
+	{
+	  /* Since the rounding mode argument position is not consistent with
+	     the instruction pattern, we need to skip rounding mode argument
+	     here.  */
+	  continue;
+	}
+      add_input_operand (argno);
+    }
 
   add_input_operand (Pmode, get_tail_policy_for_pred (pred));
   add_input_operand (Pmode, get_mask_policy_for_pred (pred));
   add_input_operand (Pmode, get_avl_type_rtx (avl_type::NONVLMAX));
 
-  /* TODO: Currently, we don't support intrinsic that is modeling rounding mode.
-     We add default rounding mode for the intrinsics that didn't model rounding
-     mode yet.  */
+  if (base->has_rounding_mode_operand_p ())
+    add_input_operand (call_expr_nargs (exp) - 2);
+
+  /* The RVV floating-point only support dynamic rounding mode in the
+     FRM register.  */
   if (opno != insn_data[icode].n_generator_args)
-    add_input_operand (Pmode, const0_rtx);
+    add_input_operand (Pmode, gen_int_mode (riscv_vector::FRM_DYN, Pmode));
 
   return generate_insn (icode);
 }
@@ -3764,17 +3771,29 @@ function_expander::use_widen_ternop_insn (insn_code icode)
     add_all_one_mask_operand (mask_mode ());
 
   for (int argno = arg_offset; argno < call_expr_nargs (exp); argno++)
-    add_input_operand (argno);
+    {
+      if (base->has_rounding_mode_operand_p ()
+	  && argno == call_expr_nargs (exp) - 2)
+	{
+	  /* Since the rounding mode argument position is not consistent with
+	     the instruction pattern, we need to skip rounding mode argument
+	     here.  */
+	  continue;
+	}
+      add_input_operand (argno);
+    }
 
   add_input_operand (Pmode, get_tail_policy_for_pred (pred));
   add_input_operand (Pmode, get_mask_policy_for_pred (pred));
   add_input_operand (Pmode, get_avl_type_rtx (avl_type::NONVLMAX));
 
-  /* TODO: Currently, we don't support intrinsic that is modeling rounding mode.
-     We add default rounding mode for the intrinsics that didn't model rounding
-     mode yet.  */
+  if (base->has_rounding_mode_operand_p ())
+    add_input_operand (call_expr_nargs (exp) - 2);
+
+  /* The RVV floating-point only support dynamic rounding mode in the
+     FRM register.  */
   if (opno != insn_data[icode].n_generator_args)
-    add_input_operand (Pmode, const0_rtx);
+    add_input_operand (Pmode, gen_int_mode (riscv_vector::FRM_DYN, Pmode));
 
   return generate_insn (icode);
 }
@@ -3851,6 +3870,23 @@ function_checker::report_out_of_range (unsigned int argno, HOST_WIDE_INT actual,
 	    actual, argno + 1, fndecl, min, max);
 }
 
+/* Report that LOCATION has a call to FNDECL in which argument ARGNO has
+   the value ACTUAL, whereas the function requires a value in the range
+   [MIN, MAX] or OR_VAL.  ARGNO counts from zero.  */
+void
+function_checker::report_out_of_range_and_not (unsigned int argno,
+					       HOST_WIDE_INT actual,
+					       HOST_WIDE_INT min,
+					       HOST_WIDE_INT max,
+					       HOST_WIDE_INT or_val) const
+{
+  error_at (location,
+	    "passing %wd to argument %d of %qE, which expects"
+	    " a value in the range [%wd, %wd] or %wd",
+	    actual, argno + 1, fndecl, min, max, or_val);
+}
+
+
 /* Check that argument ARGNO is an integer constant expression and
    store its value in VALUE_OUT if so.  The caller should first
    check that argument ARGNO exists.  */
@@ -3886,6 +3922,30 @@ function_checker::require_immediate_range (unsigned int argno,
   if (!IN_RANGE (actual, min, max))
     {
       report_out_of_range (argno, actual, min, max);
+      return false;
+    }
+
+  return true;
+}
+
+/* Check that argument REL_ARGNO is an integer constant expression in the
+   range [MIN, MAX] or OR_VAL.  REL_ARGNO counts from the end of the
+   predication arguments.  */
+bool
+function_checker::require_immediate_range_or (unsigned int argno,
+					      HOST_WIDE_INT min,
+					      HOST_WIDE_INT max,
+					      HOST_WIDE_INT or_val) const
+{
+  gcc_assert (min >= 0 && min <= max);
+  gcc_assert (argno < m_nargs);
+
+  tree arg = m_args[argno];
+  HOST_WIDE_INT actual = tree_to_uhwi (arg);
+
+  if (!IN_RANGE (actual, min, max) && actual != or_val)
+    {
+      report_out_of_range_and_not (argno, actual, min, max, or_val);
       return false;
     }
 
