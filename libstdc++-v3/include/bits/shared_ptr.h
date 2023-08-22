@@ -90,11 +90,18 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
   /// If `__p` has a deleter of type `_Del`, return a pointer to it.
   /// @relates shared_ptr
   template<typename _Del, typename _Tp>
+    _GLIBCXX_CEST_CONSTEXPR
     inline _Del*
     get_deleter(const shared_ptr<_Tp>& __p) noexcept
     {
 #if __cpp_rtti
+#if _GLIBCXX_CEST_VERSION
+      // P2738 allows constexpr casting from void* ... but not one targeting 0
+      void* __del = __p._M_get_deleter(typeid(_Del));
+      return __del ? static_cast<_Del*>(__del) : nullptr;
+#else
       return static_cast<_Del*>(__p._M_get_deleter(typeid(_Del)));
+#endif // _GLIBCXX_CEST_VERSION
 #else
       return 0;
 #endif
@@ -210,6 +217,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *  @throw  std::bad_alloc, in which case @c delete @a __p is called.
        */
       template<typename _Yp, typename = _Constructible<_Yp*>>
+	_GLIBCXX_CEST_CONSTEXPR
 	explicit
 	shared_ptr(_Yp* __p) : __shared_ptr<_Tp>(__p) { }
 
@@ -228,6 +236,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        */
       template<typename _Yp, typename _Deleter,
 	       typename = _Constructible<_Yp*, _Deleter>>
+	_GLIBCXX_CEST_CONSTEXPR
 	shared_ptr(_Yp* __p, _Deleter __d)
         : __shared_ptr<_Tp>(__p, std::move(__d)) { }
 
@@ -308,6 +317,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        * @endcode
        */
       template<typename _Yp>
+	_GLIBCXX_CEST_CONSTEXPR
 	shared_ptr(const shared_ptr<_Yp>& __r, element_type* __p) noexcept
 	: __shared_ptr<_Tp>(__r, __p) { }
 
@@ -551,7 +561,9 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
   /// Equality operator for shared_ptr objects, compares the stored pointers
   template<typename _Tp, typename _Up>
-    _GLIBCXX_NODISCARD inline bool
+    _GLIBCXX_NODISCARD
+    _GLIBCXX_CEST_CONSTEXPR
+    inline bool
     operator==(const shared_ptr<_Tp>& __a, const shared_ptr<_Up>& __b) noexcept
     { return __a.get() == __b.get(); }
 
@@ -563,6 +575,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
 #ifdef __cpp_lib_three_way_comparison
   template<typename _Tp, typename _Up>
+    _GLIBCXX_CEST_CONSTEXPR
     inline strong_ordering
     operator<=>(const shared_ptr<_Tp>& __a,
 		const shared_ptr<_Up>& __b) noexcept
