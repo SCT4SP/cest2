@@ -58,7 +58,7 @@
        (match_test "INTVAL (op) + 1 != 0")))
 
 (define_predicate "const_0_operand"
-  (and (match_code "const_int,const_wide_int,const_vector")
+  (and (match_code "const_int,const_wide_int,const_double,const_vector")
        (match_test "op == CONST0_RTX (GET_MODE (op))")))
 
 (define_predicate "const_1_operand"
@@ -282,10 +282,7 @@
 
 (define_special_predicate "autovec_length_operand"
   (ior (match_operand 0 "pmode_register_operand")
-       (ior (match_operand 0 "const_csr_operand")
-            (match_test "rtx_equal_p (op, gen_int_mode
-                         (GET_MODE_NUNITS (GET_MODE (op)),
-                                           Pmode))"))))
+       (match_code "const_int,const_poly_int")))
 
 (define_predicate "reg_or_mem_operand"
   (ior (match_operand 0 "register_operand")
@@ -294,6 +291,10 @@
 (define_predicate "reg_or_int_operand"
   (ior (match_operand 0 "register_operand")
        (match_operand 0 "const_int_operand")))
+
+(define_predicate "vector_const_0_operand"
+  (and (match_code "const_vector")
+       (match_test "satisfies_constraint_Wc0 (op)")))
 
 (define_predicate "vector_move_operand"
   (ior (match_operand 0 "nonimmediate_operand")

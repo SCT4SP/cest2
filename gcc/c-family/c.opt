@@ -1048,6 +1048,10 @@ Wmissing-prototypes
 C ObjC Var(warn_missing_prototypes) Warning
 Warn about global functions without prototypes.
 
+Wmissing-variable-declarations
+C ObjC Var(warn_missing_variable_declarations) Warning
+Warn about global variables without previous declarations.
+
 Wmudflap
 C ObjC C++ ObjC++ WarnRemoved
 
@@ -1486,7 +1490,7 @@ C++ ObjC++ Var(warn_zero_as_null_pointer_constant) Warning
 Warn when a literal '0' is used as null pointer.
 
 Wuseless-cast
-C++ ObjC++ Var(warn_useless_cast) Warning
+C ObjC C++ ObjC++ Var(warn_useless_cast) Warning
 Warn about useless casts.
 
 Wsubobject-linkage
@@ -1930,6 +1934,10 @@ C++ ObjC Var(flag_module_version_ignore) Integer
 Winvalid-imported-macros
 C++ ObjC++ Var(warn_imported_macros) Warning
 Warn about macros that have conflicting header units definitions.
+
+Wcompare-distinct-pointer-types
+C ObjC Var(warn_compare_distinct_pointer_types) Warning Init(1)
+Warn if pointers of distinct types are compared without a cast.
 
 flang-info-include-translate
 C++ Var(note_include_translate_yes)

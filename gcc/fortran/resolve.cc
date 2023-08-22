@@ -1396,11 +1396,14 @@ resolve_structure_cons (gfc_expr *expr, int init)
 	 the one of the structure, ensure this if the lengths are known at
  	 compile time and when we are dealing with PARAMETER or structure
 	 constructors.  */
-      if (cons->expr->ts.type == BT_CHARACTER && comp->ts.u.cl
-	  && comp->ts.u.cl->length
+      if (cons->expr->ts.type == BT_CHARACTER
+	  && comp->ts.type == BT_CHARACTER
+	  && comp->ts.u.cl && comp->ts.u.cl->length
 	  && comp->ts.u.cl->length->expr_type == EXPR_CONSTANT
 	  && cons->expr->ts.u.cl && cons->expr->ts.u.cl->length
 	  && cons->expr->ts.u.cl->length->expr_type == EXPR_CONSTANT
+	  && cons->expr->ts.u.cl->length->ts.type == BT_INTEGER
+	  && comp->ts.u.cl->length->ts.type == BT_INTEGER
 	  && mpz_cmp (cons->expr->ts.u.cl->length->value.integer,
 		      comp->ts.u.cl->length->value.integer) != 0)
 	{
@@ -16762,6 +16765,7 @@ check_data_variable (gfc_data_variable *var, locus *where)
   ar_type mark = AR_UNKNOWN;
   int i;
   mpz_t section_index[GFC_MAX_DIMENSIONS];
+  int vector_offset[GFC_MAX_DIMENSIONS];
   gfc_ref *ref;
   gfc_array_ref *ar;
   gfc_symbol *sym;
@@ -16771,7 +16775,6 @@ check_data_variable (gfc_data_variable *var, locus *where)
     return false;
 
   ar = NULL;
-  mpz_init_set_si (offset, 0);
   e = var->expr;
 
   if (e->expr_type == EXPR_FUNCTION && e->value.function.isym
@@ -16838,7 +16841,23 @@ check_data_variable (gfc_data_variable *var, locus *where)
 		     "attribute", ref->u.c.component->name, &e->where);
 	  return false;
 	}
+
+      /* Reject substrings of strings of non-constant length.  */
+      if (ref->type == REF_SUBSTRING
+	  && ref->u.ss.length
+	  && ref->u.ss.length->length
+	  && !gfc_is_constant_expr (ref->u.ss.length->length))
+	goto bad_charlen;
     }
+
+  /* Reject strings with deferred length or non-constant length.  */
+  if (e->ts.type == BT_CHARACTER
+      && (e->ts.deferred
+	  || (e->ts.u.cl->length
+	      && !gfc_is_constant_expr (e->ts.u.cl->length))))
+    goto bad_charlen;
+
+  mpz_init_set_si (offset, 0);
 
   if (e->rank == 0 || has_pointer)
     {
@@ -16870,7 +16889,7 @@ check_data_variable (gfc_data_variable *var, locus *where)
 	case AR_SECTION:
 	  ar = &ref->u.ar;
 	  /* Get the start position of array section.  */
-	  gfc_get_section_index (ar, section_index, &offset);
+	  gfc_get_section_index (ar, section_index, &offset, vector_offset);
 	  mark = AR_SECTION;
 	  break;
 
@@ -16953,7 +16972,7 @@ check_data_variable (gfc_data_variable *var, locus *where)
 	  /* Modify the array section indexes and recalculate the offset
 	     for next element.  */
 	  else if (mark == AR_SECTION)
-	    gfc_advance_section (section_index, ar, &offset);
+	    gfc_advance_section (section_index, ar, &offset, vector_offset);
 	}
     }
 
@@ -16967,6 +16986,11 @@ check_data_variable (gfc_data_variable *var, locus *where)
   mpz_clear (offset);
 
   return t;
+
+bad_charlen:
+  gfc_error ("Non-constant character length at %L in DATA statement",
+	     &e->where);
+  return false;
 }
 
 
@@ -17946,7 +17970,10 @@ resolve_types (gfc_namespace *ns)
 
   for (n = ns->contained; n; n = n->sibling)
     {
-      if (gfc_pure (ns->proc_name) && !gfc_pure (n->proc_name))
+      /* Exclude final wrappers with the test for the artificial attribute.  */
+      if (gfc_pure (ns->proc_name)
+	  && !gfc_pure (n->proc_name)
+	  && !n->proc_name->attr.artificial)
 	gfc_error ("Contained procedure %qs at %L of a PURE procedure must "
 		   "also be PURE", n->proc_name->name,
 		   &n->proc_name->declared_at);

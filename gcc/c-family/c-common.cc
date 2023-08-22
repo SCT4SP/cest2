@@ -420,6 +420,8 @@ const struct c_common_resword c_common_reswords[] =
   { "__transaction_cancel", RID_TRANSACTION_CANCEL, 0 },
   { "__typeof",		RID_TYPEOF,	0 },
   { "__typeof__",	RID_TYPEOF,	0 },
+  { "__typeof_unqual",	RID_TYPEOF_UNQUAL, D_CONLY },
+  { "__typeof_unqual__", RID_TYPEOF_UNQUAL, D_CONLY },
   { "__volatile",	RID_VOLATILE,	0 },
   { "__volatile__",	RID_VOLATILE,	0 },
   { "__GIMPLE",		RID_GIMPLE,	D_CONLY },
@@ -6334,6 +6336,7 @@ check_builtin_function_arguments (location_t loc, vec<location_t> arg_loc,
     case BUILT_IN_ISLESSEQUAL:
     case BUILT_IN_ISLESSGREATER:
     case BUILT_IN_ISUNORDERED:
+    case BUILT_IN_ISEQSIG:
       if (builtin_function_validate_nargs (loc, fndecl, nargs, 2))
 	{
 	  enum tree_code code0, code1;

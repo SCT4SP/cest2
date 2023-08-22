@@ -1,5 +1,10 @@
 /* { dg-do compile } */
 /* { dg-additional-options "-march=rv32gcv_zvfh -mabi=ilp32d  -fdump-tree-vect-details" } */
+/* For some reason we exceed
+   the default code model's +-2 GiB limits.  We should investigate why and
+   add a proper description here.  For now just make sure the test case
+   compiles properly.  */
+/* { dg-additional-options "-mcmodel=medany" } */
 
 #include <stdint-gcc.h>
 
@@ -31,6 +36,6 @@
 TEST_ALL (TEST_LOOP)
 
 /* { dg-final { scan-tree-dump-times "vectorized 1 loops in function" 11 "vect" } } */
-/* { dg-final { scan-tree-dump " \.LEN_MASK_SCATTER_STORE" "vect" } } */
+/* { dg-final { scan-tree-dump " \.MASK_LEN_SCATTER_STORE" "vect" } } */
 /* { dg-final { scan-tree-dump-not " \.SCATTER_STORE" "vect" } } */
 /* { dg-final { scan-tree-dump-not " \.MASK_SCATTER_STORE" "vect" } } */

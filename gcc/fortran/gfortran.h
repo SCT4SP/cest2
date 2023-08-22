@@ -1334,6 +1334,7 @@ enum gfc_omp_defaultmap
 enum gfc_omp_defaultmap_category
 {
   OMP_DEFAULTMAP_CAT_UNCATEGORIZED,
+  OMP_DEFAULTMAP_CAT_ALL,
   OMP_DEFAULTMAP_CAT_SCALAR,
   OMP_DEFAULTMAP_CAT_AGGREGATE,
   OMP_DEFAULTMAP_CAT_ALLOCATABLE,
@@ -1575,6 +1576,7 @@ typedef struct gfc_omp_clauses
   unsigned order_unconstrained:1, order_reproducible:1, capture:1;
   unsigned grainsize_strict:1, num_tasks_strict:1, compare:1, weak:1;
   unsigned non_rectangular:1, order_concurrent:1;
+  unsigned contains_teams_construct:1, target_first_st_is_teams:1;
   ENUM_BITFIELD (gfc_omp_sched_kind) sched_kind:3;
   ENUM_BITFIELD (gfc_omp_device_type) device_type:2;
   ENUM_BITFIELD (gfc_omp_memorder) memorder:3;
@@ -3180,6 +3182,21 @@ gfc_finalizer;
 
 
 /************************ Function prototypes *************************/
+
+
+/* Returns true if the type specified in TS is a character type whose length
+   is the constant one.  Otherwise returns false.  */
+
+inline bool
+gfc_length_one_character_type_p (gfc_typespec *ts)
+{
+  return ts->type == BT_CHARACTER
+	 && ts->u.cl
+	 && ts->u.cl->length
+	 && ts->u.cl->length->expr_type == EXPR_CONSTANT
+	 && ts->u.cl->length->ts.type == BT_INTEGER
+	 && mpz_cmp_ui (ts->u.cl->length->value.integer, 1) == 0;
+}
 
 /* decl.cc */
 bool gfc_in_match_data (void);

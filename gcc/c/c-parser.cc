@@ -1572,9 +1572,11 @@ static tree c_parser_c99_block_statement (c_parser *, bool *,
 					  location_t * = NULL);
 static void c_parser_if_statement (c_parser *, bool *, vec<tree> *);
 static void c_parser_switch_statement (c_parser *, bool *);
-static void c_parser_while_statement (c_parser *, bool, unsigned short, bool *);
-static void c_parser_do_statement (c_parser *, bool, unsigned short);
-static void c_parser_for_statement (c_parser *, bool, unsigned short, bool *);
+static void c_parser_while_statement (c_parser *, bool, unsigned short, bool,
+				      bool *);
+static void c_parser_do_statement (c_parser *, bool, unsigned short, bool);
+static void c_parser_for_statement (c_parser *, bool, unsigned short, bool,
+				    bool *);
 static tree c_parser_asm_statement (c_parser *);
 static tree c_parser_asm_operands (c_parser *);
 static tree c_parser_asm_goto_operands (c_parser *);
@@ -1691,6 +1693,30 @@ public:
     if (cpp_macro_p (hashnode))
       if (tree value = consider_macro (hashnode->value.macro))
 	return value;
+
+    return NULL_TREE;
+  }
+
+  tree
+  lookup_type_by_id (tree id) const final override
+  {
+    if (tree type_decl = lookup_name (id))
+	if (TREE_CODE (type_decl) == TYPE_DECL)
+	  {
+	    tree record_type = TREE_TYPE (type_decl);
+	    if (TREE_CODE (record_type) == RECORD_TYPE)
+	      return record_type;
+	  }
+
+    return NULL_TREE;
+  }
+
+  tree
+  lookup_global_var_by_id (tree id) const final override
+  {
+    if (tree var_decl = lookup_name (id))
+      if (TREE_CODE (var_decl) == VAR_DECL)
+				return var_decl;
 
     return NULL_TREE;
   }
@@ -4138,7 +4164,8 @@ c_parser_typeof_specifier (c_parser *parser)
     {
       gcc_assert (c_parser_next_token_is_keyword (parser, RID_TYPEOF_UNQUAL));
       is_unqual = true;
-      is_std = true;
+      tree spelling = c_parser_peek_token (parser)->value;
+      is_std = strcmp (IDENTIFIER_POINTER (spelling), "typeof_unqual") == 0;
     }
   c_parser_consume_token (parser);
   c_inhibit_evaluation_warnings++;
@@ -6644,13 +6671,13 @@ c_parser_statement_after_labels (c_parser *parser, bool *if_p,
 	  c_parser_switch_statement (parser, if_p);
 	  break;
 	case RID_WHILE:
-	  c_parser_while_statement (parser, false, 0, if_p);
+	  c_parser_while_statement (parser, false, 0, false, if_p);
 	  break;
 	case RID_DO:
-	  c_parser_do_statement (parser, false, 0);
+	  c_parser_do_statement (parser, false, 0, false);
 	  break;
 	case RID_FOR:
-	  c_parser_for_statement (parser, false, 0, if_p);
+	  c_parser_for_statement (parser, false, 0, false, if_p);
 	  break;
 	case RID_GOTO:
 	  c_parser_consume_token (parser);
@@ -7146,7 +7173,7 @@ c_parser_switch_statement (c_parser *parser, bool *if_p)
 
 static void
 c_parser_while_statement (c_parser *parser, bool ivdep, unsigned short unroll,
-			  bool *if_p)
+			  bool novector, bool *if_p)
 {
   tree block, cond, body;
   unsigned char save_in_statement;
@@ -7168,6 +7195,11 @@ c_parser_while_statement (c_parser *parser, bool ivdep, unsigned short unroll,
 		   build_int_cst (integer_type_node,
 				  annot_expr_unroll_kind),
 		   build_int_cst (integer_type_node, unroll));
+  if (novector && cond != error_mark_node)
+    cond = build3 (ANNOTATE_EXPR, TREE_TYPE (cond), cond,
+		   build_int_cst (integer_type_node,
+				  annot_expr_no_vector_kind),
+		   integer_zero_node);
   save_in_statement = in_statement;
   in_statement = IN_ITERATION_STMT;
 
@@ -7199,7 +7231,8 @@ c_parser_while_statement (c_parser *parser, bool ivdep, unsigned short unroll,
 */
 
 static void
-c_parser_do_statement (c_parser *parser, bool ivdep, unsigned short unroll)
+c_parser_do_statement (c_parser *parser, bool ivdep, unsigned short unroll,
+		       bool novector)
 {
   tree block, cond, body;
   unsigned char save_in_statement;
@@ -7228,6 +7261,11 @@ c_parser_do_statement (c_parser *parser, bool ivdep, unsigned short unroll)
 		   build_int_cst (integer_type_node,
 				  annot_expr_unroll_kind),
  		   build_int_cst (integer_type_node, unroll));
+  if (novector && cond != error_mark_node)
+    cond = build3 (ANNOTATE_EXPR, TREE_TYPE (cond), cond,
+		   build_int_cst (integer_type_node,
+				  annot_expr_no_vector_kind),
+		   integer_zero_node);
   if (!c_parser_require (parser, CPP_SEMICOLON, "expected %<;%>"))
     c_parser_skip_to_end_of_block_or_statement (parser);
 
@@ -7296,7 +7334,7 @@ c_parser_do_statement (c_parser *parser, bool ivdep, unsigned short unroll)
 
 static void
 c_parser_for_statement (c_parser *parser, bool ivdep, unsigned short unroll,
-			bool *if_p)
+			bool novector, bool *if_p)
 {
   tree block, cond, incr, body;
   unsigned char save_in_statement;
@@ -7452,6 +7490,11 @@ c_parser_for_statement (c_parser *parser, bool ivdep, unsigned short unroll,
  			   build_int_cst (integer_type_node,
 					  annot_expr_unroll_kind),
 			   build_int_cst (integer_type_node, unroll));
+	  if (novector && cond != error_mark_node)
+	    cond = build3 (ANNOTATE_EXPR, TREE_TYPE (cond), cond,
+			   build_int_cst (integer_type_node,
+					  annot_expr_no_vector_kind),
+			   integer_zero_node);
 	}
       /* Parse the increment expression (the third expression in a
 	 for-statement).  In the case of a foreach-statement, this is
@@ -9350,7 +9393,17 @@ c_parser_generic_selection (c_parser *parser)
 	  return error_expr;
 	}
 
+      bool match = assoc.type == NULL_TREE
+		   || comptypes (assoc.type, selector_type);
+
+      if (!match)
+	c_inhibit_evaluation_warnings++;
+
       assoc.expression = c_parser_expr_no_commas (parser, NULL);
+
+      if (!match)
+	  c_inhibit_evaluation_warnings--;
+
       if (assoc.expression.value == error_mark_node)
 	{
 	  c_parser_skip_until_found (parser, CPP_CLOSE_PAREN, NULL);
@@ -9387,7 +9440,7 @@ c_parser_generic_selection (c_parser *parser)
 	      match_found = associations.length ();
 	    }
 	}
-      else if (comptypes (assoc.type, selector_type))
+      else if (match)
 	{
 	  if (match_found < 0 || matched_assoc.type == NULL_TREE)
 	    {
@@ -13037,6 +13090,16 @@ c_parse_pragma_ivdep (c_parser *parser)
   return true;
 }
 
+/* Parse a pragma GCC novector.  */
+
+static bool
+c_parse_pragma_novector (c_parser *parser)
+{
+  c_parser_consume_pragma (parser);
+  c_parser_skip_to_pragma_eol (parser);
+  return true;
+}
+
 /* Parse a pragma GCC unroll.  */
 
 static unsigned short
@@ -13261,38 +13324,51 @@ c_parser_pragma (c_parser *parser, enum pragma_context context, bool *if_p)
     case PRAGMA_OMP_ORDERED:
       return c_parser_omp_ordered (parser, context, if_p);
 
+    case PRAGMA_NOVECTOR:
+    case PRAGMA_UNROLL:
     case PRAGMA_IVDEP:
       {
-	const bool ivdep = c_parse_pragma_ivdep (parser);
-	unsigned short unroll;
-	if (c_parser_peek_token (parser)->pragma_kind == PRAGMA_UNROLL)
-	  unroll = c_parser_pragma_unroll (parser);
-	else
-	  unroll = 0;
-	if (!c_parser_next_token_is_keyword (parser, RID_FOR)
-	    && !c_parser_next_token_is_keyword (parser, RID_WHILE)
-	    && !c_parser_next_token_is_keyword (parser, RID_DO))
-	  {
-	    c_parser_error (parser, "for, while or do statement expected");
-	    return false;
-	  }
-	if (c_parser_next_token_is_keyword (parser, RID_FOR))
-	  c_parser_for_statement (parser, ivdep, unroll, if_p);
-	else if (c_parser_next_token_is_keyword (parser, RID_WHILE))
-	  c_parser_while_statement (parser, ivdep, unroll, if_p);
-	else
-	  c_parser_do_statement (parser, ivdep, unroll);
-      }
-      return true;
+	bool novector = false;
+	unsigned short unroll = 0;
+	bool ivdep = false;
 
-    case PRAGMA_UNROLL:
-      {
-	unsigned short unroll = c_parser_pragma_unroll (parser);
-	bool ivdep;
-	if (c_parser_peek_token (parser)->pragma_kind == PRAGMA_IVDEP)
-	  ivdep = c_parse_pragma_ivdep (parser);
-	else
-	  ivdep = false;
+	switch (id)
+	  {
+	  case PRAGMA_NOVECTOR:
+	    novector = c_parse_pragma_novector (parser);
+	    break;
+	  case PRAGMA_UNROLL:
+	    unroll = c_parser_pragma_unroll (parser);
+	    break;
+	  case PRAGMA_IVDEP:
+	    ivdep = c_parse_pragma_ivdep (parser);
+	    break;
+	  default:
+	    gcc_unreachable ();
+	  }
+
+	c_token *tok = c_parser_peek_token (parser);
+	bool has_more = tok->type == CPP_PRAGMA;
+	while (has_more)
+	  {
+	    switch (tok->pragma_kind)
+	      {
+	      case PRAGMA_IVDEP:
+		ivdep = c_parse_pragma_ivdep (parser);
+		break;
+	      case PRAGMA_UNROLL:
+		unroll = c_parser_pragma_unroll (parser);
+		break;
+	      case PRAGMA_NOVECTOR:
+		novector = c_parse_pragma_novector (parser);
+		break;
+	      default:
+		has_more = false;
+		break;
+	      }
+	    tok = c_parser_peek_token (parser);
+	    has_more = has_more && tok->type == CPP_PRAGMA;
+	  }
 	if (!c_parser_next_token_is_keyword (parser, RID_FOR)
 	    && !c_parser_next_token_is_keyword (parser, RID_WHILE)
 	    && !c_parser_next_token_is_keyword (parser, RID_DO))
@@ -13301,11 +13377,11 @@ c_parser_pragma (c_parser *parser, enum pragma_context context, bool *if_p)
 	    return false;
 	  }
 	if (c_parser_next_token_is_keyword (parser, RID_FOR))
-	  c_parser_for_statement (parser, ivdep, unroll, if_p);
+	  c_parser_for_statement (parser, ivdep, unroll, novector, if_p);
 	else if (c_parser_next_token_is_keyword (parser, RID_WHILE))
-	  c_parser_while_statement (parser, ivdep, unroll, if_p);
+	  c_parser_while_statement (parser, ivdep, unroll, novector, if_p);
 	else
-	  c_parser_do_statement (parser, ivdep, unroll);
+	  c_parser_do_statement (parser, ivdep, unroll, novector);
       }
       return true;
 
@@ -13374,6 +13450,18 @@ pragma_lex (tree *value, location_t *loc)
     }
 
   return ret;
+}
+
+void
+pragma_lex_discard_to_eol ()
+{
+  cpp_ttype type;
+  do
+    {
+      type = c_parser_peek_token (the_parser)->type;
+      gcc_assert (type != CPP_EOF);
+      c_parser_consume_token (the_parser);
+    } while (type != CPP_PRAGMA_EOL);
 }
 
 static void
@@ -14979,8 +15067,8 @@ c_parser_omp_clause_defaultmap (c_parser *parser, tree list)
       if (!c_parser_next_token_is (parser, CPP_NAME))
 	{
 	invalid_category:
-	  c_parser_error (parser, "expected %<scalar%>, %<aggregate%> or "
-				  "%<pointer%>");
+	  c_parser_error (parser, "expected %<scalar%>, %<aggregate%>, "
+				  "%<pointer%> or %<all%>");
 	  goto out_err;
 	}
       p = IDENTIFIER_POINTER (c_parser_peek_token (parser)->value);
@@ -14989,6 +15077,8 @@ c_parser_omp_clause_defaultmap (c_parser *parser, tree list)
 	case 'a':
 	  if (strcmp ("aggregate", p) == 0)
 	    category = OMP_CLAUSE_DEFAULTMAP_CATEGORY_AGGREGATE;
+	  else if (strcmp ("all", p) == 0)
+	    category = OMP_CLAUSE_DEFAULTMAP_CATEGORY_ALL;
 	  else
 	    goto invalid_category;
 	  break;
@@ -15018,19 +15108,28 @@ c_parser_omp_clause_defaultmap (c_parser *parser, tree list)
   for (c = list; c ; c = OMP_CLAUSE_CHAIN (c))
     if (OMP_CLAUSE_CODE (c) == OMP_CLAUSE_DEFAULTMAP
 	&& (category == OMP_CLAUSE_DEFAULTMAP_CATEGORY_UNSPECIFIED
+	    || category == OMP_CLAUSE_DEFAULTMAP_CATEGORY_ALL
 	    || OMP_CLAUSE_DEFAULTMAP_CATEGORY (c) == category
 	    || (OMP_CLAUSE_DEFAULTMAP_CATEGORY (c)
-		== OMP_CLAUSE_DEFAULTMAP_CATEGORY_UNSPECIFIED)))
+		== OMP_CLAUSE_DEFAULTMAP_CATEGORY_UNSPECIFIED)
+	    || (OMP_CLAUSE_DEFAULTMAP_CATEGORY (c)
+		== OMP_CLAUSE_DEFAULTMAP_CATEGORY_ALL)))
       {
 	enum omp_clause_defaultmap_kind cat = category;
 	location_t loc = OMP_CLAUSE_LOCATION (c);
-	if (cat == OMP_CLAUSE_DEFAULTMAP_CATEGORY_UNSPECIFIED)
+	if (cat == OMP_CLAUSE_DEFAULTMAP_CATEGORY_UNSPECIFIED
+	    || (cat == OMP_CLAUSE_DEFAULTMAP_CATEGORY_ALL
+		&& (OMP_CLAUSE_DEFAULTMAP_CATEGORY (c)
+		    != OMP_CLAUSE_DEFAULTMAP_CATEGORY_UNSPECIFIED)))
 	  cat = OMP_CLAUSE_DEFAULTMAP_CATEGORY (c);
 	p = NULL;
 	switch (cat)
 	  {
 	  case OMP_CLAUSE_DEFAULTMAP_CATEGORY_UNSPECIFIED:
 	    p = NULL;
+	    break;
+	  case OMP_CLAUSE_DEFAULTMAP_CATEGORY_ALL:
+	    p = "all";
 	    break;
 	  case OMP_CLAUSE_DEFAULTMAP_CATEGORY_AGGREGATE:
 	    p = "aggregate";
@@ -18196,6 +18295,7 @@ c_parser_oacc_cache (location_t loc, c_parser *parser)
 	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_COPYIN)		\
 	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_COPYOUT)		\
 	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_CREATE)		\
+	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_DEFAULT)		\
 	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_DEVICEPTR)		\
 	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_IF)			\
 	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_NO_CREATE)		\
@@ -18461,8 +18561,13 @@ c_parser_oacc_host_data (location_t loc, c_parser *parser, bool *if_p)
   tree stmt, clauses, block;
 
   clauses = c_parser_oacc_all_clauses (parser, OACC_HOST_DATA_CLAUSE_MASK,
-				       "#pragma acc host_data");
-
+				       "#pragma acc host_data", false);
+  if (!omp_find_clause (clauses, OMP_CLAUSE_USE_DEVICE_PTR))
+    {
+      error_at (loc, "%<host_data%> construct requires %<use_device%> clause");
+      return error_mark_node;
+    }
+  clauses = c_finish_omp_clauses (clauses, C_ORT_ACC);
   block = c_begin_omp_parallel ();
   add_stmt (c_parser_omp_structured_block (parser, if_p));
   stmt = c_finish_oacc_host_data (loc, clauses, block);
@@ -24754,6 +24859,15 @@ c_parse_file (void)
 
   c_parser_translation_unit (the_parser);
   the_parser = NULL;
+}
+
+void
+c_init_preprocess (void)
+{
+  /* Create a parser for use by pragma_lex during preprocessing.  */
+  the_parser = ggc_alloc<c_parser> ();
+  memset (the_parser, 0, sizeof (c_parser));
+  the_parser->tokens = &the_parser->tokens_buf[0];
 }
 
 /* Parse the body of a function declaration marked with "__RTL".

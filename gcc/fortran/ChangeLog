@@ -1,3 +1,116 @@
+2023-08-16  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/110360
+	* trans-expr.cc (conv_scalar_char_value): Use gfc_replace_expr to
+	avoid leaking replaced gfc_expr.
+
+2023-08-15  Martin Jambor  <mjambor@suse.cz>
+	    Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/110677
+	* resolve.cc (resolve_structure_cons): Check comp->ts is character
+	type before accessing stuff through comp->ts.u.cl.
+
+2023-08-15  Chung-Lin Tang  <cltang@codesourcery.com>
+	    Thomas Schwinge  <thomas@codesourcery.com>
+
+	* openmp.cc (OACC_DATA_CLAUSES): Add OMP_CLAUSE_DEFAULT.
+
+2023-08-14  Mikael Morin  <mikael@gcc.gnu.org>
+
+	PR fortran/110360
+	PR fortran/110419
+	* trans-types.cc (gfc_sym_type): Use a bare character type for length
+	one value character dummy arguments.
+	* trans-expr.cc (gfc_conv_string_parameter): Handle single character
+	case.
+	(gfc_conv_procedure_call): Don't exclude interoperable kinds
+	from single character handling.  For single character dummy arguments,
+	extend the existing handling of non-constant expressions to constant
+	expressions.
+
+2023-08-14  Mikael Morin  <mikael@gcc.gnu.org>
+
+	* gfortran.h (gfc_length_one_character_type_p): New inline
+	function.
+	* check.cc (is_c_interoperable): Use
+	gfc_length_one_character_type_p.
+	* decl.cc (verify_bind_c_sym): Same.
+	* trans-expr.cc (gfc_conv_procedure_call): Same.
+
+2023-08-09  Steve Kargl  <sgk@troutmask.apl.washington.edu>
+
+	PR fortran/109684
+	* resolve.cc (resolve_types): Exclude contained procedures with
+	the artificial attribute from test for pureness.
+
+2023-07-31  Chung-Lin Tang  <cltang@codesourcery.com>
+
+	* openmp.cc (resolve_omp_clauses): Add checking requiring
+	OpenACC host_data construct to have an use_device clause.
+
+2023-07-28  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/110825
+	* gfortran.texi: Clarify argument passing convention.
+	* trans-expr.cc (gfc_conv_procedure_call): Do not pass the character
+	length as hidden argument when the declared dummy argument is
+	assumed-type.
+
+2023-07-27  Tobias Burnus  <tobias@codesourcery.com>
+
+	* openmp.cc (resolve_omp_target): Minor cleanup.
+	* parse.cc (decode_omp_directive): Find TARGET statement
+	also higher in the stack.
+
+2023-07-26  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/68569
+	* resolve.cc (check_data_variable): Do not accept strings with
+	deferred length or non-constant length in a DATA statement.
+	Reject also substrings of string variables of non-constant length.
+
+2023-07-25  Tobias Burnus  <tobias@codesourcery.com>
+
+	PR fortran/110725
+	PR middle-end/71065
+	* gfortran.h (gfc_omp_clauses): Add target_first_st_is_teams.
+	* parse.cc (parse_omp_structured_block): Set it if the first
+	statement in the structured block of a TARGET is TEAMS or
+	a combined/composite starting with TEAMS.
+	* openmp.cc (resolve_omp_target): Also show an error for
+	contains_teams_construct without target_first_st_is_teams.
+
+2023-07-24  Tobias Burnus  <tobias@codesourcery.com>
+
+	PR fortran/110725
+	PR middle-end/71065
+	* gfortran.h (gfc_omp_clauses): Add contains_teams_construct.
+	* openmp.cc (resolve_omp_target): New; check for teams nesting.
+	(gfc_resolve_omp_directive): Call it.
+	* parse.cc (decode_omp_directive): Set contains_teams_construct
+	on enclosing ST_OMP_TARGET.
+
+2023-07-20  Francois-Xavier Coudert  <fxcoudert@gcc.gnu.org>
+
+	* trans-intrinsic.cc (conv_intrinsic_ieee_comparison): Only
+	define it once.
+
+2023-07-20  Francois-Xavier Coudert  <fxcoudert@gcc.gnu.org>
+
+	* f95-lang.cc (gfc_init_builtin_functions): Add __builtin_iseqsig.
+	* trans-intrinsic.cc (conv_intrinsic_ieee_comparison): New
+	function.
+	(gfc_conv_ieee_arithmetic_function): Handle IEEE comparisons.
+
+2023-07-19  Tobias Burnus  <tobias@codesourcery.com>
+
+	PR fortran/107424
+	* trans-openmp.cc (gfc_nonrect_loop_expr): Accept all
+	constant loop steps.
+	(gfc_trans_omp_do): Likewise; use sign to determine
+	loop direction.
+
 2023-07-17  Harald Anlauf  <anlauf@gmx.de>
 
 	PR fortran/95947

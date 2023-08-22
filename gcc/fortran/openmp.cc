@@ -2250,17 +2250,22 @@ gfc_match_omp_clauses (gfc_omp_clauses **cp, const omp_mask mask,
 		    category = OMP_DEFAULTMAP_CAT_ALLOCATABLE;
 		  else if (gfc_match ("pointer ") == MATCH_YES)
 		    category = OMP_DEFAULTMAP_CAT_POINTER;
+		  else if (gfc_match ("all ") == MATCH_YES)
+		    category = OMP_DEFAULTMAP_CAT_ALL;
 		  else
 		    {
-		      gfc_error ("Expected SCALAR, AGGREGATE, ALLOCATABLE or "
-				 "POINTER at %C");
+		      gfc_error ("Expected SCALAR, AGGREGATE, ALLOCATABLE, "
+				 "POINTER or ALL at %C");
 		      break;
 		    }
 		}
 	      for (int i = 0; i < OMP_DEFAULTMAP_CAT_NUM; ++i)
 		{
 		  if (i != category
-		      && category != OMP_DEFAULTMAP_CAT_UNCATEGORIZED)
+		      && category != OMP_DEFAULTMAP_CAT_UNCATEGORIZED
+		      && category != OMP_DEFAULTMAP_CAT_ALL
+		      && i != OMP_DEFAULTMAP_CAT_UNCATEGORIZED
+		      && i != OMP_DEFAULTMAP_CAT_ALL)
 		    continue;
 		  if (c->defaultmap[i] != OMP_DEFAULTMAP_UNSET)
 		    {
@@ -2268,6 +2273,7 @@ gfc_match_omp_clauses (gfc_omp_clauses **cp, const omp_mask mask,
 		      switch (i)
 			{
 			case OMP_DEFAULTMAP_CAT_UNCATEGORIZED: break;
+			case OMP_DEFAULTMAP_CAT_ALL: pcategory = "ALL"; break;
 			case OMP_DEFAULTMAP_CAT_SCALAR: pcategory = "SCALAR"; break;
 			case OMP_DEFAULTMAP_CAT_AGGREGATE:
 			  pcategory = "AGGREGATE";
@@ -3802,7 +3808,8 @@ error:
 #define OACC_DATA_CLAUSES \
   (omp_mask (OMP_CLAUSE_IF) | OMP_CLAUSE_DEVICEPTR  | OMP_CLAUSE_COPY	      \
    | OMP_CLAUSE_COPYIN | OMP_CLAUSE_COPYOUT | OMP_CLAUSE_CREATE		      \
-   | OMP_CLAUSE_NO_CREATE | OMP_CLAUSE_PRESENT | OMP_CLAUSE_ATTACH)
+   | OMP_CLAUSE_NO_CREATE | OMP_CLAUSE_PRESENT | OMP_CLAUSE_ATTACH	      \
+   | OMP_CLAUSE_DEFAULT)
 #define OACC_LOOP_CLAUSES \
   (omp_mask (OMP_CLAUSE_COLLAPSE) | OMP_CLAUSE_GANG | OMP_CLAUSE_WORKER	      \
    | OMP_CLAUSE_VECTOR | OMP_CLAUSE_SEQ | OMP_CLAUSE_INDEPENDENT	      \
@@ -8926,6 +8933,12 @@ resolve_omp_clauses (gfc_code *code, gfc_omp_clauses *omp_clauses,
 		   "%<MERGEABLE%> clause", &omp_clauses->detach->where);
     }
 
+  if (openacc
+      && code->op == EXEC_OACC_HOST_DATA
+      && omp_clauses->lists[OMP_LIST_USE_DEVICE] == NULL)
+    gfc_error ("%<host_data%> construct at %L requires %<use_device%> clause",
+	       &code->loc);
+
   if (omp_clauses->assume)
     gfc_resolve_omp_assumptions (omp_clauses->assume);
 }
@@ -10653,6 +10666,41 @@ gfc_resolve_oacc_directive (gfc_code *code, gfc_namespace *ns ATTRIBUTE_UNUSED)
 }
 
 
+static void
+resolve_omp_target (gfc_code *code)
+{
+#define GFC_IS_TEAMS_CONSTRUCT(op)			\
+  (op == EXEC_OMP_TEAMS					\
+   || op == EXEC_OMP_TEAMS_DISTRIBUTE			\
+   || op == EXEC_OMP_TEAMS_DISTRIBUTE_SIMD		\
+   || op == EXEC_OMP_TEAMS_DISTRIBUTE_PARALLEL_DO	\
+   || op == EXEC_OMP_TEAMS_DISTRIBUTE_PARALLEL_DO_SIMD	\
+   || op == EXEC_OMP_TEAMS_LOOP)
+
+  if (!code->ext.omp_clauses->contains_teams_construct)
+    return;
+  gfc_code *c = code->block->next;
+  if (code->ext.omp_clauses->target_first_st_is_teams
+      && ((GFC_IS_TEAMS_CONSTRUCT (c->op) && c->next == NULL)
+	  || (c->op == EXEC_BLOCK
+	      && c->next
+	      && GFC_IS_TEAMS_CONSTRUCT (c->next->op)
+	      && c->next->next == NULL)))
+    return;
+  while (c && !GFC_IS_TEAMS_CONSTRUCT (c->op))
+    c = c->next;
+  if (c)
+    gfc_error ("!$OMP TARGET region at %L with a nested TEAMS at %L may not "
+	       "contain any other statement, declaration or directive outside "
+	       "of the single TEAMS construct", &c->loc, &code->loc);
+  else
+    gfc_error ("!$OMP TARGET region at %L with a nested TEAMS may not "
+	       "contain any other statement, declaration or directive outside "
+	       "of the single TEAMS construct", &code->loc);
+#undef GFC_IS_TEAMS_CONSTRUCT
+}
+
+
 /* Resolve OpenMP directive clauses and check various requirements
    of each directive.  */
 
@@ -10703,6 +10751,9 @@ gfc_resolve_omp_directive (gfc_code *code, gfc_namespace *ns)
     case EXEC_OMP_TEAMS_LOOP:
       resolve_omp_do (code);
       break;
+    case EXEC_OMP_TARGET:
+      resolve_omp_target (code);
+      gcc_fallthrough ();
     case EXEC_OMP_ALLOCATE:
     case EXEC_OMP_ALLOCATORS:
     case EXEC_OMP_ASSUME:
@@ -10718,7 +10769,6 @@ gfc_resolve_omp_directive (gfc_code *code, gfc_namespace *ns)
     case EXEC_OMP_SCOPE:
     case EXEC_OMP_SECTIONS:
     case EXEC_OMP_SINGLE:
-    case EXEC_OMP_TARGET:
     case EXEC_OMP_TARGET_DATA:
     case EXEC_OMP_TARGET_ENTER_DATA:
     case EXEC_OMP_TARGET_EXIT_DATA:

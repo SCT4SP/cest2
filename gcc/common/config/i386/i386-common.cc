@@ -107,22 +107,24 @@ along with GCC; see the file COPYING3.  If not see
 #define OPTION_MASK_ISA2_AVX512VP2INTERSECT_SET OPTION_MASK_ISA2_AVX512VP2INTERSECT
 #define OPTION_MASK_ISA2_AMX_TILE_SET OPTION_MASK_ISA2_AMX_TILE
 #define OPTION_MASK_ISA2_AMX_INT8_SET \
-  (OPTION_MASK_ISA2_AMX_TILE | OPTION_MASK_ISA2_AMX_INT8)
+  (OPTION_MASK_ISA2_AMX_TILE_SET | OPTION_MASK_ISA2_AMX_INT8)
 #define OPTION_MASK_ISA2_AMX_BF16_SET \
-  (OPTION_MASK_ISA2_AMX_TILE | OPTION_MASK_ISA2_AMX_BF16)
+  (OPTION_MASK_ISA2_AMX_TILE_SET | OPTION_MASK_ISA2_AMX_BF16)
 #define OPTION_MASK_ISA2_AVXVNNIINT8_SET OPTION_MASK_ISA2_AVXVNNIINT8
 #define OPTION_MASK_ISA2_AVXNECONVERT_SET OPTION_MASK_ISA2_AVXNECONVERT
 #define OPTION_MASK_ISA2_CMPCCXADD_SET OPTION_MASK_ISA2_CMPCCXADD
 #define OPTION_MASK_ISA2_AMX_FP16_SET \
-  (OPTION_MASK_ISA2_AMX_TILE | OPTION_MASK_ISA2_AMX_FP16)
+  (OPTION_MASK_ISA2_AMX_TILE_SET | OPTION_MASK_ISA2_AMX_FP16)
 #define OPTION_MASK_ISA2_PREFETCHI_SET OPTION_MASK_ISA2_PREFETCHI
 #define OPTION_MASK_ISA2_RAOINT_SET OPTION_MASK_ISA2_RAOINT
 #define OPTION_MASK_ISA2_AMX_COMPLEX_SET \
-  (OPTION_MASK_ISA2_AMX_TILE | OPTION_MASK_ISA2_AMX_COMPLEX)
+  (OPTION_MASK_ISA2_AMX_TILE_SET | OPTION_MASK_ISA2_AMX_COMPLEX)
 #define OPTION_MASK_ISA2_AVXVNNIINT16_SET OPTION_MASK_ISA2_AVXVNNIINT16
 #define OPTION_MASK_ISA2_SM3_SET OPTION_MASK_ISA2_SM3
 #define OPTION_MASK_ISA2_SHA512_SET OPTION_MASK_ISA2_SHA512
 #define OPTION_MASK_ISA2_SM4_SET OPTION_MASK_ISA2_SM4
+#define OPTION_MASK_ISA2_AVX10_512BIT_SET OPTION_MASK_ISA2_AVX10_512BIT
+#define OPTION_MASK_ISA2_AVX10_1_SET OPTION_MASK_ISA2_AVX10_1
 
 /* SSE4 includes both SSE4.1 and SSE4.2. -msse4 should be the same
    as -msse4.2.  */
@@ -147,7 +149,7 @@ along with GCC; see the file COPYING3.  If not see
   (OPTION_MASK_ISA_PCLMUL | OPTION_MASK_ISA_SSE2_SET)
 
 #define OPTION_MASK_ISA_ABM_SET \
-  (OPTION_MASK_ISA_ABM | OPTION_MASK_ISA_POPCNT)
+  (OPTION_MASK_ISA_ABM | OPTION_MASK_ISA_POPCNT_SET)
 
 #define OPTION_MASK_ISA2_PCONFIG_SET OPTION_MASK_ISA2_PCONFIG
 #define OPTION_MASK_ISA2_WBNOINVD_SET OPTION_MASK_ISA2_WBNOINVD
@@ -232,7 +234,8 @@ along with GCC; see the file COPYING3.  If not see
 #define OPTION_MASK_ISA2_AVX2_UNSET \
   (OPTION_MASK_ISA2_AVXIFMA_UNSET | OPTION_MASK_ISA2_AVXVNNI_UNSET \
    | OPTION_MASK_ISA2_AVXVNNIINT8_UNSET | OPTION_MASK_ISA2_AVXNECONVERT_UNSET \
-   | OPTION_MASK_ISA2_AVXVNNIINT16_UNSET | OPTION_MASK_ISA2_AVX512F_UNSET)
+   | OPTION_MASK_ISA2_AVXVNNIINT16_UNSET | OPTION_MASK_ISA2_AVX512F_UNSET \
+   | OPTION_MASK_ISA2_AVX10_1_UNSET)
 #define OPTION_MASK_ISA_AVX512F_UNSET \
   (OPTION_MASK_ISA_AVX512F | OPTION_MASK_ISA_AVX512CD_UNSET \
    | OPTION_MASK_ISA_AVX512PF_UNSET | OPTION_MASK_ISA_AVX512ER_UNSET \
@@ -309,6 +312,8 @@ along with GCC; see the file COPYING3.  If not see
 #define OPTION_MASK_ISA2_SM3_UNSET OPTION_MASK_ISA2_SM3
 #define OPTION_MASK_ISA2_SHA512_UNSET OPTION_MASK_ISA2_SHA512
 #define OPTION_MASK_ISA2_SM4_UNSET OPTION_MASK_ISA2_SM4
+#define OPTION_MASK_ISA2_AVX10_512BIT_UNSET OPTION_MASK_ISA2_AVX10_512BIT
+#define OPTION_MASK_ISA2_AVX10_1_UNSET OPTION_MASK_ISA2_AVX10_1
 
 /* SSE4 includes both SSE4.1 and SSE4.2.  -mno-sse4 should the same
    as -mno-sse4.1. */
@@ -381,6 +386,64 @@ set_malign_value (const char **flag, unsigned value)
   char *r = XNEWVEC (char, 6);
   sprintf (r, "%d", 1 << value);
   *flag = r;
+}
+
+/* Emit a warning when using -mno-avx512{f,vl,bw,dq,cd,bf16,fp16,vbmi,vbmi2,
+   vnni,ifma,bitalg,vpopcntdq} with -mavx10.1 and above.  */
+static bool
+ix86_check_avx10 (struct gcc_options *opts)
+{
+  if (opts->x_ix86_isa_flags2 & opts->x_ix86_isa_flags2_explicit
+      & OPTION_MASK_ISA2_AVX10_1)
+    {
+      warning (0, "%<-mno-avx512{f,vl,bw,dq,cd,bf16,fp16,vbmi,vbmi2,vnni,ifma,"
+	       "bitalg,vpopcntdq}%> are ignored with %<-mavx10.1%> and above");
+      return false;
+    }
+
+  return true;
+}
+
+/* Emit a warning when using -mno-avx10.1 with -mavx512{f,vl,bw,dq,cd,bf16,
+   fp16,vbmi,vbmi2,vnni,ifma,bitalg,vpopcntdq}.  */
+static bool
+ix86_check_avx512 (struct gcc_options *opts)
+{
+  if ((opts->x_ix86_isa_flags & opts->x_ix86_isa_flags_explicit
+       & (OPTION_MASK_ISA_AVX512F | OPTION_MASK_ISA_AVX512CD
+	  | OPTION_MASK_ISA_AVX512DQ | OPTION_MASK_ISA_AVX512BW
+	  | OPTION_MASK_ISA_AVX512VL | OPTION_MASK_ISA_AVX512IFMA
+	  | OPTION_MASK_ISA_AVX512VBMI | OPTION_MASK_ISA_AVX512VBMI2
+	  | OPTION_MASK_ISA_AVX512VNNI | OPTION_MASK_ISA_AVX512VPOPCNTDQ
+	  | OPTION_MASK_ISA_AVX512BITALG))
+      || (opts->x_ix86_isa_flags2 & opts->x_ix86_isa_flags2_explicit
+	  & (OPTION_MASK_ISA2_AVX512FP16 | OPTION_MASK_ISA2_AVX512BF16)))
+    {
+      warning (0, "%<-mno-avx10.1%> is ignored when using with "
+	       "%<-mavx512{f,vl,bw,dq,cd,bf16,fp16,vbmi,vbmi2,vnni,"
+	       "ifma,bitalg,vpopcntdq}%>");
+      return false;
+    }
+
+  return true;
+}
+
+/* Emit a warning when there is a conflict vector width in AVX10 options.  */
+static void
+ix86_check_avx10_vector_width (struct gcc_options *opts, bool avx10_max_512)
+{
+  if (avx10_max_512)
+    {
+      if (((opts->x_ix86_isa_flags2 | ~OPTION_MASK_ISA2_AVX10_512BIT)
+	   == ~OPTION_MASK_ISA2_AVX10_512BIT)
+	  && (opts->x_ix86_isa_flags2_explicit & OPTION_MASK_ISA2_AVX10_512BIT))
+	warning (0, "The options used for AVX10 have conflict vector width, "
+		 "using the latter 512 as vector width");
+    }
+  else if (opts->x_ix86_isa_flags2 & opts->x_ix86_isa_flags2_explicit
+	   & OPTION_MASK_ISA2_AVX10_512BIT)
+    warning (0, "The options used for AVX10 have conflict vector width, "
+	     "using the latter 256 as vector width");
 }
 
 /* Implement TARGET_HANDLE_OPTION.  */
@@ -604,7 +667,7 @@ ix86_handle_option (struct gcc_options *opts,
 	  opts->x_ix86_isa_flags |= OPTION_MASK_ISA_AVX512F_SET;
 	  opts->x_ix86_isa_flags_explicit |= OPTION_MASK_ISA_AVX512F_SET;
 	}
-      else
+      else if (ix86_check_avx10 (opts))
 	{
 	  opts->x_ix86_isa_flags &= ~OPTION_MASK_ISA_AVX512F_UNSET;
 	  opts->x_ix86_isa_flags_explicit |= OPTION_MASK_ISA_AVX512F_UNSET;
@@ -619,7 +682,7 @@ ix86_handle_option (struct gcc_options *opts,
 	  opts->x_ix86_isa_flags |= OPTION_MASK_ISA_AVX512CD_SET;
 	  opts->x_ix86_isa_flags_explicit |= OPTION_MASK_ISA_AVX512CD_SET;
 	}
-      else
+      else if (ix86_check_avx10 (opts))
 	{
 	  opts->x_ix86_isa_flags &= ~OPTION_MASK_ISA_AVX512CD_UNSET;
 	  opts->x_ix86_isa_flags_explicit |= OPTION_MASK_ISA_AVX512CD_UNSET;
@@ -893,7 +956,7 @@ ix86_handle_option (struct gcc_options *opts,
 	  opts->x_ix86_isa_flags |= OPTION_MASK_ISA_AVX512VBMI2_SET;
 	  opts->x_ix86_isa_flags_explicit |= OPTION_MASK_ISA_AVX512VBMI2_SET;
 	}
-      else
+      else if (ix86_check_avx10 (opts))
 	{
 	  opts->x_ix86_isa_flags &= ~OPTION_MASK_ISA_AVX512VBMI2_UNSET;
 	  opts->x_ix86_isa_flags_explicit |= OPTION_MASK_ISA_AVX512VBMI2_UNSET;
@@ -908,7 +971,7 @@ ix86_handle_option (struct gcc_options *opts,
 	  opts->x_ix86_isa_flags |= OPTION_MASK_ISA_AVX512FP16_SET;
 	  opts->x_ix86_isa_flags_explicit |= OPTION_MASK_ISA_AVX512FP16_SET;
 	}
-      else
+      else if (ix86_check_avx10 (opts))
 	{
 	  opts->x_ix86_isa_flags2 &= ~OPTION_MASK_ISA2_AVX512FP16_UNSET;
 	  opts->x_ix86_isa_flags2_explicit |= OPTION_MASK_ISA2_AVX512FP16_UNSET;
@@ -921,7 +984,7 @@ ix86_handle_option (struct gcc_options *opts,
 	  opts->x_ix86_isa_flags |= OPTION_MASK_ISA_AVX512VNNI_SET;
 	  opts->x_ix86_isa_flags_explicit |= OPTION_MASK_ISA_AVX512VNNI_SET;
 	}
-      else
+      else if (ix86_check_avx10 (opts))
 	{
 	  opts->x_ix86_isa_flags &= ~OPTION_MASK_ISA_AVX512VNNI_UNSET;
 	  opts->x_ix86_isa_flags_explicit |= OPTION_MASK_ISA_AVX512VNNI_UNSET;
@@ -935,7 +998,7 @@ ix86_handle_option (struct gcc_options *opts,
 	  opts->x_ix86_isa_flags_explicit
 	    |= OPTION_MASK_ISA_AVX512VPOPCNTDQ_SET;
 	}
-      else
+      else if (ix86_check_avx10 (opts))
 	{
 	  opts->x_ix86_isa_flags &= ~OPTION_MASK_ISA_AVX512VPOPCNTDQ_UNSET;
 	  opts->x_ix86_isa_flags_explicit
@@ -949,7 +1012,7 @@ ix86_handle_option (struct gcc_options *opts,
 	  opts->x_ix86_isa_flags |= OPTION_MASK_ISA_AVX512BITALG_SET;
 	  opts->x_ix86_isa_flags_explicit |= OPTION_MASK_ISA_AVX512BITALG_SET;
 	}
-      else
+      else if (ix86_check_avx10 (opts))
 	{
 	  opts->x_ix86_isa_flags &= ~OPTION_MASK_ISA_AVX512BITALG_UNSET;
 	  opts->x_ix86_isa_flags_explicit
@@ -965,7 +1028,7 @@ ix86_handle_option (struct gcc_options *opts,
 	  opts->x_ix86_isa_flags |= OPTION_MASK_ISA_AVX512BW_SET;
 	  opts->x_ix86_isa_flags_explicit |= OPTION_MASK_ISA_AVX512BW_SET;
 	}
-      else
+      else if (ix86_check_avx10 (opts))
 	{
 	  opts->x_ix86_isa_flags2 &= ~OPTION_MASK_ISA2_AVX512BF16_UNSET;
 	  opts->x_ix86_isa_flags2_explicit |= OPTION_MASK_ISA2_AVX512BF16_UNSET;
@@ -1032,7 +1095,7 @@ ix86_handle_option (struct gcc_options *opts,
 	  opts->x_ix86_isa_flags |= OPTION_MASK_ISA_AVX512DQ_SET;
 	  opts->x_ix86_isa_flags_explicit |= OPTION_MASK_ISA_AVX512DQ_SET;
 	}
-      else
+      else if (ix86_check_avx10 (opts))
 	{
 	  opts->x_ix86_isa_flags &= ~OPTION_MASK_ISA_AVX512DQ_UNSET;
 	  opts->x_ix86_isa_flags_explicit |= OPTION_MASK_ISA_AVX512DQ_UNSET;
@@ -1045,7 +1108,7 @@ ix86_handle_option (struct gcc_options *opts,
 	  opts->x_ix86_isa_flags |= OPTION_MASK_ISA_AVX512BW_SET;
 	  opts->x_ix86_isa_flags_explicit |= OPTION_MASK_ISA_AVX512BW_SET;
 	}
-      else
+      else if (ix86_check_avx10 (opts))
 	{
 	  opts->x_ix86_isa_flags &= ~OPTION_MASK_ISA_AVX512BW_UNSET;
 	  opts->x_ix86_isa_flags_explicit |= OPTION_MASK_ISA_AVX512BW_UNSET;
@@ -1060,7 +1123,7 @@ ix86_handle_option (struct gcc_options *opts,
 	  opts->x_ix86_isa_flags |= OPTION_MASK_ISA_AVX512VL_SET;
 	  opts->x_ix86_isa_flags_explicit |= OPTION_MASK_ISA_AVX512VL_SET;
 	}
-      else
+      else if (ix86_check_avx10 (opts))
 	{
 	  opts->x_ix86_isa_flags &= ~OPTION_MASK_ISA_AVX512VL_UNSET;
 	  opts->x_ix86_isa_flags_explicit |= OPTION_MASK_ISA_AVX512VL_UNSET;
@@ -1073,7 +1136,7 @@ ix86_handle_option (struct gcc_options *opts,
 	  opts->x_ix86_isa_flags |= OPTION_MASK_ISA_AVX512IFMA_SET;
 	  opts->x_ix86_isa_flags_explicit |= OPTION_MASK_ISA_AVX512IFMA_SET;
 	}
-      else
+      else if (ix86_check_avx10 (opts))
 	{
 	  opts->x_ix86_isa_flags &= ~OPTION_MASK_ISA_AVX512IFMA_UNSET;
 	  opts->x_ix86_isa_flags_explicit |= OPTION_MASK_ISA_AVX512IFMA_UNSET;
@@ -1086,7 +1149,7 @@ ix86_handle_option (struct gcc_options *opts,
 	  opts->x_ix86_isa_flags |= OPTION_MASK_ISA_AVX512VBMI_SET;
 	  opts->x_ix86_isa_flags_explicit |= OPTION_MASK_ISA_AVX512VBMI_SET;
 	}
-      else
+      else if (ix86_check_avx10 (opts))
 	{
 	  opts->x_ix86_isa_flags &= ~OPTION_MASK_ISA_AVX512VBMI_UNSET;
 	  opts->x_ix86_isa_flags_explicit |= OPTION_MASK_ISA_AVX512VBMI_UNSET;
@@ -1339,6 +1402,54 @@ ix86_handle_option (struct gcc_options *opts,
 	  opts->x_ix86_isa_flags2 &= ~OPTION_MASK_ISA2_SM4_UNSET;
 	  opts->x_ix86_isa_flags2_explicit |= OPTION_MASK_ISA2_SM4_UNSET;
 	}
+      return true;
+
+    case OPT_mavx10_max_512bit:
+      if (value)
+	{
+	  opts->x_ix86_isa_flags2 |= OPTION_MASK_ISA2_AVX10_512BIT_SET;
+	  opts->x_ix86_isa_flags2_explicit |= OPTION_MASK_ISA2_AVX10_512BIT_SET;
+	}
+      else
+	{
+	  opts->x_ix86_isa_flags2 &= ~OPTION_MASK_ISA2_AVX10_512BIT_UNSET;
+	  opts->x_ix86_isa_flags2_explicit |= OPTION_MASK_ISA2_AVX10_512BIT_UNSET;
+	}
+      return true;
+
+    case OPT_mavx10_1:
+      if (value)
+	{
+	  opts->x_ix86_isa_flags2 |= OPTION_MASK_ISA2_AVX10_1_SET;
+	  opts->x_ix86_isa_flags2_explicit |= OPTION_MASK_ISA2_AVX10_1_SET;
+	  opts->x_ix86_isa_flags |= OPTION_MASK_ISA_AVX2_SET;
+	  opts->x_ix86_isa_flags_explicit |= OPTION_MASK_ISA_AVX2_SET;
+	}
+      else if (ix86_check_avx512 (opts))
+	{
+	  opts->x_ix86_isa_flags2 &= ~OPTION_MASK_ISA2_AVX10_1_UNSET;
+	  opts->x_ix86_isa_flags2_explicit |= OPTION_MASK_ISA2_AVX10_1_UNSET;
+	}
+      return true;
+
+    case OPT_mavx10_1_256:
+      ix86_check_avx10_vector_width (opts, false);
+      opts->x_ix86_isa_flags2 |= OPTION_MASK_ISA2_AVX10_1_SET;
+      opts->x_ix86_isa_flags2_explicit |= OPTION_MASK_ISA2_AVX10_1_SET;
+      opts->x_ix86_isa_flags2 &= ~OPTION_MASK_ISA2_AVX10_512BIT_SET;
+      opts->x_ix86_isa_flags2_explicit |= OPTION_MASK_ISA2_AVX10_512BIT_SET;
+      opts->x_ix86_isa_flags |= OPTION_MASK_ISA_AVX2_SET;
+      opts->x_ix86_isa_flags_explicit |= OPTION_MASK_ISA_AVX2_SET;
+      return true;
+
+    case OPT_mavx10_1_512:
+      ix86_check_avx10_vector_width (opts, true);
+      opts->x_ix86_isa_flags2 |= OPTION_MASK_ISA2_AVX10_1_SET;
+      opts->x_ix86_isa_flags2_explicit |= OPTION_MASK_ISA2_AVX10_1_SET;
+      opts->x_ix86_isa_flags2 |= OPTION_MASK_ISA2_AVX10_512BIT_SET;
+      opts->x_ix86_isa_flags2_explicit |= OPTION_MASK_ISA2_AVX10_512BIT_SET;
+      opts->x_ix86_isa_flags |= OPTION_MASK_ISA_AVX2_SET;
+      opts->x_ix86_isa_flags_explicit |= OPTION_MASK_ISA_AVX2_SET;
       return true;
 
     case OPT_mfma:
@@ -2190,6 +2301,8 @@ const pta processor_alias_table[] =
     M_CPU_TYPE (INTEL_GOLDMONT_PLUS), P_PROC_SSE4_2},
   {"tremont", PROCESSOR_TREMONT, CPU_HASWELL, PTA_TREMONT,
     M_CPU_TYPE (INTEL_TREMONT), P_PROC_SSE4_2},
+  {"gracemont", PROCESSOR_ALDERLAKE, CPU_HASWELL, PTA_ALDERLAKE,
+   M_CPU_SUBTYPE (INTEL_COREI7_ALDERLAKE), P_PROC_AVX2},
   {"sierraforest", PROCESSOR_SIERRAFOREST, CPU_HASWELL, PTA_SIERRAFOREST,
     M_CPU_SUBTYPE (INTEL_SIERRAFOREST), P_PROC_AVX2},
   {"grandridge", PROCESSOR_GRANDRIDGE, CPU_HASWELL, PTA_GRANDRIDGE,

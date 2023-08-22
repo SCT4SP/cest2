@@ -7703,6 +7703,47 @@ fold_loop_internal_call (gimple *g, tree value)
       FOR_EACH_IMM_USE_ON_STMT (use_p, iter)
 	SET_USE (use_p, value);
       update_stmt (use_stmt);
+      /* If we turn conditional to constant, scale profile counts.
+	 We know that the conditional was created by loop distribution
+	 and all basic blocks dominated by the taken edge are part of
+	 the loop distributed.  */
+      if (gimple_code (use_stmt) == GIMPLE_COND)
+	{
+	  edge true_edge, false_edge;
+	  extract_true_false_edges_from_block (gimple_bb (use_stmt),
+					       &true_edge, &false_edge);
+	  edge taken_edge = NULL, other_edge = NULL;
+	  if (gimple_cond_true_p (as_a <gcond *>(use_stmt)))
+	    {
+	      taken_edge = true_edge;
+	      other_edge = false_edge;
+	    }
+	  else if (gimple_cond_false_p (as_a <gcond *>(use_stmt)))
+	    {
+	      taken_edge = false_edge;
+	      other_edge = true_edge;
+	    }
+	  if (taken_edge
+	      && !(taken_edge->probability == profile_probability::always ()))
+	    {
+	      profile_count old_count = taken_edge->count ();
+	      profile_count new_count = taken_edge->src->count;
+	      taken_edge->probability = profile_probability::always ();
+	      other_edge->probability = profile_probability::never ();
+	      /* If we have multiple predecessors, we can't use the dominance
+		 test.  This should not happen as the guarded code should
+		 start with pre-header.  */
+	      gcc_assert (single_pred_edge (taken_edge->dest));
+	      if (old_count.nonzero_p ())
+		{
+		  taken_edge->dest->count
+		    = taken_edge->dest->count.apply_scale (new_count,
+							   old_count);
+		  scale_strictly_dominated_blocks (taken_edge->dest,
+						   new_count, old_count);
+		}
+	    }
+	}
     }
 }
 
@@ -8479,6 +8520,59 @@ print_loops_bb (FILE *file, basic_block bb, int indent, int verbosity)
     }
 }
 
+/* Print loop information.  */
+
+void
+print_loop_info (FILE *file, const class loop *loop, const char *prefix)
+{
+  if (loop->can_be_parallel)
+    fprintf (file, ", can_be_parallel");
+  if (loop->warned_aggressive_loop_optimizations)
+    fprintf (file, ", warned_aggressive_loop_optimizations");
+  if (loop->dont_vectorize)
+    fprintf (file, ", dont_vectorize");
+  if (loop->force_vectorize)
+    fprintf (file, ", force_vectorize");
+  if (loop->in_oacc_kernels_region)
+    fprintf (file, ", in_oacc_kernels_region");
+  if (loop->finite_p)
+    fprintf (file, ", finite_p");
+  if (loop->unroll)
+    fprintf (file, "\n%sunroll %d", prefix, loop->unroll);
+  if (loop->nb_iterations)
+    {
+      fprintf (file, "\n%sniter ", prefix);
+      print_generic_expr (file, loop->nb_iterations);
+    }
+
+  if (loop->any_upper_bound)
+    {
+      fprintf (file, "\n%supper_bound ", prefix);
+      print_decu (loop->nb_iterations_upper_bound, file);
+    }
+  if (loop->any_likely_upper_bound)
+    {
+      fprintf (file, "\n%slikely_upper_bound ", prefix);
+      print_decu (loop->nb_iterations_likely_upper_bound, file);
+    }
+
+  if (loop->any_estimate)
+    {
+      fprintf (file, "\n%sestimate ", prefix);
+      print_decu (loop->nb_iterations_estimate, file);
+    }
+  bool reliable;
+  sreal iterations;
+  if (loop->num && expected_loop_iterations_by_profile (loop, &iterations, &reliable))
+    {
+      fprintf (file, "\n%siterations by profile: %f (%s%s) entry count:", prefix,
+	       iterations.to_double (), reliable ? "reliable" : "unreliable",
+	       maybe_flat_loop_profile (loop) ? ", maybe flat" : "");
+      loop_count_in (loop).dump (file, cfun);
+    }
+
+}
+
 static void print_loop_and_siblings (FILE *, class loop *, int, int);
 
 /* Pretty print LOOP on FILE, indented INDENT spaces.  Following
@@ -8511,27 +8605,7 @@ print_loop (FILE *file, class loop *loop, int indent, int verbosity)
     fprintf (file, ", latch = %d", loop->latch->index);
   else
     fprintf (file, ", multiple latches");
-  fprintf (file, ", niter = ");
-  print_generic_expr (file, loop->nb_iterations);
-
-  if (loop->any_upper_bound)
-    {
-      fprintf (file, ", upper_bound = ");
-      print_decu (loop->nb_iterations_upper_bound, file);
-    }
-  if (loop->any_likely_upper_bound)
-    {
-      fprintf (file, ", likely_upper_bound = ");
-      print_decu (loop->nb_iterations_likely_upper_bound, file);
-    }
-
-  if (loop->any_estimate)
-    {
-      fprintf (file, ", estimate = ");
-      print_decu (loop->nb_iterations_estimate, file);
-    }
-  if (loop->unroll)
-    fprintf (file, ", unroll = %d", loop->unroll);
+  print_loop_info (file, loop, s_indent);
   fprintf (file, ")\n");
 
   /* Print loop's body.  */

@@ -71,6 +71,8 @@ static const riscv_implied_info_t riscv_implied_info[] =
   {"zks", "zksed"},
   {"zks", "zksh"},
 
+  {"ztso", "a"},
+
   {"v", "zvl128b"},
   {"v", "zve64d"},
 
@@ -128,6 +130,16 @@ static const riscv_implied_info_t riscv_implied_info[] =
   {"zhinx", "zhinxmin"},
   {"zhinxmin", "zfinx"},
 
+  {"zce",  "zca"},
+  {"zce",  "zcb"},
+  {"zce",  "zcmp"},
+  {"zce",  "zcmt"},
+  {"zcf",  "zca"},
+  {"zcd",  "zca"},
+  {"zcb",  "zca"},
+  {"zcmp", "zca"},
+  {"zcmt", "zca"},
+
   {NULL, NULL}
 };
 
@@ -183,6 +195,8 @@ static const struct riscv_ext_version riscv_ext_version_table[] =
   {"zifencei", ISA_SPEC_CLASS_20191213, 2, 0},
   {"zifencei", ISA_SPEC_CLASS_20190608, 2, 0},
 
+  {"zicond", ISA_SPEC_CLASS_NONE, 1, 0},
+
   {"zawrs", ISA_SPEC_CLASS_NONE, 1, 0},
 
   {"zba", ISA_SPEC_CLASS_NONE, 1, 0},
@@ -216,9 +230,10 @@ static const struct riscv_ext_version riscv_ext_version_table[] =
   {"zkn",   ISA_SPEC_CLASS_NONE, 1, 0},
   {"zks",   ISA_SPEC_CLASS_NONE, 1, 0},
 
+  {"ztso",  ISA_SPEC_CLASS_NONE, 1, 0},
+
   {"zve32x", ISA_SPEC_CLASS_NONE, 1, 0},
   {"zve32f", ISA_SPEC_CLASS_NONE, 1, 0},
-  {"zve32d", ISA_SPEC_CLASS_NONE, 1, 0},
   {"zve64x", ISA_SPEC_CLASS_NONE, 1, 0},
   {"zve64f", ISA_SPEC_CLASS_NONE, 1, 0},
   {"zve64d", ISA_SPEC_CLASS_NONE, 1, 0},
@@ -258,6 +273,14 @@ static const struct riscv_ext_version riscv_ext_version_table[] =
   {"zvfh",      ISA_SPEC_CLASS_NONE, 1, 0},
 
   {"zmmul", ISA_SPEC_CLASS_NONE, 1, 0},
+
+  {"zca",  ISA_SPEC_CLASS_NONE, 1, 0},
+  {"zcb",  ISA_SPEC_CLASS_NONE, 1, 0},
+  {"zce",  ISA_SPEC_CLASS_NONE, 1, 0},
+  {"zcf",  ISA_SPEC_CLASS_NONE, 1, 0},
+  {"zcd",  ISA_SPEC_CLASS_NONE, 1, 0},
+  {"zcmp", ISA_SPEC_CLASS_NONE, 1, 0},
+  {"zcmt", ISA_SPEC_CLASS_NONE, 1, 0},
 
   {"svinval", ISA_SPEC_CLASS_NONE, 1, 0},
   {"svnapot", ISA_SPEC_CLASS_NONE, 1, 0},
@@ -573,7 +596,7 @@ riscv_subset_list::add (const char *subset, int major_version,
   else if (subset[0] == 'z' && !standard_extensions_p (subset))
     {
       error_at (m_loc,
-		"%<-march=%s%>: extension %qs starts with `z` but is "
+		"%<-march=%s%>: extension %qs starts with 'z' but is "
 		"unsupported standard extension",
 		m_arch, subset);
       return;
@@ -581,7 +604,7 @@ riscv_subset_list::add (const char *subset, int major_version,
   else if (subset[0] == 's' && !standard_extensions_p (subset))
     {
       error_at (m_loc,
-		"%<-march=%s%>: extension %qs starts with `s` but is "
+		"%<-march=%s%>: extension %qs starts with 's' but is "
 		"unsupported standard supervisor extension",
 		m_arch, subset);
       return;
@@ -589,7 +612,7 @@ riscv_subset_list::add (const char *subset, int major_version,
   else if (subset[0] == 'x' && !standard_extensions_p (subset))
     {
       error_at (m_loc,
-		"%<-march=%s%>: extension %qs starts with `x` but is "
+		"%<-march=%s%>: extension %qs starts with 'x' but is "
 		"unsupported non-standard extension",
 		m_arch, subset);
       return;
@@ -1264,10 +1287,21 @@ riscv_subset_list::parse (const char *arch, location_t loc)
       subset_list->handle_implied_ext (itr->name.c_str ());
     }
 
+  /* Zce only implies zcf when RV32 and 'f' extension exist.  */
+  if (subset_list->lookup ("zce") != NULL
+	&& subset_list->m_xlen == 32
+	&& subset_list->lookup ("f") != NULL
+	&& subset_list->lookup ("zcf") == NULL)
+    subset_list->add ("zcf", false);
+
   /* Make sure all implied extensions are included. */
   gcc_assert (subset_list->check_implied_ext ());
 
   subset_list->handle_combine_ext ();
+
+  if (subset_list->lookup ("zcf") && subset_list->m_xlen == 64)
+    error_at (loc, "%<-march=%s%>: zcf extension supports in rv32 only"
+		  , arch);
 
   if (subset_list->lookup ("zfinx") && subset_list->lookup ("f"))
     error_at (loc, "%<-march=%s%>: z*inx conflicts with floating-point "
@@ -1316,6 +1350,7 @@ static const riscv_ext_flag_table_t riscv_ext_flag_table[] =
 
   {"zicsr",    &gcc_options::x_riscv_zi_subext, MASK_ZICSR},
   {"zifencei", &gcc_options::x_riscv_zi_subext, MASK_ZIFENCEI},
+  {"zicond",   &gcc_options::x_riscv_zi_subext, MASK_ZICOND},
 
   {"zawrs", &gcc_options::x_riscv_za_subext, MASK_ZAWRS},
 
@@ -1401,8 +1436,19 @@ static const riscv_ext_flag_table_t riscv_ext_flag_table[] =
 
   {"zmmul", &gcc_options::x_riscv_zm_subext, MASK_ZMMUL},
 
+  /* Code-size reduction extensions.  */
+  {"zca",     &gcc_options::x_riscv_zc_subext, MASK_ZCA},
+  {"zcb",     &gcc_options::x_riscv_zc_subext, MASK_ZCB},
+  {"zce",     &gcc_options::x_riscv_zc_subext, MASK_ZCE},
+  {"zcf",     &gcc_options::x_riscv_zc_subext, MASK_ZCF},
+  {"zcd",     &gcc_options::x_riscv_zc_subext, MASK_ZCD},
+  {"zcmp",    &gcc_options::x_riscv_zc_subext, MASK_ZCMP},
+  {"zcmt",    &gcc_options::x_riscv_zc_subext, MASK_ZCMT},
+
   {"svinval", &gcc_options::x_riscv_sv_subext, MASK_SVINVAL},
   {"svnapot", &gcc_options::x_riscv_sv_subext, MASK_SVNAPOT},
+
+  {"ztso", &gcc_options::x_riscv_ztso_subext, MASK_ZTSO},
 
   {"xtheadba",      &gcc_options::x_riscv_xthead_subext, MASK_XTHEADBA},
   {"xtheadbb",      &gcc_options::x_riscv_xthead_subext, MASK_XTHEADBB},

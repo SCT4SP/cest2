@@ -186,7 +186,7 @@ ASM_MISA_SPEC
 #define PARM_BOUNDARY BITS_PER_WORD
 
 /* Allocation boundary (in *bits*) for the code of a function.  */
-#define FUNCTION_BOUNDARY (TARGET_RVC ? 16 : 32)
+#define FUNCTION_BOUNDARY ((TARGET_RVC || TARGET_ZCA) ? 16 : 32)
 
 /* The smallest supported stack boundary the calling convention supports.  */
 #define STACK_BOUNDARY \
@@ -1040,6 +1040,7 @@ extern unsigned riscv_stack_boundary;
 extern unsigned riscv_bytes_per_vector_chunk;
 extern poly_uint16 riscv_vector_chunks;
 extern poly_int64 riscv_v_adjust_nunits (enum machine_mode, int);
+extern poly_int64 riscv_v_adjust_nunits (machine_mode, bool, int, int);
 extern poly_int64 riscv_v_adjust_precision (enum machine_mode, int);
 extern poly_int64 riscv_v_adjust_bytesize (enum machine_mode, int);
 /* The number of bits and bytes in a RVV vector.  */
@@ -1119,6 +1120,6 @@ extern void riscv_remove_unneeded_save_restore_calls (void);
 
 /* Mode switching (Lazy code motion) for RVV rounding mode instructions.  */
 #define OPTIMIZE_MODE_SWITCHING(ENTITY) (TARGET_VECTOR)
-#define NUM_MODES_FOR_MODE_SWITCHING {VXRM_MODE_NONE, FRM_MODE_NONE}
+#define NUM_MODES_FOR_MODE_SWITCHING {VXRM_MODE_NONE, riscv_vector::FRM_NONE}
 
 #endif /* ! GCC_RISCV_H */

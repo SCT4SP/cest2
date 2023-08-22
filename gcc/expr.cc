@@ -2622,16 +2622,11 @@ emit_group_load_1 (rtx *tmps, rtx dst, rtx orig_src, tree type,
 	 be loaded directly into the destination.  */
       src = orig_src;
       if (!MEM_P (orig_src)
-	  && (!CONSTANT_P (orig_src)
-	      || (GET_MODE (orig_src) != mode
-		  && GET_MODE (orig_src) != VOIDmode)))
+	  && (!REG_P (orig_src) || HARD_REGISTER_P (orig_src))
+	  && !CONSTANT_P (orig_src))
 	{
-	  if (GET_MODE (orig_src) == VOIDmode)
-	    src = gen_reg_rtx (mode);
-	  else
-	    src = gen_reg_rtx (GET_MODE (orig_src));
-
-	  emit_move_insn (src, orig_src);
+	  gcc_assert (GET_MODE (orig_src) != VOIDmode);
+	  src = force_reg (GET_MODE (orig_src), orig_src);
 	}
 
       /* Optimize the access just a bit.  */
@@ -11253,17 +11248,15 @@ expand_expr_real_1 (tree exp, rtx target, machine_mode tmode,
 	set_mem_addr_space (temp, as);
 	if (TREE_THIS_VOLATILE (exp))
 	  MEM_VOLATILE_P (temp) = 1;
-	if (modifier != EXPAND_WRITE
-	    && modifier != EXPAND_MEMORY
-	    && !inner_reference_p
+	if (modifier == EXPAND_WRITE || modifier == EXPAND_MEMORY)
+	  return temp;
+	if (!inner_reference_p
 	    && mode != BLKmode
 	    && align < GET_MODE_ALIGNMENT (mode))
 	  temp = expand_misaligned_mem_ref (temp, mode, unsignedp, align,
 					    modifier == EXPAND_STACK_PARM
 					    ? NULL_RTX : target, alt_rtl);
-	if (reverse
-	    && modifier != EXPAND_MEMORY
-	    && modifier != EXPAND_WRITE)
+	if (reverse)
 	  temp = flip_storage_order (mode, temp);
 	return temp;
       }

@@ -74,6 +74,9 @@ along with GCC; see the file COPYING3.  If not see
 #include "ipa-modref-tree.h"
 #include "ipa-modref.h"
 #include "tree-ssa-sccvn.h"
+#include "alloc-pool.h"
+#include "symbol-summary.h"
+#include "ipa-prop.h"
 
 /* This algorithm is based on the SCC algorithm presented by Keith
    Cooper and L. Taylor Simpson in "SCC-Based Value numbering"
@@ -2327,7 +2330,7 @@ vn_walk_cb_data::push_partial_def (pd_data pd,
    with the current VUSE and performs the expression lookup.  */
 
 static void *
-vn_reference_lookup_2 (ao_ref *op ATTRIBUTE_UNUSED, tree vuse, void *data_)
+vn_reference_lookup_2 (ao_ref *op, tree vuse, void *data_)
 {
   vn_walk_cb_data *data = (vn_walk_cb_data *)data_;
   vn_reference_t vr = data->vr;
@@ -2359,6 +2362,35 @@ vn_reference_lookup_2 (ao_ref *op ATTRIBUTE_UNUSED, tree vuse, void *data_)
       if ((*slot)->result && data->saved_operands.exists ())
 	return data->finish (vr->set, vr->base_set, (*slot)->result);
       return *slot;
+    }
+
+  if (SSA_NAME_IS_DEFAULT_DEF (vuse))
+    {
+      HOST_WIDE_INT op_offset, op_size;
+      tree v = NULL_TREE;
+      tree base = ao_ref_base (op);
+
+      if (base
+	  && op->offset.is_constant (&op_offset)
+	  && op->size.is_constant (&op_size)
+	  && op->max_size_known_p ()
+	  && known_eq (op->size, op->max_size))
+	{
+	  if (TREE_CODE (base) == PARM_DECL)
+	    v = ipcp_get_aggregate_const (cfun, base, false, op_offset,
+					  op_size);
+	  else if (TREE_CODE (base) == MEM_REF
+		   && integer_zerop (TREE_OPERAND (base, 1))
+		   && TREE_CODE (TREE_OPERAND (base, 0)) == SSA_NAME
+		   && SSA_NAME_IS_DEFAULT_DEF (TREE_OPERAND (base, 0))
+		   && (TREE_CODE (SSA_NAME_VAR (TREE_OPERAND (base, 0)))
+		       == PARM_DECL))
+	    v = ipcp_get_aggregate_const (cfun,
+					  SSA_NAME_VAR (TREE_OPERAND (base, 0)),
+					  true, op_offset, op_size);
+	}
+      if (v)
+	return data->finish (vr->set, vr->base_set, v);
     }
 
   return NULL;
@@ -3299,11 +3331,14 @@ vn_reference_lookup_3 (ao_ref *ref, tree vuse, void *data_,
 	    return (void *)-1;
 	  break;
 	case IFN_LEN_STORE:
-	  len = gimple_call_arg (call, 2);
-	  bias = gimple_call_arg (call, 4);
-	  if (!tree_fits_uhwi_p (len) || !tree_fits_shwi_p (bias))
-	    return (void *)-1;
-	  break;
+	  {
+	    int len_index = internal_fn_len_index (fn);
+	    len = gimple_call_arg (call, len_index);
+	    bias = gimple_call_arg (call, len_index + 1);
+	    if (!tree_fits_uhwi_p (len) || !tree_fits_shwi_p (bias))
+	      return (void *) -1;
+	    break;
+	  }
 	default:
 	  return (void *)-1;
 	}
@@ -6594,7 +6629,24 @@ eliminate_dom_walker::eliminate_avail (basic_block, tree op)
       if (SSA_NAME_IS_DEFAULT_DEF (valnum))
 	return valnum;
       if (avail.length () > SSA_NAME_VERSION (valnum))
-	return avail[SSA_NAME_VERSION (valnum)];
+	{
+	  tree av = avail[SSA_NAME_VERSION (valnum)];
+	  /* When PRE discovers a new redundancy there's no way to unite
+	     the value classes so it instead inserts a copy old-val = new-val.
+	     Look through such copies here, providing one more level of
+	     simplification at elimination time.  */
+	  gassign *ass;
+	  if (av && (ass = dyn_cast <gassign *> (SSA_NAME_DEF_STMT (av))))
+	    if (gimple_assign_rhs_class (ass) == GIMPLE_SINGLE_RHS)
+	      {
+		tree rhs1 = gimple_assign_rhs1 (ass);
+		if (CONSTANT_CLASS_P (rhs1)
+		    || (TREE_CODE (rhs1) == SSA_NAME
+			&& !SSA_NAME_OCCURS_IN_ABNORMAL_PHI (rhs1)))
+		  av = rhs1;
+	      }
+	  return av;
+	}
     }
   else if (is_gimple_min_invariant (valnum))
     return valnum;

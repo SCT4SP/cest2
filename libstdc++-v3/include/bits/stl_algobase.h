@@ -79,6 +79,9 @@
 # include <compare>
 #endif
 
+#define __glibcxx_want_robust_nonmodifying_seq_ops
+#include <bits/version.h>
+
 namespace std _GLIBCXX_VISIBILITY(default)
 {
 _GLIBCXX_BEGIN_NAMESPACE_VERSION
@@ -1533,15 +1536,12 @@ _GLIBCXX_END_NAMESPACE_CONTAINER
       return std::__bit_width(make_unsigned_t<_Tp>(__n)) - 1;
 #else
       // Use +__n so it promotes to at least int.
-      const int __sz = sizeof(+__n);
-      int __w = __sz * __CHAR_BIT__ - 1;
-      if (__sz == sizeof(long long))
-	__w -= __builtin_clzll(+__n);
-      else if (__sz == sizeof(long))
-	__w -= __builtin_clzl(+__n);
-      else if (__sz == sizeof(int))
-	__w -= __builtin_clz(+__n);
-      return __w;
+      return (sizeof(+__n) * __CHAR_BIT__ - 1)
+	       - (sizeof(+__n) == sizeof(long long)
+		    ? __builtin_clzll(+__n)
+		    : (sizeof(+__n) == sizeof(long)
+			 ? __builtin_clzl(+__n)
+			 : __builtin_clz(+__n)));
 #endif
     }
 
@@ -1663,10 +1663,7 @@ _GLIBCXX_BEGIN_NAMESPACE_ALGO
     }
 #endif // C++11
 
-#if __cplusplus > 201103L
-
-#define __cpp_lib_robust_nonmodifying_seq_ops 201304L
-
+#ifdef __cpp_lib_robust_nonmodifying_seq_ops // C++ >= 14
   /**
    *  @brief Tests a range for element-wise equality.
    *  @ingroup non_mutating_algorithms
@@ -1728,7 +1725,7 @@ _GLIBCXX_BEGIN_NAMESPACE_ALGO
       return _GLIBCXX_STD_A::__equal4(__first1, __last1, __first2, __last2,
 				      __binary_pred);
     }
-#endif // C++14
+#endif // __cpp_lib_robust_nonmodifying_seq_ops
 
   /**
    *  @brief Performs @b dictionary comparison on ranges.
@@ -1970,8 +1967,7 @@ _GLIBCXX_BEGIN_NAMESPACE_ALGO
 	__gnu_cxx::__ops::__iter_comp_iter(__binary_pred));
     }
 
-#if __cplusplus > 201103L
-
+#if __cpp_lib_robust_nonmodifying_seq_ops // C++ >= 14
   template<typename _InputIterator1, typename _InputIterator2,
 	   typename _BinaryPredicate>
     _GLIBCXX20_CONSTEXPR

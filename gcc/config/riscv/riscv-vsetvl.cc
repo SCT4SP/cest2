@@ -333,7 +333,9 @@ anticipatable_occurrence_p (const bb_info *bb, const vector_insn_info dem)
   if (dem.has_avl_reg ())
     {
       /* rs1 (avl) are not modified in the basic block prior to the VSETVL.  */
-      if (!vlmax_avl_p (dem.get_avl ()))
+      rtx avl
+	= has_vl_op (insn->rtl ()) ? get_vl (insn->rtl ()) : dem.get_avl ();
+      if (!vlmax_avl_p (avl))
 	{
 	  set_info *set = dem.get_avl_source ();
 	  /* If it's undefined, it's not anticipatable conservatively.  */
@@ -892,9 +894,9 @@ change_insn (function_info *ssa, insn_change change, insn_info *insn,
     return false;
 
   /* Fix bug:
-      (insn 12 34 13 2 (set (reg:VNx8DI 120 v24 [orig:134 _1 ] [134])
-	(if_then_else:VNx8DI (unspec:VNx8BI [
-		    (const_vector:VNx8BI repeat [
+      (insn 12 34 13 2 (set (reg:RVVM4DI 120 v24 [orig:134 _1 ] [134])
+	(if_then_else:RVVM4DI (unspec:RVVMF8BI [
+		    (const_vector:RVVMF8BI repeat [
 			    (const_int 1 [0x1])
 			])
 		    (const_int 0 [0])
@@ -903,13 +905,13 @@ change_insn (function_info *ssa, insn_change change, insn_info *insn,
 		    (reg:SI 66 vl)
 		    (reg:SI 67 vtype)
 		] UNSPEC_VPREDICATE)
-	    (plus:VNx8DI (reg/v:VNx8DI 104 v8 [orig:137 op1 ] [137])
-		(sign_extend:VNx8DI (vec_duplicate:VNx8SI (reg:SI 15 a5
-    [140])))) (unspec:VNx8DI [ (const_int 0 [0]) ] UNSPEC_VUNDEF))) "rvv.c":8:12
+	    (plus:RVVM4DI (reg/v:RVVM4DI 104 v8 [orig:137 op1 ] [137])
+		(sign_extend:RVVM4DI (vec_duplicate:RVVM4SI (reg:SI 15 a5
+    [140])))) (unspec:RVVM4DI [ (const_int 0 [0]) ] UNSPEC_VUNDEF))) "rvv.c":8:12
     2784 {pred_single_widen_addsvnx8di_scalar} (expr_list:REG_EQUIV
-    (mem/c:VNx8DI (reg:DI 10 a0 [142]) [1 <retval>+0 S[64, 64] A128])
-	(expr_list:REG_EQUAL (if_then_else:VNx8DI (unspec:VNx8BI [
-			(const_vector:VNx8BI repeat [
+    (mem/c:RVVM4DI (reg:DI 10 a0 [142]) [1 <retval>+0 S[64, 64] A128])
+	(expr_list:REG_EQUAL (if_then_else:RVVM4DI (unspec:RVVMF8BI [
+			(const_vector:RVVMF8BI repeat [
 				(const_int 1 [0x1])
 			    ])
 			(reg/v:DI 13 a3 [orig:139 vl ] [139])
@@ -918,11 +920,11 @@ change_insn (function_info *ssa, insn_change change, insn_info *insn,
 			(reg:SI 66 vl)
 			(reg:SI 67 vtype)
 		    ] UNSPEC_VPREDICATE)
-		(plus:VNx8DI (reg/v:VNx8DI 104 v8 [orig:137 op1 ] [137])
-		    (const_vector:VNx8DI repeat [
+		(plus:RVVM4DI (reg/v:RVVM4DI 104 v8 [orig:137 op1 ] [137])
+		    (const_vector:RVVM4DI repeat [
 			    (const_int 2730 [0xaaa])
 			]))
-		(unspec:VNx8DI [
+		(unspec:RVVM4DI [
 			(const_int 0 [0])
 		    ] UNSPEC_VUNDEF))
 	    (nil))))
@@ -1182,17 +1184,35 @@ second_ratio_invalid_for_first_lmul_p (const vector_insn_info &info1,
 }
 
 static bool
+float_insn_valid_sew_p (const vector_insn_info &info, unsigned int sew)
+{
+  if (info.get_insn () && info.get_insn ()->is_real ()
+      && get_attr_type (info.get_insn ()->rtl ()) == TYPE_VFMOVFV)
+    {
+      if (sew == 16)
+	return TARGET_VECTOR_ELEN_FP_16;
+      else if (sew == 32)
+	return TARGET_VECTOR_ELEN_FP_32;
+      else if (sew == 64)
+	return TARGET_VECTOR_ELEN_FP_64;
+    }
+  return true;
+}
+
+static bool
 second_sew_less_than_first_sew_p (const vector_insn_info &info1,
 				  const vector_insn_info &info2)
 {
-  return info2.get_sew () < info1.get_sew ();
+  return info2.get_sew () < info1.get_sew ()
+	 || !float_insn_valid_sew_p (info1, info2.get_sew ());
 }
 
 static bool
 first_sew_less_than_second_sew_p (const vector_insn_info &info1,
 				  const vector_insn_info &info2)
 {
-  return info1.get_sew () < info2.get_sew ();
+  return info1.get_sew () < info2.get_sew ()
+	 || !float_insn_valid_sew_p (info2, info1.get_sew ());
 }
 
 /* return 0 if LMUL1 == LMUL2.
@@ -3310,6 +3330,23 @@ pass_vsetvl::backward_demand_fusion (void)
 	  else if (block_info.reaching_out.dirty_p ())
 	    {
 	      /* DIRTY -> DIRTY or VALID -> DIRTY.  */
+
+	      /* Forbidden this case fuse because it change the value of a5.
+		   bb 1: vsetvl zero, no_zero_avl
+			 ...
+			 use a5
+			 ...
+		   bb 2: vsetvl a5, zero
+		 =>
+		   bb 1: vsetvl a5, zero
+			 ...
+			 use a5
+			 ...
+		   bb 2:
+	      */
+	      if (block_info.reaching_out.demand_p (DEMAND_NONZERO_AVL)
+		  && vlmax_avl_p (prop.get_avl ()))
+		continue;
 	      vector_insn_info new_info;
 
 	      if (block_info.reaching_out.compatible_p (prop))

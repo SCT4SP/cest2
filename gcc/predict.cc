@@ -790,7 +790,7 @@ dump_prediction (FILE *file, enum br_predictor predictor, int probability,
     {
       fprintf (file, "  exec ");
       bb->count.dump (file);
-      if (e)
+      if (e && e->count ().initialized_p () && bb->count.to_gcov_type ())
 	{
 	  fprintf (file, " hit ");
 	  e->count ().dump (file);
@@ -4003,8 +4003,8 @@ estimate_bb_frequencies ()
 		break;
 	      }
 	}
-      tmp = tmp * freq_max + sreal (1, -1);
-      profile_count count = profile_count::from_gcov_type (tmp.to_int ());
+      tmp = tmp * freq_max;
+      profile_count count = profile_count::from_gcov_type (tmp.to_nearest_int ());
 
       /* If we have profile feedback in which this function was never
 	 executed, then preserve this info.  */
@@ -4142,11 +4142,11 @@ pass_profile::execute (function *fun)
     profile_status_for_fn (fun) = PROFILE_GUESSED;
  if (dump_file && (dump_flags & TDF_DETAILS))
    {
+     sreal iterations;
      for (auto loop : loops_list (cfun, LI_FROM_INNERMOST))
-       if (loop->header->count.initialized_p ())
-         fprintf (dump_file, "Loop got predicted %d to iterate %i times.\n",
-       	   loop->num,
-       	   (int)expected_loop_iterations_unbounded (loop));
+       if (expected_loop_iterations_by_profile (loop, &iterations))
+	 fprintf (dump_file, "Loop got predicted %d to iterate %f times.\n",
+	   loop->num, iterations.to_double ());
    }
   return 0;
 }
@@ -4632,43 +4632,6 @@ force_edge_cold (edge e, bool impossible)
 	fprintf (dump_file, "Giving up on making bb %i %s.\n", e->src->index,
 		 impossible ? "impossible" : "cold");
     }
-}
-
-/* Change E's probability to NEW_E_PROB, redistributing the probabilities
-   of other outgoing edges proportionally.
-
-   Note that this function does not change the profile counts of any
-   basic blocks.  The caller must do that instead, using whatever
-   information it has about the region that needs updating.  */
-
-void
-change_edge_frequency (edge e, profile_probability new_e_prob)
-{
-  profile_probability old_e_prob = e->probability;
-  profile_probability old_other_prob = old_e_prob.invert ();
-  profile_probability new_other_prob = new_e_prob.invert ();
-
-  e->probability = new_e_prob;
-  profile_probability cumulative_prob = new_e_prob;
-
-  unsigned int num_other = EDGE_COUNT (e->src->succs) - 1;
-  edge other_e;
-  edge_iterator ei;
-  FOR_EACH_EDGE (other_e, ei, e->src->succs)
-    if (other_e != e)
-      {
-	num_other -= 1;
-	if (num_other == 0)
-	  /* Ensure that the probabilities add up to 1 without
-	     rounding error.  */
-	  other_e->probability = cumulative_prob.invert ();
-	else
-	  {
-	    other_e->probability /= old_other_prob;
-	    other_e->probability *= new_other_prob;
-	    cumulative_prob += other_e->probability;
-	  }
-      }
 }
 
 #if CHECKING_P

@@ -22,24 +22,24 @@
 ;; == Loads/Stores
 ;; =========================================================================
 
-(define_expand "len_maskload<mode><vm>"
+(define_expand "mask_len_load<mode><vm>"
   [(match_operand:V 0 "register_operand")
    (match_operand:V 1 "memory_operand")
-   (match_operand 2 "autovec_length_operand")
-   (match_operand 3 "const_0_operand")
-   (match_operand:<VM> 4 "vector_mask_operand")]
+   (match_operand:<VM> 2 "vector_mask_operand")
+   (match_operand 3 "autovec_length_operand")
+   (match_operand 4 "const_0_operand")]
   "TARGET_VECTOR"
 {
   riscv_vector::expand_load_store (operands, true);
   DONE;
 })
 
-(define_expand "len_maskstore<mode><vm>"
+(define_expand "mask_len_store<mode><vm>"
   [(match_operand:V 0 "memory_operand")
    (match_operand:V 1 "register_operand")
-   (match_operand 2 "autovec_length_operand")
-   (match_operand 3 "const_0_operand")
-   (match_operand:<VM> 4 "vector_mask_operand")]
+   (match_operand:<VM> 2 "vector_mask_operand")
+   (match_operand 3 "autovec_length_operand")
+   (match_operand 4 "const_0_operand")]
   "TARGET_VECTOR"
 {
   riscv_vector::expand_load_store (operands, false);
@@ -61,105 +61,90 @@
 ;; == Gather Load
 ;; =========================================================================
 
-(define_expand "len_mask_gather_load<VNX1_QHSD:mode><VNX1_QHSDI:mode>"
-  [(match_operand:VNX1_QHSD 0 "register_operand")
+(define_expand "mask_len_gather_load<RATIO64:mode><RATIO64I:mode>"
+  [(match_operand:RATIO64 0 "register_operand")
    (match_operand 1 "pmode_reg_or_0_operand")
-   (match_operand:VNX1_QHSDI 2 "register_operand")
-   (match_operand 3 "<VNX1_QHSD:gs_extension>")
-   (match_operand 4 "<VNX1_QHSD:gs_scale>")
-   (match_operand 5 "autovec_length_operand")
-   (match_operand 6 "const_0_operand")
-   (match_operand:<VNX1_QHSD:VM> 7 "vector_mask_operand")]
+   (match_operand:RATIO64I 2 "register_operand")
+   (match_operand 3 "<RATIO64:gs_extension>")
+   (match_operand 4 "<RATIO64:gs_scale>")
+   (match_operand:<RATIO64:VM> 5 "vector_mask_operand")
+   (match_operand 6 "autovec_length_operand")
+   (match_operand 7 "const_0_operand")]
   "TARGET_VECTOR"
 {
   riscv_vector::expand_gather_scatter (operands, true);
   DONE;
 })
 
-(define_expand "len_mask_gather_load<VNX2_QHSD:mode><VNX2_QHSDI:mode>"
-  [(match_operand:VNX2_QHSD 0 "register_operand")
+(define_expand "mask_len_gather_load<RATIO32:mode><RATIO32I:mode>"
+  [(match_operand:RATIO32 0 "register_operand")
    (match_operand 1 "pmode_reg_or_0_operand")
-   (match_operand:VNX2_QHSDI 2 "register_operand")
-   (match_operand 3 "<VNX2_QHSD:gs_extension>")
-   (match_operand 4 "<VNX2_QHSD:gs_scale>")
-   (match_operand 5 "autovec_length_operand")
-   (match_operand 6 "const_0_operand")
-   (match_operand:<VNX2_QHSD:VM> 7 "vector_mask_operand")]
+   (match_operand:RATIO32I 2 "register_operand")
+   (match_operand 3 "<RATIO32:gs_extension>")
+   (match_operand 4 "<RATIO32:gs_scale>")
+   (match_operand:<RATIO32:VM> 5 "vector_mask_operand")
+   (match_operand 6 "autovec_length_operand")
+   (match_operand 7 "const_0_operand")]
   "TARGET_VECTOR"
 {
   riscv_vector::expand_gather_scatter (operands, true);
   DONE;
 })
 
-(define_expand "len_mask_gather_load<VNX4_QHSD:mode><VNX4_QHSDI:mode>"
-  [(match_operand:VNX4_QHSD 0 "register_operand")
+(define_expand "mask_len_gather_load<RATIO16:mode><RATIO16I:mode>"
+  [(match_operand:RATIO16 0 "register_operand")
    (match_operand 1 "pmode_reg_or_0_operand")
-   (match_operand:VNX4_QHSDI 2 "register_operand")
-   (match_operand 3 "<VNX4_QHSD:gs_extension>")
-   (match_operand 4 "<VNX4_QHSD:gs_scale>")
-   (match_operand 5 "autovec_length_operand")
-   (match_operand 6 "const_0_operand")
-   (match_operand:<VNX4_QHSD:VM> 7 "vector_mask_operand")]
+   (match_operand:RATIO16I 2 "register_operand")
+   (match_operand 3 "<RATIO16:gs_extension>")
+   (match_operand 4 "<RATIO16:gs_scale>")
+   (match_operand:<RATIO16:VM> 5 "vector_mask_operand")
+   (match_operand 6 "autovec_length_operand")
+   (match_operand 7 "const_0_operand")]
   "TARGET_VECTOR"
 {
   riscv_vector::expand_gather_scatter (operands, true);
   DONE;
 })
 
-(define_expand "len_mask_gather_load<VNX8_QHSD:mode><VNX8_QHSDI:mode>"
-  [(match_operand:VNX8_QHSD 0 "register_operand")
+(define_expand "mask_len_gather_load<RATIO8:mode><RATIO8I:mode>"
+  [(match_operand:RATIO8 0 "register_operand")
    (match_operand 1 "pmode_reg_or_0_operand")
-   (match_operand:VNX8_QHSDI 2 "register_operand")
-   (match_operand 3 "<VNX8_QHSD:gs_extension>")
-   (match_operand 4 "<VNX8_QHSD:gs_scale>")
-   (match_operand 5 "autovec_length_operand")
-   (match_operand 6 "const_0_operand")
-   (match_operand:<VNX8_QHSD:VM> 7 "vector_mask_operand")]
+   (match_operand:RATIO8I 2 "register_operand")
+   (match_operand 3 "<RATIO8:gs_extension>")
+   (match_operand 4 "<RATIO8:gs_scale>")
+   (match_operand:<RATIO8:VM> 5 "vector_mask_operand")
+   (match_operand 6 "autovec_length_operand")
+   (match_operand 7 "const_0_operand")]
   "TARGET_VECTOR"
 {
   riscv_vector::expand_gather_scatter (operands, true);
   DONE;
 })
 
-(define_expand "len_mask_gather_load<VNX16_QHSD:mode><VNX16_QHSDI:mode>"
-  [(match_operand:VNX16_QHSD 0 "register_operand")
+(define_expand "mask_len_gather_load<RATIO4:mode><RATIO4I:mode>"
+  [(match_operand:RATIO4 0 "register_operand")
    (match_operand 1 "pmode_reg_or_0_operand")
-   (match_operand:VNX16_QHSDI 2 "register_operand")
-   (match_operand 3 "<VNX16_QHSD:gs_extension>")
-   (match_operand 4 "<VNX16_QHSD:gs_scale>")
-   (match_operand 5 "autovec_length_operand")
-   (match_operand 6 "const_0_operand")
-   (match_operand:<VNX16_QHSD:VM> 7 "vector_mask_operand")]
+   (match_operand:RATIO4I 2 "register_operand")
+   (match_operand 3 "<RATIO4:gs_extension>")
+   (match_operand 4 "<RATIO4:gs_scale>")
+   (match_operand:<RATIO4:VM> 5 "vector_mask_operand")
+   (match_operand 6 "autovec_length_operand")
+   (match_operand 7 "const_0_operand")]
   "TARGET_VECTOR"
 {
   riscv_vector::expand_gather_scatter (operands, true);
   DONE;
 })
 
-(define_expand "len_mask_gather_load<VNX32_QHS:mode><VNX32_QHSI:mode>"
-  [(match_operand:VNX32_QHS 0 "register_operand")
+(define_expand "mask_len_gather_load<RATIO2:mode><RATIO2I:mode>"
+  [(match_operand:RATIO2 0 "register_operand")
    (match_operand 1 "pmode_reg_or_0_operand")
-   (match_operand:VNX32_QHSI 2 "register_operand")
-   (match_operand 3 "<VNX32_QHS:gs_extension>")
-   (match_operand 4 "<VNX32_QHS:gs_scale>")
-   (match_operand 5 "autovec_length_operand")
-   (match_operand 6 "const_0_operand")
-   (match_operand:<VNX32_QHS:VM> 7 "vector_mask_operand")]
-  "TARGET_VECTOR"
-{
-  riscv_vector::expand_gather_scatter (operands, true);
-  DONE;
-})
-
-(define_expand "len_mask_gather_load<VNX64_QH:mode><VNX64_QHI:mode>"
-  [(match_operand:VNX64_QH 0 "register_operand")
-   (match_operand 1 "pmode_reg_or_0_operand")
-   (match_operand:VNX64_QHI 2 "register_operand")
-   (match_operand 3 "<VNX64_QH:gs_extension>")
-   (match_operand 4 "<VNX64_QH:gs_scale>")
-   (match_operand 5 "autovec_length_operand")
-   (match_operand 6 "const_0_operand")
-   (match_operand:<VNX64_QH:VM> 7 "vector_mask_operand")]
+   (match_operand:RATIO2I 2 "register_operand")
+   (match_operand 3 "<RATIO2:gs_extension>")
+   (match_operand 4 "<RATIO2:gs_scale>")
+   (match_operand:<RATIO2:VM> 5 "vector_mask_operand")
+   (match_operand 6 "autovec_length_operand")
+   (match_operand 7 "const_0_operand")]
   "TARGET_VECTOR"
 {
   riscv_vector::expand_gather_scatter (operands, true);
@@ -170,15 +155,15 @@
 ;; larger SEW. Since RVV indexed load/store support zero extend
 ;; implicitly and not support scaling, we should only allow
 ;; operands[3] and operands[4] to be const_1_operand.
-(define_expand "len_mask_gather_load<mode><mode>"
-  [(match_operand:VNX128_Q 0 "register_operand")
+(define_expand "mask_len_gather_load<RATIO1:mode><RATIO1:mode>"
+  [(match_operand:RATIO1 0 "register_operand")
    (match_operand 1 "pmode_reg_or_0_operand")
-   (match_operand:VNX128_Q 2 "register_operand")
-   (match_operand 3 "const_1_operand")
-   (match_operand 4 "const_1_operand")
-   (match_operand 5 "autovec_length_operand")
-   (match_operand 6 "const_0_operand")
-   (match_operand:<VM> 7 "vector_mask_operand")]
+   (match_operand:RATIO1 2 "register_operand")
+   (match_operand 3 "<RATIO1:gs_extension>")
+   (match_operand 4 "<RATIO1:gs_scale>")
+   (match_operand:<RATIO1:VM> 5 "vector_mask_operand")
+   (match_operand 6 "autovec_length_operand")
+   (match_operand 7 "const_0_operand")]
   "TARGET_VECTOR"
 {
   riscv_vector::expand_gather_scatter (operands, true);
@@ -189,105 +174,90 @@
 ;; == Scatter Store
 ;; =========================================================================
 
-(define_expand "len_mask_scatter_store<VNX1_QHSD:mode><VNX1_QHSDI:mode>"
+(define_expand "mask_len_scatter_store<RATIO64:mode><RATIO64I:mode>"
   [(match_operand 0 "pmode_reg_or_0_operand")
-   (match_operand:VNX1_QHSDI 1 "register_operand")
-   (match_operand 2 "<VNX1_QHSD:gs_extension>")
-   (match_operand 3 "<VNX1_QHSD:gs_scale>")
-   (match_operand:VNX1_QHSD 4 "register_operand")
-   (match_operand 5 "autovec_length_operand")
-   (match_operand 6 "const_0_operand")
-   (match_operand:<VNX1_QHSD:VM> 7 "vector_mask_operand")]
+   (match_operand:RATIO64I 1 "register_operand")
+   (match_operand 2 "<RATIO64:gs_extension>")
+   (match_operand 3 "<RATIO64:gs_scale>")
+   (match_operand:RATIO64 4 "register_operand")
+   (match_operand:<RATIO64:VM> 5 "vector_mask_operand")
+   (match_operand 6 "autovec_length_operand")
+   (match_operand 7 "const_0_operand")]
   "TARGET_VECTOR"
 {
   riscv_vector::expand_gather_scatter (operands, false);
   DONE;
 })
 
-(define_expand "len_mask_scatter_store<VNX2_QHSD:mode><VNX2_QHSDI:mode>"
+(define_expand "mask_len_scatter_store<RATIO32:mode><RATIO32I:mode>"
   [(match_operand 0 "pmode_reg_or_0_operand")
-   (match_operand:VNX2_QHSDI 1 "register_operand")
-   (match_operand 2 "<VNX2_QHSD:gs_extension>")
-   (match_operand 3 "<VNX2_QHSD:gs_scale>")
-   (match_operand:VNX2_QHSD 4 "register_operand")
-   (match_operand 5 "autovec_length_operand")
-   (match_operand 6 "const_0_operand")
-   (match_operand:<VNX2_QHSD:VM> 7 "vector_mask_operand")]
+   (match_operand:RATIO32I 1 "register_operand")
+   (match_operand 2 "<RATIO32:gs_extension>")
+   (match_operand 3 "<RATIO32:gs_scale>")
+   (match_operand:RATIO32 4 "register_operand")
+   (match_operand:<RATIO32:VM> 5 "vector_mask_operand")
+   (match_operand 6 "autovec_length_operand")
+   (match_operand 7 "const_0_operand")]
   "TARGET_VECTOR"
 {
   riscv_vector::expand_gather_scatter (operands, false);
   DONE;
 })
 
-(define_expand "len_mask_scatter_store<VNX4_QHSD:mode><VNX4_QHSDI:mode>"
+(define_expand "mask_len_scatter_store<RATIO16:mode><RATIO16I:mode>"
   [(match_operand 0 "pmode_reg_or_0_operand")
-   (match_operand:VNX4_QHSDI 1 "register_operand")
-   (match_operand 2 "<VNX4_QHSD:gs_extension>")
-   (match_operand 3 "<VNX4_QHSD:gs_scale>")
-   (match_operand:VNX4_QHSD 4 "register_operand")
-   (match_operand 5 "autovec_length_operand")
-   (match_operand 6 "const_0_operand")
-   (match_operand:<VNX4_QHSD:VM> 7 "vector_mask_operand")]
+   (match_operand:RATIO16I 1 "register_operand")
+   (match_operand 2 "<RATIO16:gs_extension>")
+   (match_operand 3 "<RATIO16:gs_scale>")
+   (match_operand:RATIO16 4 "register_operand")
+   (match_operand:<RATIO16:VM> 5 "vector_mask_operand")
+   (match_operand 6 "autovec_length_operand")
+   (match_operand 7 "const_0_operand")]
   "TARGET_VECTOR"
 {
   riscv_vector::expand_gather_scatter (operands, false);
   DONE;
 })
 
-(define_expand "len_mask_scatter_store<VNX8_QHSD:mode><VNX8_QHSDI:mode>"
+(define_expand "mask_len_scatter_store<RATIO8:mode><RATIO8I:mode>"
   [(match_operand 0 "pmode_reg_or_0_operand")
-   (match_operand:VNX8_QHSDI 1 "register_operand")
-   (match_operand 2 "<VNX8_QHSD:gs_extension>")
-   (match_operand 3 "<VNX8_QHSD:gs_scale>")
-   (match_operand:VNX8_QHSD 4 "register_operand")
-   (match_operand 5 "autovec_length_operand")
-   (match_operand 6 "const_0_operand")
-   (match_operand:<VNX8_QHSD:VM> 7 "vector_mask_operand")]
+   (match_operand:RATIO8I 1 "register_operand")
+   (match_operand 2 "<RATIO8:gs_extension>")
+   (match_operand 3 "<RATIO8:gs_scale>")
+   (match_operand:RATIO8 4 "register_operand")
+   (match_operand:<RATIO8:VM> 5 "vector_mask_operand")
+   (match_operand 6 "autovec_length_operand")
+   (match_operand 7 "const_0_operand")]
   "TARGET_VECTOR"
 {
   riscv_vector::expand_gather_scatter (operands, false);
   DONE;
 })
 
-(define_expand "len_mask_scatter_store<VNX16_QHSD:mode><VNX16_QHSDI:mode>"
+(define_expand "mask_len_scatter_store<RATIO4:mode><RATIO4I:mode>"
   [(match_operand 0 "pmode_reg_or_0_operand")
-   (match_operand:VNX16_QHSDI 1 "register_operand")
-   (match_operand 2 "<VNX16_QHSD:gs_extension>")
-   (match_operand 3 "<VNX16_QHSD:gs_scale>")
-   (match_operand:VNX16_QHSD 4 "register_operand")
-   (match_operand 5 "autovec_length_operand")
-   (match_operand 6 "const_0_operand")
-   (match_operand:<VNX16_QHSD:VM> 7 "vector_mask_operand")]
+   (match_operand:RATIO4I 1 "register_operand")
+   (match_operand 2 "<RATIO4:gs_extension>")
+   (match_operand 3 "<RATIO4:gs_scale>")
+   (match_operand:RATIO4 4 "register_operand")
+   (match_operand:<RATIO4:VM> 5 "vector_mask_operand")
+   (match_operand 6 "autovec_length_operand")
+   (match_operand 7 "const_0_operand")]
   "TARGET_VECTOR"
 {
   riscv_vector::expand_gather_scatter (operands, false);
   DONE;
 })
 
-(define_expand "len_mask_scatter_store<VNX32_QHS:mode><VNX32_QHSI:mode>"
+(define_expand "mask_len_scatter_store<RATIO2:mode><RATIO2I:mode>"
   [(match_operand 0 "pmode_reg_or_0_operand")
-   (match_operand:VNX32_QHSI 1 "register_operand")
-   (match_operand 2 "<VNX32_QHS:gs_extension>")
-   (match_operand 3 "<VNX32_QHS:gs_scale>")
-   (match_operand:VNX32_QHS 4 "register_operand")
-   (match_operand 5 "autovec_length_operand")
-   (match_operand 6 "const_0_operand")
-   (match_operand:<VNX32_QHS:VM> 7 "vector_mask_operand")]
-  "TARGET_VECTOR"
-{
-  riscv_vector::expand_gather_scatter (operands, false);
-  DONE;
-})
-
-(define_expand "len_mask_scatter_store<VNX64_QH:mode><VNX64_QHI:mode>"
-  [(match_operand 0 "pmode_reg_or_0_operand")
-   (match_operand:VNX64_QHI 1 "register_operand")
-   (match_operand 2 "<VNX64_QH:gs_extension>")
-   (match_operand 3 "<VNX64_QH:gs_scale>")
-   (match_operand:VNX64_QH 4 "register_operand")
-   (match_operand 5 "autovec_length_operand")
-   (match_operand 6 "const_0_operand")
-   (match_operand:<VNX64_QH:VM> 7 "vector_mask_operand")]
+   (match_operand:RATIO2I 1 "register_operand")
+   (match_operand 2 "<RATIO2:gs_extension>")
+   (match_operand 3 "<RATIO2:gs_scale>")
+   (match_operand:RATIO2 4 "register_operand")
+   (match_operand:<RATIO2:VM> 5 "vector_mask_operand")
+   (match_operand 6 "autovec_length_operand")
+   (match_operand 7 "const_0_operand")]
   "TARGET_VECTOR"
 {
   riscv_vector::expand_gather_scatter (operands, false);
@@ -298,15 +268,15 @@
 ;; larger SEW. Since RVV indexed load/store support zero extend
 ;; implicitly and not support scaling, we should only allow
 ;; operands[3] and operands[4] to be const_1_operand.
-(define_expand "len_mask_scatter_store<mode><mode>"
+(define_expand "mask_len_scatter_store<RATIO1:mode><RATIO1:mode>"
   [(match_operand 0 "pmode_reg_or_0_operand")
-   (match_operand:VNX128_Q 1 "register_operand")
-   (match_operand 2 "const_1_operand")
-   (match_operand 3 "const_1_operand")
-   (match_operand:VNX128_Q 4 "register_operand")
-   (match_operand 5 "autovec_length_operand")
-   (match_operand 6 "const_0_operand")
-   (match_operand:<VM> 7 "vector_mask_operand")]
+   (match_operand:RATIO1 1 "register_operand")
+   (match_operand 2 "<RATIO1:gs_extension>")
+   (match_operand 3 "<RATIO1:gs_scale>")
+   (match_operand:RATIO1 4 "register_operand")
+   (match_operand:<RATIO1:VM> 5 "vector_mask_operand")
+   (match_operand 6 "autovec_length_operand")
+   (match_operand 7 "const_0_operand")]
   "TARGET_VECTOR"
 {
   riscv_vector::expand_gather_scatter (operands, false);
@@ -314,8 +284,59 @@
 })
 
 ;; =========================================================================
+;; == Array Load/Store
+;; =========================================================================
+
+(define_expand "vec_mask_len_load_lanes<mode><vsingle>"
+  [(match_operand:VT 0 "register_operand")
+   (match_operand:VT 1 "memory_operand")
+   (match_operand:<VM> 2 "vector_mask_operand")
+   (match_operand 3 "autovec_length_operand")
+   (match_operand 4 "const_0_operand")]
+  "TARGET_VECTOR"
+  {
+    riscv_vector::expand_lanes_load_store (operands, true);
+    DONE;
+  }
+)
+
+(define_expand "vec_mask_len_store_lanes<mode><vsingle>"
+  [(match_operand:VT 0 "memory_operand")
+   (match_operand:VT 1 "register_operand")
+   (match_operand:<VM> 2 "vector_mask_operand")
+   (match_operand 3 "autovec_length_operand")
+   (match_operand 4 "const_0_operand")]
+  "TARGET_VECTOR"
+  {
+    riscv_vector::expand_lanes_load_store (operands, false);
+    DONE;
+  }
+)
+
+;; =========================================================================
 ;; == Vector creation
 ;; =========================================================================
+
+;; -------------------------------------------------------------------------
+;; ---- [BOOL] Duplicate element
+;; -------------------------------------------------------------------------
+;; The patterns in this section are synthetic.
+;; -------------------------------------------------------------------------
+
+;; Implement a predicate broadcast by shifting the low bit of the scalar
+;; input into the top bit by duplicate the input and do a compare with zero.
+(define_expand "vec_duplicate<mode>"
+  [(set (match_operand:VB 0 "register_operand")
+	(vec_duplicate:VB (match_operand:QI 1 "register_operand")))]
+  "TARGET_VECTOR"
+  {
+    poly_int64 nunits = GET_MODE_NUNITS (<MODE>mode);
+    machine_mode mode = riscv_vector::get_vector_mode (QImode, nunits).require ();
+    rtx dup = expand_vector_broadcast (mode, operands[1]);
+    riscv_vector::expand_vec_cmp (operands[0], NE, dup, CONST0_RTX (mode));
+    DONE;
+  }
+)
 
 ;; -------------------------------------------------------------------------
 ;; ---- [INT] Linear series
@@ -327,7 +348,7 @@
 ;; -------------------------------------------------------------------------
 
 (define_expand "@vec_series<mode>"
-  [(match_operand:VI 0 "register_operand")
+  [(match_operand:V_VLSI 0 "register_operand")
    (match_operand:<VEL> 1 "reg_or_int_operand")
    (match_operand:<VEL> 2 "reg_or_int_operand")]
   "TARGET_VECTOR"
@@ -430,9 +451,9 @@
 ;; -------------------------------------------------------------------------
 
 (define_insn_and_split "<optab><mode>3"
-  [(set (match_operand:VI 0 "register_operand" "=vr")
-    (any_shift:VI
-     (match_operand:VI 1 "register_operand"    " vr")
+  [(set (match_operand:V_VLSI 0 "register_operand" "=vr")
+    (any_shift:V_VLSI
+     (match_operand:V_VLSI 1 "register_operand"    " vr")
      (match_operand:<VEL> 2 "csr_operand"      " rK")))]
   "TARGET_VECTOR && can_create_pseudo_p ()"
   "#"
@@ -455,10 +476,10 @@
 ;; -------------------------------------------------------------------------
 
 (define_insn_and_split "v<optab><mode>3"
-  [(set (match_operand:VI 0 "register_operand"  "=vr,vr")
-    (any_shift:VI
-     (match_operand:VI 1 "register_operand"     " vr,vr")
-     (match_operand:VI 2 "vector_shift_operand" " vr,vk")))]
+  [(set (match_operand:V_VLSI 0 "register_operand"  "=vr,vr")
+    (any_shift:V_VLSI
+     (match_operand:V_VLSI 1 "register_operand"     " vr,vr")
+     (match_operand:V_VLSI 2 "vector_shift_operand" " vr,vk")))]
   "TARGET_VECTOR && can_create_pseudo_p ()"
   "#"
   "&& 1"
@@ -942,7 +963,7 @@
   "TARGET_VECTOR"
 {
   rtx zero = gen_const_vec_duplicate (<MODE>mode, GEN_INT (0));
-  machine_mode mask_mode = riscv_vector::get_mask_mode (<MODE>mode).require ();
+  machine_mode mask_mode = riscv_vector::get_mask_mode (<MODE>mode);
   rtx mask = gen_reg_rtx (mask_mode);
   riscv_vector::expand_vec_cmp (mask, LT, operands[1], zero);
 
@@ -1042,8 +1063,6 @@
   [(const_int 0)]
   {
     riscv_vector::emit_vlmax_vsetvl (<VI:MODE>mode, operands[4]);
-    if (which_alternative == 2)
-      emit_insn (gen_rtx_SET (operands[0], operands[3]));
     rtx ops[] = {operands[0], operands[1], operands[2], operands[3], operands[0]};
     riscv_vector::emit_vlmax_ternary_insn (code_for_pred_mul_plus (<VI:MODE>mode),
 					   riscv_vector::RVV_TERNOP, ops, operands[4]);
@@ -1088,8 +1107,6 @@
   [(const_int 0)]
   {
     riscv_vector::emit_vlmax_vsetvl (<VI:MODE>mode, operands[4]);
-    if (which_alternative == 2)
-      emit_insn (gen_rtx_SET (operands[0], operands[3]));
     rtx ops[] = {operands[0], operands[1], operands[2], operands[3], operands[0]};
     riscv_vector::emit_vlmax_ternary_insn (code_for_pred_minus_mul (<VI:MODE>mode),
     					   riscv_vector::RVV_TERNOP, ops, operands[4]);
@@ -1132,8 +1149,6 @@
   [(const_int 0)]
   {
     riscv_vector::emit_vlmax_vsetvl (<VF:MODE>mode, operands[4]);
-    if (which_alternative == 2)
-      emit_insn (gen_rtx_SET (operands[0], operands[3]));
     rtx ops[] = {operands[0], operands[1], operands[2], operands[3], operands[0]};
     riscv_vector::emit_vlmax_fp_ternary_insn (code_for_pred_mul (PLUS, <VF:MODE>mode),
 					      riscv_vector::RVV_TERNOP, ops, operands[4]);
@@ -1178,8 +1193,6 @@
   [(const_int 0)]
   {
     riscv_vector::emit_vlmax_vsetvl (<VF:MODE>mode, operands[4]);
-    if (which_alternative == 2)
-      emit_insn (gen_rtx_SET (operands[0], operands[3]));
     rtx ops[] = {operands[0], operands[1], operands[2], operands[3], operands[0]};
     riscv_vector::emit_vlmax_fp_ternary_insn (code_for_pred_mul_neg (PLUS, <VF:MODE>mode),
 					      riscv_vector::RVV_TERNOP, ops, operands[4]);
@@ -1224,8 +1237,6 @@
   [(const_int 0)]
   {
     riscv_vector::emit_vlmax_vsetvl (<VF:MODE>mode, operands[4]);
-    if (which_alternative == 2)
-      emit_insn (gen_rtx_SET (operands[0], operands[3]));
     rtx ops[] = {operands[0], operands[1], operands[2], operands[3], operands[0]};
     riscv_vector::emit_vlmax_fp_ternary_insn (code_for_pred_mul (MINUS, <VF:MODE>mode),
 					      riscv_vector::RVV_TERNOP, ops, operands[4]);
@@ -1272,8 +1283,6 @@
   [(const_int 0)]
   {
     riscv_vector::emit_vlmax_vsetvl (<VF:MODE>mode, operands[4]);
-    if (which_alternative == 2)
-      emit_insn (gen_rtx_SET (operands[0], operands[3]));
     rtx ops[] = {operands[0], operands[1], operands[2], operands[3], operands[0]};
     riscv_vector::emit_vlmax_fp_ternary_insn (code_for_pred_mul_neg (MINUS, <VF:MODE>mode),
 					      riscv_vector::RVV_TERNOP, ops, operands[4]);
@@ -1494,9 +1503,65 @@
 ;; ---- [INT] Conditional binary operations
 ;; -------------------------------------------------------------------------
 ;; Includes:
+;; - vsra/vsrl/vsll
+;; -------------------------------------------------------------------------
+
+(define_expand "cond_<optab><mode>"
+  [(match_operand:VI 0 "register_operand")
+   (match_operand:<VM> 1 "vector_mask_operand")
+   (any_shift:VI
+     (match_operand:VI 2 "register_operand")
+     (match_operand:VI 3 "vector_shift_operand"))
+   (match_operand:VI 4 "register_operand")]
+  "TARGET_VECTOR"
+{
+  /* Normalize into cond_len_* operations.  */
+  emit_insn (gen_cond_len_<optab><mode> (operands[0], operands[1], operands[2],
+					 operands[3], operands[4],
+					 gen_int_mode (GET_MODE_NUNITS (<MODE>mode), Pmode),
+					 const0_rtx));
+  DONE;
+})
+
+(define_expand "cond_len_<optab><mode>"
+  [(match_operand:VI 0 "register_operand")
+   (match_operand:<VM> 1 "vector_mask_operand")
+   (any_shift:VI
+     (match_operand:VI 2 "register_operand")
+     (match_operand:VI 3 "vector_shift_operand"))
+   (match_operand:VI 4 "register_operand")
+   (match_operand 5 "autovec_length_operand")
+   (match_operand 6 "const_0_operand")]
+  "TARGET_VECTOR"
+{
+  riscv_vector::expand_cond_len_binop (<CODE>, operands);
+  DONE;
+})
+
+;; -------------------------------------------------------------------------
+;; ---- [INT] Conditional binary operations
+;; -------------------------------------------------------------------------
+;; Includes:
 ;; - vadd.vv/vsub.vv/...
 ;; - vadd.vi/vsub.vi/...
 ;; -------------------------------------------------------------------------
+
+(define_expand "cond_<optab><mode>"
+  [(match_operand:VI 0 "register_operand")
+   (match_operand:<VM> 1 "vector_mask_operand")
+   (any_int_binop_no_shift:VI
+     (match_operand:VI 2 "<binop_rhs1_predicate>")
+     (match_operand:VI 3 "<binop_rhs2_predicate>"))
+   (match_operand:VI 4 "register_operand")]
+  "TARGET_VECTOR"
+{
+  /* Normalize into cond_len_* operations.  */
+  emit_insn (gen_cond_len_<optab><mode> (operands[0], operands[1], operands[2],
+					 operands[3], operands[4],
+					 gen_int_mode (GET_MODE_NUNITS (<MODE>mode), Pmode),
+					 const0_rtx));
+  DONE;
+})
 
 (define_expand "cond_len_<optab><mode>"
   [(match_operand:VI 0 "register_operand")
@@ -1521,6 +1586,23 @@
 ;; - vfadd.vf/vfsub.vf/...
 ;; -------------------------------------------------------------------------
 
+(define_expand "cond_<optab><mode>"
+  [(match_operand:VF 0 "register_operand")
+   (match_operand:<VM> 1 "vector_mask_operand")
+   (any_float_binop:VF
+     (match_operand:VF 2 "register_operand")
+     (match_operand:VF 3 "register_operand"))
+   (match_operand:VF 4 "register_operand")]
+  "TARGET_VECTOR"
+{
+  /* Normalize into cond_len_* operations.  */
+  emit_insn (gen_cond_len_<optab><mode> (operands[0], operands[1], operands[2],
+					 operands[3], operands[4],
+					 gen_int_mode (GET_MODE_NUNITS (<MODE>mode), Pmode),
+					 const0_rtx));
+  DONE;
+})
+
 (define_expand "cond_len_<optab><mode>"
   [(match_operand:VF 0 "register_operand")
    (match_operand:<VM> 1 "vector_mask_operand")
@@ -1542,6 +1624,23 @@
 ;; - vfmin.vf/vfmax.vf
 ;; -------------------------------------------------------------------------
 
+(define_expand "cond_<optab><mode>"
+  [(match_operand:VF 0 "register_operand")
+   (match_operand:<VM> 1 "vector_mask_operand")
+   (any_float_binop_nofrm:VF
+     (match_operand:VF 2 "register_operand")
+     (match_operand:VF 3 "register_operand"))
+   (match_operand:VF 4 "register_operand")]
+  "TARGET_VECTOR"
+{
+  /* Normalize into cond_len_* operations.  */
+  emit_insn (gen_cond_len_<optab><mode> (operands[0], operands[1], operands[2],
+					 operands[3], operands[4],
+					 gen_int_mode (GET_MODE_NUNITS (<MODE>mode), Pmode),
+					 const0_rtx));
+  DONE;
+})
+
 (define_expand "cond_len_<optab><mode>"
   [(match_operand:VF 0 "register_operand")
    (match_operand:<VM> 1 "vector_mask_operand")
@@ -1558,11 +1657,101 @@
 })
 
 ;; -------------------------------------------------------------------------
+;; ---- [INT] Conditional ternary operations
+;; -------------------------------------------------------------------------
+;; Includes:
+;; - vmacc/...
+;; -------------------------------------------------------------------------
+
+(define_expand "cond_fma<mode>"
+  [(match_operand:VI 0 "register_operand")
+   (match_operand:<VM> 1 "vector_mask_operand")
+   (match_operand:VI 2 "register_operand")
+   (match_operand:VI 3 "register_operand")
+   (match_operand:VI 4 "register_operand")
+   (match_operand:VI 5 "register_operand")]
+  "TARGET_VECTOR"
+{
+  /* Normalize into cond_len_* operations.  */
+  emit_insn (gen_cond_len_fma<mode> (operands[0], operands[1], operands[2],
+				     operands[3], operands[4], operands[5],
+				     gen_int_mode (GET_MODE_NUNITS (<MODE>mode), Pmode),
+				     const0_rtx));
+  DONE;
+})
+
+(define_expand "cond_len_fma<mode>"
+  [(match_operand:VI 0 "register_operand")
+   (match_operand:<VM> 1 "vector_mask_operand")
+   (match_operand:VI 2 "register_operand")
+   (match_operand:VI 3 "register_operand")
+   (match_operand:VI 4 "register_operand")
+   (match_operand:VI 5 "register_operand")
+   (match_operand 6 "autovec_length_operand")
+   (match_operand 7 "const_0_operand")]
+  "TARGET_VECTOR"
+{
+  insn_code icode = code_for_pred_mul_plus (<MODE>mode);
+  riscv_vector::expand_cond_len_ternop (icode, operands);
+  DONE;
+})
+
+(define_expand "cond_fnma<mode>"
+  [(match_operand:VI 0 "register_operand")
+   (match_operand:<VM> 1 "vector_mask_operand")
+   (match_operand:VI 2 "register_operand")
+   (match_operand:VI 3 "register_operand")
+   (match_operand:VI 4 "register_operand")
+   (match_operand:VI 5 "register_operand")]
+  "TARGET_VECTOR"
+{
+  /* Normalize into cond_len_* operations.  */
+  emit_insn (gen_cond_len_fnma<mode> (operands[0], operands[1], operands[2],
+				      operands[3], operands[4], operands[5],
+				      gen_int_mode (GET_MODE_NUNITS (<MODE>mode), Pmode),
+				      const0_rtx));
+  DONE;
+})
+
+(define_expand "cond_len_fnma<mode>"
+  [(match_operand:VI 0 "register_operand")
+   (match_operand:<VM> 1 "vector_mask_operand")
+   (match_operand:VI 2 "register_operand")
+   (match_operand:VI 3 "register_operand")
+   (match_operand:VI 4 "register_operand")
+   (match_operand:VI 5 "register_operand")
+   (match_operand 6 "autovec_length_operand")
+   (match_operand 7 "const_0_operand")]
+  "TARGET_VECTOR"
+{
+  insn_code icode = code_for_pred_minus_mul (<MODE>mode);
+  riscv_vector::expand_cond_len_ternop (icode, operands);
+  DONE;
+})
+
+;; -------------------------------------------------------------------------
 ;; ---- [FP] Conditional ternary operations
 ;; -------------------------------------------------------------------------
 ;; Includes:
 ;; - vfmacc/...
 ;; -------------------------------------------------------------------------
+
+(define_expand "cond_fma<mode>"
+  [(match_operand:VF 0 "register_operand")
+   (match_operand:<VM> 1 "vector_mask_operand")
+   (match_operand:VF 2 "register_operand")
+   (match_operand:VF 3 "register_operand")
+   (match_operand:VF 4 "register_operand")
+   (match_operand:VF 5 "register_operand")]
+  "TARGET_VECTOR"
+{
+  /* Normalize into cond_len_* operations.  */
+  emit_insn (gen_cond_len_fma<mode> (operands[0], operands[1], operands[2],
+				     operands[3], operands[4], operands[5],
+				     gen_int_mode (GET_MODE_NUNITS (<MODE>mode), Pmode),
+				     const0_rtx));
+  DONE;
+})
 
 (define_expand "cond_len_fma<mode>"
   [(match_operand:VF 0 "register_operand")
@@ -1576,6 +1765,105 @@
   "TARGET_VECTOR"
 {
   insn_code icode = code_for_pred_mul (PLUS, <MODE>mode);
+  riscv_vector::expand_cond_len_ternop (icode, operands);
+  DONE;
+})
+
+(define_expand "cond_fnma<mode>"
+  [(match_operand:VF 0 "register_operand")
+   (match_operand:<VM> 1 "vector_mask_operand")
+   (match_operand:VF 2 "register_operand")
+   (match_operand:VF 3 "register_operand")
+   (match_operand:VF 4 "register_operand")
+   (match_operand:VF 5 "register_operand")]
+  "TARGET_VECTOR"
+{
+  /* Normalize into cond_len_* operations.  */
+  emit_insn (gen_cond_len_fnma<mode> (operands[0], operands[1], operands[2],
+				      operands[3], operands[4], operands[5],
+				      gen_int_mode (GET_MODE_NUNITS (<MODE>mode), Pmode),
+				      const0_rtx));
+  DONE;
+})
+
+(define_expand "cond_len_fnma<mode>"
+  [(match_operand:VF 0 "register_operand")
+   (match_operand:<VM> 1 "vector_mask_operand")
+   (match_operand:VF 2 "register_operand")
+   (match_operand:VF 3 "register_operand")
+   (match_operand:VF 4 "register_operand")
+   (match_operand:VF 5 "register_operand")
+   (match_operand 6 "autovec_length_operand")
+   (match_operand 7 "const_0_operand")]
+  "TARGET_VECTOR"
+{
+  insn_code icode = code_for_pred_mul_neg (PLUS, <MODE>mode);
+  riscv_vector::expand_cond_len_ternop (icode, operands);
+  DONE;
+})
+
+(define_expand "cond_fms<mode>"
+  [(match_operand:VF 0 "register_operand")
+   (match_operand:<VM> 1 "vector_mask_operand")
+   (match_operand:VF 2 "register_operand")
+   (match_operand:VF 3 "register_operand")
+   (match_operand:VF 4 "register_operand")
+   (match_operand:VF 5 "register_operand")]
+  "TARGET_VECTOR"
+{
+  /* Normalize into cond_len_* operations.  */
+  emit_insn (gen_cond_len_fms<mode> (operands[0], operands[1], operands[2],
+				     operands[3], operands[4], operands[5],
+				     gen_int_mode (GET_MODE_NUNITS (<MODE>mode), Pmode),
+				     const0_rtx));
+  DONE;
+})
+
+(define_expand "cond_len_fms<mode>"
+  [(match_operand:VF 0 "register_operand")
+   (match_operand:<VM> 1 "vector_mask_operand")
+   (match_operand:VF 2 "register_operand")
+   (match_operand:VF 3 "register_operand")
+   (match_operand:VF 4 "register_operand")
+   (match_operand:VF 5 "register_operand")
+   (match_operand 6 "autovec_length_operand")
+   (match_operand 7 "const_0_operand")]
+  "TARGET_VECTOR"
+{
+  insn_code icode = code_for_pred_mul (MINUS, <MODE>mode);
+  riscv_vector::expand_cond_len_ternop (icode, operands);
+  DONE;
+})
+
+(define_expand "cond_fnms<mode>"
+  [(match_operand:VF 0 "register_operand")
+   (match_operand:<VM> 1 "vector_mask_operand")
+   (match_operand:VF 2 "register_operand")
+   (match_operand:VF 3 "register_operand")
+   (match_operand:VF 4 "register_operand")
+   (match_operand:VF 5 "register_operand")]
+  "TARGET_VECTOR"
+{
+  /* Normalize into cond_len_* operations.  */
+  emit_insn (gen_cond_len_fnms<mode> (operands[0], operands[1], operands[2],
+				      operands[3], operands[4], operands[5],
+				      gen_int_mode (GET_MODE_NUNITS (<MODE>mode), Pmode),
+				      const0_rtx));
+  DONE;
+})
+
+(define_expand "cond_len_fnms<mode>"
+  [(match_operand:VF 0 "register_operand")
+   (match_operand:<VM> 1 "vector_mask_operand")
+   (match_operand:VF 2 "register_operand")
+   (match_operand:VF 3 "register_operand")
+   (match_operand:VF 4 "register_operand")
+   (match_operand:VF 5 "register_operand")
+   (match_operand 6 "autovec_length_operand")
+   (match_operand 7 "const_0_operand")]
+  "TARGET_VECTOR"
+{
+  insn_code icode = code_for_pred_mul_neg (MINUS, <MODE>mode);
   riscv_vector::expand_cond_len_ternop (icode, operands);
   DONE;
 })
@@ -1715,5 +2003,110 @@
   real_inf (&rv, false);
   rtx f = const_double_from_real_value (rv, <VEL>mode);
   riscv_vector::expand_reduction (SMIN, operands, f);
+  DONE;
+})
+
+;; -------------------------------------------------------------------------
+;; ---- [FP] Left-to-right reductions
+;; -------------------------------------------------------------------------
+;; Includes:
+;; - vfredosum.vs
+;; -------------------------------------------------------------------------
+
+;; Unpredicated in-order FP reductions.
+(define_expand "fold_left_plus_<mode>"
+  [(match_operand:<VEL> 0 "register_operand")
+   (match_operand:<VEL> 1 "register_operand")
+   (match_operand:VF 2 "register_operand")]
+  "TARGET_VECTOR"
+{
+  riscv_vector::expand_reduction (PLUS, operands,
+				  operands[1],
+				  riscv_vector::reduction_type::FOLD_LEFT);
+  DONE;
+})
+
+;; Predicated in-order FP reductions.
+(define_expand "mask_len_fold_left_plus_<mode>"
+  [(match_operand:<VEL> 0 "register_operand")
+   (match_operand:<VEL> 1 "register_operand")
+   (match_operand:VF 2 "register_operand")
+   (match_operand:<VM> 3 "vector_mask_operand")
+   (match_operand 4 "autovec_length_operand")
+   (match_operand 5 "const_0_operand")]
+  "TARGET_VECTOR"
+{
+  if (rtx_equal_p (operands[4], const0_rtx))
+    emit_move_insn (operands[0], operands[1]);
+  else
+    riscv_vector::expand_reduction (PLUS, operands,
+				    operands[1],
+				    riscv_vector::reduction_type::MASK_LEN_FOLD_LEFT);
+  DONE;
+})
+
+;; -------------------------------------------------------------------------
+;; ---- [INT] Average.
+;; -------------------------------------------------------------------------
+;; Implements the following "average" patterns:
+;; floor:
+;;  op[0] = (narrow) ((wide) op[1] + (wide) op[2]) >> 1;
+;; ceil:
+;;  op[0] = (narrow) ((wide) op[1] + (wide) op[2] + 1)) >> 1;
+;; -------------------------------------------------------------------------
+
+(define_expand "<u>avg<v_double_trunc>3_floor"
+ [(set (match_operand:<V_DOUBLE_TRUNC> 0 "register_operand")
+   (truncate:<V_DOUBLE_TRUNC>
+    (<ext_to_rshift>:VWEXTI
+     (plus:VWEXTI
+      (any_extend:VWEXTI
+       (match_operand:<V_DOUBLE_TRUNC> 1 "register_operand"))
+      (any_extend:VWEXTI
+       (match_operand:<V_DOUBLE_TRUNC> 2 "register_operand"))))))]
+  "TARGET_VECTOR"
+{
+  /* First emit a widening addition.  */
+  rtx tmp1 = gen_reg_rtx (<MODE>mode);
+  rtx ops1[] = {tmp1, operands[1], operands[2]};
+  insn_code icode = code_for_pred_dual_widen (PLUS, <CODE>, <MODE>mode);
+  riscv_vector::emit_vlmax_insn (icode, riscv_vector::RVV_BINOP, ops1);
+
+  /* Then a narrowing shift.  */
+  rtx ops2[] = {operands[0], tmp1, const1_rtx};
+  icode = code_for_pred_narrow_scalar (<EXT_TO_RSHIFT>, <MODE>mode);
+  riscv_vector::emit_vlmax_insn (icode, riscv_vector::RVV_BINOP, ops2);
+  DONE;
+})
+
+(define_expand "<u>avg<v_double_trunc>3_ceil"
+ [(set (match_operand:<V_DOUBLE_TRUNC> 0 "register_operand")
+   (truncate:<V_DOUBLE_TRUNC>
+    (<ext_to_rshift>:VWEXTI
+     (plus:VWEXTI
+      (plus:VWEXTI
+       (any_extend:VWEXTI
+	(match_operand:<V_DOUBLE_TRUNC> 1 "register_operand"))
+       (any_extend:VWEXTI
+	(match_operand:<V_DOUBLE_TRUNC> 2 "register_operand")))
+      (const_int 1)))))]
+  "TARGET_VECTOR"
+{
+  /* First emit a widening addition.  */
+  rtx tmp1 = gen_reg_rtx (<MODE>mode);
+  rtx ops1[] = {tmp1, operands[1], operands[2]};
+  insn_code icode = code_for_pred_dual_widen (PLUS, <CODE>, <MODE>mode);
+  riscv_vector::emit_vlmax_insn (icode, riscv_vector::RVV_BINOP, ops1);
+
+  /* Then add 1.  */
+  rtx tmp2 = gen_reg_rtx (<MODE>mode);
+  rtx ops2[] = {tmp2, tmp1, const1_rtx};
+  icode = code_for_pred_scalar (PLUS, <MODE>mode);
+  riscv_vector::emit_vlmax_insn (icode, riscv_vector::RVV_BINOP, ops2);
+
+  /* Finally, a narrowing shift.  */
+  rtx ops3[] = {operands[0], tmp2, const1_rtx};
+  icode = code_for_pred_narrow_scalar (<EXT_TO_RSHIFT>, <MODE>mode);
+  riscv_vector::emit_vlmax_insn (icode, riscv_vector::RVV_BINOP, ops3);
   DONE;
 })

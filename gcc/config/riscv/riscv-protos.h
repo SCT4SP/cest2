@@ -103,7 +103,7 @@ extern const char *riscv_output_move (rtx, rtx);
 extern const char *riscv_output_return ();
 
 #ifdef RTX_CODE
-extern void riscv_expand_int_scc (rtx, enum rtx_code, rtx, rtx);
+extern void riscv_expand_int_scc (rtx, enum rtx_code, rtx, rtx, bool *invert_ptr = 0);
 extern void riscv_expand_float_scc (rtx, enum rtx_code, rtx, rtx);
 extern void riscv_expand_conditional_branch (rtx, enum rtx_code, rtx, rtx);
 extern rtx riscv_emit_binary (enum rtx_code code, rtx dest, rtx x, rtx y);
@@ -127,6 +127,8 @@ extern void riscv_reinit (void);
 extern poly_uint64 riscv_regmode_natural_size (machine_mode);
 extern bool riscv_v_ext_vector_mode_p (machine_mode);
 extern bool riscv_v_ext_tuple_mode_p (machine_mode);
+extern bool riscv_v_ext_vls_mode_p (machine_mode);
+extern int riscv_get_v_regno_alignment (machine_mode);
 extern bool riscv_shamt_matches_mask_p (int, HOST_WIDE_INT);
 extern void riscv_subword_address (rtx, rtx *, rtx *, rtx *, rtx *);
 extern void riscv_lshift_subword (machine_mode, rtx, rtx, rtx *);
@@ -185,13 +187,16 @@ enum insn_type
   RVV_BINOP = 3,
   RVV_BINOP_MU = RVV_BINOP + 2,
   RVV_BINOP_TU = RVV_BINOP + 2,
+  RVV_BINOP_TUMU = RVV_BINOP + 2,
   RVV_MERGE_OP = 4,
   RVV_CMP_OP = 4,
   RVV_CMP_MU_OP = RVV_CMP_OP + 2, /* +2 means mask and maskoff operand.  */
   RVV_UNOP_MU = RVV_UNOP + 2,	  /* Likewise.  */
   RVV_UNOP_M = RVV_UNOP + 2,	  /* Likewise.  */
   RVV_TERNOP = 5,
+  RVV_TERNOP_MU = RVV_TERNOP + 1,
   RVV_TERNOP_TU = RVV_TERNOP + 1,
+  RVV_TERNOP_TUMU = RVV_TERNOP + 1,
   RVV_WIDEN_TERNOP = 4,
   RVV_SCALAR_MOV_OP = 4, /* +1 for VUNDEF according to vector.md.  */
   RVV_SLIDE_OP = 4,      /* Dest, VUNDEF, source and offset.  */
@@ -199,6 +204,7 @@ enum insn_type
   RVV_GATHER_M_OP = 5,
   RVV_SCATTER_M_OP = 4,
   RVV_REDUCTION_OP = 3,
+  RVV_REDUCTION_TU_OP = RVV_REDUCTION_OP + 2,
 };
 enum vlmul_type
 {
@@ -247,7 +253,7 @@ void emit_vlmax_merge_insn (unsigned, int, rtx *);
 void emit_vlmax_cmp_insn (unsigned, rtx *);
 void emit_vlmax_cmp_mu_insn (unsigned, rtx *);
 void emit_vlmax_masked_mu_insn (unsigned, int, rtx *);
-void emit_scalar_move_insn (unsigned, rtx *);
+void emit_scalar_move_insn (unsigned, rtx *, rtx = 0);
 void emit_nonvlmax_integer_move_insn (unsigned, rtx *, rtx);
 enum vlmul_type get_vlmul (machine_mode);
 unsigned int get_ratio (machine_mode);
@@ -270,6 +276,13 @@ enum mask_policy
   MASK_AGNOSTIC = 1,
   MASK_ANY = 2,
 };
+
+enum class reduction_type
+{
+  UNORDERED,
+  FOLD_LEFT,
+  MASK_LEN_FOLD_LEFT,
+};
 enum tail_policy get_prefer_tail_policy ();
 enum mask_policy get_prefer_mask_policy ();
 rtx get_avl_type_rtx (enum avl_type);
@@ -282,7 +295,8 @@ bool has_vi_variant_p (rtx_code, rtx);
 void expand_vec_cmp (rtx, rtx_code, rtx, rtx);
 bool expand_vec_cmp_float (rtx, rtx_code, rtx, rtx, bool);
 void expand_cond_len_binop (rtx_code, rtx *);
-void expand_reduction (rtx_code, rtx *, rtx);
+void expand_reduction (rtx_code, rtx *, rtx,
+		       reduction_type = reduction_type::UNORDERED);
 #endif
 bool sew64_scalar_helper (rtx *, rtx *, rtx, machine_mode,
 			  bool, void (*)(rtx *, rtx));
@@ -302,7 +316,7 @@ bool slide1_sew64_helper (int, machine_mode, machine_mode,
 rtx gen_avl_for_scalar_move (rtx);
 void expand_tuple_move (rtx *);
 machine_mode preferred_simd_mode (scalar_mode);
-opt_machine_mode get_mask_mode (machine_mode);
+machine_mode get_mask_mode (machine_mode);
 void expand_vec_series (rtx, rtx, rtx);
 void expand_vec_init (rtx, rtx);
 void expand_vec_perm (rtx, rtx, rtx, rtx);
@@ -310,6 +324,8 @@ void expand_select_vl (rtx *);
 void expand_load_store (rtx *, bool);
 void expand_gather_scatter (rtx *, bool);
 void expand_cond_len_ternop (unsigned, rtx *);
+void prepare_ternary_operands (rtx *, bool = false);
+void expand_lanes_load_store (rtx *, bool);
 
 /* Rounding mode bitfield for fixed point VXRM.  */
 enum fixed_point_rounding_mode
@@ -334,8 +350,12 @@ enum floating_point_rounding_mode
   FRM_DYN = 7, /* Aka 0b111.  */
   FRM_STATIC_MIN = FRM_RNE,
   FRM_STATIC_MAX = FRM_RMM,
+  FRM_DYN_EXIT = 8,
+  FRM_DYN_CALL = 9,
+  FRM_NONE = 10,
 };
 
+enum floating_point_rounding_mode get_frm_mode (rtx);
 opt_machine_mode vectorize_related_mode (machine_mode, scalar_mode,
 					 poly_uint64);
 unsigned int autovectorize_vector_modes (vec<machine_mode> *, bool);
