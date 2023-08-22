@@ -551,6 +551,10 @@ namespace std _GLIBCXX_VISIBILITY(default)
       {
 	if constexpr (__detail::__3way_builtin_ptr_cmp<_Tp, _Up>)
 	  {
+#if _GLIBCXX_CEST_VERSION
+	    if (std::__is_constant_evaluated())
+	      return static_cast<_Tp&&>(__t) <=> static_cast<_Up&&>(__u);
+#endif
 	    auto __pt = static_cast<const volatile void*>(__t);
 	    auto __pu = static_cast<const volatile void*>(__u);
 	    if (std::__is_constant_evaluated())
