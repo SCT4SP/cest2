@@ -369,6 +369,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *  @param  __r  A %shared_ptr rvalue.
        *  @post   *this contains the old value of @a __r, @a __r is empty.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       shared_ptr(shared_ptr&& __r) noexcept
       : __shared_ptr<_Tp>(std::move(__r)) { }
 
@@ -378,6 +379,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *  @post   *this contains the old value of @a __r, @a __r is empty.
        */
       template<typename _Yp, typename = _Constructible<shared_ptr<_Yp>>>
+	_GLIBCXX_CEST_CONSTEXPR
 	shared_ptr(shared_ptr<_Yp>&& __r) noexcept
 	: __shared_ptr<_Tp>(std::move(__r)) { }
 
@@ -447,6 +449,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 #pragma GCC diagnostic pop
 #endif
 
+      _GLIBCXX_CEST_CONSTEXPR
       shared_ptr&
       operator=(shared_ptr&& __r) noexcept
       {
@@ -473,6 +476,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     private:
       // This constructor is non-standard, it is used by allocate_shared.
       template<typename _Alloc, typename... _Args>
+	_GLIBCXX_CEST_CONSTEXPR
 	shared_ptr(_Sp_alloc_shared_tag<_Alloc> __tag, _Args&&... __args)
 	: __shared_ptr<_Tp>(__tag, std::forward<_Args>(__args)...)
 	{ }
@@ -482,6 +486,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	allocate_shared(const _Alloc&, _Args&&...);
 
       template<typename _Yp, typename... _Args>
+	_GLIBCXX_CEST_CONSTEXPR
 	friend shared_ptr<_NonArray<_Yp>>
 	make_shared(_Args&&...);
 
@@ -1016,6 +1021,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
    *          constructor of @a _Tp.
    */
   template<typename _Tp, typename... _Args>
+    _GLIBCXX_CEST_CONSTEXPR
     inline shared_ptr<_NonArray<_Tp>>
     make_shared(_Args&&... __args)
     {

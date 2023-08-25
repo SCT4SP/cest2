@@ -658,8 +658,10 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	typedef _Sp_ebo_helper<0, _Alloc>	_A_base;
 
       public:
+	_GLIBCXX_CEST_CONSTEXPR
 	explicit _Impl(_Alloc __a) noexcept : _A_base(__a) { }
 
+	_GLIBCXX_CEST_CONSTEXPR
 	_Alloc& _M_alloc() noexcept { return _A_base::_S_get(*this); }
 
 	__gnu_cxx::__aligned_buffer<_Tp> _M_storage;
@@ -670,6 +672,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
       // Alloc parameter is not a reference so doesn't alias anything in __args
       template<typename... _Args>
+	_GLIBCXX_CEST_CONSTEXPR
 	_Sp_counted_ptr_inplace(_Alloc __a, _Args&&... __args)
 	: _M_impl(__a)
 	{
@@ -679,8 +682,10 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	      std::forward<_Args>(__args)...); // might throw
 	}
 
+      _GLIBCXX_CEST_CONSTEXPR
       ~_Sp_counted_ptr_inplace() noexcept { }
 
+      _GLIBCXX_CEST_CONSTEXPR
       virtual void
       _M_dispose() noexcept
       {
@@ -688,6 +693,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       }
 
       // Override because the allocator needs to know the dynamic type
+      _GLIBCXX_CEST_CONSTEXPR
       virtual void
       _M_destroy() noexcept
       {
@@ -722,6 +728,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	return nullptr;
       }
 
+      _GLIBCXX_CEST_CONSTEXPR
       _Tp* _M_ptr() noexcept { return _M_impl._M_storage._M_ptr(); }
 
       _Impl _M_impl;
@@ -1044,6 +1051,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	}
 
       template<typename _Tp, typename _Alloc, typename... _Args>
+	_GLIBCXX_CEST_CONSTEXPR
 	__shared_count(_Tp*& __p, _Sp_alloc_shared_tag<_Alloc> __a,
 		       _Args&&... __args)
 	{
@@ -1051,8 +1059,14 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	  typename _Sp_cp_type::__allocator_type __a2(__a._M_a);
 	  auto __guard = std::__allocate_guarded(__a2);
 	  _Sp_cp_type* __mem = __guard.get();
+#if _GLIBCXX_CEST_VERSION
+	  auto __pi = __builtin_is_constant_evaluated()
+	    ?  std::construct_at(__mem, __a._M_a, std::forward<_Args>(__args)...)
+	    : ::new (__mem) _Sp_cp_type(__a._M_a, std::forward<_Args>(__args)...);
+#else
 	  auto __pi = ::new (__mem)
 	    _Sp_cp_type(__a._M_a, std::forward<_Args>(__args)...);
+#endif
 	  __guard = nullptr;
 	  _M_pi = __pi;
 	  __p = __pi->_M_ptr();
@@ -1178,6 +1192,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	return *this;
       }
 
+      _GLIBCXX_CEST_CONSTEXPR
       void
       _M_swap(__shared_count& __r) noexcept
       {
@@ -1438,6 +1453,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	return *_M_get();
       }
 
+      _GLIBCXX_CEST_CONSTEXPR
       element_type*
       operator->() const noexcept
       {
@@ -1622,6 +1638,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	: _M_ptr(__r._M_ptr), _M_refcount(__r._M_refcount)
 	{ }
 
+      _GLIBCXX_CEST_CONSTEXPR
       __shared_ptr(__shared_ptr&& __r) noexcept
       : _M_ptr(__r._M_ptr), _M_refcount()
       {
@@ -1630,6 +1647,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       }
 
       template<typename _Yp, typename = _Compatible<_Yp>>
+	_GLIBCXX_CEST_CONSTEXPR
 	__shared_ptr(__shared_ptr<_Yp, _Lp>&& __r) noexcept
 	: _M_ptr(__r._M_ptr), _M_refcount()
 	{
@@ -1708,6 +1726,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 #pragma GCC diagnostic pop
 #endif
 
+      _GLIBCXX_CEST_CONSTEXPR
       __shared_ptr&
       operator=(__shared_ptr&& __r) noexcept
       {
@@ -1761,6 +1780,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       { return _M_ptr; }
 
       /// Return true if the stored pointer is not null.
+      _GLIBCXX_CEST_CONSTEXPR
       explicit operator bool() const noexcept
       { return _M_ptr != nullptr; }
 
@@ -1776,6 +1796,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       { return _M_refcount._M_get_use_count(); }
 
       /// Exchange both the owned pointer and the stored pointer.
+      _GLIBCXX_CEST_CONSTEXPR
       void
       swap(__shared_ptr<_Tp, _Lp>& __other) noexcept
       {
@@ -1804,6 +1825,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     protected:
       // This constructor is non-standard, it is used by allocate_shared.
       template<typename _Alloc, typename... _Args>
+	_GLIBCXX_CEST_CONSTEXPR
 	__shared_ptr(_Sp_alloc_shared_tag<_Alloc> __tag, _Args&&... __args)
 	: _M_ptr(), _M_refcount(_M_ptr, __tag, std::forward<_Args>(__args)...)
 	{ _M_enable_shared_from_this_with(_M_ptr); }
