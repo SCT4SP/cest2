@@ -118,6 +118,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *  <code>if (!a_stream) ...</code> and <code>while (a_stream) ...</code>
       */
 #if __cplusplus >= 201103L
+      _GLIBCXX_CEST_CONSTEXPR
       explicit operator bool() const
       { return !this->fail(); }
 #else

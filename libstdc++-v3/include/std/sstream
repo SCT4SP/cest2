@@ -305,6 +305,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        *  Deallocates any previous stored sequence, then copies @a s to
        *  use as a new one.
       */
+      _GLIBCXX_CEST_CONSTEXPR
       void
       str(const __string_type& __s)
       {
@@ -746,6 +747,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        *
        *  Calls @c rdbuf()->str(s).
       */
+      _GLIBCXX_CEST_CONSTEXPR
       void
       str(const __string_type& __s)
       { _M_stringbuf.str(__s); }

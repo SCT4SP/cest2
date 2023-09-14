@@ -696,6 +696,12 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
 	// we mess up the contents if we put a '\0' in the string.
 	_M_length(__str.length());
 	__str._M_data(__str._M_local_data());
+#ifdef _GLIBCXX_CEST_CONSTEXPR
+#ifdef __clang__
+  if (__builtin_is_constant_evaluated())
+    __str._M_use_local_data();
+#endif
+#endif
 	__str._M_set_length(0);
       }
 
@@ -1216,7 +1222,17 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
       _GLIBCXX20_CONSTEXPR
       void
       clear() _GLIBCXX_NOEXCEPT
+#ifdef _GLIBCXX_CEST_CONSTEXPR
+      {
+#ifdef __clang__
+      if (__builtin_is_constant_evaluated())
+        _M_use_local_data(); // explicates _M_local_buf union member as active
+#endif
+        _M_set_length(0);
+      }
+#else
       { _M_set_length(0); }
+#endif
 
       /**
        *  Returns true if the %string is empty.  Equivalent to 
