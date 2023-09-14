@@ -141,10 +141,12 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
       // Called when _M_use_count drops to zero, to release the resources
       // managed by *this.
+      _GLIBCXX_CEST_CONSTEXPR
       virtual void
       _M_dispose() noexcept = 0;
 
       // Called when _M_weak_count drops to zero.
+      _GLIBCXX_CEST_CONSTEXPR
       virtual void
       _M_destroy() noexcept
       { delete this; }
@@ -168,6 +170,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 #endif
 
       // Increment the use count if it is non-zero, throw otherwise.
+      _GLIBCXX_CEST_CONSTEXPR
       void
       _M_add_ref_lock()
       {
@@ -176,6 +179,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       }
 
       // Increment the use count if it is non-zero.
+      _GLIBCXX_CEST_CONSTEXPR
       bool
       _M_add_ref_lock_nothrow() noexcept;
 
@@ -218,16 +222,19 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
       // As above, but 'noinline' to reduce code size on the cold path.
       __attribute__((__noinline__))
+      _GLIBCXX_CEST_CONSTEXPR
       void
       _M_release_last_use_cold() noexcept
       { _M_release_last_use(); }
 
       // Increment the weak count.
+      _GLIBCXX_CEST_CONSTEXPR
       void
       _M_weak_add_ref() noexcept
       { __gnu_cxx::__atomic_add_dispatch(&_M_weak_count, 1); }
 
       // Decrement the weak count.
+      _GLIBCXX_CEST_CONSTEXPR
       void
       _M_weak_release() noexcept
       {
@@ -270,6 +277,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     };
 
   template<>
+    _GLIBCXX_CEST_CONSTEXPR
     inline bool
     _Sp_counted_base<_S_single>::
     _M_add_ref_lock_nothrow() noexcept
@@ -281,6 +289,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     }
 
   template<>
+    _GLIBCXX_CEST_CONSTEXPR
     inline bool
     _Sp_counted_base<_S_mutex>::
     _M_add_ref_lock_nothrow() noexcept
@@ -295,6 +304,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     }
 
   template<>
+    _GLIBCXX_CEST_CONSTEXPR
     inline bool
     _Sp_counted_base<_S_atomic>::
     _M_add_ref_lock_nothrow() noexcept
@@ -405,11 +415,13 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     }
 
   template<>
+    _GLIBCXX_CEST_CONSTEXPR
     inline void
     _Sp_counted_base<_S_single>::_M_weak_add_ref() noexcept
     { ++_M_weak_count; }
 
   template<>
+    _GLIBCXX_CEST_CONSTEXPR
     inline void
     _Sp_counted_base<_S_single>::_M_weak_release() noexcept
     {
@@ -789,7 +801,6 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	this->~_Sp_counted_ptr_inplace();
       }
 
-      _GLIBCXX_CEST_CONSTEXPR
       void*
       _M_get_deleter(const std::type_info&) noexcept override
       { return nullptr; }
@@ -807,12 +818,14 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       size_t _M_n = 0;
       bool _M_overwrite = false;
 
+      _GLIBCXX_CEST_CONSTEXPR
       typename allocator_traits<_Alloc>::pointer
       _M_alloc_array(size_t __tail)
       {
 	return allocator_traits<_Alloc>::allocate(_M_alloc, _M_n + __tail);
       }
 
+      _GLIBCXX_CEST_CONSTEXPR
       void
       _M_dealloc_array(typename allocator_traits<_Alloc>::pointer __p,
 		       size_t __tail)
@@ -822,6 +835,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
       // Init the array elements
       template<typename _Init>
+	_GLIBCXX_CEST_CONSTEXPR
 	void
 	_M_init(typename allocator_traits<_Alloc>::value_type* __p,
 		_Init __init)
@@ -1051,7 +1065,6 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	}
 
       template<typename _Tp, typename _Alloc, typename... _Args>
-	_GLIBCXX_CEST_CONSTEXPR
 	__shared_count(_Tp*& __p, _Sp_alloc_shared_tag<_Alloc> __a,
 		       _Args&&... __args)
 	{
@@ -1059,14 +1072,8 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	  typename _Sp_cp_type::__allocator_type __a2(__a._M_a);
 	  auto __guard = std::__allocate_guarded(__a2);
 	  _Sp_cp_type* __mem = __guard.get();
-#if _GLIBCXX_CEST_VERSION
-	  auto __pi = __builtin_is_constant_evaluated()
-	    ?  std::construct_at(__mem, __a._M_a, std::forward<_Args>(__args)...)
-	    : ::new (__mem) _Sp_cp_type(__a._M_a, std::forward<_Args>(__args)...);
-#else
 	  auto __pi = ::new (__mem)
 	    _Sp_cp_type(__a._M_a, std::forward<_Args>(__args)...);
-#endif
 	  __guard = nullptr;
 	  _M_pi = __pi;
 	  __p = __pi->_M_ptr();
@@ -1177,6 +1184,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	  _M_pi->_M_add_ref_copy();
       }
 
+      _GLIBCXX_CEST_CONSTEXPR
       __shared_count&
       operator=(const __shared_count& __r) noexcept
       {
@@ -1215,6 +1223,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       _M_get_deleter(const std::type_info& __ti) const noexcept
       { return _M_pi ? _M_pi->_M_get_deleter(__ti) : nullptr; }
 
+      _GLIBCXX_CEST_CONSTEXPR
       bool
       _M_less(const __shared_count& __rhs) const noexcept
       { return std::less<_Sp_counted_base<_Lp>*>()(this->_M_pi, __rhs._M_pi); }
@@ -1593,6 +1602,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
       template<typename _Yp, typename _Deleter, typename _Alloc,
 	       typename = _SafeConv<_Yp>>
+	_GLIBCXX_CEST_CONSTEXPR
 	__shared_ptr(_Yp* __p, _Deleter __d, _Alloc __a)
 	: _M_ptr(__p), _M_refcount(__p, std::move(__d), std::move(__a))
 	{
@@ -1602,11 +1612,13 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	}
 
       template<typename _Deleter>
+	_GLIBCXX_CEST_CONSTEXPR
 	__shared_ptr(nullptr_t __p, _Deleter __d)
 	: _M_ptr(0), _M_refcount(__p, std::move(__d))
 	{ }
 
       template<typename _Deleter, typename _Alloc>
+        _GLIBCXX_CEST_CONSTEXPR
         __shared_ptr(nullptr_t __p, _Deleter __d, _Alloc __a)
 	: _M_ptr(0), _M_refcount(__p, std::move(__d), std::move(__a))
 	{ }
@@ -1705,6 +1717,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       constexpr __shared_ptr(nullptr_t) noexcept : __shared_ptr() { }
 
       template<typename _Yp>
+	_GLIBCXX_CEST_CONSTEXPR
 	_Assignable<_Yp>
 	operator=(const __shared_ptr<_Yp, _Lp>& __r) noexcept
 	{
@@ -1735,6 +1748,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       }
 
       template<class _Yp>
+	_GLIBCXX_CEST_CONSTEXPR
 	_Assignable<_Yp>
 	operator=(__shared_ptr<_Yp, _Lp>&& __r) noexcept
 	{
@@ -1750,11 +1764,13 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	  return *this;
 	}
 
+      _GLIBCXX_CEST_CONSTEXPR
       void
       reset() noexcept
       { __shared_ptr().swap(*this); }
 
       template<typename _Yp>
+	_GLIBCXX_CEST_CONSTEXPR
 	_SafeConv<_Yp>
 	reset(_Yp* __p) // _Yp must be complete.
 	{
@@ -1764,6 +1780,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	}
 
       template<typename _Yp, typename _Deleter>
+	_GLIBCXX_CEST_CONSTEXPR
 	_SafeConv<_Yp>
 	reset(_Yp* __p, _Deleter __d)
 	{ __shared_ptr(__p, std::move(__d)).swap(*this); }
@@ -1812,6 +1829,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        * @{
       */
       template<typename _Tp1>
+	_GLIBCXX_CEST_CONSTEXPR
 	bool
 	owner_before(__shared_ptr<_Tp1, _Lp> const& __rhs) const noexcept
 	{ return _M_refcount._M_less(__rhs._M_refcount); }
@@ -1838,6 +1856,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 #if __cpp_lib_shared_ptr_arrays >= 201707L // C++ >= 20 && HOSTED
       // This constructor is non-standard, it is used by allocate_shared<T[]>.
       template<typename _Alloc, typename _Init = const remove_extent_t<_Tp>*>
+	_GLIBCXX_CEST_CONSTEXPR
 	__shared_ptr(const _Sp_counted_array_base<_Alloc>& __a,
 		     _Init __init = nullptr)
 	: _M_ptr(), _M_refcount(_M_ptr, __a, __init)
