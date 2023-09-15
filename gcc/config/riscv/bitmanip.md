@@ -206,7 +206,7 @@
 	(popcount:GPR (match_operand:GPR 1 "register_operand")))]
   "TARGET_ZBB")
 
-(define_insn "*<optab>_not<mode>"
+(define_insn "<optab>_not<mode>3"
   [(set (match_operand:X 0 "register_operand" "=r")
         (bitmanip_bitwise:X (not:X (match_operand:X 1 "register_operand" "r"))
                             (match_operand:X 2 "register_operand" "r")))]
@@ -262,7 +262,7 @@
           (match_operand:DI 2 "const_int_operand")))]
   "TARGET_64BIT && TARGET_ZBB && ((INTVAL (operands[2]) & 0x3f) == 0x3f)"
   "<bitmanip_insn>w\t%0,%1"
-  [(set_attr "type" "bitmanip")
+  [(set_attr "type" "<bitmanip_insn>")
    (set_attr "mode" "SI")])
 
 (define_insn "*<bitmanip_optab>di2"
@@ -283,7 +283,7 @@
   [(set_attr "type" "bitmanip,load")
    (set_attr "mode" "<GPR:MODE>")])
 
-(define_insn "*extend<SHORT:mode><SUPERQI:mode>2_zbb"
+(define_insn "*extend<SHORT:mode><SUPERQI:mode>2_bitmanip"
   [(set (match_operand:SUPERQI   0 "register_operand"     "=r,r")
 	(sign_extend:SUPERQI
 	    (match_operand:SHORT 1 "nonimmediate_operand" " r,m")))]
@@ -293,17 +293,6 @@
    l<SHORT:size>\t%0,%1"
   [(set_attr "type" "bitmanip,load")
    (set_attr "mode" "<SUPERQI:MODE>")])
-
-(define_insn "*zero_extendhi<GPR:mode>2_zbb"
-  [(set (match_operand:GPR    0 "register_operand"     "=r,r")
-	(zero_extend:GPR
-	    (match_operand:HI 1 "nonimmediate_operand" " r,m")))]
-  "TARGET_ZBB"
-  "@
-   zext.h\t%0,%1
-   lhu\t%0,%1"
-  [(set_attr "type" "bitmanip,load")
-   (set_attr "mode" "HI")])
 
 (define_expand "rotrdi3"
   [(set (match_operand:DI 0 "register_operand")
@@ -454,7 +443,16 @@
 (define_expand "bswapsi2"
   [(set (match_operand:SI 0 "register_operand")
 	(bswap:SI (match_operand:SI 1 "register_operand")))]
-  "(!TARGET_64BIT && (TARGET_ZBB || TARGET_ZBKB)) || TARGET_XTHEADBB")
+  "TARGET_ZBB || TARGET_ZBKB || TARGET_XTHEADBB"
+{
+  /* Expose bswapsi2 on TARGET_64BIT so that the gimple store
+     merging pass will create suitable bswap insns.  We can actually
+     just FAIL that case when generating RTL and let the generic code
+     handle it.  */
+  if (TARGET_64BIT && !TARGET_XTHEADBB)
+    FAIL;
+})
+
 
 (define_insn "*bswap<mode>2"
   [(set (match_operand:X 0 "register_operand" "=r")
