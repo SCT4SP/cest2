@@ -129,12 +129,12 @@ char *test_dynamic_4 (const char *src)
 
 void test_symbolic_ptr (const char *ptr)
 {
-  __analyzer_describe (0, __analyzer_get_strlen (ptr)); /* { dg-warning "UNKNOWN" } */
+  __analyzer_describe (0, __analyzer_get_strlen (ptr)); /* { dg-warning "CONJURED" } */
 }
 
 void test_symbolic_offset (size_t idx)
 {
-  __analyzer_describe (0, __analyzer_get_strlen ("abc" + idx)); /* { dg-warning "UNKNOWN" } */
+  __analyzer_describe (0, __analyzer_get_strlen ("abc" + idx)); /* { dg-warning "CONJURED" } */
 }
 
 void test_casts (void)
@@ -143,4 +143,28 @@ void test_casts (void)
   const char *p = (const char *)&i;
   __analyzer_eval (__analyzer_get_strlen (p) == 0); /* { dg-warning "UNKNOWN" } */  
   __analyzer_eval (__analyzer_get_strlen (p + 1) == 0); /* { dg-warning "UNKNOWN" } */  
+}
+
+void test_filled_nonzero (void)
+{
+  char buf[10];
+  __builtin_memset (buf, 'a', 10);
+  __analyzer_get_strlen (buf); /* { dg-warning "stack-based buffer over-read" "" { xfail *-*-* } } */
+}
+
+void test_filled_zero (void)
+{
+  char buf[10];
+  __builtin_memset (buf, 0, 10);
+  __analyzer_eval (__analyzer_get_strlen (buf) == 0); /* { dg-warning "TRUE" "correct" { xfail *-*-* } } */
+  /* { dg-bogus "UNKNOWN" "status quo" { xfail *-*-* } .-1 } */
+  __analyzer_eval (__analyzer_get_strlen (buf + 1) == 0); /* { dg-warning "TRUE" "correct" { xfail *-*-* } } */
+  /* { dg-bogus "UNKNOWN" "status quo" { xfail *-*-* } .-1 } */
+}
+
+void test_filled_symbolic (int c)
+{
+  char buf[10];
+  __builtin_memset (buf, c, 10);
+  __analyzer_eval (__analyzer_get_strlen (buf) == 0); /* { dg-warning "UNKNOWN" } */  
 }
