@@ -357,6 +357,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        * @endcode
        */
       template<typename _Yp>
+	_GLIBCXX_CEST_CONSTEXPR
 	shared_ptr(shared_ptr<_Yp>&& __r, element_type* __p) noexcept
 	: __shared_ptr<_Tp>(std::move(__r), __p) { }
 #endif
@@ -369,6 +370,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        */
       template<typename _Yp,
 	       typename = _Constructible<const shared_ptr<_Yp>&>>
+	_GLIBCXX_CEST_CONSTEXPR
 	shared_ptr(const shared_ptr<_Yp>& __r) noexcept
         : __shared_ptr<_Tp>(__r) { }
 
@@ -400,6 +402,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *          in which case the constructor has no effect.
        */
       template<typename _Yp, typename = _Constructible<const weak_ptr<_Yp>&>>
+	_GLIBCXX_CEST_CONSTEXPR
 	explicit shared_ptr(const weak_ptr<_Yp>& __r)
 	: __shared_ptr<_Tp>(__r) { }
 
@@ -415,6 +418,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       // 2399. shared_ptr's constructor from unique_ptr should be constrained
       template<typename _Yp, typename _Del,
 	       typename = _Constructible<unique_ptr<_Yp, _Del>>>
+	_GLIBCXX_CEST_CONSTEXPR
 	shared_ptr(unique_ptr<_Yp, _Del>&& __r)
 	: __shared_ptr<_Tp>(std::move(__r)) { }
 
@@ -476,6 +480,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	}
 
       template<typename _Yp, typename _Del>
+	_GLIBCXX_CEST_CONSTEXPR
 	_Assignable<unique_ptr<_Yp, _Del>>
 	operator=(unique_ptr<_Yp, _Del>&& __r)
 	{
@@ -573,6 +578,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 #endif
 
       // This constructor is non-standard, it is used by weak_ptr::lock().
+      _GLIBCXX_CEST_CONSTEXPR
       shared_ptr(const weak_ptr<_Tp>& __r, std::nothrow_t) noexcept
       : __shared_ptr<_Tp>(__r, std::nothrow) { }
 
@@ -615,6 +621,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     { return compare_three_way()(__a.get(), __b.get()); }
 
   template<typename _Tp>
+    _GLIBCXX_CEST_CONSTEXPR
     inline strong_ordering
     operator<=>(const shared_ptr<_Tp>& __a, nullptr_t) noexcept
     {
@@ -743,6 +750,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
   /// Convert type of `shared_ptr`, via `static_cast`
   template<typename _Tp, typename _Up>
+    _GLIBCXX_CEST_CONSTEXPR
     inline shared_ptr<_Tp>
     static_pointer_cast(const shared_ptr<_Up>& __r) noexcept
     {
@@ -752,6 +760,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
   /// Convert type of `shared_ptr`, via `const_cast`
   template<typename _Tp, typename _Up>
+    _GLIBCXX_CEST_CONSTEXPR
     inline shared_ptr<_Tp>
     const_pointer_cast(const shared_ptr<_Up>& __r) noexcept
     {
@@ -761,6 +770,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
   /// Convert type of `shared_ptr`, via `dynamic_cast`
   template<typename _Tp, typename _Up>
+    _GLIBCXX_CEST_CONSTEXPR
     inline shared_ptr<_Tp>
     dynamic_pointer_cast(const shared_ptr<_Up>& __r) noexcept
     {
@@ -788,6 +798,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
   /// Convert type of `shared_ptr` rvalue, via `static_cast`
   /// @since C++20
   template<typename _Tp, typename _Up>
+    _GLIBCXX_CEST_CONSTEXPR
     inline shared_ptr<_Tp>
     static_pointer_cast(shared_ptr<_Up>&& __r) noexcept
     {
@@ -799,6 +810,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
   /// Convert type of `shared_ptr` rvalue, via `const_cast`
   /// @since C++20
   template<typename _Tp, typename _Up>
+    _GLIBCXX_CEST_CONSTEXPR
     inline shared_ptr<_Tp>
     const_pointer_cast(shared_ptr<_Up>&& __r) noexcept
     {
@@ -810,6 +822,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
   /// Convert type of `shared_ptr` rvalue, via `dynamic_cast`
   /// @since C++20
   template<typename _Tp, typename _Up>
+    _GLIBCXX_CEST_CONSTEXPR
     inline shared_ptr<_Tp>
     dynamic_pointer_cast(shared_ptr<_Up>&& __r) noexcept
     {
@@ -872,18 +885,21 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
       template<typename _Yp,
 	       typename = _Constructible<const shared_ptr<_Yp>&>>
+	_GLIBCXX_CEST_CONSTEXPR
 	weak_ptr(const shared_ptr<_Yp>& __r) noexcept
 	: __weak_ptr<_Tp>(__r) { }
 
       weak_ptr(const weak_ptr&) noexcept = default;
 
       template<typename _Yp, typename = _Constructible<const weak_ptr<_Yp>&>>
+	_GLIBCXX_CEST_CONSTEXPR
 	weak_ptr(const weak_ptr<_Yp>& __r) noexcept
 	: __weak_ptr<_Tp>(__r) { }
 
       weak_ptr(weak_ptr&&) noexcept = default;
 
       template<typename _Yp, typename = _Constructible<weak_ptr<_Yp>>>
+	_GLIBCXX_CEST_CONSTEXPR
 	weak_ptr(weak_ptr<_Yp>&& __r) noexcept
 	: __weak_ptr<_Tp>(std::move(__r)) { }
 
@@ -891,6 +907,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       operator=(const weak_ptr& __r) noexcept = default;
 
       template<typename _Yp>
+	_GLIBCXX_CEST_CONSTEXPR
 	_Assignable<const weak_ptr<_Yp>&>
 	operator=(const weak_ptr<_Yp>& __r) noexcept
 	{
@@ -899,6 +916,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	}
 
       template<typename _Yp>
+	_GLIBCXX_CEST_CONSTEXPR
 	_Assignable<const shared_ptr<_Yp>&>
 	operator=(const shared_ptr<_Yp>& __r) noexcept
 	{
@@ -910,6 +928,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       operator=(weak_ptr&& __r) noexcept = default;
 
       template<typename _Yp>
+	_GLIBCXX_CEST_CONSTEXPR
 	_Assignable<weak_ptr<_Yp>>
 	operator=(weak_ptr<_Yp>&& __r) noexcept
 	{
@@ -917,6 +936,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	  return *this;
 	}
 
+      _GLIBCXX_CEST_CONSTEXPR
       shared_ptr<_Tp>
       lock() const noexcept
       { return shared_ptr<_Tp>(*this, std::nothrow); }
@@ -931,6 +951,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
   /// Swap overload for weak_ptr
   /// @relates weak_ptr
   template<typename _Tp>
+    _GLIBCXX_CEST_CONSTEXPR
     inline void
     swap(weak_ptr<_Tp>& __a, weak_ptr<_Tp>& __b) noexcept
     { __a.swap(__b); }
@@ -974,9 +995,11 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       operator=(const enable_shared_from_this&) noexcept
       { return *this; }
 
+      _GLIBCXX_CEST_CONSTEXPR
       ~enable_shared_from_this() { }
 
     public:
+      _GLIBCXX_CEST_CONSTEXPR
       shared_ptr<_Tp>
       shared_from_this()
       { return shared_ptr<_Tp>(this->_M_weak_this); }
@@ -1002,11 +1025,13 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
     private:
       template<typename _Tp1>
+	_GLIBCXX_CEST_CONSTEXPR
 	void
 	_M_weak_assign(_Tp1* __p, const __shared_count<>& __n) const noexcept
 	{ _M_weak_this._M_assign(__p, __n); }
 
       // Found by ADL when this is an associated class.
+      _GLIBCXX_CEST_CONSTEXPR
       friend const enable_shared_from_this*
       __enable_shared_from_this_base(const __shared_count<>&,
 				     const enable_shared_from_this* __p)
@@ -1025,7 +1050,6 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
   constexpr auto
   cest_allocate_shared(const _Alloc& __a, size_t __n, _Args&&... __args)
   {
-//    using _Up = remove_cv_t<remove_all_extents_t<_Tp>>;
     using _Up = remove_extent_t<_Tp>;
     using _Alloc_traits = allocator_traits<_Alloc>;
     using _Alloc2 = _Alloc_traits::template rebind_alloc<_Up>;

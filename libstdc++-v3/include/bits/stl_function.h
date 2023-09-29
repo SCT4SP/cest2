@@ -450,6 +450,10 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       _GLIBCXX14_CONSTEXPR bool
       operator()(_Tp* __x, _Tp* __y) const _GLIBCXX_NOTHROW
       {
+#if _GLIBCXX_CEST_VERSION && defined(__clang__)
+	if (__builtin_is_constant_evaluated())
+	  return std::strong_ordering::less == std::compare_three_way{}(__x, __y);
+#endif
 #if __cplusplus >= 201402L
 	if (std::__is_constant_evaluated())
 	  return __x < __y;

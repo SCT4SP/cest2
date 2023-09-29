@@ -553,7 +553,11 @@ namespace std _GLIBCXX_VISIBILITY(default)
 	  {
 #if _GLIBCXX_CEST_VERSION
 	    if (std::__is_constant_evaluated())
+	    {
+	      if (__t == nullptr || __u == nullptr) // special handling of nullptr
+	        return (__t ? 1 : 0) <=> (__u ? 1 : 0);
 	      return static_cast<_Tp&&>(__t) <=> static_cast<_Up&&>(__u);
+	    }
 #endif
 	    auto __pt = static_cast<const volatile void*>(__t);
 	    auto __pu = static_cast<const volatile void*>(__u);
