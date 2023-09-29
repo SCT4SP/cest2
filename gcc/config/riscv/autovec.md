@@ -373,7 +373,7 @@
 ;; -------------------------------------------------------------------------
 
 (define_expand "vec_init<mode><vel>"
-  [(match_operand:V 0 "register_operand")
+  [(match_operand:V_VLS 0 "register_operand")
    (match_operand 1 "")]
   "TARGET_VECTOR"
   {
@@ -420,10 +420,10 @@
 ;; -------------------------------------------------------------------------
 
 (define_insn_and_split "<optab><mode>3"
-  [(set (match_operand:VI 0 "register_operand")
-    (any_int_binop_no_shift:VI
-     (match_operand:VI 1 "<binop_rhs1_predicate>")
-     (match_operand:VI 2 "<binop_rhs2_predicate>")))]
+  [(set (match_operand:V_VLSI 0 "register_operand")
+    (any_int_binop_no_shift:V_VLSI
+     (match_operand:V_VLSI 1 "<binop_rhs1_predicate>")
+     (match_operand:V_VLSI 2 "<binop_rhs2_predicate>")))]
   "TARGET_VECTOR && can_create_pseudo_p ()"
   "#"
   "&& 1"
@@ -847,7 +847,7 @@
 (define_insn_and_split "<optab><mode><vconvert>2"
   [(set (match_operand:<VCONVERT> 0 "register_operand")
 	(any_fix:<VCONVERT>
-	  (match_operand:VF 1 "register_operand")))]
+	  (match_operand:V_VLSF 1 "register_operand")))]
   "TARGET_VECTOR && can_create_pseudo_p ()"
   "#"
   "&& 1"
@@ -868,8 +868,8 @@
 ;; -------------------------------------------------------------------------
 
 (define_insn_and_split "<float_cvt><vconvert><mode>2"
-  [(set (match_operand:VF 0 "register_operand")
-	(any_float:VF
+  [(set (match_operand:V_VLSF 0 "register_operand")
+	(any_float:V_VLSF
 	  (match_operand:<VCONVERT> 1 "register_operand")))]
   "TARGET_VECTOR && can_create_pseudo_p ()"
   "#"
@@ -916,8 +916,8 @@
 ;; - vfwcvt.f.x.v
 ;; -------------------------------------------------------------------------
 (define_insn_and_split "<float_cvt><vnconvert><mode>2"
-  [(set (match_operand:VF 0 "register_operand")
-	(any_float:VF
+  [(set (match_operand:V_VLSF 0 "register_operand")
+	(any_float:V_VLSF
 	  (match_operand:<VNCONVERT> 1 "register_operand")))]
   "TARGET_VECTOR && can_create_pseudo_p ()"
   "#"
@@ -940,7 +940,7 @@
 (define_insn_and_split "<optab><mode><vnconvert>2"
   [(set (match_operand:<VNCONVERT> 0 "register_operand")
 	(any_fix:<VNCONVERT>
-	  (match_operand:VF 1 "register_operand")))]
+	  (match_operand:V_VLSF 1 "register_operand")))]
   "TARGET_VECTOR && can_create_pseudo_p ()"
   "#"
   "&& 1"
@@ -974,6 +974,30 @@
 }
 [(set_attr "type" "vfncvtitof")])
 
+;; This operation can be performed in the loop vectorizer but unfortunately
+;; not applicable for now. We can remove this pattern after loop vectorizer
+;; is able to take care of INT64 to FP16 conversion.
+(define_insn_and_split "<float_cvt><mode><vnnconvert>2"
+  [(set (match_operand:<VNNCONVERT>  0 "register_operand")
+	(any_float:<VNNCONVERT>
+	  (match_operand:VWWCONVERTI 1 "register_operand")))]
+  "TARGET_VECTOR && TARGET_ZVFH && can_create_pseudo_p () && !flag_trapping_math"
+  "#"
+  "&& 1"
+  [(const_int 0)]
+  {
+    rtx single = gen_reg_rtx (<VNCONVERT>mode); /* Get vector SF mode.  */
+
+    /* Step-1, INT64 => FP32.  */
+    emit_insn (gen_<float_cvt><mode><vnconvert>2 (single, operands[1]));
+    /* Step-2, FP32 => FP16.  */
+    emit_insn (gen_trunc<vnconvert><vnnconvert>2 (operands[0], single));
+
+    DONE;
+  }
+  [(set_attr "type" "vfncvtitof")]
+)
+
 ;; =========================================================================
 ;; == Unary arithmetic
 ;; =========================================================================
@@ -985,9 +1009,9 @@
 ;; - vneg.v/vnot.v
 ;; -------------------------------------------------------------------------------
 (define_insn_and_split "<optab><mode>2"
-  [(set (match_operand:VI 0 "register_operand")
-    (any_int_unop:VI
-     (match_operand:VI 1 "register_operand")))]
+  [(set (match_operand:V_VLSI 0 "register_operand")
+    (any_int_unop:V_VLSI
+     (match_operand:V_VLSI 1 "register_operand")))]
   "TARGET_VECTOR && can_create_pseudo_p ()"
   "#"
   "&& 1"
@@ -1004,9 +1028,9 @@
 ;; -------------------------------------------------------------------------------
 
 (define_insn_and_split "abs<mode>2"
-  [(set (match_operand:VI 0 "register_operand")
-     (abs:VI
-       (match_operand:VI 1 "register_operand")))]
+  [(set (match_operand:V_VLSI 0 "register_operand")
+     (abs:V_VLSI
+       (match_operand:V_VLSI 1 "register_operand")))]
   "TARGET_VECTOR && can_create_pseudo_p ()"
   "#"
   "&& 1"
@@ -1031,9 +1055,9 @@
 ;; - vfneg.v/vfabs.v
 ;; -------------------------------------------------------------------------------
 (define_insn_and_split "<optab><mode>2"
-  [(set (match_operand:VF 0 "register_operand")
-    (any_float_unop_nofrm:VF
-     (match_operand:VF 1 "register_operand")))]
+  [(set (match_operand:V_VLSF 0 "register_operand")
+    (any_float_unop_nofrm:V_VLSF
+     (match_operand:V_VLSF 1 "register_operand")))]
   "TARGET_VECTOR && can_create_pseudo_p ()"
   "#"
   "&& 1"
@@ -1052,9 +1076,9 @@
 ;; - vfsqrt.v
 ;; -------------------------------------------------------------------------------
 (define_insn_and_split "<optab><mode>2"
-  [(set (match_operand:VF 0 "register_operand")
-    (any_float_unop:VF
-     (match_operand:VF 1 "register_operand")))]
+  [(set (match_operand:V_VLSF 0 "register_operand")
+    (any_float_unop:V_VLSF
+     (match_operand:V_VLSF 1 "register_operand")))]
   "TARGET_VECTOR && can_create_pseudo_p ()"
   "#"
   "&& 1"
@@ -1078,57 +1102,25 @@
 ;; - vmadd
 ;; -------------------------------------------------------------------------
 
-;; We can't expand FMA for the following reasons:
-;; 1. Before RA, we don't know which multiply-add instruction is the ideal one.
-;;    The vmacc is the ideal instruction when operands[3] overlaps operands[0].
-;;    The vmadd is the ideal instruction when operands[1|2] overlaps operands[0].
-;; 2. According to vector.md, the multiply-add patterns has 'merge' operand which
-;;    is the operands[5]. Since operands[5] should overlap operands[0], this operand
-;;    should be allocated the same regno as operands[1|2|3].
-;; 3. The 'merge' operand is always a real merge operand and we don't allow undefined
-;;    operand.
-;; 4. The operation of FMA pattern needs VLMAX vsetlvi which needs a VL operand.
-;;
-;; In this situation, we design the codegen of FMA as follows:
-;; 1. clobber a scratch in the expand pattern of FMA.
-;; 2. Let's RA decide which input operand (operands[1|2|3]) overlap operands[0].
-;; 3. Generate instructions (vmacc or vmadd) according to the register allocation
-;;    result after reload_completed.
-(define_expand "fma<mode>4"
-  [(parallel
-    [(set (match_operand:VI 0 "register_operand")
-	  (plus:VI
-	    (mult:VI
-	      (match_operand:VI 1 "register_operand")
-	      (match_operand:VI 2 "register_operand"))
-	    (match_operand:VI 3 "register_operand")))
-     (clobber (match_dup 4))])]
-  "TARGET_VECTOR"
-  {
-    operands[4] = gen_reg_rtx (Pmode);
-  })
-
-(define_insn_and_split "*fma<VI:mode><P:mode>"
-  [(set (match_operand:VI 0 "register_operand"     "=vr, vr, ?&vr")
-	(plus:VI
-	  (mult:VI
-	    (match_operand:VI 1 "register_operand" " %0, vr,   vr")
-	    (match_operand:VI 2 "register_operand" " vr, vr,   vr"))
-	  (match_operand:VI 3 "register_operand"   " vr,  0,   vr")))
-   (clobber (match_operand:P 4 "register_operand" "=r,r,r"))]
-  "TARGET_VECTOR"
+(define_insn_and_split "fma<mode>4"
+  [(set (match_operand:V_VLSI 0 "register_operand")
+	(plus:V_VLSI
+	  (mult:V_VLSI
+	    (match_operand:V_VLSI 1 "register_operand")
+	    (match_operand:V_VLSI 2 "register_operand"))
+	  (match_operand:V_VLSI 3 "register_operand")))]
+  "TARGET_VECTOR && can_create_pseudo_p ()"
   "#"
-  "&& reload_completed"
+  "&& 1"
   [(const_int 0)]
   {
-    riscv_vector::emit_vlmax_vsetvl (<VI:MODE>mode, operands[4]);
-    rtx ops[] = {operands[0], operands[1], operands[2], operands[3], operands[0]};
-    riscv_vector::emit_vlmax_insn_lra (code_for_pred_mul_plus (<VI:MODE>mode),
-					riscv_vector::TERNARY_OP, ops, operands[4]);
+    rtx ops[] = {operands[0], operands[1], operands[2], operands[3],
+                 RVV_VUNDEF(<MODE>mode)};
+    riscv_vector::emit_vlmax_insn (code_for_pred_mul_plus (<MODE>mode),
+				   riscv_vector::TERNARY_OP, ops);
     DONE;
   }
-  [(set_attr "type" "vimuladd")
-   (set_attr "mode" "<VI:MODE>")])
+  [(set_attr "type" "vector")])
 
 ;; -------------------------------------------------------------------------
 ;; ---- [INT] VNMSAC and VNMSUB
@@ -1138,41 +1130,25 @@
 ;; - vnmsub
 ;; -------------------------------------------------------------------------
 
-(define_expand "fnma<mode>4"
-  [(parallel
-    [(set (match_operand:VI 0 "register_operand")
-   (minus:VI
-     (match_operand:VI 3 "register_operand")
-     (mult:VI
-       (match_operand:VI 1 "register_operand")
-       (match_operand:VI 2 "register_operand"))))
-     (clobber (match_dup 4))])]
-  "TARGET_VECTOR"
-  {
-    operands[4] = gen_reg_rtx (Pmode);
-  })
-
-(define_insn_and_split "*fnma<VI:mode><P:mode>"
-  [(set (match_operand:VI 0 "register_operand"     "=vr, vr, ?&vr")
- (minus:VI
-   (match_operand:VI 3 "register_operand"   " vr,  0,   vr")
-   (mult:VI
-     (match_operand:VI 1 "register_operand" " %0, vr,   vr")
-     (match_operand:VI 2 "register_operand" " vr, vr,   vr"))))
-   (clobber (match_operand:P 4 "register_operand" "=r,r,r"))]
-  "TARGET_VECTOR"
+(define_insn_and_split "fnma<mode>4"
+  [(set (match_operand:V_VLSI 0 "register_operand")
+        (minus:V_VLSI
+          (match_operand:V_VLSI 3 "register_operand")
+          (mult:V_VLSI
+            (match_operand:V_VLSI 1 "register_operand")
+            (match_operand:V_VLSI 2 "register_operand"))))]
+  "TARGET_VECTOR && can_create_pseudo_p ()"
   "#"
-  "&& reload_completed"
+  "&& 1"
   [(const_int 0)]
   {
-    riscv_vector::emit_vlmax_vsetvl (<VI:MODE>mode, operands[4]);
-    rtx ops[] = {operands[0], operands[1], operands[2], operands[3], operands[0]};
-    riscv_vector::emit_vlmax_insn_lra (code_for_pred_minus_mul (<VI:MODE>mode),
-                                       riscv_vector::TERNARY_OP, ops, operands[4]);
+    rtx ops[] = {operands[0], operands[1], operands[2], operands[3],
+                 RVV_VUNDEF(<MODE>mode)};
+    riscv_vector::emit_vlmax_insn (code_for_pred_minus_mul (<MODE>mode),
+				   riscv_vector::TERNARY_OP, ops);
     DONE;
   }
-  [(set_attr "type" "vimuladd")
-   (set_attr "mode" "<VI:MODE>")])
+  [(set_attr "type" "vector")])
 
 ;; -------------------------------------------------------------------------
 ;; ---- [FP] VFMACC and VFMADD
@@ -1182,45 +1158,25 @@
 ;; - vfmadd
 ;; -------------------------------------------------------------------------
 
-(define_expand "fma<mode>4"
-  [(parallel
-    [(set (match_operand:VF 0 "register_operand")
-	  (unspec:VF
-	    [(fma:VF
-	      (match_operand:VF 1 "register_operand")
-	      (match_operand:VF 2 "register_operand")
-	      (match_operand:VF 3 "register_operand"))
-	     (reg:SI FRM_REGNUM)] UNSPEC_VFFMA))
-     (clobber (match_dup 4))])]
-  "TARGET_VECTOR"
-  {
-    operands[4] = gen_reg_rtx (Pmode);
-  }
-  [(set (attr "frm_mode") (symbol_ref "riscv_vector::FRM_DYN"))])
-
-(define_insn_and_split "*fma<VF:mode><P:mode>"
-  [(set (match_operand:VF 0 "register_operand"   "=vr, vr, ?&vr")
-	(unspec:VF
-	  [(fma:VF
-	    (match_operand:VF 1 "register_operand" " %0, vr,   vr")
-	    (match_operand:VF 2 "register_operand" " vr, vr,   vr")
-	    (match_operand:VF 3 "register_operand" " vr,  0,   vr"))
-	   (reg:SI FRM_REGNUM)] UNSPEC_VFFMA))
-   (clobber (match_operand:P 4 "register_operand" "=r,r,r"))]
-  "TARGET_VECTOR"
+(define_insn_and_split "fma<mode>4"
+  [(set (match_operand:V_VLSF 0 "register_operand")
+        (plus:V_VLSF
+	  (mult:V_VLSF
+	    (match_operand:V_VLSF 1 "register_operand")
+	    (match_operand:V_VLSF 2 "register_operand"))
+	  (match_operand:V_VLSF 3 "register_operand")))]
+  "TARGET_VECTOR && can_create_pseudo_p ()"
   "#"
-  "&& reload_completed"
+  "&& 1"
   [(const_int 0)]
   {
-    riscv_vector::emit_vlmax_vsetvl (<VF:MODE>mode, operands[4]);
-    rtx ops[] = {operands[0], operands[1], operands[2], operands[3], operands[0]};
-    riscv_vector::emit_vlmax_insn_lra (code_for_pred_mul (PLUS, <VF:MODE>mode),
-					riscv_vector::TERNARY_OP_FRM_DYN, ops, operands[4]);
+    rtx ops[] = {operands[0], operands[1], operands[2], operands[3],
+                 RVV_VUNDEF(<MODE>mode)};
+    riscv_vector::emit_vlmax_insn (code_for_pred_mul (PLUS, <MODE>mode),
+				   riscv_vector::TERNARY_OP_FRM_DYN, ops);
     DONE;
   }
-  [(set_attr "type" "vfmuladd")
-   (set_attr "mode" "<VF:MODE>")
-   (set (attr "frm_mode") (symbol_ref "riscv_vector::FRM_DYN"))])
+  [(set_attr "type" "vector")])
 
 ;; -------------------------------------------------------------------------
 ;; ---- [FP] VFNMSAC and VFNMSUB
@@ -1230,47 +1186,25 @@
 ;; - vfnmsub
 ;; -------------------------------------------------------------------------
 
-(define_expand "fnma<mode>4"
-  [(parallel
-    [(set (match_operand:VF 0 "register_operand")
-	  (unspec:VF
-	    [(fma:VF
-	      (neg:VF
-		(match_operand:VF 1 "register_operand"))
-	      (match_operand:VF 2 "register_operand")
-	      (match_operand:VF 3 "register_operand"))
-	     (reg:SI FRM_REGNUM)] UNSPEC_VFFMA))
-     (clobber (match_dup 4))])]
-  "TARGET_VECTOR"
-  {
-    operands[4] = gen_reg_rtx (Pmode);
-  }
-  [(set (attr "frm_mode") (symbol_ref "riscv_vector::FRM_DYN"))])
-
-(define_insn_and_split "*fnma<VF:mode><P:mode>"
-  [(set (match_operand:VF 0 "register_operand"     "=vr, vr, ?&vr")
-	(unspec:VF
-	  [(fma:VF
-	    (neg:VF
-	      (match_operand:VF 1 "register_operand" " %0, vr,   vr"))
-	    (match_operand:VF 2 "register_operand"   " vr, vr,   vr")
-	    (match_operand:VF 3 "register_operand"   " vr,  0,   vr"))
-	   (reg:SI FRM_REGNUM)] UNSPEC_VFFMA))
-   (clobber (match_operand:P 4 "register_operand" "=r,r,r"))]
-  "TARGET_VECTOR"
+(define_insn_and_split "fnma<mode>4"
+  [(set (match_operand:V_VLSF 0 "register_operand")
+        (minus:V_VLSF
+          (match_operand:V_VLSF 3 "register_operand")
+	  (mult:V_VLSF
+	    (match_operand:V_VLSF 1 "register_operand")
+	    (match_operand:V_VLSF 2 "register_operand"))))]
+  "TARGET_VECTOR && can_create_pseudo_p ()"
   "#"
-  "&& reload_completed"
+  "&& 1"
   [(const_int 0)]
   {
-    riscv_vector::emit_vlmax_vsetvl (<VF:MODE>mode, operands[4]);
-    rtx ops[] = {operands[0], operands[1], operands[2], operands[3], operands[0]};
-    riscv_vector::emit_vlmax_insn_lra (code_for_pred_mul_neg (PLUS, <VF:MODE>mode),
-					riscv_vector::TERNARY_OP_FRM_DYN, ops, operands[4]);
+    rtx ops[] = {operands[0], operands[1], operands[2], operands[3],
+                 RVV_VUNDEF(<MODE>mode)};
+    riscv_vector::emit_vlmax_insn (code_for_pred_mul_neg (PLUS, <MODE>mode),
+				   riscv_vector::TERNARY_OP_FRM_DYN, ops);
     DONE;
   }
-  [(set_attr "type" "vfmuladd")
-   (set_attr "mode" "<VF:MODE>")
-   (set (attr "frm_mode") (symbol_ref "riscv_vector::FRM_DYN"))])
+  [(set_attr "type" "vector")])
 
 ;; -------------------------------------------------------------------------
 ;; ---- [FP] VFMSAC and VFMSUB
@@ -1280,47 +1214,25 @@
 ;; - vfmsub
 ;; -------------------------------------------------------------------------
 
-(define_expand "fms<mode>4"
-  [(parallel
-    [(set (match_operand:VF 0 "register_operand")
-	  (unspec:VF
-	    [(fma:VF
-	      (match_operand:VF 1 "register_operand")
-	      (match_operand:VF 2 "register_operand")
-	      (neg:VF
-		(match_operand:VF 3 "register_operand")))
-	     (reg:SI FRM_REGNUM)] UNSPEC_VFFMA))
-     (clobber (match_dup 4))])]
-  "TARGET_VECTOR"
-  {
-    operands[4] = gen_reg_rtx (Pmode);
-  }
-  [(set (attr "frm_mode") (symbol_ref "riscv_vector::FRM_DYN"))])
-
-(define_insn_and_split "*fms<VF:mode><P:mode>"
-  [(set (match_operand:VF 0 "register_operand"     "=vr, vr, ?&vr")
-	(unspec:VF
-	  [(fma:VF
-	    (match_operand:VF 1 "register_operand"   " %0, vr,   vr")
-	    (match_operand:VF 2 "register_operand"   " vr, vr,   vr")
-	    (neg:VF
-	      (match_operand:VF 3 "register_operand" " vr,  0,   vr")))
-	   (reg:SI FRM_REGNUM)] UNSPEC_VFFMA))
-   (clobber (match_operand:P 4 "register_operand" "=r,r,r"))]
-  "TARGET_VECTOR"
+(define_insn_and_split "fms<mode>4"
+  [(set (match_operand:V_VLSF 0 "register_operand")
+        (minus:V_VLSF
+	  (mult:V_VLSF
+	    (match_operand:V_VLSF 1 "register_operand")
+	    (match_operand:V_VLSF 2 "register_operand"))
+	  (match_operand:V_VLSF 3 "register_operand")))]
+  "TARGET_VECTOR && can_create_pseudo_p ()"
   "#"
-  "&& reload_completed"
+  "&& 1"
   [(const_int 0)]
   {
-    riscv_vector::emit_vlmax_vsetvl (<VF:MODE>mode, operands[4]);
-    rtx ops[] = {operands[0], operands[1], operands[2], operands[3], operands[0]};
-    riscv_vector::emit_vlmax_insn_lra (code_for_pred_mul (MINUS, <VF:MODE>mode),
-					riscv_vector::TERNARY_OP_FRM_DYN, ops, operands[4]);
+    rtx ops[] = {operands[0], operands[1], operands[2], operands[3],
+                 RVV_VUNDEF(<MODE>mode)};
+    riscv_vector::emit_vlmax_insn (code_for_pred_mul (MINUS, <MODE>mode),
+				   riscv_vector::TERNARY_OP_FRM_DYN, ops);
     DONE;
   }
-  [(set_attr "type" "vfmuladd")
-   (set_attr "mode" "<VF:MODE>")
-   (set (attr "frm_mode") (symbol_ref "riscv_vector::FRM_DYN"))])
+  [(set_attr "type" "vector")])
 
 ;; -------------------------------------------------------------------------
 ;; ---- [FP] VFNMACC and VFNMADD
@@ -1330,49 +1242,26 @@
 ;; - vfnmadd
 ;; -------------------------------------------------------------------------
 
-(define_expand "fnms<mode>4"
-  [(parallel
-    [(set (match_operand:VF 0 "register_operand")
-	  (unspec:VF
-	    [(fma:VF
-	      (neg:VF
-		(match_operand:VF 1 "register_operand"))
-	      (match_operand:VF 2 "register_operand")
-	      (neg:VF
-		(match_operand:VF 3 "register_operand")))
-	     (reg:SI FRM_REGNUM)] UNSPEC_VFFMA))
-     (clobber (match_dup 4))])]
-  "TARGET_VECTOR"
-  {
-    operands[4] = gen_reg_rtx (Pmode);
-  }
-  [(set (attr "frm_mode") (symbol_ref "riscv_vector::FRM_DYN"))])
-
-(define_insn_and_split "*fnms<VF:mode><P:mode>"
-  [(set (match_operand:VF 0 "register_operand"     "=vr, vr, ?&vr")
-	(unspec:VF
-	  [(fma:VF
-	    (neg:VF
-	      (match_operand:VF 1 "register_operand" " %0, vr,   vr"))
-	    (match_operand:VF 2 "register_operand"   " vr, vr,   vr")
-	    (neg:VF
-	      (match_operand:VF 3 "register_operand" " vr,  0,   vr")))
-	   (reg:SI FRM_REGNUM)] UNSPEC_VFFMA))
-   (clobber (match_operand:P 4 "register_operand" "=r,r,r"))]
-  "TARGET_VECTOR"
+(define_insn_and_split "fnms<mode>4"
+  [(set (match_operand:V_VLSF 0 "register_operand")
+        (minus:V_VLSF
+          (neg:V_VLSF
+	    (mult:V_VLSF
+	      (match_operand:V_VLSF 1 "register_operand")
+	      (match_operand:V_VLSF 2 "register_operand")))
+	  (match_operand:V_VLSF 3 "register_operand")))]
+  "TARGET_VECTOR && can_create_pseudo_p ()"
   "#"
-  "&& reload_completed"
+  "&& 1"
   [(const_int 0)]
   {
-    riscv_vector::emit_vlmax_vsetvl (<VF:MODE>mode, operands[4]);
-    rtx ops[] = {operands[0], operands[1], operands[2], operands[3], operands[0]};
-    riscv_vector::emit_vlmax_insn_lra (code_for_pred_mul_neg (MINUS, <VF:MODE>mode),
-					riscv_vector::TERNARY_OP_FRM_DYN, ops, operands[4]);
+    rtx ops[] = {operands[0], operands[1], operands[2], operands[3],
+                 RVV_VUNDEF(<MODE>mode)};
+    riscv_vector::emit_vlmax_insn (code_for_pred_mul_neg (MINUS, <MODE>mode),
+				   riscv_vector::TERNARY_OP_FRM_DYN, ops);
     DONE;
   }
-  [(set_attr "type" "vfmuladd")
-   (set_attr "mode" "<VF:MODE>")
-   (set (attr "frm_mode") (symbol_ref "riscv_vector::FRM_DYN"))])
+  [(set_attr "type" "vector")])
 
 ;; =========================================================================
 ;; == SELECT_VL
@@ -1393,17 +1282,17 @@
 ;; -------------------------------------------------------------------------
 
 (define_expand "vec_set<mode>"
-  [(match_operand:V	0 "register_operand")
+  [(match_operand:V_VLS 0 "register_operand")
    (match_operand:<VEL> 1 "register_operand")
-   (match_operand	2 "nonmemory_operand")]
+   (match_operand       2 "nonmemory_operand")]
   "TARGET_VECTOR"
 {
   /* If we set the first element, emit an v(f)mv.s.[xf].  */
   if (operands[2] == const0_rtx)
     {
-      rtx ops[] = {operands[0], operands[1]};
+      rtx ops[] = {operands[0], operands[0], operands[1]};
       riscv_vector::emit_nonvlmax_insn (code_for_pred_broadcast (<MODE>mode),
-                                         riscv_vector::SCALAR_MOVE_OP, ops, CONST1_RTX (Pmode));
+					riscv_vector::SCALAR_MOVE_MERGED_OP, ops, CONST1_RTX (Pmode));
     }
   else
     {
@@ -1442,7 +1331,7 @@
 ;; -------------------------------------------------------------------------
 ;; ---- [INT,FP] Extract a vector element.
 ;; -------------------------------------------------------------------------
-(define_expand "@vec_extract<mode><vel>"
+(define_expand "vec_extract<mode><vel>"
   [(set (match_operand:<VEL>	  0 "register_operand")
      (vec_select:<VEL>
        (match_operand:V_VLS	  1 "register_operand")
@@ -1516,10 +1405,10 @@
 ;; - vfadd.vf/vfsub.vf/...
 ;; -------------------------------------------------------------------------
 (define_insn_and_split "<optab><mode>3"
-  [(set (match_operand:VF 0 "register_operand")
-        (any_float_binop:VF
-          (match_operand:VF 1 "register_operand")
-          (match_operand:VF 2 "register_operand")))]
+  [(set (match_operand:V_VLSF 0 "register_operand")
+        (any_float_binop:V_VLSF
+          (match_operand:V_VLSF 1 "register_operand")
+          (match_operand:V_VLSF 2 "register_operand")))]
   "TARGET_VECTOR && can_create_pseudo_p ()"
   "#"
   "&& 1"
@@ -1537,10 +1426,10 @@
 ;; - vfmin.vf/vfmax.vf
 ;; -------------------------------------------------------------------------
 (define_insn_and_split "<optab><mode>3"
-  [(set (match_operand:VF 0 "register_operand")
-        (any_float_binop_nofrm:VF
-          (match_operand:VF 1 "register_operand")
-          (match_operand:VF 2 "register_operand")))]
+  [(set (match_operand:V_VLSF 0 "register_operand")
+        (any_float_binop_nofrm:V_VLSF
+          (match_operand:V_VLSF 1 "register_operand")
+          (match_operand:V_VLSF 2 "register_operand")))]
   "TARGET_VECTOR && can_create_pseudo_p ()"
   "#"
   "&& 1"
@@ -1563,10 +1452,10 @@
 ;; Leave the pattern like this as to still allow combine to match
 ;; a negated copysign (see vector.md) before adding the UNSPEC_VPREDICATE later.
 (define_insn_and_split "copysign<mode>3"
-  [(set (match_operand:VF 0 "register_operand"      "=vd, vd, vr, vr")
-    (unspec:VF
-     [(match_operand:VF 1 "register_operand"        " vr, vr, vr, vr")
-     (match_operand:VF 2 "register_operand"         " vr, vr, vr, vr")] UNSPEC_VCOPYSIGN))]
+  [(set (match_operand:V_VLSF 0 "register_operand"  "=vd, vd, vr, vr")
+    (unspec:V_VLSF
+     [(match_operand:V_VLSF 1 "register_operand"        " vr, vr, vr, vr")
+     (match_operand:V_VLSF 2 "register_operand"         " vr, vr, vr, vr")] UNSPEC_VCOPYSIGN))]
   "TARGET_VECTOR && can_create_pseudo_p ()"
   "#"
   "&& 1"
@@ -1585,9 +1474,9 @@
 ;; - vfsgnjx.vf
 ;; -------------------------------------------------------------------------------
 (define_expand "xorsign<mode>3"
-  [(match_operand:VF 0 "register_operand")
-    (match_operand:VF 1 "register_operand")
-    (match_operand:VF 2 "register_operand")]
+  [(match_operand:V_VLSF 0 "register_operand")
+    (match_operand:V_VLSF 1 "register_operand")
+    (match_operand:V_VLSF 2 "register_operand")]
   "TARGET_VECTOR"
 {
   riscv_vector::emit_vlmax_insn (code_for_pred (UNSPEC_VXORSIGN, <MODE>mode),
@@ -1627,18 +1516,15 @@
 ;; -------------------------------------------------------------------------
 
 (define_expand "cond_<optab><mode>"
-  [(match_operand:VI 0 "register_operand")
+  [(match_operand:V_VLSI 0 "register_operand")
    (match_operand:<VM> 1 "vector_mask_operand")
-   (any_int_unop:VI
-     (match_operand:VI 2 "register_operand"))
-   (match_operand:VI 3 "register_operand")]
+   (any_int_unop:V_VLSI
+     (match_operand:V_VLSI 2 "register_operand"))
+   (match_operand:V_VLSI 3 "autovec_else_operand")]
   "TARGET_VECTOR"
 {
-  /* Normalize into cond_len_* operations.  */
-  emit_insn (gen_cond_len_<optab><mode> (operands[0], operands[1], operands[2],
-					 operands[3],
-					 gen_int_mode (GET_MODE_NUNITS (<MODE>mode), Pmode),
-					 const0_rtx));
+  insn_code icode = code_for_pred (<CODE>, <MODE>mode);
+  riscv_vector::expand_cond_unop (icode, operands);
   DONE;
 })
 
@@ -1647,7 +1533,7 @@
    (match_operand:<VM> 1 "vector_mask_operand")
    (any_int_unop:VI
      (match_operand:VI 2 "register_operand"))
-   (match_operand:VI 3 "register_operand")
+   (match_operand:VI 3 "autovec_else_operand")
    (match_operand 4 "autovec_length_operand")
    (match_operand 5 "const_0_operand")]
   "TARGET_VECTOR"
@@ -1665,18 +1551,15 @@
 ;; -------------------------------------------------------------------------
 
 (define_expand "cond_<optab><mode>"
-  [(match_operand:VF 0 "register_operand")
+  [(match_operand:V_VLSF 0 "register_operand")
    (match_operand:<VM> 1 "vector_mask_operand")
-   (any_float_unop_nofrm:VF
-     (match_operand:VF 2 "register_operand"))
-   (match_operand:VF 3 "register_operand")]
+   (any_float_unop_nofrm:V_VLSF
+     (match_operand:V_VLSF 2 "register_operand"))
+   (match_operand:V_VLSF 3 "autovec_else_operand")]
   "TARGET_VECTOR"
 {
-  /* Normalize into cond_len_* operations.  */
-  emit_insn (gen_cond_len_<optab><mode> (operands[0], operands[1], operands[2],
-					 operands[3],
-					 gen_int_mode (GET_MODE_NUNITS (<MODE>mode), Pmode),
-					 const0_rtx));
+  insn_code icode = code_for_pred (<CODE>, <MODE>mode);
+  riscv_vector::expand_cond_unop (icode, operands);
   DONE;
 })
 
@@ -1685,7 +1568,7 @@
    (match_operand:<VM> 1 "vector_mask_operand")
    (any_float_unop_nofrm:VF
      (match_operand:VF 2 "register_operand"))
-   (match_operand:VF 3 "register_operand")
+   (match_operand:VF 3 "autovec_else_operand")
    (match_operand 4 "autovec_length_operand")
    (match_operand 5 "const_0_operand")]
   "TARGET_VECTOR"
@@ -1703,19 +1586,16 @@
 ;; -------------------------------------------------------------------------
 
 (define_expand "cond_<optab><mode>"
-  [(match_operand:VI 0 "register_operand")
+  [(match_operand:V_VLSI 0 "register_operand")
    (match_operand:<VM> 1 "vector_mask_operand")
-   (any_shift:VI
-     (match_operand:VI 2 "register_operand")
-     (match_operand:VI 3 "vector_shift_operand"))
-   (match_operand:VI 4 "register_operand")]
+   (any_shift:V_VLSI
+     (match_operand:V_VLSI 2 "register_operand")
+     (match_operand:V_VLSI 3 "vector_shift_operand"))
+   (match_operand:V_VLSI 4 "autovec_else_operand")]
   "TARGET_VECTOR"
 {
-  /* Normalize into cond_len_* operations.  */
-  emit_insn (gen_cond_len_<optab><mode> (operands[0], operands[1], operands[2],
-					 operands[3], operands[4],
-					 gen_int_mode (GET_MODE_NUNITS (<MODE>mode), Pmode),
-					 const0_rtx));
+  insn_code icode = code_for_pred (<CODE>, <MODE>mode);
+  riscv_vector::expand_cond_binop (icode, operands);
   DONE;
 })
 
@@ -1725,7 +1605,7 @@
    (any_shift:VI
      (match_operand:VI 2 "register_operand")
      (match_operand:VI 3 "vector_shift_operand"))
-   (match_operand:VI 4 "register_operand")
+   (match_operand:VI 4 "autovec_else_operand")
    (match_operand 5 "autovec_length_operand")
    (match_operand 6 "const_0_operand")]
   "TARGET_VECTOR"
@@ -1744,19 +1624,16 @@
 ;; -------------------------------------------------------------------------
 
 (define_expand "cond_<optab><mode>"
-  [(match_operand:VI 0 "register_operand")
+  [(match_operand:V_VLSI 0 "register_operand")
    (match_operand:<VM> 1 "vector_mask_operand")
-   (any_int_binop_no_shift:VI
-     (match_operand:VI 2 "<binop_rhs1_predicate>")
-     (match_operand:VI 3 "<binop_rhs2_predicate>"))
-   (match_operand:VI 4 "register_operand")]
+   (any_int_binop_no_shift:V_VLSI
+     (match_operand:V_VLSI 2 "<binop_rhs1_predicate>")
+     (match_operand:V_VLSI 3 "<binop_rhs2_predicate>"))
+   (match_operand:V_VLSI 4 "autovec_else_operand")]
   "TARGET_VECTOR"
 {
-  /* Normalize into cond_len_* operations.  */
-  emit_insn (gen_cond_len_<optab><mode> (operands[0], operands[1], operands[2],
-					 operands[3], operands[4],
-					 gen_int_mode (GET_MODE_NUNITS (<MODE>mode), Pmode),
-					 const0_rtx));
+  insn_code icode = code_for_pred (<CODE>, <MODE>mode);
+  riscv_vector::expand_cond_binop (icode, operands);
   DONE;
 })
 
@@ -1766,7 +1643,7 @@
    (any_int_binop_no_shift:VI
      (match_operand:VI 2 "<binop_rhs1_predicate>")
      (match_operand:VI 3 "<binop_rhs2_predicate>"))
-   (match_operand:VI 4 "register_operand")
+   (match_operand:VI 4 "autovec_else_operand")
    (match_operand 5 "autovec_length_operand")
    (match_operand 6 "const_0_operand")]
   "TARGET_VECTOR"
@@ -1785,19 +1662,16 @@
 ;; -------------------------------------------------------------------------
 
 (define_expand "cond_<optab><mode>"
-  [(match_operand:VF 0 "register_operand")
+  [(match_operand:V_VLSF 0 "register_operand")
    (match_operand:<VM> 1 "vector_mask_operand")
-   (any_float_binop:VF
-     (match_operand:VF 2 "register_operand")
-     (match_operand:VF 3 "register_operand"))
-   (match_operand:VF 4 "register_operand")]
+   (any_float_binop:V_VLSF
+     (match_operand:V_VLSF 2 "register_operand")
+     (match_operand:V_VLSF 3 "register_operand"))
+   (match_operand:V_VLSF 4 "autovec_else_operand")]
   "TARGET_VECTOR"
 {
-  /* Normalize into cond_len_* operations.  */
-  emit_insn (gen_cond_len_<optab><mode> (operands[0], operands[1], operands[2],
-					 operands[3], operands[4],
-					 gen_int_mode (GET_MODE_NUNITS (<MODE>mode), Pmode),
-					 const0_rtx));
+  insn_code icode = code_for_pred (<CODE>, <MODE>mode);
+  riscv_vector::expand_cond_binop (icode, operands);
   DONE;
 })
 
@@ -1807,7 +1681,7 @@
    (any_float_binop:VF
      (match_operand:VF 2 "register_operand")
      (match_operand:VF 3 "register_operand"))
-   (match_operand:VF 4 "register_operand")
+   (match_operand:VF 4 "autovec_else_operand")
    (match_operand 5 "autovec_length_operand")
    (match_operand 6 "const_0_operand")]
   "TARGET_VECTOR"
@@ -1824,19 +1698,16 @@
 ;; -------------------------------------------------------------------------
 
 (define_expand "cond_<optab><mode>"
-  [(match_operand:VF 0 "register_operand")
+  [(match_operand:V_VLSF 0 "register_operand")
    (match_operand:<VM> 1 "vector_mask_operand")
-   (any_float_binop_nofrm:VF
-     (match_operand:VF 2 "register_operand")
-     (match_operand:VF 3 "register_operand"))
-   (match_operand:VF 4 "register_operand")]
+   (any_float_binop_nofrm:V_VLSF
+     (match_operand:V_VLSF 2 "register_operand")
+     (match_operand:V_VLSF 3 "register_operand"))
+   (match_operand:V_VLSF 4 "autovec_else_operand")]
   "TARGET_VECTOR"
 {
-  /* Normalize into cond_len_* operations.  */
-  emit_insn (gen_cond_len_<optab><mode> (operands[0], operands[1], operands[2],
-					 operands[3], operands[4],
-					 gen_int_mode (GET_MODE_NUNITS (<MODE>mode), Pmode),
-					 const0_rtx));
+  insn_code icode = code_for_pred (<CODE>, <MODE>mode);
+  riscv_vector::expand_cond_binop (icode, operands);
   DONE;
 })
 
@@ -1846,7 +1717,7 @@
    (any_float_binop_nofrm:VF
      (match_operand:VF 2 "register_operand")
      (match_operand:VF 3 "register_operand"))
-   (match_operand:VF 4 "register_operand")
+   (match_operand:VF 4 "autovec_else_operand")
    (match_operand 5 "autovec_length_operand")
    (match_operand 6 "const_0_operand")]
   "TARGET_VECTOR"
@@ -1864,19 +1735,16 @@
 ;; -------------------------------------------------------------------------
 
 (define_expand "cond_fma<mode>"
-  [(match_operand:VI 0 "register_operand")
+  [(match_operand:V_VLSI 0 "register_operand")
    (match_operand:<VM> 1 "vector_mask_operand")
-   (match_operand:VI 2 "register_operand")
-   (match_operand:VI 3 "register_operand")
-   (match_operand:VI 4 "register_operand")
-   (match_operand:VI 5 "register_operand")]
+   (match_operand:V_VLSI 2 "register_operand")
+   (match_operand:V_VLSI 3 "register_operand")
+   (match_operand:V_VLSI 4 "register_operand")
+   (match_operand:V_VLSI 5 "autovec_else_operand")]
   "TARGET_VECTOR"
 {
-  /* Normalize into cond_len_* operations.  */
-  emit_insn (gen_cond_len_fma<mode> (operands[0], operands[1], operands[2],
-				     operands[3], operands[4], operands[5],
-				     gen_int_mode (GET_MODE_NUNITS (<MODE>mode), Pmode),
-				     const0_rtx));
+  insn_code icode = code_for_pred_mul_plus (<MODE>mode);
+  riscv_vector::expand_cond_ternop (icode, operands);
   DONE;
 })
 
@@ -1886,7 +1754,7 @@
    (match_operand:VI 2 "register_operand")
    (match_operand:VI 3 "register_operand")
    (match_operand:VI 4 "register_operand")
-   (match_operand:VI 5 "register_operand")
+   (match_operand:VI 5 "autovec_else_operand")
    (match_operand 6 "autovec_length_operand")
    (match_operand 7 "const_0_operand")]
   "TARGET_VECTOR"
@@ -1897,19 +1765,16 @@
 })
 
 (define_expand "cond_fnma<mode>"
-  [(match_operand:VI 0 "register_operand")
+  [(match_operand:V_VLSI 0 "register_operand")
    (match_operand:<VM> 1 "vector_mask_operand")
-   (match_operand:VI 2 "register_operand")
-   (match_operand:VI 3 "register_operand")
-   (match_operand:VI 4 "register_operand")
-   (match_operand:VI 5 "register_operand")]
+   (match_operand:V_VLSI 2 "register_operand")
+   (match_operand:V_VLSI 3 "register_operand")
+   (match_operand:V_VLSI 4 "register_operand")
+   (match_operand:V_VLSI 5 "autovec_else_operand")]
   "TARGET_VECTOR"
 {
-  /* Normalize into cond_len_* operations.  */
-  emit_insn (gen_cond_len_fnma<mode> (operands[0], operands[1], operands[2],
-				      operands[3], operands[4], operands[5],
-				      gen_int_mode (GET_MODE_NUNITS (<MODE>mode), Pmode),
-				      const0_rtx));
+  insn_code icode = code_for_pred_minus_mul (<MODE>mode);
+  riscv_vector::expand_cond_ternop (icode, operands);
   DONE;
 })
 
@@ -1919,7 +1784,7 @@
    (match_operand:VI 2 "register_operand")
    (match_operand:VI 3 "register_operand")
    (match_operand:VI 4 "register_operand")
-   (match_operand:VI 5 "register_operand")
+   (match_operand:VI 5 "autovec_else_operand")
    (match_operand 6 "autovec_length_operand")
    (match_operand 7 "const_0_operand")]
   "TARGET_VECTOR"
@@ -1937,19 +1802,16 @@
 ;; -------------------------------------------------------------------------
 
 (define_expand "cond_fma<mode>"
-  [(match_operand:VF 0 "register_operand")
+  [(match_operand:V_VLSF 0 "register_operand")
    (match_operand:<VM> 1 "vector_mask_operand")
-   (match_operand:VF 2 "register_operand")
-   (match_operand:VF 3 "register_operand")
-   (match_operand:VF 4 "register_operand")
-   (match_operand:VF 5 "register_operand")]
+   (match_operand:V_VLSF 2 "register_operand")
+   (match_operand:V_VLSF 3 "register_operand")
+   (match_operand:V_VLSF 4 "register_operand")
+   (match_operand:V_VLSF 5 "autovec_else_operand")]
   "TARGET_VECTOR"
 {
-  /* Normalize into cond_len_* operations.  */
-  emit_insn (gen_cond_len_fma<mode> (operands[0], operands[1], operands[2],
-				     operands[3], operands[4], operands[5],
-				     gen_int_mode (GET_MODE_NUNITS (<MODE>mode), Pmode),
-				     const0_rtx));
+  insn_code icode = code_for_pred_mul (PLUS, <MODE>mode);
+  riscv_vector::expand_cond_ternop (icode, operands);
   DONE;
 })
 
@@ -1959,7 +1821,7 @@
    (match_operand:VF 2 "register_operand")
    (match_operand:VF 3 "register_operand")
    (match_operand:VF 4 "register_operand")
-   (match_operand:VF 5 "register_operand")
+   (match_operand:VF 5 "autovec_else_operand")
    (match_operand 6 "autovec_length_operand")
    (match_operand 7 "const_0_operand")]
   "TARGET_VECTOR"
@@ -1970,19 +1832,16 @@
 })
 
 (define_expand "cond_fnma<mode>"
-  [(match_operand:VF 0 "register_operand")
+  [(match_operand:V_VLSF 0 "register_operand")
    (match_operand:<VM> 1 "vector_mask_operand")
-   (match_operand:VF 2 "register_operand")
-   (match_operand:VF 3 "register_operand")
-   (match_operand:VF 4 "register_operand")
-   (match_operand:VF 5 "register_operand")]
+   (match_operand:V_VLSF 2 "register_operand")
+   (match_operand:V_VLSF 3 "register_operand")
+   (match_operand:V_VLSF 4 "register_operand")
+   (match_operand:V_VLSF 5 "autovec_else_operand")]
   "TARGET_VECTOR"
 {
-  /* Normalize into cond_len_* operations.  */
-  emit_insn (gen_cond_len_fnma<mode> (operands[0], operands[1], operands[2],
-				      operands[3], operands[4], operands[5],
-				      gen_int_mode (GET_MODE_NUNITS (<MODE>mode), Pmode),
-				      const0_rtx));
+  insn_code icode = code_for_pred_mul_neg (PLUS, <MODE>mode);
+  riscv_vector::expand_cond_ternop (icode, operands);
   DONE;
 })
 
@@ -1992,7 +1851,7 @@
    (match_operand:VF 2 "register_operand")
    (match_operand:VF 3 "register_operand")
    (match_operand:VF 4 "register_operand")
-   (match_operand:VF 5 "register_operand")
+   (match_operand:VF 5 "autovec_else_operand")
    (match_operand 6 "autovec_length_operand")
    (match_operand 7 "const_0_operand")]
   "TARGET_VECTOR"
@@ -2003,19 +1862,16 @@
 })
 
 (define_expand "cond_fms<mode>"
-  [(match_operand:VF 0 "register_operand")
+  [(match_operand:V_VLSF 0 "register_operand")
    (match_operand:<VM> 1 "vector_mask_operand")
-   (match_operand:VF 2 "register_operand")
-   (match_operand:VF 3 "register_operand")
-   (match_operand:VF 4 "register_operand")
-   (match_operand:VF 5 "register_operand")]
+   (match_operand:V_VLSF 2 "register_operand")
+   (match_operand:V_VLSF 3 "register_operand")
+   (match_operand:V_VLSF 4 "register_operand")
+   (match_operand:V_VLSF 5 "autovec_else_operand")]
   "TARGET_VECTOR"
 {
-  /* Normalize into cond_len_* operations.  */
-  emit_insn (gen_cond_len_fms<mode> (operands[0], operands[1], operands[2],
-				     operands[3], operands[4], operands[5],
-				     gen_int_mode (GET_MODE_NUNITS (<MODE>mode), Pmode),
-				     const0_rtx));
+  insn_code icode = code_for_pred_mul (MINUS, <MODE>mode);
+  riscv_vector::expand_cond_ternop (icode, operands);
   DONE;
 })
 
@@ -2025,7 +1881,7 @@
    (match_operand:VF 2 "register_operand")
    (match_operand:VF 3 "register_operand")
    (match_operand:VF 4 "register_operand")
-   (match_operand:VF 5 "register_operand")
+   (match_operand:VF 5 "autovec_else_operand")
    (match_operand 6 "autovec_length_operand")
    (match_operand 7 "const_0_operand")]
   "TARGET_VECTOR"
@@ -2036,19 +1892,16 @@
 })
 
 (define_expand "cond_fnms<mode>"
-  [(match_operand:VF 0 "register_operand")
+  [(match_operand:V_VLSF 0 "register_operand")
    (match_operand:<VM> 1 "vector_mask_operand")
-   (match_operand:VF 2 "register_operand")
-   (match_operand:VF 3 "register_operand")
-   (match_operand:VF 4 "register_operand")
-   (match_operand:VF 5 "register_operand")]
+   (match_operand:V_VLSF 2 "register_operand")
+   (match_operand:V_VLSF 3 "register_operand")
+   (match_operand:V_VLSF 4 "register_operand")
+   (match_operand:V_VLSF 5 "autovec_else_operand")]
   "TARGET_VECTOR"
 {
-  /* Normalize into cond_len_* operations.  */
-  emit_insn (gen_cond_len_fnms<mode> (operands[0], operands[1], operands[2],
-				      operands[3], operands[4], operands[5],
-				      gen_int_mode (GET_MODE_NUNITS (<MODE>mode), Pmode),
-				      const0_rtx));
+  insn_code icode = code_for_pred_mul_neg (MINUS, <MODE>mode);
+  riscv_vector::expand_cond_ternop (icode, operands);
   DONE;
 })
 
@@ -2058,7 +1911,7 @@
    (match_operand:VF 2 "register_operand")
    (match_operand:VF 3 "register_operand")
    (match_operand:VF 4 "register_operand")
-   (match_operand:VF 5 "register_operand")
+   (match_operand:VF 5 "autovec_else_operand")
    (match_operand 6 "autovec_length_operand")
    (match_operand 7 "const_0_operand")]
   "TARGET_VECTOR"
@@ -2089,7 +1942,7 @@
 (define_insn_and_split "reduc_plus_scal_<mode>"
   [(set (match_operand:<VEL> 0 "register_operand")
         (unspec:<VEL> [
-             (match_operand:VI 1 "register_operand")
+             (match_operand:V_VLSI 1 "register_operand")
         ] UNSPEC_REDUC_SUM))]
   "TARGET_VECTOR && can_create_pseudo_p ()"
   "#"
@@ -2104,7 +1957,7 @@
 
 (define_expand "reduc_smax_scal_<mode>"
   [(match_operand:<VEL> 0 "register_operand")
-   (match_operand:VI 1 "register_operand")]
+   (match_operand:V_VLSI 1 "register_operand")]
   "TARGET_VECTOR"
 {
   int prec = GET_MODE_PRECISION (<VEL>mode);
@@ -2116,7 +1969,7 @@
 
 (define_expand "reduc_umax_scal_<mode>"
   [(match_operand:<VEL> 0 "register_operand")
-   (match_operand:VI 1 "register_operand")]
+   (match_operand:V_VLSI 1 "register_operand")]
   "TARGET_VECTOR"
 {
   riscv_vector::expand_reduction (UNSPEC_REDUC_MAXU, riscv_vector::REDUCE_OP,
@@ -2126,7 +1979,7 @@
 
 (define_expand "reduc_smin_scal_<mode>"
   [(match_operand:<VEL> 0 "register_operand")
-   (match_operand:VI 1 "register_operand")]
+   (match_operand:V_VLSI 1 "register_operand")]
   "TARGET_VECTOR"
 {
   int prec = GET_MODE_PRECISION (<VEL>mode);
@@ -2138,7 +1991,7 @@
 
 (define_expand "reduc_umin_scal_<mode>"
   [(match_operand:<VEL> 0 "register_operand")
-   (match_operand:VI 1 "register_operand")]
+   (match_operand:V_VLSI 1 "register_operand")]
   "TARGET_VECTOR"
 {
   int prec = GET_MODE_PRECISION (<VEL>mode);
@@ -2150,7 +2003,7 @@
 
 (define_expand "reduc_and_scal_<mode>"
   [(match_operand:<VEL> 0 "register_operand")
-   (match_operand:VI 1 "register_operand")]
+   (match_operand:V_VLSI 1 "register_operand")]
   "TARGET_VECTOR"
 {
   riscv_vector::expand_reduction (UNSPEC_REDUC_AND, riscv_vector::REDUCE_OP,
@@ -2160,7 +2013,7 @@
 
 (define_expand "reduc_ior_scal_<mode>"
   [(match_operand:<VEL> 0 "register_operand")
-   (match_operand:VI 1 "register_operand")]
+   (match_operand:V_VLSI 1 "register_operand")]
   "TARGET_VECTOR"
 {
   riscv_vector::expand_reduction (UNSPEC_REDUC_OR, riscv_vector::REDUCE_OP,
@@ -2170,7 +2023,7 @@
 
 (define_expand "reduc_xor_scal_<mode>"
   [(match_operand:<VEL> 0 "register_operand")
-   (match_operand:VI 1 "register_operand")]
+   (match_operand:V_VLSI 1 "register_operand")]
   "TARGET_VECTOR"
 {
   riscv_vector::expand_reduction (UNSPEC_REDUC_XOR, riscv_vector::REDUCE_OP,
@@ -2190,7 +2043,7 @@
 (define_insn_and_split "reduc_plus_scal_<mode>"
   [(set (match_operand:<VEL> 0 "register_operand")
         (unspec:<VEL> [
-             (match_operand:VF 1 "register_operand")
+             (match_operand:V_VLSF 1 "register_operand")
         ] UNSPEC_REDUC_SUM_UNORDERED))]
   "TARGET_VECTOR && can_create_pseudo_p ()"
   "#"
@@ -2206,7 +2059,7 @@
 
 (define_expand "reduc_smax_scal_<mode>"
   [(match_operand:<VEL> 0 "register_operand")
-   (match_operand:VF 1 "register_operand")]
+   (match_operand:V_VLSF 1 "register_operand")]
   "TARGET_VECTOR"
 {
   REAL_VALUE_TYPE rv;
@@ -2219,7 +2072,7 @@
 
 (define_expand "reduc_smin_scal_<mode>"
   [(match_operand:<VEL> 0 "register_operand")
-   (match_operand:VF 1 "register_operand")]
+   (match_operand:V_VLSF 1 "register_operand")]
   "TARGET_VECTOR"
 {
   REAL_VALUE_TYPE rv;
@@ -2241,7 +2094,7 @@
 (define_insn_and_split "fold_left_plus_<mode>"
   [(set (match_operand:<VEL> 0 "register_operand")
         (unspec:<VEL> [
-             (match_operand:VF 2 "register_operand")
+             (match_operand:V_VLSF 2 "register_operand")
              (match_operand:<VEL> 1 "register_operand")
         ] UNSPEC_REDUC_SUM_ORDERED))]
   "TARGET_VECTOR && can_create_pseudo_p ()"
@@ -2374,3 +2227,81 @@
   riscv_vector::emit_vlmax_insn (icode, riscv_vector::BINARY_OP, ops3);
   DONE;
 })
+
+;; -------------------------------------------------------------------------
+;; ---- [FP] Math.h.
+;; -------------------------------------------------------------------------
+;; Includes:
+;; - ceil/ceilf
+;; - floor/floorf
+;; - nearbyint/nearbyintf
+;; -------------------------------------------------------------------------
+(define_expand "ceil<mode>2"
+  [(match_operand:V_VLSF 0 "register_operand")
+   (match_operand:V_VLSF 1 "register_operand")]
+  "TARGET_VECTOR && !flag_trapping_math && !flag_rounding_math"
+  {
+    riscv_vector::expand_vec_ceil (operands[0], operands[1], <MODE>mode, <VCONVERT>mode);
+    DONE;
+  }
+)
+
+(define_expand "floor<mode>2"
+  [(match_operand:V_VLSF 0 "register_operand")
+   (match_operand:V_VLSF 1 "register_operand")]
+  "TARGET_VECTOR && !flag_trapping_math && !flag_rounding_math"
+  {
+    riscv_vector::expand_vec_floor (operands[0], operands[1], <MODE>mode, <VCONVERT>mode);
+    DONE;
+  }
+)
+
+(define_expand "nearbyint<mode>2"
+  [(match_operand:V_VLSF 0 "register_operand")
+   (match_operand:V_VLSF 1 "register_operand")]
+  "TARGET_VECTOR && !flag_trapping_math && !flag_rounding_math"
+  {
+    riscv_vector::expand_vec_nearbyint (operands[0], operands[1], <MODE>mode, <VCONVERT>mode);
+    DONE;
+  }
+)
+
+(define_expand "rint<mode>2"
+  [(match_operand:V_VLSF 0 "register_operand")
+   (match_operand:V_VLSF 1 "register_operand")]
+  "TARGET_VECTOR && !flag_trapping_math && !flag_rounding_math"
+  {
+    riscv_vector::expand_vec_rint (operands[0], operands[1], <MODE>mode, <VCONVERT>mode);
+    DONE;
+  }
+)
+
+(define_expand "round<mode>2"
+  [(match_operand:V_VLSF 0 "register_operand")
+   (match_operand:V_VLSF 1 "register_operand")]
+  "TARGET_VECTOR && !flag_trapping_math && !flag_rounding_math"
+  {
+    riscv_vector::expand_vec_round (operands[0], operands[1], <MODE>mode, <VCONVERT>mode);
+    DONE;
+  }
+)
+
+(define_expand "btrunc<mode>2"
+  [(match_operand:V_VLSF 0 "register_operand")
+   (match_operand:V_VLSF 1 "register_operand")]
+  "TARGET_VECTOR && !flag_trapping_math && !flag_rounding_math"
+  {
+    riscv_vector::expand_vec_trunc (operands[0], operands[1], <MODE>mode, <VCONVERT>mode);
+    DONE;
+  }
+)
+
+(define_expand "roundeven<mode>2"
+  [(match_operand:V_VLSF 0 "register_operand")
+   (match_operand:V_VLSF 1 "register_operand")]
+  "TARGET_VECTOR && !flag_trapping_math && !flag_rounding_math"
+  {
+    riscv_vector::expand_vec_roundeven (operands[0], operands[1], <MODE>mode, <VCONVERT>mode);
+    DONE;
+  }
+)
