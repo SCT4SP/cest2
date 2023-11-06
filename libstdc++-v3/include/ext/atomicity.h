@@ -42,10 +42,15 @@ namespace __gnu_cxx _GLIBCXX_VISIBILITY(default)
 {
 _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
+  _GLIBCXX_CEST_CONSTEXPR
   __attribute__((__always_inline__))
   inline bool
   __is_single_threaded() _GLIBCXX_NOTHROW
   {
+#if _GLIBCXX_CEST_VERSION
+    if (__builtin_is_constant_evaluated())
+      return true;
+#endif
 #ifndef __GTHREADS
     return true;
 #elif __has_include(<sys/single_threaded.h>)
@@ -77,6 +82,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
   __atomic_add(volatile _Atomic_word*, int) _GLIBCXX_NOTHROW;
 #endif
 
+  _GLIBCXX_CEST_CONSTEXPR
   inline _Atomic_word
   __attribute__((__always_inline__))
   __exchange_and_add_single(_Atomic_word* __mem, int __val)
@@ -86,11 +92,13 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     return __result;
   }
 
+  _GLIBCXX_CEST_CONSTEXPR
   inline void
   __attribute__((__always_inline__))
   __atomic_add_single(_Atomic_word* __mem, int __val)
   { *__mem += __val; }
 
+  _GLIBCXX_CEST_CONSTEXPR
   inline _Atomic_word
   __attribute__ ((__always_inline__))
   __exchange_and_add_dispatch(_Atomic_word* __mem, int __val)
@@ -101,6 +109,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       return __exchange_and_add(__mem, __val);
   }
 
+  _GLIBCXX_CEST_CONSTEXPR
   inline void
   __attribute__ ((__always_inline__))
   __atomic_add_dispatch(_Atomic_word* __mem, int __val)

@@ -1008,6 +1008,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     : private __poison_hash<_Ptr>
 #endif
     {
+      _GLIBCXX_CEST_CONSTEXPR
       size_t
       operator()(const _Up& __u) const
       noexcept(noexcept(std::declval<hash<_Ptr>>()(std::declval<_Ptr>())))

@@ -989,8 +989,10 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     protected:
       constexpr enable_shared_from_this() noexcept { }
 
+      _GLIBCXX_CEST_CONSTEXPR
       enable_shared_from_this(const enable_shared_from_this&) noexcept { }
 
+      _GLIBCXX_CEST_CONSTEXPR
       enable_shared_from_this&
       operator=(const enable_shared_from_this&) noexcept
       { return *this; }
@@ -1004,6 +1006,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       shared_from_this()
       { return shared_ptr<_Tp>(this->_M_weak_this); }
 
+      _GLIBCXX_CEST_CONSTEXPR
       shared_ptr<const _Tp>
       shared_from_this() const
       { return shared_ptr<const _Tp>(this->_M_weak_this); }
@@ -1013,10 +1016,12 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        * Get a `weak_ptr` referring to the object that has `*this` as its base.
        * @since C++17
        */
+      _GLIBCXX_CEST_CONSTEXPR
       weak_ptr<_Tp>
       weak_from_this() noexcept
       { return this->_M_weak_this; }
 
+      _GLIBCXX_CEST_CONSTEXPR
       weak_ptr<const _Tp>
       weak_from_this() const noexcept
       { return this->_M_weak_this; }
@@ -1371,6 +1376,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     struct hash<shared_ptr<_Tp>>
     : public __hash_base<size_t, shared_ptr<_Tp>>
     {
+      _GLIBCXX_CEST_CONSTEXPR
       size_t
       operator()(const shared_ptr<_Tp>& __s) const noexcept
       {

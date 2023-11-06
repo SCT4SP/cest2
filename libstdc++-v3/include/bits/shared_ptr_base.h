@@ -89,8 +89,10 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
   class bad_weak_ptr : public std::exception
   {
   public:
+    _GLIBCXX_CEST_CONSTEXPR
     virtual char const* what() const noexcept;
 
+    _GLIBCXX_CEST_CONSTEXPR
     virtual ~bad_weak_ptr() noexcept;
   };
 
@@ -159,15 +161,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       _GLIBCXX_CEST_CONSTEXPR
       void
       _M_add_ref_copy()
-#if _GLIBCXX_CEST_VERSION
-      {
-        __builtin_is_constant_evaluated()
-          ? void(_M_use_count++)
-          : __gnu_cxx::__atomic_add_dispatch(&_M_use_count, 1);
-      }
-#else
       { __gnu_cxx::__atomic_add_dispatch(&_M_use_count, 1); }
-#endif
 
       // Increment the use count if it is non-zero, throw otherwise.
       _GLIBCXX_CEST_CONSTEXPR
@@ -206,14 +200,8 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
 	// Be race-detector-friendly.  For more info see bits/c++config.
 	_GLIBCXX_SYNCHRONIZATION_HAPPENS_BEFORE(&_M_weak_count);
-#if _GLIBCXX_CEST_VERSION
-  if (__builtin_is_constant_evaluated()
-        ? (_M_weak_count-- == 1)
-        : (__gnu_cxx::__exchange_and_add_dispatch(&_M_weak_count, -1) == 1))
-#else
 	if (__gnu_cxx::__exchange_and_add_dispatch(&_M_weak_count,
 						   -1) == 1)
-#endif
 	  {
 	    _GLIBCXX_SYNCHRONIZATION_HAPPENS_AFTER(&_M_weak_count);
 	    _M_destroy();
@@ -231,15 +219,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       _GLIBCXX_CEST_CONSTEXPR
       void
       _M_weak_add_ref() noexcept
-#if _GLIBCXX_CEST_VERSION
-      {
-        __builtin_is_constant_evaluated()
-          ? void(_M_weak_count++)
-          : __gnu_cxx::__atomic_add_dispatch(&_M_weak_count, 1);
-      }
-#else
       { __gnu_cxx::__atomic_add_dispatch(&_M_weak_count, 1); }
-#endif
 
       // Decrement the weak count.
       _GLIBCXX_CEST_CONSTEXPR
@@ -248,13 +228,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       {
         // Be race-detector-friendly. For more info see bits/c++config.
         _GLIBCXX_SYNCHRONIZATION_HAPPENS_BEFORE(&_M_weak_count);
-#if _GLIBCXX_CEST_VERSION
-	if (__builtin_is_constant_evaluated()
-	 ? (_M_weak_count-- == 1)
-	 : (__gnu_cxx::__exchange_and_add_dispatch(&_M_weak_count, -1) == 1))
-#else
 	if (__gnu_cxx::__exchange_and_add_dispatch(&_M_weak_count, -1) == 1)
-#endif
 	  {
             _GLIBCXX_SYNCHRONIZATION_HAPPENS_AFTER(&_M_weak_count);
 	    if (_Mutex_base<_Lp>::_S_need_barriers)
@@ -425,13 +399,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	}
       else
 #endif
-#if _GLIBCXX_CEST_VERSION
-      if (__builtin_is_constant_evaluated()
-            ? (_M_use_count-- == 1)
-            : (__gnu_cxx::__exchange_and_add_dispatch(&_M_use_count, -1) == 1))
-#else
       if (__gnu_cxx::__exchange_and_add_dispatch(&_M_use_count, -1) == 1)
-#endif
 	{
 	  _M_release_last_use();
 	}
@@ -2334,14 +2302,17 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
   template<typename _Tp, typename _Tp1>
     struct _Sp_owner_less : public binary_function<_Tp, _Tp, bool>
     {
+      _GLIBCXX_CEST_CONSTEXPR
       bool
       operator()(const _Tp& __lhs, const _Tp& __rhs) const noexcept
       { return __lhs.owner_before(__rhs); }
 
+      _GLIBCXX_CEST_CONSTEXPR
       bool
       operator()(const _Tp& __lhs, const _Tp1& __rhs) const noexcept
       { return __lhs.owner_before(__rhs); }
 
+      _GLIBCXX_CEST_CONSTEXPR
       bool
       operator()(const _Tp1& __lhs, const _Tp& __rhs) const noexcept
       { return __lhs.owner_before(__rhs); }
@@ -2448,6 +2419,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     struct hash<__shared_ptr<_Tp, _Lp>>
     : public __hash_base<size_t, __shared_ptr<_Tp, _Lp>>
     {
+      _GLIBCXX_CEST_CONSTEXPR
       size_t
       operator()(const __shared_ptr<_Tp, _Lp>& __s) const noexcept
       {
