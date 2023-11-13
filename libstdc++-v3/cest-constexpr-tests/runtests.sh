@@ -1,0 +1,25 @@
+#/bin/bash
+
+GNUC_ROOT="$HOME/repos/SCT4SP/gcc/install"
+#GNUC_ROOT="/opt/gcc-latest"
+CLANG_ROOT="$HOME/code/ext/llvm_src/build-25-Oct-2023-Wed/llvm-project-main/install"
+
+MYGCC="$GNUC_ROOT/bin/g++ -g -std=c++26 -Winvalid-constexpr -Wl,-rpath,"$GNUC_ROOT/lib64:$LD_LIBRARY_PATH" -I $GNUC_ROOT/constexpr-std-headers/include/c++/14.0.0 -I $GNUC_ROOT/constexpr-std-headers/include/c++/14.0.0/x86_64-pc-linux-gnu -fsanitize=address -static-libasan"
+
+CLANGCC="$HOME/code/ext/llvm_src/build-25-Oct-2023-Wed/llvm-project-main/install/bin/clang++"
+# CLANGCC="$CLANGOZ_ROOT/bin/clang++" # this needs a pull from tip
+MYCLANG="$CLANG_ROOT/bin/clang++ -g -std=c++2c -Winvalid-constexpr -Wl,-rpath,"$GNUC_ROOT/lib64:$LD_LIBRARY_PATH" -I $GNUC_ROOT/constexpr-std-headers/include/c++/14.0.0 -I $GNUC_ROOT/constexpr-std-headers/include/c++/14.0.0/x86_64-pc-linux-gnu -L $GNUC_ROOT/lib64 -D_GLIBCXX_CEST_CONSTEXPR=constexpr -D_GLIBCXX_CEST_VERSION=1 -fsanitize=address"
+
+FILES_GCC="deque_tests.cpp list_tests.cpp queue_tests.cpp forward_list_tests.cpp  map_tests.cpp set_tests.cpp iostream_tests.cpp algorithm_tests.cpp stringstream_tests.cpp cctype_tests.cpp memory_tests.cpp"
+
+FILES_CLANG="deque_tests.cpp list_tests.cpp queue_tests.cpp forward_list_tests.cpp  map_tests.cpp set_tests.cpp iostream_tests.cpp algorithm_tests.cpp stringstream_tests.cpp cctype_tests.cpp memory_tests.cpp"
+
+for FILE in $FILES_GCC
+do
+  $MYGCC $FILE && ./a.out
+done
+
+for FILE in $FILES_CLANG
+do
+  $MYCLANG $FILE && ./a.out
+done
