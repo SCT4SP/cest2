@@ -7,6 +7,7 @@
 // P1383: More constexpr for <cmath> and <complex> (C++26)
 // Partial support for both in libstdc++
 
+// Based on https://codereview.stackexchange.com/a/283360:
 template <std::floating_point T> [[nodiscard]]
 constexpr bool is_float_equal(T x, T y) { return y == std::nextafter(x, y); }
 
