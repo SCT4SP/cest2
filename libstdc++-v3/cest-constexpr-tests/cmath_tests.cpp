@@ -16,11 +16,16 @@ constexpr bool cmath_tests()
 {
   T pi = std::atan(1.0f) * 4.0f;
   T pi2 = std::numbers::pi_v<T>;
+  bool b1 = is_float_equal(pi,pi2);
+
   T f1 = std::sin(pi2/4.0f);
   T f2 = std::cos(pi2/4.0f);
-  bool b1 = is_float_equal(pi,pi2);
   bool b2 = is_float_equal(f1,f2);
-  return b1 && b2;
+
+  T f3 = std::sqrt(4.0f);
+  bool b3 = is_float_equal(f3, 2.0f);
+
+  return b1 && b2 && b3;
 }
 
 int main(int argc, char *argv[])
