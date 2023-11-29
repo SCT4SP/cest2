@@ -5,8 +5,8 @@
 
 GNUC_ROOT="$HOME/repos/SCT4SP/gcc/install"
 #GNUC_ROOT="/opt/gcc-latest"
-CLANG_ROOT="$HOME/code/ext/llvm_src/build-25-Oct-2023-Wed/llvm-project-main/install"
-#CLANG_ROOT="$HOME/repos/agozillon/clangoz_new/install"
+#CLANG_ROOT="$HOME/code/ext/llvm_src/build-25-Oct-2023-Wed/llvm-project-main/install"
+CLANG_ROOT=$CLANGOZ_ROOT   # Any recent (months) clang will work
 
 MYGCC="$GNUC_ROOT/bin/g++ -g --std=c++26 -Winvalid-constexpr -Wl,-rpath,"$GNUC_ROOT/lib64:$LD_LIBRARY_PATH" -I $GNUC_ROOT/constexpr-std-headers/include/c++/14.0.0 -I $GNUC_ROOT/constexpr-std-headers/include/c++/14.0.0/x86_64-pc-linux-gnu -fsanitize=address -static-libasan"
 
