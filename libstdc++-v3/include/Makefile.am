@@ -310,6 +310,15 @@ pstl_headers = \
 	${pstl_srcdir}/unseq_backend_simd.h \
 	${pstl_srcdir}/utils.h
 
+# ClangOz Parallel Constexpr Includes.
+clangoz_srcdir = ${pstl_srcdir}/clangoz
+clangoz_builddir = ${pstl_builddir}/clangoz
+clangoz_headers = \
+	${clangoz_srcdir}/algorithm_constexpr_par \
+	${clangoz_srcdir}/__cep_execution \
+	${clangoz_srcdir}/loop_wrapper.h \
+	${clangoz_srcdir}/numeric_constexpr_par
+
 backward_srcdir = ${glibcxx_srcdir}/include/backward
 backward_builddir = ./backward
 backward_freestanding = \
@@ -1103,7 +1112,7 @@ endif
 # List of all timestamp files.  By keeping only one copy of this list, both
 # CLEANFILES and all-local are kept up-to-date.
 allstamped = \
-	stamp-std stamp-bits stamp-bits-sup stamp-pstl stamp-c_base stamp-c_compatibility \
+	stamp-std stamp-bits stamp-bits-sup stamp-pstl stamp-clangoz stamp-c_base stamp-c_compatibility \
 	stamp-backward stamp-ext stamp-pb stamp-tr1 stamp-tr2 stamp-decimal \
 	stamp-experimental stamp-experimental-bits stamp-debug stamp-parallel \
 	stamp-host
@@ -1142,6 +1151,11 @@ stamp-pstl: ${pstl_headers}
 	@-mkdir -p ${pstl_builddir}
 	@-cd ${pstl_builddir} && $(LN_S) $? . 2>/dev/null
 	@$(STAMP) stamp-pstl
+
+stamp-clangoz: ${clangoz_headers}
+	@-mkdir -p ${clangoz_builddir}
+	@-cd ${clangoz_builddir} && $(LN_S) $? . 2>/dev/null
+	@$(STAMP) stamp-clangoz
 
 stamp-c_base: ${c_base_headers}
 	@-mkdir -p ${c_base_builddir}
@@ -1559,6 +1573,9 @@ if GLIBCXX_HOSTED
 	$(mkinstalldirs) $(DESTDIR)${gxx_include_dir}/${pstl_builddir}
 	for file in ${pstl_headers}; do \
 	  $(INSTALL_DATA) $${file} $(DESTDIR)${gxx_include_dir}/${pstl_builddir}; done
+	$(mkinstalldirs) $(DESTDIR)${gxx_include_dir}/${clangoz_builddir}
+	for file in ${clangoz_headers}; do \
+	  $(INSTALL_DATA) $${file} $(DESTDIR)${gxx_include_dir}/${clangoz_builddir}; done
 endif GLIBCXX_HOSTED
 
 # By adding these files here, automake will remove them for 'make clean'

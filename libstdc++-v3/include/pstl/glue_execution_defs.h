@@ -50,5 +50,7 @@ using __pstl::execution::unsequenced_policy;
 #include "algorithm_impl.h"
 #include "numeric_impl.h"
 #include "parallel_backend.h"
+#include "clangoz/algorithm_constexpr_par"
+#include "clangoz/numeric_constexpr_par"
 
 #endif /* _PSTL_GLUE_EXECUTION_DEFS_H */
