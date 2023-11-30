@@ -144,6 +144,7 @@ __cep::experimental::__internal::__enable_if_constexpr_par_execution_policy<
 for_each(_ExecutionPolicy&& __exec, _ForwardIterator __first, 
          _ForwardIterator __last, _Function __f)
 {
+#pragma message "You found me!"
 /*    __ThreadLocalCopy(__first);*/
     __BeginEndIteratorPair(__first, __last);
     __ReduceVariable(__first, ReductionType::PartitionedOrderedAssign, 
