@@ -2,6 +2,7 @@
 
 if [ "$1" == "" ]; then                                                           echo "error: Please provide a destination directory for the C'est constexpr headers."
   echo e.g. bash install.sh \$PWD/../install/constexpr-std-headers
+  echo Note that this script should be called from the CMake build directory
   exit -1
 fi
 
