@@ -82,6 +82,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
   union [[gnu::may_alias]] _Any_data
   {
+    _GLIBCXX_CEST_CONSTEXPR
     void*       _M_access()       noexcept { return &_M_pod_data[0]; }
     const void* _M_access() const noexcept { return &_M_pod_data[0]; }
 
@@ -146,9 +147,19 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	// Construct a location-invariant function object that fits within
 	// an _Any_data structure.
 	template<typename _Fn>
+	  _GLIBCXX_CEST_CONSTEXPR
 	  static void
 	  _M_create(_Any_data& __dest, _Fn&& __f, true_type)
 	  {
+#if _GLIBCXX_CEST_VERSION
+	    // alas no: the void* returned by _M_access() targets a char (_M_pod_data)
+	    if (__builtin_is_constant_evaluated())
+	      std::construct_at(
+          static_cast<decltype(_Functor(std::forward<_Fn>(__f)))*>
+                      (__dest._M_access()),
+	        _Functor(std::forward<_Fn>(__f)));
+	    else
+#endif
 	    ::new (__dest._M_access()) _Functor(std::forward<_Fn>(__f));
 	  }
 
@@ -207,6 +218,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	}
 
 	template<typename _Fn>
+	  _GLIBCXX_CEST_CONSTEXPR
 	  static void
 	  _M_init_functor(_Any_data& __functor, _Fn&& __f)
 	  noexcept(__and_<_Local_storage,
@@ -216,21 +228,25 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	  }
 
 	template<typename _Signature>
+	  _GLIBCXX_CEST_CONSTEXPR
 	  static bool
 	  _M_not_empty_function(const function<_Signature>& __f) noexcept
 	  { return static_cast<bool>(__f); }
 
 	template<typename _Tp>
+	  _GLIBCXX_CEST_CONSTEXPR
 	  static bool
 	  _M_not_empty_function(_Tp* __fp) noexcept
 	  { return __fp != nullptr; }
 
 	template<typename _Class, typename _Tp>
+	  _GLIBCXX_CEST_CONSTEXPR
 	  static bool
 	  _M_not_empty_function(_Tp _Class::* __mp) noexcept
 	  { return __mp != nullptr; }
 
 	template<typename _Tp>
+	  _GLIBCXX_CEST_CONSTEXPR
 	  static bool
 	  _M_not_empty_function(const _Tp&) noexcept
 	  { return true; }
@@ -238,12 +254,14 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
     _Function_base() = default;
 
+    _GLIBCXX_CEST_CONSTEXPR
     ~_Function_base()
     {
       if (_M_manager)
 	_M_manager(_M_functor, _M_functor, __destroy_functor);
     }
 
+    _GLIBCXX_CEST_CONSTEXPR
     bool _M_empty() const { return !_M_manager; }
 
     using _Manager_type
