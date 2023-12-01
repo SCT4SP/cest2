@@ -432,6 +432,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       // 2774. std::function construction vs assignment
       template<typename _Functor,
 	       typename _Constraints = _Requires<_Callable<_Functor>>>
+	_GLIBCXX_CEST_CONSTEXPR
 	function(_Functor&& __f)
 	noexcept(_Handler<_Functor>::template _S_nothrow_init<_Functor>())
 	: _Function_base()
@@ -583,6 +584,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *  The function call operator invokes the target function object
        *  stored by `this`.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       _Res
       operator()(_ArgTypes... __args) const
       {
