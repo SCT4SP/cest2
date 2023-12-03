@@ -112,13 +112,14 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     class function;
 
   /// Base class of all polymorphic function object wrappers.
+    template<typename _Functor>
   class _Function_base
   {
   public:
     static const size_t _M_max_size = sizeof(_Nocopy_types);
     static const size_t _M_max_align = __alignof__(_Nocopy_types);
 
-    template<typename _Functor>
+//    template<typename _Functor>
       class _Base_manager
       {
       protected:
@@ -276,9 +277,9 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
   template<typename _Res, typename _Functor, typename... _ArgTypes>
     class _Function_handler<_Res(_ArgTypes...), _Functor>
-    : public _Function_base::_Base_manager<_Functor>
+    : public _Function_base<_Functor>::_Base_manager
     {
-      using _Base = _Function_base::_Base_manager<_Functor>;
+      using _Base = _Function_base<_Functor>::_Base_manager;
 
     public:
       static bool
@@ -351,7 +352,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
   template<typename _Res, typename... _ArgTypes>
     class function<_Res(_ArgTypes...)>
     : public _Maybe_unary_or_binary_function<_Res, _ArgTypes...>,
-      private _Function_base
+      private _Function_base<_Res(_ArgTypes...)>
     {
       // Equivalent to std::decay_t except that it produces an invalid type
       // if the decayed type is the current specialization of std::function.
@@ -384,14 +385,14 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *  @post `!(bool)*this`
        */
       function() noexcept
-      : _Function_base() { }
+      : _Function_base<_Res(_ArgTypes...)>() { }
 
       /**
        *  @brief Creates an empty function call wrapper.
        *  @post @c !(bool)*this
        */
       function(nullptr_t) noexcept
-      : _Function_base() { }
+      : _Function_base<_Res(_ArgTypes...)>() { }
 
       /**
        *  @brief %Function copy constructor.
@@ -402,13 +403,13 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *  `__x` (if it has one).
        */
       function(const function& __x)
-      : _Function_base()
+      : _Function_base<_Res(_ArgTypes...)>()
       {
 	if (static_cast<bool>(__x))
 	  {
-	    __x._M_manager(_M_functor, __x._M_functor, __clone_functor);
+	    __x._M_manager(this->_M_functor, __x._M_functor, __clone_functor);
 	    _M_invoker = __x._M_invoker;
-	    _M_manager = __x._M_manager;
+	    this->_M_manager = __x._M_manager;
 	  }
       }
 
@@ -420,12 +421,12 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *  (if it has one).
        */
       function(function&& __x) noexcept
-      : _Function_base(), _M_invoker(__x._M_invoker)
+      : _Function_base<_Res(_ArgTypes...)>(), _M_invoker(__x._M_invoker)
       {
 	if (static_cast<bool>(__x))
 	  {
-	    _M_functor = __x._M_functor;
-	    _M_manager = __x._M_manager;
+	    this->_M_functor = __x._M_functor;
+	    this->_M_manager = __x._M_manager;
 	    __x._M_manager = nullptr;
 	    __x._M_invoker = nullptr;
 	  }
@@ -453,7 +454,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	_GLIBCXX_CEST_CONSTEXPR
 	function(_Functor&& __f)
 	noexcept(_Handler<_Functor>::template _S_nothrow_init<_Functor>())
-	: _Function_base()
+	: _Function_base<_Res(_ArgTypes...)>()
 	{
 	  static_assert(is_copy_constructible<__decay_t<_Functor>>::value,
 	      "std::function target must be copy-constructible");
@@ -465,10 +466,10 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
 	  if (_My_handler::_M_not_empty_function(__f))
 	    {
-	      _My_handler::_M_init_functor(_M_functor,
+	      _My_handler::_M_init_functor(this->_M_functor,
 					   std::forward<_Functor>(__f));
 	      _M_invoker = &_My_handler::_M_invoke;
-	      _M_manager = &_My_handler::_M_manager;
+	      this->_M_manager = &_My_handler::_M_manager;
 	    }
 	}
 
@@ -519,10 +520,10 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       function&
       operator=(nullptr_t) noexcept
       {
-	if (_M_manager)
+	if (this->_M_manager)
 	  {
-	    _M_manager(_M_functor, _M_functor, __destroy_functor);
-	    _M_manager = nullptr;
+	    _M_manager(this->_M_functor, this->_M_functor, __destroy_functor);
+	    this->_M_manager = nullptr;
 	    _M_invoker = nullptr;
 	  }
 	return *this;
@@ -574,8 +575,8 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        */
       void swap(function& __x) noexcept
       {
-	std::swap(_M_functor, __x._M_functor);
-	std::swap(_M_manager, __x._M_manager);
+	std::swap(this->_M_functor, __x._M_functor);
+	std::swap(this->_M_manager, __x._M_manager);
 	std::swap(_M_invoker, __x._M_invoker);
       }
 
@@ -590,7 +591,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *  This function will not throw exceptions.
        */
       explicit operator bool() const noexcept
-      { return !_M_empty(); }
+      { return !this->_M_empty(); }
 
       // [3.7.2.4] function invocation
 
@@ -606,9 +607,9 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       _Res
       operator()(_ArgTypes... __args) const
       {
-	if (_M_empty())
+	if (this->_M_empty())
 	  __throw_bad_function_call();
-	return _M_invoker(_M_functor, std::forward<_ArgTypes>(__args)...);
+	return _M_invoker(this->_M_functor, std::forward<_ArgTypes>(__args)...);
       }
 
 #if __cpp_rtti
@@ -625,10 +626,10 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       const type_info&
       target_type() const noexcept
       {
-	if (_M_manager)
+	if (this->_M_manager)
 	  {
 	    _Any_data __typeinfo_result;
-	    _M_manager(__typeinfo_result, _M_functor, __get_type_info);
+	    _M_manager(__typeinfo_result, this->_M_functor, __get_type_info);
 	    if (auto __ti =  __typeinfo_result._M_access<const type_info*>())
 	      return *__ti;
 	  }
@@ -668,14 +669,14 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	      // _Target_handler avoids ill-formed _Function_handler types.
 	      using _Handler = _Target_handler<_Res(_ArgTypes...), _Functor>;
 
-	      if (_M_manager == &_Handler::_M_manager
+	      if (this->_M_manager == &_Handler::_M_manager
 #if __cpp_rtti
-		  || (_M_manager && typeid(_Functor) == target_type())
+		  || (this->_M_manager && typeid(_Functor) == target_type())
 #endif
 		 )
 		{
 		  _Any_data __ptr;
-		  _M_manager(__ptr, _M_functor, __get_functor_ptr);
+		  _M_manager(__ptr, this->_M_functor, __get_functor_ptr);
 		  return __ptr._M_access<const _Functor*>();
 		}
 	    }
