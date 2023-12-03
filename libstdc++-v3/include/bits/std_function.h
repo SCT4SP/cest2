@@ -87,6 +87,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     const void* _M_access() const noexcept { return &_M_pod_data[0]; }
 
     template<typename _Tp>
+      _GLIBCXX_CEST_CONSTEXPR
       _Tp&
       _M_access() noexcept
       { return *static_cast<_Tp*>(_M_access()); }
@@ -112,14 +113,13 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     class function;
 
   /// Base class of all polymorphic function object wrappers.
-    template<typename _Functor>
+  template<typename _Signature, typename _Functor = _Signature>
   class _Function_base
   {
   public:
     static const size_t _M_max_size = sizeof(_Nocopy_types);
     static const size_t _M_max_align = __alignof__(_Nocopy_types);
 
-//    template<typename _Functor>
       class _Base_manager
       {
       protected:
@@ -166,6 +166,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
 	// Construct a function object on the heap and store a pointer.
 	template<typename _Fn>
+	  _GLIBCXX_CEST_CONSTEXPR
 	  static void
 	  _M_create(_Any_data& __dest, _Fn&& __f, false_type)
 	  {
@@ -228,10 +229,10 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	    _M_create(__functor, std::forward<_Fn>(__f), _Local_storage());
 	  }
 
-	template<typename _Signature>
+	template<typename _Signature2>
 	  _GLIBCXX_CEST_CONSTEXPR
 	  static bool
-	  _M_not_empty_function(const function<_Signature>& __f) noexcept
+	  _M_not_empty_function(const function<_Signature2>& __f) noexcept
 	  { return static_cast<bool>(__f); }
 
 	template<typename _Tp>
@@ -277,9 +278,9 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
   template<typename _Res, typename _Functor, typename... _ArgTypes>
     class _Function_handler<_Res(_ArgTypes...), _Functor>
-    : public _Function_base<_Functor>::_Base_manager
+    : public _Function_base<_Res(_ArgTypes...),_Functor>::_Base_manager
     {
-      using _Base = _Function_base<_Functor>::_Base_manager;
+      using _Base = _Function_base<_Res(_ArgTypes...), _Functor>::_Base_manager;
 
     public:
       static bool
