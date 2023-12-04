@@ -80,6 +80,13 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     void (_Undefined_class::*_M_member_pointer)();
   };
 
+ /* template <typename T>
+  union _Any
+  {
+     int x; float y;
+  };*/
+
+  template<typename _Signature>
   union [[gnu::may_alias]] _Any_data
   {
     _GLIBCXX_CEST_CONSTEXPR
@@ -133,15 +140,15 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
 	// Retrieve a pointer to the function object
 	static _Functor*
-	_M_get_pointer(const _Any_data& __source) noexcept
+	_M_get_pointer(const _Any_data<_Signature>& __source) noexcept
 	{
 	  if _GLIBCXX17_CONSTEXPR (__stored_locally)
 	    {
-	      const _Functor& __f = __source._M_access<_Functor>();
+	      const _Functor& __f = __source.template _M_access<_Functor>();
 	      return const_cast<_Functor*>(std::__addressof(__f));
 	    }
 	  else // have stored a pointer
-	    return __source._M_access<_Functor*>();
+	    return __source.template _M_access<_Functor*>();
 	}
 
       private:
@@ -150,7 +157,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	template<typename _Fn>
 	  _GLIBCXX_CEST_CONSTEXPR
 	  static void
-	  _M_create(_Any_data& __dest, _Fn&& __f, true_type)
+	  _M_create(_Any_data<_Signature>& __dest, _Fn&& __f, true_type)
 	  {
 #if _GLIBCXX_CEST_VERSION
 	    // alas no: the void* returned by _M_access() targets a char (_M_pod_data)
@@ -168,43 +175,43 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	template<typename _Fn>
 	  _GLIBCXX_CEST_CONSTEXPR
 	  static void
-	  _M_create(_Any_data& __dest, _Fn&& __f, false_type)
+	  _M_create(_Any_data<_Signature>& __dest, _Fn&& __f, false_type)
 	  {
-	    __dest._M_access<_Functor*>()
+	    __dest.template _M_access<_Functor*>()
 	      = new _Functor(std::forward<_Fn>(__f));
 	  }
 
 	// Destroy an object stored in the internal buffer.
 	static void
-	_M_destroy(_Any_data& __victim, true_type)
+	_M_destroy(_Any_data<_Signature>& __victim, true_type)
 	{
-	  __victim._M_access<_Functor>().~_Functor();
+	  __victim.template _M_access<_Functor>().~_Functor();
 	}
 
 	// Destroy an object located on the heap.
 	static void
-	_M_destroy(_Any_data& __victim, false_type)
+	_M_destroy(_Any_data<_Signature>& __victim, false_type)
 	{
-	  delete __victim._M_access<_Functor*>();
+	  delete __victim.template _M_access<_Functor*>();
 	}
 
       public:
 	static bool
-	_M_manager(_Any_data& __dest, const _Any_data& __source,
+	_M_manager(_Any_data<_Signature>& __dest, const _Any_data<_Signature>& __source,
 		   _Manager_operation __op)
 	{
 	  switch (__op)
 	    {
 	    case __get_type_info:
 #if __cpp_rtti
-	      __dest._M_access<const type_info*>() = &typeid(_Functor);
+	      __dest.template _M_access<const type_info*>() = &typeid(_Functor);
 #else
-	      __dest._M_access<const type_info*>() = nullptr;
+	      __dest.template _M_access<const type_info*>() = nullptr;
 #endif
 	      break;
 
 	    case __get_functor_ptr:
-	      __dest._M_access<_Functor*>() = _M_get_pointer(__source);
+	      __dest.template _M_access<_Functor*>() = _M_get_pointer(__source);
 	      break;
 
 	    case __clone_functor:
@@ -222,7 +229,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	template<typename _Fn>
 	  _GLIBCXX_CEST_CONSTEXPR
 	  static void
-	  _M_init_functor(_Any_data& __functor, _Fn&& __f)
+	  _M_init_functor(_Any_data<_Signature>& __functor, _Fn&& __f)
 	  noexcept(__and_<_Local_storage,
 			  is_nothrow_constructible<_Functor, _Fn>>::value)
 	  {
@@ -267,9 +274,9 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     bool _M_empty() const { return !_M_manager; }
 
     using _Manager_type
-      = bool (*)(_Any_data&, const _Any_data&, _Manager_operation);
+      = bool (*)(_Any_data<_Signature>&, const _Any_data<_Signature>&, _Manager_operation);
 
-    _Any_data     _M_functor{};
+    _Any_data<_Signature>     _M_functor{};
     _Manager_type _M_manager{};
   };
 
@@ -280,22 +287,23 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     class _Function_handler<_Res(_ArgTypes...), _Functor>
     : public _Function_base<_Res(_ArgTypes...),_Functor>::_Base_manager
     {
+using _Signature = _Res(_ArgTypes...);
       using _Base = _Function_base<_Res(_ArgTypes...), _Functor>::_Base_manager;
 
     public:
       static bool
-      _M_manager(_Any_data& __dest, const _Any_data& __source,
+      _M_manager(_Any_data<_Signature>& __dest, const _Any_data<_Signature>& __source,
 		 _Manager_operation __op)
       {
 	switch (__op)
 	  {
 #if __cpp_rtti
 	  case __get_type_info:
-	    __dest._M_access<const type_info*>() = &typeid(_Functor);
+	    __dest.template _M_access<const type_info*>() = &typeid(_Functor);
 	    break;
 #endif
 	  case __get_functor_ptr:
-	    __dest._M_access<_Functor*>() = _Base::_M_get_pointer(__source);
+	    __dest.template _M_access<_Functor*>() = _Base::_M_get_pointer(__source);
 	    break;
 
 	  default:
@@ -305,7 +313,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       }
 
       static _Res
-      _M_invoke(const _Any_data& __functor, _ArgTypes&&... __args)
+      _M_invoke(const _Any_data<_Signature>& __functor, _ArgTypes&&... __args)
       {
 	return std::__invoke_r<_Res>(*_Base::_M_get_pointer(__functor),
 				     std::forward<_ArgTypes>(__args)...);
@@ -326,7 +334,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     {
     public:
       static bool
-      _M_manager(_Any_data&, const _Any_data&, _Manager_operation)
+      _M_manager(_Any_data<void>&, const _Any_data<void>&, _Manager_operation)
       { return false; }
     };
 
@@ -355,6 +363,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     : public _Maybe_unary_or_binary_function<_Res, _ArgTypes...>,
       private _Function_base<_Res(_ArgTypes...)>
     {
+using _Signature = _Res(_ArgTypes...);
       // Equivalent to std::decay_t except that it produces an invalid type
       // if the decayed type is the current specialization of std::function.
       template<typename _Func,
@@ -629,9 +638,9 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       {
 	if (this->_M_manager)
 	  {
-	    _Any_data __typeinfo_result;
+	    _Any_data<_Signature> __typeinfo_result;
 	    _M_manager(__typeinfo_result, this->_M_functor, __get_type_info);
-	    if (auto __ti =  __typeinfo_result._M_access<const type_info*>())
+	    if (auto __ti =  __typeinfo_result.template _M_access<const type_info*>())
 	      return *__ti;
 	  }
 	return typeid(void);
@@ -676,9 +685,9 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 #endif
 		 )
 		{
-		  _Any_data __ptr;
+		  _Any_data<_Signature> __ptr;
 		  _M_manager(__ptr, this->_M_functor, __get_functor_ptr);
-		  return __ptr._M_access<const _Functor*>();
+		  return __ptr.template _M_access<const _Functor*>();
 		}
 	    }
 	  return nullptr;
@@ -686,7 +695,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       /// @}
 
     private:
-      using _Invoker_type = _Res (*)(const _Any_data&, _ArgTypes&&...);
+      using _Invoker_type = _Res (*)(const _Any_data<_Signature>&, _ArgTypes&&...);
       _Invoker_type _M_invoker = nullptr;
     };
 
