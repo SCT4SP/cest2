@@ -86,27 +86,30 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
      int x; float y;
   };*/
 
-  template<typename _Signature>
-  union [[gnu::may_alias]] _Any_data
-  {
-    _GLIBCXX_CEST_CONSTEXPR
-    void*       _M_access()       noexcept { return &_M_pod_data[0]; }
-    const void* _M_access() const noexcept { return &_M_pod_data[0]; }
+  template <typename _Signature>
+    union _Any_data;
 
-    template<typename _Tp>
+  template<typename _Res, typename... _ArgTypes>
+    union [[gnu::may_alias]] _Any_data<_Res(_ArgTypes...)>
+    {
       _GLIBCXX_CEST_CONSTEXPR
-      _Tp&
-      _M_access() noexcept
-      { return *static_cast<_Tp*>(_M_access()); }
+      void*       _M_access()       noexcept { return &_M_pod_data[0]; }
+      const void* _M_access() const noexcept { return &_M_pod_data[0]; }
 
-    template<typename _Tp>
-      const _Tp&
-      _M_access() const noexcept
-      { return *static_cast<const _Tp*>(_M_access()); }
+      template<typename _Tp>
+        _GLIBCXX_CEST_CONSTEXPR
+        _Tp&
+        _M_access() noexcept
+        { return *static_cast<_Tp*>(_M_access()); }
 
-    _Nocopy_types _M_unused;
-    char _M_pod_data[sizeof(_Nocopy_types)];
-  };
+      template<typename _Tp>
+        const _Tp&
+        _M_access() const noexcept
+        { return *static_cast<const _Tp*>(_M_access()); }
+
+      _Nocopy_types _M_unused;
+      char _M_pod_data[sizeof(_Nocopy_types)];
+    };
 
   enum _Manager_operation
   {
@@ -287,8 +290,8 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     class _Function_handler<_Res(_ArgTypes...), _Functor>
     : public _Function_base<_Res(_ArgTypes...),_Functor>::_Base_manager
     {
-using _Signature = _Res(_ArgTypes...);
-      using _Base = _Function_base<_Res(_ArgTypes...), _Functor>::_Base_manager;
+      using _Signature = _Res(_ArgTypes...);
+      using _Base = _Function_base<_Signature, _Functor>::_Base_manager;
 
     public:
       static bool
@@ -363,7 +366,6 @@ using _Signature = _Res(_ArgTypes...);
     : public _Maybe_unary_or_binary_function<_Res, _ArgTypes...>,
       private _Function_base<_Res(_ArgTypes...)>
     {
-using _Signature = _Res(_ArgTypes...);
       // Equivalent to std::decay_t except that it produces an invalid type
       // if the decayed type is the current specialization of std::function.
       template<typename _Func,
@@ -381,9 +383,11 @@ using _Signature = _Res(_ArgTypes...);
       template<typename _Cond, typename _Tp = void>
 	using _Requires = __enable_if_t<_Cond::value, _Tp>;
 
+	using _Signature = _Res(_ArgTypes...);
+
       template<typename _Functor>
 	using _Handler
-	  = _Function_handler<_Res(_ArgTypes...), __decay_t<_Functor>>;
+	  = _Function_handler<_Signature, __decay_t<_Functor>>;
 
     public:
       typedef _Res result_type;
