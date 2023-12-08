@@ -80,30 +80,24 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     void (_Undefined_class::*_M_member_pointer)();
   };
 
-  template <typename _Signature>
-    union _Any_data;
+  union [[gnu::may_alias]] _Any_data
+  {
+    void*       _M_access()       noexcept { return &_M_pod_data[0]; }
+    const void* _M_access() const noexcept { return &_M_pod_data[0]; }
 
-  template<typename _Res, typename... _ArgTypes>
-    union [[gnu::may_alias]] _Any_data<_Res(_ArgTypes...)>
-    {
-      _GLIBCXX_CEST_CONSTEXPR
-      void*       _M_access()       noexcept { return &_M_pod_data[0]; }
-      const void* _M_access() const noexcept { return &_M_pod_data[0]; }
+    template<typename _Tp>
+      _Tp&
+      _M_access() noexcept
+      { return *static_cast<_Tp*>(_M_access()); }
 
-      template<typename _Tp>
-        _GLIBCXX_CEST_CONSTEXPR
-        _Tp&
-        _M_access() noexcept
-        { return *static_cast<_Tp*>(_M_access()); }
+    template<typename _Tp>
+      const _Tp&
+      _M_access() const noexcept
+      { return *static_cast<const _Tp*>(_M_access()); }
 
-      template<typename _Tp>
-        const _Tp&
-        _M_access() const noexcept
-        { return *static_cast<const _Tp*>(_M_access()); }
-
-      _Nocopy_types _M_unused;
-      char _M_pod_data[sizeof(_Nocopy_types)];
-    };
+    _Nocopy_types _M_unused;
+    char _M_pod_data[sizeof(_Nocopy_types)];
+  };
 
   enum _Manager_operation
   {
@@ -117,13 +111,13 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     class function;
 
   /// Base class of all polymorphic function object wrappers.
-  template<typename _Signature, typename _Functor = _Signature>
   class _Function_base
   {
   public:
     static const size_t _M_max_size = sizeof(_Nocopy_types);
     static const size_t _M_max_align = __alignof__(_Nocopy_types);
 
+    template<typename _Functor>
       class _Base_manager
       {
       protected:
@@ -137,81 +131,67 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
 	// Retrieve a pointer to the function object
 	static _Functor*
-	_M_get_pointer(const _Any_data<_Signature>& __source) noexcept
+	_M_get_pointer(const _Any_data& __source) noexcept
 	{
 	  if _GLIBCXX17_CONSTEXPR (__stored_locally)
 	    {
-	      const _Functor& __f = __source.template _M_access<_Functor>();
+	      const _Functor& __f = __source._M_access<_Functor>();
 	      return const_cast<_Functor*>(std::__addressof(__f));
 	    }
 	  else // have stored a pointer
-	    return __source.template _M_access<_Functor*>();
+	    return __source._M_access<_Functor*>();
 	}
 
       private:
 	// Construct a location-invariant function object that fits within
 	// an _Any_data structure.
 	template<typename _Fn>
-	  _GLIBCXX_CEST_CONSTEXPR
 	  static void
-	  _M_create(_Any_data<_Signature>& __dest, _Fn&& __f, true_type)
+	  _M_create(_Any_data& __dest, _Fn&& __f, true_type)
 	  {
-#if _GLIBCXX_CEST_VERSION
-	    // alas no: the void* returned by _M_access() targets a char (_M_pod_data)
-	    if (__builtin_is_constant_evaluated())
-	      std::construct_at(
-          static_cast<decltype(_Functor(std::forward<_Fn>(__f)))*>
-                      (__dest._M_access()),
-	        _Functor(std::forward<_Fn>(__f)));
-	    else
-#endif
 	    ::new (__dest._M_access()) _Functor(std::forward<_Fn>(__f));
 	  }
 
 	// Construct a function object on the heap and store a pointer.
 	template<typename _Fn>
-	  _GLIBCXX_CEST_CONSTEXPR
 	  static void
-	  _M_create(_Any_data<_Signature>& __dest, _Fn&& __f, false_type)
+	  _M_create(_Any_data& __dest, _Fn&& __f, false_type)
 	  {
-	    auto p = new _Functor(std::forward<_Fn>(__f));
-	    __dest->dp_ = p;
-	    __dest.template _M_access<_Functor*>() = p;
-//	    __dest.template _M_access<_Functor*>()
-//	      = new _Functor(std::forward<_Fn>(__f));
+	    __dest._M_access<_Functor*>()
+	      = new _Functor(std::forward<_Fn>(__f));
 	  }
 
 	// Destroy an object stored in the internal buffer.
 	static void
-	_M_destroy(_Any_data<_Signature>& __victim, true_type)
+	_M_destroy(_Any_data& __victim, true_type)
 	{
-	  __victim.template _M_access<_Functor>().~_Functor();
+	  __victim._M_access<_Functor>().~_Functor();
 	}
 
 	// Destroy an object located on the heap.
 	static void
-	_M_destroy(_Any_data<_Signature>& __victim, false_type)
+	_M_destroy(_Any_data& __victim, false_type)
 	{
-	  delete __victim.template _M_access<_Functor*>();
+	  delete __victim._M_access<_Functor*>();
 	}
 
       public:
 	static bool
-	_M_manager(_Any_data<_Signature>& __dest, const _Any_data<_Signature>& __source,
+	_M_manager(_Any_data& __dest, const _Any_data& __source,
 		   _Manager_operation __op)
 	{
 	  switch (__op)
 	    {
 	    case __get_type_info:
 #if __cpp_rtti
-	      __dest.template _M_access<const type_info*>() = &typeid(_Functor);
+	      __dest._M_access<const type_info*>() = &typeid(_Functor);
 #else
-	      __dest.template _M_access<const type_info*>() = nullptr;
+	      __dest._M_access<const type_info*>() = nullptr;
 #endif
 	      break;
 
 	    case __get_functor_ptr:
-	      __dest.template _M_access<_Functor*>() = _M_get_pointer(__source);
+	      __dest._M_access<_Functor*>() = _M_get_pointer(__source);
 	      break;
 
 	    case __clone_functor:
@@ -227,35 +207,30 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	}
 
 	template<typename _Fn>
-	  _GLIBCXX_CEST_CONSTEXPR
 	  static void
-	  _M_init_functor(_Any_data<_Signature>& __functor, _Fn&& __f)
+	  _M_init_functor(_Any_data& __functor, _Fn&& __f)
 	  noexcept(__and_<_Local_storage,
 			  is_nothrow_constructible<_Functor, _Fn>>::value)
 	  {
 	    _M_create(__functor, std::forward<_Fn>(__f), _Local_storage());
 	  }
 
-	template<typename _Signature2>
-	  _GLIBCXX_CEST_CONSTEXPR
+	template<typename _Signature>
 	  static bool
-	  _M_not_empty_function(const function<_Signature2>& __f) noexcept
+	  _M_not_empty_function(const function<_Signature>& __f) noexcept
 	  { return static_cast<bool>(__f); }
 
 	template<typename _Tp>
-	  _GLIBCXX_CEST_CONSTEXPR
 	  static bool
 	  _M_not_empty_function(_Tp* __fp) noexcept
 	  { return __fp != nullptr; }
 
 	template<typename _Class, typename _Tp>
-	  _GLIBCXX_CEST_CONSTEXPR
 	  static bool
 	  _M_not_empty_function(_Tp _Class::* __mp) noexcept
 	  { return __mp != nullptr; }
 
 	template<typename _Tp>
-	  _GLIBCXX_CEST_CONSTEXPR
 	  static bool
 	  _M_not_empty_function(const _Tp&) noexcept
 	  { return true; }
@@ -263,22 +238,18 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
     _Function_base() = default;
 
-    _GLIBCXX_CEST_CONSTEXPR
     ~_Function_base()
     {
       if (_M_manager)
 	_M_manager(_M_functor, _M_functor, __destroy_functor);
     }
 
-    _GLIBCXX_CEST_CONSTEXPR
     bool _M_empty() const { return !_M_manager; }
 
     using _Manager_type
-      = bool (*)(_Any_data<_Signature>&, const _Any_data<_Signature>&, _Manager_operation);
+      = bool (*)(_Any_data&, const _Any_data&, _Manager_operation);
 
-    _Any_data<_Signature>     _M_functor{};
-//    __decay_t<_Functor>* dp_;
-    void* dp_{};
+    _Any_data     _M_functor{};
     _Manager_type _M_manager{};
   };
 
@@ -287,25 +258,24 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
   template<typename _Res, typename _Functor, typename... _ArgTypes>
     class _Function_handler<_Res(_ArgTypes...), _Functor>
-    : public _Function_base<_Res(_ArgTypes...),_Functor>::_Base_manager
+    : public _Function_base::_Base_manager<_Functor>
     {
-      using _Signature = _Res(_ArgTypes...);
-      using _Base = _Function_base<_Signature, _Functor>::_Base_manager;
+      using _Base = _Function_base::_Base_manager<_Functor>;
 
     public:
       static bool
-      _M_manager(_Any_data<_Signature>& __dest, const _Any_data<_Signature>& __source,
+      _M_manager(_Any_data& __dest, const _Any_data& __source,
 		 _Manager_operation __op)
       {
 	switch (__op)
 	  {
 #if __cpp_rtti
 	  case __get_type_info:
-	    __dest.template _M_access<const type_info*>() = &typeid(_Functor);
+	    __dest._M_access<const type_info*>() = &typeid(_Functor);
 	    break;
 #endif
 	  case __get_functor_ptr:
-	    __dest.template _M_access<_Functor*>() = _Base::_M_get_pointer(__source);
+	    __dest._M_access<_Functor*>() = _Base::_M_get_pointer(__source);
 	    break;
 
 	  default:
@@ -315,7 +285,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       }
 
       static _Res
-      _M_invoke(const _Any_data<_Signature>& __functor, _ArgTypes&&... __args)
+      _M_invoke(const _Any_data& __functor, _ArgTypes&&... __args)
       {
 	return std::__invoke_r<_Res>(*_Base::_M_get_pointer(__functor),
 				     std::forward<_ArgTypes>(__args)...);
@@ -336,7 +306,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     {
     public:
       static bool
-      _M_manager(_Any_data<void>&, const _Any_data<void>&, _Manager_operation)
+      _M_manager(_Any_data&, const _Any_data&, _Manager_operation)
       { return false; }
     };
 
@@ -363,7 +333,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
   template<typename _Res, typename... _ArgTypes>
     class function<_Res(_ArgTypes...)>
     : public _Maybe_unary_or_binary_function<_Res, _ArgTypes...>,
-      private _Function_base<_Res(_ArgTypes...)>
+      private _Function_base
     {
       // Equivalent to std::decay_t except that it produces an invalid type
       // if the decayed type is the current specialization of std::function.
@@ -382,11 +352,9 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       template<typename _Cond, typename _Tp = void>
 	using _Requires = __enable_if_t<_Cond::value, _Tp>;
 
-	using _Signature = _Res(_ArgTypes...);
-
       template<typename _Functor>
 	using _Handler
-	  = _Function_handler<_Signature, __decay_t<_Functor>>;
+	  = _Function_handler<_Res(_ArgTypes...), __decay_t<_Functor>>;
 
     public:
       typedef _Res result_type;
@@ -398,14 +366,14 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *  @post `!(bool)*this`
        */
       function() noexcept
-      : _Function_base<_Res(_ArgTypes...)>() { }
+      : _Function_base() { }
 
       /**
        *  @brief Creates an empty function call wrapper.
        *  @post @c !(bool)*this
        */
       function(nullptr_t) noexcept
-      : _Function_base<_Res(_ArgTypes...)>() { }
+      : _Function_base() { }
 
       /**
        *  @brief %Function copy constructor.
@@ -416,13 +384,13 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *  `__x` (if it has one).
        */
       function(const function& __x)
-      : _Function_base<_Res(_ArgTypes...)>()
+      : _Function_base()
       {
 	if (static_cast<bool>(__x))
 	  {
-	    __x._M_manager(this->_M_functor, __x._M_functor, __clone_functor);
+	    __x._M_manager(_M_functor, __x._M_functor, __clone_functor);
 	    _M_invoker = __x._M_invoker;
-	    this->_M_manager = __x._M_manager;
+	    _M_manager = __x._M_manager;
 	  }
       }
 
@@ -434,12 +402,12 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *  (if it has one).
        */
       function(function&& __x) noexcept
-      : _Function_base<_Res(_ArgTypes...)>(), _M_invoker(__x._M_invoker)
+      : _Function_base(), _M_invoker(__x._M_invoker)
       {
 	if (static_cast<bool>(__x))
 	  {
-	    this->_M_functor = __x._M_functor;
-	    this->_M_manager = __x._M_manager;
+	    _M_functor = __x._M_functor;
+	    _M_manager = __x._M_manager;
 	    __x._M_manager = nullptr;
 	    __x._M_invoker = nullptr;
 	  }
@@ -467,7 +435,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	_GLIBCXX_CEST_CONSTEXPR
 	function(_Functor&& __f)
 	noexcept(_Handler<_Functor>::template _S_nothrow_init<_Functor>())
-	: _Function_base<_Res(_ArgTypes...)>()
+	: _Function_base()
 	{
 	  static_assert(is_copy_constructible<__decay_t<_Functor>>::value,
 	      "std::function target must be copy-constructible");
@@ -479,15 +447,10 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
 	  if (_My_handler::_M_not_empty_function(__f))
 	    {
-{
-	    using dt = __decay_t<_Functor>;
-	    this->dp_  = new dt(__f); // now try calling it; ensure heap alloc
-      delete static_cast<dt*>(this->dp_); // move this to the destructor
-}
-	      _My_handler::_M_init_functor(this->_M_functor,
+	      _My_handler::_M_init_functor(_M_functor,
 					   std::forward<_Functor>(__f));
 	      _M_invoker = &_My_handler::_M_invoke;
-	      this->_M_manager = &_My_handler::_M_manager;
+	      _M_manager = &_My_handler::_M_manager;
 	    }
 	}
 
@@ -538,10 +501,10 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       function&
       operator=(nullptr_t) noexcept
       {
-	if (this->_M_manager)
+	if (_M_manager)
 	  {
-	    _M_manager(this->_M_functor, this->_M_functor, __destroy_functor);
-	    this->_M_manager = nullptr;
+	    _M_manager(_M_functor, _M_functor, __destroy_functor);
+	    _M_manager = nullptr;
 	    _M_invoker = nullptr;
 	  }
 	return *this;
@@ -593,8 +556,8 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        */
       void swap(function& __x) noexcept
       {
-	std::swap(this->_M_functor, __x._M_functor);
-	std::swap(this->_M_manager, __x._M_manager);
+	std::swap(_M_functor, __x._M_functor);
+	std::swap(_M_manager, __x._M_manager);
 	std::swap(_M_invoker, __x._M_invoker);
       }
 
@@ -609,7 +572,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *  This function will not throw exceptions.
        */
       explicit operator bool() const noexcept
-      { return !this->_M_empty(); }
+      { return !_M_empty(); }
 
       // [3.7.2.4] function invocation
 
@@ -625,9 +588,9 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       _Res
       operator()(_ArgTypes... __args) const
       {
-	if (this->_M_empty())
+	if (_M_empty())
 	  __throw_bad_function_call();
-	return _M_invoker(this->_M_functor, std::forward<_ArgTypes>(__args)...);
+	return _M_invoker(_M_functor, std::forward<_ArgTypes>(__args)...);
       }
 
 #if __cpp_rtti
@@ -644,11 +607,11 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       const type_info&
       target_type() const noexcept
       {
-	if (this->_M_manager)
+	if (_M_manager)
 	  {
-	    _Any_data<_Signature> __typeinfo_result;
-	    _M_manager(__typeinfo_result, this->_M_functor, __get_type_info);
-	    if (auto __ti =  __typeinfo_result.template _M_access<const type_info*>())
+	    _Any_data __typeinfo_result;
+	    _M_manager(__typeinfo_result, _M_functor, __get_type_info);
+	    if (auto __ti =  __typeinfo_result._M_access<const type_info*>())
 	      return *__ti;
 	  }
 	return typeid(void);
@@ -687,15 +650,15 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	      // _Target_handler avoids ill-formed _Function_handler types.
 	      using _Handler = _Target_handler<_Res(_ArgTypes...), _Functor>;
 
-	      if (this->_M_manager == &_Handler::_M_manager
+	      if (_M_manager == &_Handler::_M_manager
 #if __cpp_rtti
-		  || (this->_M_manager && typeid(_Functor) == target_type())
+		  || (_M_manager && typeid(_Functor) == target_type())
 #endif
 		 )
 		{
-		  _Any_data<_Signature> __ptr;
-		  _M_manager(__ptr, this->_M_functor, __get_functor_ptr);
-		  return __ptr.template _M_access<const _Functor*>();
+		  _Any_data __ptr;
+		  _M_manager(__ptr, _M_functor, __get_functor_ptr);
+		  return __ptr._M_access<const _Functor*>();
 		}
 	    }
 	  return nullptr;
@@ -703,7 +666,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       /// @}
 
     private:
-      using _Invoker_type = _Res (*)(const _Any_data<_Signature>&, _ArgTypes&&...);
+      using _Invoker_type = _Res (*)(const _Any_data&, _ArgTypes&&...);
       _Invoker_type _M_invoker = nullptr;
     };
 
