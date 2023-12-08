@@ -80,12 +80,6 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     void (_Undefined_class::*_M_member_pointer)();
   };
 
- /* template <typename T>
-  union _Any
-  {
-     int x; float y;
-  };*/
-
   template <typename _Signature>
     union _Any_data;
 
@@ -180,8 +174,11 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	  static void
 	  _M_create(_Any_data<_Signature>& __dest, _Fn&& __f, false_type)
 	  {
-	    __dest.template _M_access<_Functor*>()
-	      = new _Functor(std::forward<_Fn>(__f));
+	    auto p = new _Functor(std::forward<_Fn>(__f));
+	    __dest->dp_ = p;
+	    __dest.template _M_access<_Functor*>() = p;
+//	    __dest.template _M_access<_Functor*>()
+//	      = new _Functor(std::forward<_Fn>(__f));
 	  }
 
 	// Destroy an object stored in the internal buffer.
@@ -280,6 +277,8 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       = bool (*)(_Any_data<_Signature>&, const _Any_data<_Signature>&, _Manager_operation);
 
     _Any_data<_Signature>     _M_functor{};
+//    __decay_t<_Functor>* dp_;
+    void* dp_{};
     _Manager_type _M_manager{};
   };
 
@@ -480,6 +479,11 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
 	  if (_My_handler::_M_not_empty_function(__f))
 	    {
+{
+	    using dt = __decay_t<_Functor>;
+	    this->dp_  = new dt(__f); // now try calling it; ensure heap alloc
+      delete static_cast<dt*>(this->dp_); // move this to the destructor
+}
 	      _My_handler::_M_init_functor(this->_M_functor,
 					   std::forward<_Functor>(__f));
 	      _M_invoker = &_My_handler::_M_invoke;
