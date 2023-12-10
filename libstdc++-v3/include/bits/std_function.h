@@ -82,8 +82,10 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
   union [[gnu::may_alias]] _Any_data
   {
-    void*       _M_access()       noexcept { return &_M_pod_data[0]; }
-    const void* _M_access() const noexcept { return &_M_pod_data[0]; }
+//    void*       _M_access()       noexcept { return &_M_pod_data[0]; }
+//    const void* _M_access() const noexcept { return &_M_pod_data[0]; }
+    void*       _M_access()       noexcept { return _M_unused._M_object; }
+    const void* _M_access() const noexcept { return _M_unused._M_object; }
 
     template<typename _Tp>
       _Tp&
@@ -96,7 +98,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       { return *static_cast<const _Tp*>(_M_access()); }
 
     _Nocopy_types _M_unused;
-    char _M_pod_data[sizeof(_Nocopy_types)];
+//    char _M_pod_data[sizeof(_Nocopy_types)];
   };
 
   enum _Manager_operation
@@ -125,7 +127,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	(__is_location_invariant<_Functor>::value
 	 && sizeof(_Functor) <= _M_max_size
 	 && __alignof__(_Functor) <= _M_max_align
-	 && (_M_max_align % __alignof__(_Functor) == 0));
+	 && (_M_max_align % __alignof__(_Functor) == 0) && false);
 
 	using _Local_storage = integral_constant<bool, __stored_locally>;
 
@@ -154,10 +156,13 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
 	// Construct a function object on the heap and store a pointer.
 	template<typename _Fn>
+	  _GLIBCXX_CEST_CONSTEXPR
 	  static void
 	  _M_create(_Any_data& __dest, _Fn&& __f, false_type)
 	  {
-	    __dest._M_access<_Functor*>()
+//	    __dest._M_access<_Functor*>()
+//	      = new _Functor(std::forward<_Fn>(__f));
+	    __dest._M_unused._M_object
 	      = new _Functor(std::forward<_Fn>(__f));
 	  }
 
@@ -169,13 +174,16 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	}
 
 	// Destroy an object located on the heap.
+	_GLIBCXX_CEST_CONSTEXPR
 	static void
 	_M_destroy(_Any_data& __victim, false_type)
 	{
-	  delete __victim._M_access<_Functor*>();
+//	  delete __victim._M_access<_Functor*>();
+	  delete static_cast<_Functor*>(__victim._M_unused._M_object);
 	}
 
       public:
+	_GLIBCXX_CEST_CONSTEXPR
 	static bool
 	_M_manager(_Any_data& __dest, const _Any_data& __source,
 		   _Manager_operation __op)
@@ -207,6 +215,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	}
 
 	template<typename _Fn>
+	  _GLIBCXX_CEST_CONSTEXPR
 	  static void
 	  _M_init_functor(_Any_data& __functor, _Fn&& __f)
 	  noexcept(__and_<_Local_storage,
@@ -216,21 +225,25 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	  }
 
 	template<typename _Signature>
+	  _GLIBCXX_CEST_CONSTEXPR
 	  static bool
 	  _M_not_empty_function(const function<_Signature>& __f) noexcept
 	  { return static_cast<bool>(__f); }
 
 	template<typename _Tp>
+	  _GLIBCXX_CEST_CONSTEXPR
 	  static bool
 	  _M_not_empty_function(_Tp* __fp) noexcept
 	  { return __fp != nullptr; }
 
 	template<typename _Class, typename _Tp>
+	  _GLIBCXX_CEST_CONSTEXPR
 	  static bool
 	  _M_not_empty_function(_Tp _Class::* __mp) noexcept
 	  { return __mp != nullptr; }
 
 	template<typename _Tp>
+	  _GLIBCXX_CEST_CONSTEXPR
 	  static bool
 	  _M_not_empty_function(const _Tp&) noexcept
 	  { return true; }
@@ -238,12 +251,14 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
     _Function_base() = default;
 
+    _GLIBCXX_CEST_CONSTEXPR
     ~_Function_base()
     {
       if (_M_manager)
 	_M_manager(_M_functor, _M_functor, __destroy_functor);
     }
 
+    _GLIBCXX_CEST_CONSTEXPR
     bool _M_empty() const { return !_M_manager; }
 
     using _Manager_type
@@ -263,6 +278,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       using _Base = _Function_base::_Base_manager<_Functor>;
 
     public:
+      _GLIBCXX_CEST_CONSTEXPR
       static bool
       _M_manager(_Any_data& __dest, const _Any_data& __source,
 		 _Manager_operation __op)
@@ -284,11 +300,14 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	return false;
       }
 
+      _GLIBCXX_CEST_CONSTEXPR
       static _Res
       _M_invoke(const _Any_data& __functor, _ArgTypes&&... __args)
       {
-	return std::__invoke_r<_Res>(*_Base::_M_get_pointer(__functor),
+	return std::__invoke_r<_Res>(*static_cast<_Functor*>(__functor._M_unused._M_object),
 				     std::forward<_ArgTypes>(__args)...);
+//	return std::__invoke_r<_Res>(*_Base::_M_get_pointer(__functor),
+//				     std::forward<_ArgTypes>(__args)...);
       }
 
       template<typename _Fn>

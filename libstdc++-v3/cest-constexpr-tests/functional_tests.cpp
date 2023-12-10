@@ -18,7 +18,7 @@ constexpr bool function_test1()
 
 int main(int argc, char *argv[])
 {
-//  static_assert(function_test1());
+  static_assert(function_test1());
   assert((function_test1()));
 
   return 0;
