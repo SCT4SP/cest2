@@ -82,10 +82,10 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
   union [[gnu::may_alias]] _Any_data
   {
-//    void*       _M_access()       noexcept { return &_M_pod_data[0]; }
-//    const void* _M_access() const noexcept { return &_M_pod_data[0]; }
-    void*       _M_access()       noexcept { return _M_unused._M_object; }
-    const void* _M_access() const noexcept { return _M_unused._M_object; }
+    void*       _M_access()       noexcept { return &_M_pod_data[0]; }
+    const void* _M_access() const noexcept { return &_M_pod_data[0]; }
+//    void*       _M_access()       noexcept { return _M_unused._M_object; }
+//    const void* _M_access() const noexcept { return _M_unused._M_object; }
 
     template<typename _Tp>
       _Tp&
@@ -98,7 +98,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       { return *static_cast<const _Tp*>(_M_access()); }
 
     _Nocopy_types _M_unused;
-//    char _M_pod_data[sizeof(_Nocopy_types)];
+    char _M_pod_data[sizeof(_Nocopy_types)];
   };
 
   enum _Manager_operation
@@ -287,7 +287,8 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	  {
 #if __cpp_rtti
 	  case __get_type_info:
-	    __dest._M_access<const type_info*>() = &typeid(_Functor);
+//	    __dest._M_access<const type_info*>() = &typeid(_Functor);
+	    __dest._M_unused._M_const_object = &typeid(_Functor);
 	    break;
 #endif
 	  case __get_functor_ptr:
@@ -304,7 +305,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       static _Res
       _M_invoke(const _Any_data& __functor, _ArgTypes&&... __args)
       {
-	return std::__invoke_r<_Res>(*static_cast<_Functor*>(__functor._M_unused._M_object),
+	return std::__invoke_r<_Res>(*static_cast<const _Functor*>(__functor._M_unused._M_object),
 				     std::forward<_ArgTypes>(__args)...);
 //	return std::__invoke_r<_Res>(*_Base::_M_get_pointer(__functor),
 //				     std::forward<_ArgTypes>(__args)...);
@@ -623,6 +624,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *
        *  This function will not throw exceptions.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       const type_info&
       target_type() const noexcept
       {
@@ -630,7 +632,8 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	  {
 	    _Any_data __typeinfo_result;
 	    _M_manager(__typeinfo_result, _M_functor, __get_type_info);
-	    if (auto __ti =  __typeinfo_result._M_access<const type_info*>())
+	    if (auto __ti =  static_cast<const type_info*>(__typeinfo_result._M_unused._M_const_object))
+//	    if (auto __ti =  __typeinfo_result._M_access<const type_info*>())
 	      return *__ti;
 	  }
 	return typeid(void);

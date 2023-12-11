@@ -11,8 +11,9 @@ constexpr bool function_test1()
   std::function<bool()> f1 = [&]{ return b0; };
 
   std::function<bool(double*,char)> f2 = forty_two;
+  bool b2 = typeid(void) != f2.target_type();
 
-  bool b = f1() && f2(&d,'q');
+  bool b = f1() && f2(&d,'q') && b2;
   return b;
 }
 
