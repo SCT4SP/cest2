@@ -16,11 +16,11 @@ constexpr bool function_test1()
   std::function<int(int, int)> myplus = std::plus<int>();
   bool b3 = myplus.target<std::plus<int>>() != nullptr;
 
-  //std::function<int(int, int)> myf = f; // use forty_two
-  //int (*const* fptr)(int, int) = myf.target<int(*)(int, int)>();
-  //bool b4 = fptr && *fptr == f;
+  std::function<int(double*, char)> fp42 = forty_two;
+  int (*const* fp)(double*, char) = fp42.target<int(*)(double*, char)>();
+  bool b4 = fp && *fp == forty_two;
 
-  bool b = f1() && f2(&d,'q') && b2 && b3;
+  bool b = f1() && f2(&d,'q') && b2 && b3 && b4;
   return b;
 }
 
