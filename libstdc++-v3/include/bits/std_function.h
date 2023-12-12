@@ -55,8 +55,10 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
   class bad_function_call : public std::exception
   {
   public:
+    _GLIBCXX_CEST_CONSTEXPR
     virtual ~bad_function_call() noexcept;
 
+    _GLIBCXX_CEST_CONSTEXPR
     const char* what() const noexcept;
   };
 
@@ -85,8 +87,6 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
   {
     void*       _M_access()       noexcept { return &_M_pod_data[0]; }
     const void* _M_access() const noexcept { return &_M_pod_data[0]; }
-//    void*       _M_access()       noexcept { return _M_unused._M_object; }
-//    const void* _M_access() const noexcept { return _M_unused._M_object; }
 
     template<typename _Tp>
       _Tp&
@@ -208,8 +208,10 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	      break;
 
 	    case __clone_functor:
+//	      _M_init_functor(__dest,
+//		  *const_cast<const _Functor*>(_M_get_pointer(__source)));
 	      _M_init_functor(__dest,
-		  *const_cast<const _Functor*>(_M_get_pointer(__source)));
+		  *static_cast<const _Functor*>(__source._M_unused._M_object));
 	      break;
 
 	    case __destroy_functor:
@@ -392,6 +394,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *  @brief Default construct creates an empty function call wrapper.
        *  @post `!(bool)*this`
        */
+      _GLIBCXX_CEST_CONSTEXPR
       function() noexcept
       : _Function_base() { }
 
@@ -399,6 +402,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *  @brief Creates an empty function call wrapper.
        *  @post @c !(bool)*this
        */
+      _GLIBCXX_CEST_CONSTEXPR
       function(nullptr_t) noexcept
       : _Function_base() { }
 
@@ -410,6 +414,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *  The newly-created %function contains a copy of the target of
        *  `__x` (if it has one).
        */
+      _GLIBCXX_CEST_CONSTEXPR
       function(const function& __x)
       : _Function_base()
       {
@@ -428,6 +433,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *  The newly-created %function contains the target of `__x`
        *  (if it has one).
        */
+      _GLIBCXX_CEST_CONSTEXPR
       function(function&& __x) noexcept
       : _Function_base(), _M_invoker(__x._M_invoker)
       {
@@ -493,6 +499,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *  If `__x` targets a function pointer or a reference to a function
        *  object, then this operation will not throw an exception.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       function&
       operator=(const function& __x)
       {
@@ -511,6 +518,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *  If `__x` targets a function pointer or a reference to a function
        *  object, then this operation will not throw an exception.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       function&
       operator=(function&& __x) noexcept
       {
@@ -525,6 +533,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *
        *  The target of `*this` is deallocated, leaving it empty.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       function&
       operator=(nullptr_t) noexcept
       {
@@ -556,6 +565,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        */
       template<typename _Functor>
 	_Requires<_Callable<_Functor>, function&>
+	_GLIBCXX_CEST_CONSTEXPR
 	operator=(_Functor&& __f)
 	noexcept(_Handler<_Functor>::template _S_nothrow_init<_Functor>())
 	{
@@ -565,6 +575,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
       /// @overload
       template<typename _Functor>
+	_GLIBCXX_CEST_CONSTEXPR
 	function&
 	operator=(reference_wrapper<_Functor> __f) noexcept
 	{
@@ -581,6 +592,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *  Swap the targets of `this` function object and `__f`.
        *  This function will not throw exceptions.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       void swap(function& __x) noexcept
       {
 	std::swap(_M_functor, __x._M_functor);
@@ -598,6 +610,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *
        *  This function will not throw exceptions.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       explicit operator bool() const noexcept
       { return !_M_empty(); }
 
@@ -767,6 +780,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
    *  This function will not throw exceptions.
    */
   template<typename _Res, typename... _Args>
+    _GLIBCXX_CEST_CONSTEXPR
     inline bool
     operator==(const function<_Res(_Args...)>& __f, nullptr_t) noexcept
     { return !static_cast<bool>(__f); }
@@ -806,6 +820,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
   // _GLIBCXX_RESOLVE_LIB_DEFECTS
   // 2062. Effect contradictions w/o no-throw guarantee of std::function swaps
   template<typename _Res, typename... _Args>
+    _GLIBCXX_CEST_CONSTEXPR
     inline void
     swap(function<_Res(_Args...)>& __x, function<_Res(_Args...)>& __y) noexcept
     { __x.swap(__y); }
