@@ -41,6 +41,7 @@
 #include <bits/invoke.h>      // __invoke_r
 #include <bits/refwrap.h>     // ref wrapper, _Maybe_unary_or_binary_function
 #include <bits/functexcept.h> // __throw_bad_function_call
+#include <cassert> // debug
 
 namespace std _GLIBCXX_VISIBILITY(default)
 {
@@ -192,13 +193,17 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	    {
 	    case __get_type_info:
 #if __cpp_rtti
-	      __dest._M_access<const type_info*>() = &typeid(_Functor);
+	      assert(false); // case is handled in _Function_handler::_M_manager
+//	      __dest._M_access<const type_info*>() = &typeid(_Functor);
+	      __dest._M_unused._M_const_object = &typeid(_Functor);
 #else
-	      __dest._M_access<const type_info*>() = nullptr;
+//	      __dest._M_access<const type_info*>() = nullptr;
+	      __dest._M_unused._M_const_object = nullptr;
 #endif
 	      break;
 
 	    case __get_functor_ptr:
+	      assert(false); // case is handled in _Function_handler::_M_manager
 	      __dest._M_access<_Functor*>() = _M_get_pointer(__source);
 	      break;
 
@@ -292,7 +297,9 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	    break;
 #endif
 	  case __get_functor_ptr:
-	    __dest._M_access<_Functor*>() = _Base::_M_get_pointer(__source);
+//	    __dest._M_access<_Functor*>() = _Base::_M_get_pointer(__source);
+	    __dest._M_unused._M_const_object =
+        static_cast<const _Functor*>(__source._M_unused._M_object);
 	    break;
 
 	  default:
@@ -652,6 +659,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        * @{
        */
       template<typename _Functor>
+	_GLIBCXX_CEST_CONSTEXPR
 	_Functor*
 	target() noexcept
 	{
@@ -663,6 +671,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	}
 
       template<typename _Functor>
+	_GLIBCXX_CEST_CONSTEXPR
 	const _Functor*
 	target() const noexcept
 	{
@@ -680,7 +689,8 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 		{
 		  _Any_data __ptr;
 		  _M_manager(__ptr, _M_functor, __get_functor_ptr);
-		  return __ptr._M_access<const _Functor*>();
+//		  return __ptr._M_access<const _Functor*>();
+		  return static_cast<const _Functor*>(__ptr._M_unused._M_const_object);
 		}
 	    }
 	  return nullptr;

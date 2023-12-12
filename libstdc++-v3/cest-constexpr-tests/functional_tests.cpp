@@ -13,7 +13,14 @@ constexpr bool function_test1()
   std::function<bool(double*,char)> f2 = forty_two;
   bool b2 = typeid(void) != f2.target_type();
 
-  bool b = f1() && f2(&d,'q') && b2;
+  std::function<int(int, int)> myplus = std::plus<int>();
+  bool b3 = myplus.target<std::plus<int>>() != nullptr;
+
+  //std::function<int(int, int)> myf = f; // use forty_two
+  //int (*const* fptr)(int, int) = myf.target<int(*)(int, int)>();
+  //bool b4 = fptr && *fptr == f;
+
+  bool b = f1() && f2(&d,'q') && b2 && b3;
   return b;
 }
 
