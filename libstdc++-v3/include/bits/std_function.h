@@ -161,9 +161,12 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	  static void
 	  _M_create(_Any_data& __dest, _Fn&& __f, false_type)
 	  {
-//	    __dest._M_access<_Functor*>()
-//	      = new _Functor(std::forward<_Fn>(__f));
-	    __dest._M_unused._M_object
+#if _GLIBCXX_CEST_VERSION
+	      if (__builtin_is_constant_evaluated())
+	    __dest._M_unused._M_object = new _Functor(std::forward<_Fn>(__f));
+	      else
+#endif
+	    __dest._M_access<_Functor*>()
 	      = new _Functor(std::forward<_Fn>(__f));
 	  }
 
@@ -179,8 +182,12 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	static void
 	_M_destroy(_Any_data& __victim, false_type)
 	{
-//	  delete __victim._M_access<_Functor*>();
+#if _GLIBCXX_CEST_VERSION
+	    if (__builtin_is_constant_evaluated())
 	  delete static_cast<_Functor*>(__victim._M_unused._M_object);
+	    else
+#endif
+	  delete __victim._M_access<_Functor*>();
 	}
 
       public:
@@ -193,25 +200,37 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	    {
 	    case __get_type_info:
 #if __cpp_rtti
-	      assert(false); // case is handled in _Function_handler::_M_manager
-//	      __dest._M_access<const type_info*>() = &typeid(_Functor);
+	      // this case is handled in _Function_handler::_M_manager
+#if _GLIBCXX_CEST_VERSION
+	        if (__builtin_is_constant_evaluated())
 	      __dest._M_unused._M_const_object = &typeid(_Functor);
+	        else
+#endif
+	      __dest._M_access<const type_info*>() = &typeid(_Functor);
 #else
-//	      __dest._M_access<const type_info*>() = nullptr;
+#if _GLIBCXX_CEST_VERSION
+	        if (__builtin_is_constant_evaluated())
 	      __dest._M_unused._M_const_object = nullptr;
+	        else
+#endif
+	      __dest._M_access<const type_info*>() = nullptr;
 #endif
 	      break;
 
 	    case __get_functor_ptr:
-	      assert(false); // case is handled in _Function_handler::_M_manager
+	      // this case is handled in _Function_handler::_M_manager
 	      __dest._M_access<_Functor*>() = _M_get_pointer(__source);
 	      break;
 
 	    case __clone_functor:
-//	      _M_init_functor(__dest,
-//		  *const_cast<const _Functor*>(_M_get_pointer(__source)));
+#if _GLIBCXX_CEST_VERSION
+	        if (__builtin_is_constant_evaluated())
 	      _M_init_functor(__dest,
 		  *static_cast<const _Functor*>(__source._M_unused._M_object));
+	        else
+#endif
+	      _M_init_functor(__dest,
+		  *const_cast<const _Functor*>(_M_get_pointer(__source)));
 	      break;
 
 	    case __destroy_functor:
@@ -294,14 +313,22 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	  {
 #if __cpp_rtti
 	  case __get_type_info:
-//	    __dest._M_access<const type_info*>() = &typeid(_Functor);
+#if _GLIBCXX_CEST_VERSION
+	      if (__builtin_is_constant_evaluated())
 	    __dest._M_unused._M_const_object = &typeid(_Functor);
+	      else
+#endif
+	    __dest._M_access<const type_info*>() = &typeid(_Functor);
 	    break;
 #endif
 	  case __get_functor_ptr:
-//	    __dest._M_access<_Functor*>() = _Base::_M_get_pointer(__source);
+#if _GLIBCXX_CEST_VERSION
+	      if (__builtin_is_constant_evaluated())
 	    __dest._M_unused._M_const_object =
-        static_cast<const _Functor*>(__source._M_unused._M_object);
+	      static_cast<const _Functor*>(__source._M_unused._M_object);
+	      else
+#endif
+	    __dest._M_access<_Functor*>() = _Base::_M_get_pointer(__source);
 	    break;
 
 	  default:
@@ -314,10 +341,15 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       static _Res
       _M_invoke(const _Any_data& __functor, _ArgTypes&&... __args)
       {
-	return std::__invoke_r<_Res>(*static_cast<const _Functor*>(__functor._M_unused._M_object),
+#if _GLIBCXX_CEST_VERSION
+	      if (__builtin_is_constant_evaluated())
+	return std::__invoke_r<_Res>(
+				     *static_cast<const _Functor*>(__functor._M_unused._M_object),
 				     std::forward<_ArgTypes>(__args)...);
-//	return std::__invoke_r<_Res>(*_Base::_M_get_pointer(__functor),
-//				     std::forward<_ArgTypes>(__args)...);
+	      else
+#endif
+	return std::__invoke_r<_Res>(*_Base::_M_get_pointer(__functor),
+				     std::forward<_ArgTypes>(__args)...);
       }
 
       template<typename _Fn>
@@ -652,8 +684,15 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	  {
 	    _Any_data __typeinfo_result;
 	    _M_manager(__typeinfo_result, _M_functor, __get_type_info);
+#if _GLIBCXX_CEST_VERSION
+	      if (__builtin_is_constant_evaluated())
+	      {
 	    if (auto __ti =  static_cast<const type_info*>(__typeinfo_result._M_unused._M_const_object))
-//	    if (auto __ti =  __typeinfo_result._M_access<const type_info*>())
+	      return *__ti;
+	      }
+	      else
+#endif
+	    if (auto __ti =  __typeinfo_result._M_access<const type_info*>())
 	      return *__ti;
 	  }
 	return typeid(void);
@@ -702,8 +741,12 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 		{
 		  _Any_data __ptr;
 		  _M_manager(__ptr, _M_functor, __get_functor_ptr);
-//		  return __ptr._M_access<const _Functor*>();
+#if _GLIBCXX_CEST_VERSION
+		    if (__builtin_is_constant_evaluated())
 		  return static_cast<const _Functor*>(__ptr._M_unused._M_const_object);
+		    else
+#endif
+		  return __ptr._M_access<const _Functor*>();
 		}
 	    }
 	  return nullptr;
