@@ -125,10 +125,14 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       {
       protected:
 	static const bool __stored_locally =
+#if _GLIBCXX_CEST_VERSION
+	false;   // this can't vary based on is_constant_evaluated (see noexcept)
+#else
 	(__is_location_invariant<_Functor>::value
 	 && sizeof(_Functor) <= _M_max_size
 	 && __alignof__(_Functor) <= _M_max_align
-	 && (_M_max_align % __alignof__(_Functor) == 0) && false);
+	 && (_M_max_align % __alignof__(_Functor) == 0);
+#endif
 
 	using _Local_storage = integral_constant<bool, __stored_locally>;
 
