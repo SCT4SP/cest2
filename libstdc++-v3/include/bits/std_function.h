@@ -54,8 +54,10 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
   class bad_function_call : public std::exception
   {
   public:
+    _GLIBCXX_CEST_CONSTEXPR
     virtual ~bad_function_call() noexcept;
 
+    _GLIBCXX_CEST_CONSTEXPR
     const char* what() const noexcept;
   };
 
@@ -122,10 +124,14 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       {
       protected:
 	static const bool __stored_locally =
+#if _GLIBCXX_CEST_VERSION
+	false;   // this can't vary based on is_constant_evaluated (see noexcept)
+#else
 	(__is_location_invariant<_Functor>::value
 	 && sizeof(_Functor) <= _M_max_size
 	 && __alignof__(_Functor) <= _M_max_align
-	 && (_M_max_align % __alignof__(_Functor) == 0));
+	 && (_M_max_align % __alignof__(_Functor) == 0);
+#endif
 
 	using _Local_storage = integral_constant<bool, __stored_locally>;
 
@@ -154,9 +160,15 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
 	// Construct a function object on the heap and store a pointer.
 	template<typename _Fn>
+	  _GLIBCXX_CEST_CONSTEXPR
 	  static void
 	  _M_create(_Any_data& __dest, _Fn&& __f, false_type)
 	  {
+#if _GLIBCXX_CEST_VERSION
+	      if (__builtin_is_constant_evaluated())
+	    __dest._M_unused._M_object = new _Functor(std::forward<_Fn>(__f));
+	      else
+#endif
 	    __dest._M_access<_Functor*>()
 	      = new _Functor(std::forward<_Fn>(__f));
 	  }
@@ -169,13 +181,20 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	}
 
 	// Destroy an object located on the heap.
+	_GLIBCXX_CEST_CONSTEXPR
 	static void
 	_M_destroy(_Any_data& __victim, false_type)
 	{
+#if _GLIBCXX_CEST_VERSION
+	    if (__builtin_is_constant_evaluated())
+	  delete static_cast<_Functor*>(__victim._M_unused._M_object);
+	    else
+#endif
 	  delete __victim._M_access<_Functor*>();
 	}
 
       public:
+	_GLIBCXX_CEST_CONSTEXPR
 	static bool
 	_M_manager(_Any_data& __dest, const _Any_data& __source,
 		   _Manager_operation __op)
@@ -184,17 +203,35 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	    {
 	    case __get_type_info:
 #if __cpp_rtti
+	      // assert(false); this case is handled in _Function_handler::_M_manager
+#if _GLIBCXX_CEST_VERSION
+	        if (__builtin_is_constant_evaluated())
+	      __dest._M_unused._M_const_object = &typeid(_Functor);
+	        else
+#endif
 	      __dest._M_access<const type_info*>() = &typeid(_Functor);
 #else
+#if _GLIBCXX_CEST_VERSION
+	        if (__builtin_is_constant_evaluated())
+	      __dest._M_unused._M_const_object = nullptr;
+	        else
+#endif
 	      __dest._M_access<const type_info*>() = nullptr;
 #endif
 	      break;
 
 	    case __get_functor_ptr:
+	      // assert(false); this case is handled in _Function_handler::_M_manager
 	      __dest._M_access<_Functor*>() = _M_get_pointer(__source);
 	      break;
 
 	    case __clone_functor:
+#if _GLIBCXX_CEST_VERSION
+	        if (__builtin_is_constant_evaluated())
+	      _M_init_functor(__dest,
+		  *static_cast<const _Functor*>(__source._M_unused._M_object));
+	        else
+#endif
 	      _M_init_functor(__dest,
 		  *const_cast<const _Functor*>(_M_get_pointer(__source)));
 	      break;
@@ -207,6 +244,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	}
 
 	template<typename _Fn>
+	  _GLIBCXX_CEST_CONSTEXPR
 	  static void
 	  _M_init_functor(_Any_data& __functor, _Fn&& __f)
 	  noexcept(__and_<_Local_storage,
@@ -216,21 +254,25 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	  }
 
 	template<typename _Signature>
+	  _GLIBCXX_CEST_CONSTEXPR
 	  static bool
 	  _M_not_empty_function(const function<_Signature>& __f) noexcept
 	  { return static_cast<bool>(__f); }
 
 	template<typename _Tp>
+	  _GLIBCXX_CEST_CONSTEXPR
 	  static bool
 	  _M_not_empty_function(_Tp* __fp) noexcept
 	  { return __fp != nullptr; }
 
 	template<typename _Class, typename _Tp>
+	  _GLIBCXX_CEST_CONSTEXPR
 	  static bool
 	  _M_not_empty_function(_Tp _Class::* __mp) noexcept
 	  { return __mp != nullptr; }
 
 	template<typename _Tp>
+	  _GLIBCXX_CEST_CONSTEXPR
 	  static bool
 	  _M_not_empty_function(const _Tp&) noexcept
 	  { return true; }
@@ -238,12 +280,14 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
     _Function_base() = default;
 
+    _GLIBCXX_CEST_CONSTEXPR
     ~_Function_base()
     {
       if (_M_manager)
 	_M_manager(_M_functor, _M_functor, __destroy_functor);
     }
 
+    _GLIBCXX_CEST_CONSTEXPR
     bool _M_empty() const { return !_M_manager; }
 
     using _Manager_type
@@ -263,6 +307,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       using _Base = _Function_base::_Base_manager<_Functor>;
 
     public:
+      _GLIBCXX_CEST_CONSTEXPR
       static bool
       _M_manager(_Any_data& __dest, const _Any_data& __source,
 		 _Manager_operation __op)
@@ -271,10 +316,21 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	  {
 #if __cpp_rtti
 	  case __get_type_info:
+#if _GLIBCXX_CEST_VERSION
+	      if (__builtin_is_constant_evaluated())
+	    __dest._M_unused._M_const_object = &typeid(_Functor);
+	      else
+#endif
 	    __dest._M_access<const type_info*>() = &typeid(_Functor);
 	    break;
 #endif
 	  case __get_functor_ptr:
+#if _GLIBCXX_CEST_VERSION
+	      if (__builtin_is_constant_evaluated())
+	    __dest._M_unused._M_const_object =
+	      static_cast<const _Functor*>(__source._M_unused._M_object);
+	      else
+#endif
 	    __dest._M_access<_Functor*>() = _Base::_M_get_pointer(__source);
 	    break;
 
@@ -284,9 +340,17 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	return false;
       }
 
+      _GLIBCXX_CEST_CONSTEXPR
       static _Res
       _M_invoke(const _Any_data& __functor, _ArgTypes&&... __args)
       {
+#if _GLIBCXX_CEST_VERSION
+	      if (__builtin_is_constant_evaluated())
+	return std::__invoke_r<_Res>(
+				     *static_cast<const _Functor*>(__functor._M_unused._M_object),
+				     std::forward<_ArgTypes>(__args)...);
+	      else
+#endif
 	return std::__invoke_r<_Res>(*_Base::_M_get_pointer(__functor),
 				     std::forward<_ArgTypes>(__args)...);
       }
@@ -365,6 +429,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *  @brief Default construct creates an empty function call wrapper.
        *  @post `!(bool)*this`
        */
+      _GLIBCXX_CEST_CONSTEXPR
       function() noexcept
       : _Function_base() { }
 
@@ -372,6 +437,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *  @brief Creates an empty function call wrapper.
        *  @post @c !(bool)*this
        */
+      _GLIBCXX_CEST_CONSTEXPR
       function(nullptr_t) noexcept
       : _Function_base() { }
 
@@ -383,6 +449,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *  The newly-created %function contains a copy of the target of
        *  `__x` (if it has one).
        */
+      _GLIBCXX_CEST_CONSTEXPR
       function(const function& __x)
       : _Function_base()
       {
@@ -401,6 +468,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *  The newly-created %function contains the target of `__x`
        *  (if it has one).
        */
+      _GLIBCXX_CEST_CONSTEXPR
       function(function&& __x) noexcept
       : _Function_base(), _M_invoker(__x._M_invoker)
       {
@@ -432,6 +500,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       // 2774. std::function construction vs assignment
       template<typename _Functor,
 	       typename _Constraints = _Requires<_Callable<_Functor>>>
+	_GLIBCXX_CEST_CONSTEXPR
 	function(_Functor&& __f)
 	noexcept(_Handler<_Functor>::template _S_nothrow_init<_Functor>())
 	: _Function_base()
@@ -465,6 +534,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *  If `__x` targets a function pointer or a reference to a function
        *  object, then this operation will not throw an exception.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       function&
       operator=(const function& __x)
       {
@@ -483,6 +553,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *  If `__x` targets a function pointer or a reference to a function
        *  object, then this operation will not throw an exception.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       function&
       operator=(function&& __x) noexcept
       {
@@ -497,6 +568,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *
        *  The target of `*this` is deallocated, leaving it empty.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       function&
       operator=(nullptr_t) noexcept
       {
@@ -528,6 +600,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        */
       template<typename _Functor>
 	_Requires<_Callable<_Functor>, function&>
+	_GLIBCXX_CEST_CONSTEXPR
 	operator=(_Functor&& __f)
 	noexcept(_Handler<_Functor>::template _S_nothrow_init<_Functor>())
 	{
@@ -537,6 +610,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
       /// @overload
       template<typename _Functor>
+	_GLIBCXX_CEST_CONSTEXPR
 	function&
 	operator=(reference_wrapper<_Functor> __f) noexcept
 	{
@@ -553,6 +627,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *  Swap the targets of `this` function object and `__f`.
        *  This function will not throw exceptions.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       void swap(function& __x) noexcept
       {
 	std::swap(_M_functor, __x._M_functor);
@@ -570,6 +645,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *
        *  This function will not throw exceptions.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       explicit operator bool() const noexcept
       { return !_M_empty(); }
 
@@ -583,6 +659,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *  The function call operator invokes the target function object
        *  stored by `this`.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       _Res
       operator()(_ArgTypes... __args) const
       {
@@ -602,6 +679,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *
        *  This function will not throw exceptions.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       const type_info&
       target_type() const noexcept
       {
@@ -609,6 +687,14 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	  {
 	    _Any_data __typeinfo_result;
 	    _M_manager(__typeinfo_result, _M_functor, __get_type_info);
+#if _GLIBCXX_CEST_VERSION
+	      if (__builtin_is_constant_evaluated())
+	      {
+	    if (auto __ti =  static_cast<const type_info*>(__typeinfo_result._M_unused._M_const_object))
+	      return *__ti;
+	      }
+	      else
+#endif
 	    if (auto __ti =  __typeinfo_result._M_access<const type_info*>())
 	      return *__ti;
 	  }
@@ -628,6 +714,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        * @{
        */
       template<typename _Functor>
+	_GLIBCXX_CEST_CONSTEXPR
 	_Functor*
 	target() noexcept
 	{
@@ -639,6 +726,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	}
 
       template<typename _Functor>
+	_GLIBCXX_CEST_CONSTEXPR
 	const _Functor*
 	target() const noexcept
 	{
@@ -656,6 +744,11 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 		{
 		  _Any_data __ptr;
 		  _M_manager(__ptr, _M_functor, __get_functor_ptr);
+#if _GLIBCXX_CEST_VERSION
+		    if (__builtin_is_constant_evaluated())
+		  return static_cast<const _Functor*>(__ptr._M_unused._M_const_object);
+		    else
+#endif
 		  return __ptr._M_access<const _Functor*>();
 		}
 	    }
@@ -733,6 +826,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
    *  This function will not throw exceptions.
    */
   template<typename _Res, typename... _Args>
+    _GLIBCXX_CEST_CONSTEXPR
     inline bool
     operator==(const function<_Res(_Args...)>& __f, nullptr_t) noexcept
     { return !static_cast<bool>(__f); }
@@ -772,6 +866,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
   // _GLIBCXX_RESOLVE_LIB_DEFECTS
   // 2062. Effect contradictions w/o no-throw guarantee of std::function swaps
   template<typename _Res, typename... _Args>
+    _GLIBCXX_CEST_CONSTEXPR
     inline void
     swap(function<_Res(_Args...)>& __x, function<_Res(_Args...)>& __y) noexcept
     { __x.swap(__y); }

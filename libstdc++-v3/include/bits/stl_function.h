@@ -63,6 +63,10 @@
 #define __glibcxx_want_transparent_operators
 #include <bits/version.h>
 
+#if _GLIBCXX_CEST_VERSION && defined(__clang__)
+#include <compare> // std::strong_ordering::less and std::compare_three_way
+#endif
+
 namespace std _GLIBCXX_VISIBILITY(default)
 {
 _GLIBCXX_BEGIN_NAMESPACE_VERSION
