@@ -41,7 +41,6 @@
 #include <bits/invoke.h>      // __invoke_r
 #include <bits/refwrap.h>     // ref wrapper, _Maybe_unary_or_binary_function
 #include <bits/functexcept.h> // __throw_bad_function_call
-#include <cassert> // debug
 
 namespace std _GLIBCXX_VISIBILITY(default)
 {
@@ -204,7 +203,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	    {
 	    case __get_type_info:
 #if __cpp_rtti
-	      // this case is handled in _Function_handler::_M_manager
+	      // assert(false); this case is handled in _Function_handler::_M_manager
 #if _GLIBCXX_CEST_VERSION
 	        if (__builtin_is_constant_evaluated())
 	      __dest._M_unused._M_const_object = &typeid(_Functor);
@@ -222,7 +221,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	      break;
 
 	    case __get_functor_ptr:
-	      // this case is handled in _Function_handler::_M_manager
+	      // assert(false); this case is handled in _Function_handler::_M_manager
 	      __dest._M_access<_Functor*>() = _M_get_pointer(__source);
 	      break;
 
