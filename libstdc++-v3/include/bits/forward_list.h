@@ -1413,6 +1413,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 		      const_iterator __last);
 
       // Called by forward_list(n).
+      _GLIBCXX_CEST_CONSTEXPR
       void
       _M_default_initialize(size_type __n);
 

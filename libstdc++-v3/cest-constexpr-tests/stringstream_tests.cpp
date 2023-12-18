@@ -14,7 +14,7 @@ template <typename Iss, typename S> constexpr bool istringstream_test1() {
   char c1, c2;
   s1.get(c1);
   s2.get(c2);
-  bool b1 = c1 == 'a' && c2 == 'd';
+  bool b1 = c1 == 'a' && c2 == 'd' && s2.str() == str;
   s1.get(c1);
   s2.get(c2);
   bool b2 = c1 == 'b' && c2 == 'e';

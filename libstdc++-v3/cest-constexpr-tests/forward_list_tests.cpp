@@ -6,6 +6,7 @@ namespace fl_tests {
 
 template <typename FL> constexpr bool forward_list_test1() {
   FL fl;
+  FL fl2(100);
   return fl.empty();
 }
 
