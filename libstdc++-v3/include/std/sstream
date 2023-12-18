@@ -249,6 +249,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        *  character sequence is equal to the input sequence; otherwise, it
        *  is equal to the output sequence.</em> [27.7.1.2]/1
       */
+      _GLIBCXX_CEST_CONSTEXPR
       __string_type
       str() const _GLIBCXX_LVAL_REF_QUAL
       {
@@ -446,6 +447,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
       // This might not be the same character as _M_string.end() because
       // basic_stringbuf::overflow might have written to unused capacity
       // in _M_string without updating its length.
+      _GLIBCXX_CEST_CONSTEXPR
       __attribute__((__always_inline__))
       char_type*
       _M_high_mark() const _GLIBCXX_NOEXCEPT
@@ -717,6 +719,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        *  @brief  Copying out the string buffer.
        *  @return  @c rdbuf()->str()
       */
+      _GLIBCXX_CEST_CONSTEXPR
       __string_type
       str() const _GLIBCXX_LVAL_REF_QUAL
       { return _M_stringbuf.str(); }
