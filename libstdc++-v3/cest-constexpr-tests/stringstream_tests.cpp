@@ -58,39 +58,11 @@ constexpr bool istringstream_test3() {
 
 } // namespace ss_tests
 
-constexpr bool help()
-{
-  std::string str("def");
-  std::istringstream s(str);
-  return s.good();
-}
-
 void stringstream_tests() {
   using namespace ss_tests;
 
   using std_isbi = std::istreambuf_iterator<char>;
 
-  std::ifstream file(__FILE__);
-  std::istreambuf_iterator<char> it(file);
-#if 0
-    if (!file) // operator! is used here
-    {
-        std::cout << "File opening failed\n";
-    }
-if (file.bad())
-        std::cout << "I/O error while reading\n";
-    else if (file.eof())
-        std::cout << "End of file reached successfully\n";
-    else if (file.fail())
-        std::cout << "Non-integer data encountered\n";
-if (file.rdbuf() == nullptr)
-  std::cout << "rdbuf is null\n";
-std::string filename = __FILE__;
-std::cout << filename << ' ' << file.is_open() << ' ' << file.good() << ' ';
-std::cout << *it << std::endl; // *it++ causes a crash
-#endif
-  bool b1 = *it == '#';
-  assert(b1);
   assert((istringstream_test1<std::istringstream, std::string>()));
   assert((istringstream_test2<std::istringstream, std::string>()));
   assert((istringstream_test3<std::ifstream, std::string, std_isbi>()));
