@@ -127,6 +127,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
     }
 
   template<typename _Tp, typename _Alloc>
+    _GLIBCXX_CEST_CONSTEXPR
     void
     forward_list<_Tp, _Alloc>::
     _M_default_initialize(size_type __n)
