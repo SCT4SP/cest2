@@ -90,6 +90,7 @@ __for_each_n_it_serial(_ForwardIterator __first, _Size __n, _Function __f)
 // walk1 evaluates f(x) for each dereferenced value x drawn from [first,last)
 //------------------------------------------------------------------------
 template <class _ForwardIterator, class _Function>
+_GLIBCXX_CEST_CONSTEXPR
 void
 __brick_walk1(_ForwardIterator __first, _ForwardIterator __last, _Function __f, /*vector=*/std::false_type) noexcept
 {
@@ -105,6 +106,7 @@ __brick_walk1(_RandomAccessIterator __first, _RandomAccessIterator __last, _Func
 }
 
 template <class _Tag, class _ExecutionPolicy, class _ForwardIterator, class _Function>
+_GLIBCXX_CEST_CONSTEXPR
 void
 __pattern_walk1(_Tag, _ExecutionPolicy&&, _ForwardIterator __first, _ForwardIterator __last, _Function __f) noexcept
 {

@@ -48,6 +48,7 @@ __pattern_any_of(__parallel_tag<_IsVector>, _ExecutionPolicy&&, _RandomAccessIte
 //------------------------------------------------------------------------
 
 template <class _ForwardIterator, class _Function>
+_GLIBCXX_CEST_CONSTEXPR
 void __brick_walk1(_ForwardIterator, _ForwardIterator, _Function,
                    /*vector=*/std::false_type) noexcept;
 
@@ -56,6 +57,7 @@ void __brick_walk1(_RandomAccessIterator, _RandomAccessIterator, _Function,
                    /*vector=*/std::true_type) noexcept;
 
 template <class _Tag, class _ExecutionPolicy, class _ForwardIterator, class _Function>
+_GLIBCXX_CEST_CONSTEXPR
 void
 __pattern_walk1(_Tag, _ExecutionPolicy&&, _ForwardIterator, _ForwardIterator, _Function) noexcept;
 
