@@ -67,6 +67,7 @@ using __tag_type = typename std::conditional<__internal::__are_random_access_ite
                                              __parallel_tag<_IsVector>, __serial_tag<_IsVector>>::type;
 
 template <class... _IteratorTypes>
+_GLIBCXX_CEST_CONSTEXPR
 __serial_tag</*_IsVector = */ std::false_type>
 __select_backend(__pstl::execution::sequenced_policy, _IteratorTypes&&...)
 {
@@ -74,6 +75,7 @@ __select_backend(__pstl::execution::sequenced_policy, _IteratorTypes&&...)
 }
 
 template <class... _IteratorTypes>
+_GLIBCXX_CEST_CONSTEXPR
 __serial_tag<__internal::__are_random_access_iterators<_IteratorTypes...>>
 __select_backend(__pstl::execution::unsequenced_policy, _IteratorTypes&&...)
 {
@@ -81,6 +83,7 @@ __select_backend(__pstl::execution::unsequenced_policy, _IteratorTypes&&...)
 }
 
 template <class... _IteratorTypes>
+_GLIBCXX_CEST_CONSTEXPR
 __tag_type</*_IsVector = */ std::false_type, _IteratorTypes...>
 __select_backend(__pstl::execution::parallel_policy, _IteratorTypes&&...)
 {
@@ -88,6 +91,7 @@ __select_backend(__pstl::execution::parallel_policy, _IteratorTypes&&...)
 }
 
 template <class... _IteratorTypes>
+_GLIBCXX_CEST_CONSTEXPR
 __tag_type<__internal::__are_random_access_iterators<_IteratorTypes...>, _IteratorTypes...>
 __select_backend(__pstl::execution::parallel_unsequenced_policy, _IteratorTypes&&...)
 {
