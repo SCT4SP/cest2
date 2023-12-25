@@ -54,6 +54,7 @@ none_of(_ExecutionPolicy&& __exec, _ForwardIterator __first, _ForwardIterator __
 
 template <class _ExecutionPolicy, class _ForwardIterator, class _Function>
 __pstl::__internal::__enable_if_execution_policy<_ExecutionPolicy, void>
+_GLIBCXX_CEST_CONSTEXPR
 for_each(_ExecutionPolicy&& __exec, _ForwardIterator __first, _ForwardIterator __last, _Function __f)
 {
     auto __dispatch_tag = __pstl::__internal::__select_backend(__exec, __first);
