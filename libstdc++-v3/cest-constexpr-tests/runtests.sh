@@ -21,7 +21,7 @@ do
   $MYGCC $FILE -ltbb && ./a.out   #  -ltbb is only needed for policy_tests.cpp
 done
 
-#for FILE in $FILES_CLANG
-#do
-#  $MYCLANG $FILE -ltbb && ./a.out
-#done
+for FILE in $FILES_CLANG
+do
+  $MYCLANG $FILE -ltbb && ./a.out
+done
