@@ -37,6 +37,7 @@ transform_reduce(_ExecutionPolicy&& __exec, _ForwardIterator1 __first1, _Forward
 
 template <class _ExecutionPolicy, class _ForwardIterator1, class _ForwardIterator2, class _Tp, class _BinaryOperation1,
           class _BinaryOperation2>
+_GLIBCXX_CEST_CONSTEXPR
 __pstl::__internal::__enable_if_execution_policy<_ExecutionPolicy, _Tp>
 transform_reduce(_ExecutionPolicy&& __exec, _ForwardIterator1 __first1, _ForwardIterator1 __last1,
                  _ForwardIterator2 __first2, _Tp __init, _BinaryOperation1 __binary_op1,
