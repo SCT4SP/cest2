@@ -30,6 +30,7 @@ namespace __internal
 //------------------------------------------------------------------------
 
 template <class _ForwardIterator1, class _ForwardIterator2, class _Tp, class _BinaryOperation1, class _BinaryOperation2>
+_GLIBCXX_CEST_CONSTEXPR
 _Tp
 __brick_transform_reduce(_ForwardIterator1 __first1, _ForwardIterator1 __last1, _ForwardIterator2 __first2, _Tp __init,
                          _BinaryOperation1 __binary_op1, _BinaryOperation2 __binary_op2,
@@ -54,6 +55,7 @@ __brick_transform_reduce(_RandomAccessIterator1 __first1, _RandomAccessIterator1
 
 template <class _Tag, class _ExecutionPolicy, class _ForwardIterator1, class _ForwardIterator2, class _Tp,
           class _BinaryOperation1, class _BinaryOperation2>
+_GLIBCXX_CEST_CONSTEXPR
 _Tp
 __pattern_transform_reduce(_Tag, _ExecutionPolicy&&, _ForwardIterator1 __first1, _ForwardIterator1 __last1,
                            _ForwardIterator2 __first2, _Tp __init, _BinaryOperation1 __binary_op1,
