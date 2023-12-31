@@ -78,6 +78,7 @@ __invoke_if_else(std::false_type, _F1, _F2 __f2) -> decltype(__f2())
 struct __no_op
 {
     template <typename _Tp>
+    _GLIBCXX_CEST_CONSTEXPR
     _Tp&&
     operator()(_Tp&& __a) const
     {
