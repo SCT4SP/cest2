@@ -6,8 +6,12 @@
 constexpr bool policy_test1()
 {
   std::vector v = {1,2,3,4,5,6,7,8};
-  int x1 = std::reduce(
+  int x1a = std::reduce( // pstl implements this using transform_reduce
     std::execution::seq, v.begin(), v.end(), 1, std::multiplies{}
+  );
+  int x1b = std::transform_reduce(
+    std::execution::seq, v.begin(), v.end(), 1, std::multiplies{},
+                                                  std::identity{}
   );
   std::for_each(std::execution::seq, v.begin(), v.end(), [](auto& x) { x++; });
   bool b = v == std::vector{2,3,4,5,6,7,8,9};
@@ -20,7 +24,7 @@ constexpr bool policy_test1()
     std::plus{},
     [](int x, int y) { return y - x; } // always 1 with the input data
   );
-  return b && x1==40320 && x2==7;
+  return b && x1a==40320 && x1b==40320 && x2==7;
 }
 
 int main(int argc, char *argv[])
