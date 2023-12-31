@@ -21,6 +21,7 @@ namespace std
 // [reduce]
 
 template <class _ExecutionPolicy, class _ForwardIterator, class _Tp, class _BinaryOperation>
+_GLIBCXX_CEST_CONSTEXPR
 __pstl::__internal::__enable_if_execution_policy<_ExecutionPolicy, _Tp>
 reduce(_ExecutionPolicy&& __exec, _ForwardIterator __first, _ForwardIterator __last, _Tp __init,
        _BinaryOperation __binary_op)
@@ -76,6 +77,7 @@ transform_reduce(_ExecutionPolicy&& __exec, _ForwardIterator1 __first1, _Forward
 }
 
 template <class _ExecutionPolicy, class _ForwardIterator, class _Tp, class _BinaryOperation, class _UnaryOperation>
+_GLIBCXX_CEST_CONSTEXPR
 __pstl::__internal::__enable_if_execution_policy<_ExecutionPolicy, _Tp>
 transform_reduce(_ExecutionPolicy&& __exec, _ForwardIterator __first, _ForwardIterator __last, _Tp __init,
                  _BinaryOperation __binary_op, _UnaryOperation __unary_op)

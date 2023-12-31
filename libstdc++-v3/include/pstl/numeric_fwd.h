@@ -56,11 +56,13 @@ _Tp __brick_transform_reduce(_RandomAccessIterator, _RandomAccessIterator, _Tp, 
                              /*is_vector=*/std::true_type) noexcept;
 
 template <class _ForwardIterator, class _Tp, class _BinaryOperation, class _UnaryOperation>
+_GLIBCXX_CEST_CONSTEXPR
 _Tp __brick_transform_reduce(_ForwardIterator, _ForwardIterator, _Tp, _BinaryOperation, _UnaryOperation,
                              /*is_vector=*/std::false_type) noexcept;
 
 template <class _Tag, class _ExecutionPolicy, class _ForwardIterator, class _Tp, class _BinaryOperation,
           class _UnaryOperation>
+_GLIBCXX_CEST_CONSTEXPR
 _Tp
 __pattern_transform_reduce(_Tag, _ExecutionPolicy&&, _ForwardIterator, _ForwardIterator, _Tp, _BinaryOperation,
                            _UnaryOperation) noexcept;

@@ -97,6 +97,7 @@ __pattern_transform_reduce(__parallel_tag<_IsVector> __tag, _ExecutionPolicy&& _
 //------------------------------------------------------------------------
 
 template <class _ForwardIterator, class _Tp, class _BinaryOperation, class _UnaryOperation>
+_GLIBCXX_CEST_CONSTEXPR
 _Tp
 __brick_transform_reduce(_ForwardIterator __first, _ForwardIterator __last, _Tp __init, _BinaryOperation __binary_op,
                          _UnaryOperation __unary_op, /*is_vector=*/std::false_type) noexcept
@@ -118,6 +119,7 @@ __brick_transform_reduce(_RandomAccessIterator __first, _RandomAccessIterator __
 
 template <class _Tag, class _ExecutionPolicy, class _ForwardIterator, class _Tp, class _BinaryOperation,
           class _UnaryOperation>
+_GLIBCXX_CEST_CONSTEXPR
 _Tp
 __pattern_transform_reduce(_Tag, _ExecutionPolicy&&, _ForwardIterator __first, _ForwardIterator __last, _Tp __init,
                            _BinaryOperation __binary_op, _UnaryOperation __unary_op) noexcept
