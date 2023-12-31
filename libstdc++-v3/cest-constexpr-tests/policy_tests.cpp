@@ -2,6 +2,7 @@
 #include <vector>
 #include <algorithm>
 #include <cassert>
+#include <functional> // std::identity, std::multiplies, std::plus
 
 constexpr bool policy_test1()
 {
