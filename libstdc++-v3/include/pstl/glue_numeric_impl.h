@@ -52,9 +52,20 @@ reduce(_ExecutionPolicy&& __exec, _ForwardIterator __first, _ForwardIterator __l
 
 template <class _ExecutionPolicy, class _ForwardIterator1, class _ForwardIterator2, class _Tp>
 __pstl::__internal::__enable_if_execution_policy<_ExecutionPolicy, _Tp>
+_GLIBCXX_CEST_CONSTEXPR
 transform_reduce(_ExecutionPolicy&& __exec, _ForwardIterator1 __first1, _ForwardIterator1 __last1,
                  _ForwardIterator2 __first2, _Tp __init)
 {
+    if constexpr (std::is_same_v<std::__remove_cvref_t<_ExecutionPolicy>,
+                                 execution::parallel_policy>) // execution::par
+    {
+        if (__builtin_is_constant_evaluated()) {
+            using namespace __cep::experimental::execution;   // for ce_par
+            return std::transform_reduce(ce_par,
+              __first1, __last1, __first2, std::move(__init));
+        }
+    }
+
     auto __dispatch_tag = __pstl::__internal::__select_backend(__exec, __first1, __first2);
 
     typedef typename iterator_traits<_ForwardIterator1>::value_type _InputType;
@@ -70,6 +81,17 @@ __pstl::__internal::__enable_if_execution_policy<_ExecutionPolicy, _Tp>
 transform_reduce(_ExecutionPolicy&& __exec, _ForwardIterator1 __first1, _ForwardIterator1 __last1,
                  _ForwardIterator2 __first2, _Tp __init, _BinaryOperation1 __binary_op1, _BinaryOperation2 __binary_op2)
 {
+    if constexpr (std::is_same_v<std::__remove_cvref_t<_ExecutionPolicy>,
+                                 execution::parallel_policy>) // execution::par
+    {
+        if (__builtin_is_constant_evaluated()) {
+            using namespace __cep::experimental::execution;   // for ce_par
+            return std::transform_reduce(ce_par,
+              __first1, __last1, __first2, std::move(__init),
+              std::move(__binary_op1), std::move(__binary_op2));
+        }
+    }
+
     auto __dispatch_tag = __pstl::__internal::__select_backend(__exec, __first1, __first2);
     return __pstl::__internal::__pattern_transform_reduce(__dispatch_tag, std::forward<_ExecutionPolicy>(__exec),
                                                           __first1, __last1, __first2, __init, __binary_op1,

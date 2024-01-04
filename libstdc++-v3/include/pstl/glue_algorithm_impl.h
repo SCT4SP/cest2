@@ -63,8 +63,7 @@ for_each(_ExecutionPolicy&& __exec, _ForwardIterator __first, _ForwardIterator _
     {
         if (__builtin_is_constant_evaluated()) {
             using namespace __cep::experimental::execution;   // for ce_par
-            std::for_each(ce_par, __first, __last, __f);
-            return;
+            return std::for_each(ce_par, __first, __last, __f);
         }
     }
 
