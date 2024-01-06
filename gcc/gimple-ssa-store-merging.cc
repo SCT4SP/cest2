@@ -1,5 +1,5 @@
 /* GIMPLE store merging and byte swapping passes.
-   Copyright (C) 2009-2023 Free Software Foundation, Inc.
+   Copyright (C) 2009-2024 Free Software Foundation, Inc.
    Contributed by ARM Ltd.
 
    This file is part of GCC.
@@ -227,7 +227,7 @@ struct symbolic_number {
   tree type;
   tree base_addr;
   tree offset;
-  poly_int64_pod bytepos;
+  poly_int64 bytepos;
   tree src;
   tree alias_set;
   tree vuse;

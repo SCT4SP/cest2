@@ -18,19 +18,18 @@ import core.stdc.stdio;
 
 import dmd.astenums;
 import dmd.attrib;
+import dmd.errors;
 import dmd.gluelayer;
 import dmd.declaration;
 import dmd.dscope;
 import dmd.dsymbol;
 import dmd.dsymbolsem;
 import dmd.expression;
-import dmd.globals;
 import dmd.id;
 import dmd.identifier;
 import dmd.init;
 import dmd.location;
 import dmd.mtype;
-import dmd.tokens;
 import dmd.typesem;
 import dmd.visitor;
 
@@ -84,32 +83,6 @@ extern (C++) final class EnumDeclaration : ScopeDsymbol
         return ed;
     }
 
-    override void addMember(Scope* sc, ScopeDsymbol sds)
-    {
-        version (none)
-        {
-            printf("EnumDeclaration::addMember() %s\n", toChars());
-            for (size_t i = 0; i < members.length; i++)
-            {
-                EnumMember em = (*members)[i].isEnumMember();
-                printf("    member %s\n", em.toChars());
-            }
-        }
-        if (!isAnonymous())
-        {
-            ScopeDsymbol.addMember(sc, sds);
-        }
-
-        addEnumMembers(this, sc, sds);
-    }
-
-    override void setScope(Scope* sc)
-    {
-        if (semanticRun > PASS.initial)
-            return;
-        ScopeDsymbol.setScope(sc);
-    }
-
     override bool oneMember(Dsymbol* ps, Identifier ident)
     {
         if (isAnonymous())
@@ -125,19 +98,6 @@ extern (C++) final class EnumDeclaration : ScopeDsymbol
     override const(char)* kind() const
     {
         return "enum";
-    }
-
-    override Dsymbol search(const ref Loc loc, Identifier ident, int flags = SearchLocalsOnly)
-    {
-        //printf("%s.EnumDeclaration::search('%s')\n", toChars(), ident.toChars());
-        if (_scope)
-        {
-            // Try one last time to resolve this enum
-            dsymbolSemantic(this, _scope);
-        }
-
-        Dsymbol s = ScopeDsymbol.search(loc, ident, flags);
-        return s;
     }
 
     // is Dsymbol deprecated?
@@ -193,7 +153,7 @@ extern (C++) final class EnumDeclaration : ScopeDsymbol
                 return defaultval = memtype.defaultInit(loc);
             }
 
-            error(loc, "is opaque and has no default initializer");
+            error(loc, "%s `%s` is opaque and has no default initializer", kind, toPrettyChars);
             return handleErrors();
         }
 
@@ -204,7 +164,7 @@ extern (C++) final class EnumDeclaration : ScopeDsymbol
             {
                 if (em.semanticRun < PASS.semanticdone)
                 {
-                    error(loc, "forward reference of `%s.init`", toChars());
+                    error(loc, "%s `%s` forward reference of `%s.init`", kind, toPrettyChars, toChars());
                     return handleErrors();
                 }
 

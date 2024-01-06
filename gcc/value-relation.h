@@ -1,5 +1,5 @@
 /* Header file for the value range relational processing.
-   Copyright (C) 2020-2023 Free Software Foundation, Inc.
+   Copyright (C) 2020-2024 Free Software Foundation, Inc.
    Contributed by Andrew MacLeod <amacleod@redhat.com>
 
 This file is part of GCC.
@@ -91,8 +91,8 @@ inline bool relation_equiv_p (relation_kind r)
 
 void print_relation (FILE *f, relation_kind rel);
 
-// Return relation for NAME == NAME with RANGE.
-relation_kind get_identity_relation (tree name, vrange &range);
+// Adjust range as an equivalence.
+void adjust_equivalence_range (vrange &range);
 
 class relation_oracle
 {

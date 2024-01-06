@@ -12,8 +12,8 @@
 module dmd.compiler;
 
 import dmd.arraytypes;
+import dmd.ctfeexpr;
 import dmd.dmodule;
-import dmd.dscope;
 import dmd.expression;
 import dmd.mtype;
 import dmd.root.array;

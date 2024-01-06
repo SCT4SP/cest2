@@ -1,56 +1,8 @@
 /* { dg-do compile } */
-/* { dg-options "-march=rv64gcv_zvfh_zvl4096b -mabi=lp64d -O3 -fno-schedule-insns -fno-schedule-insns2" } */
+/* { dg-options "-march=rv64gcv_zvfh_zvl4096b -mabi=lp64d --param=riscv-autovec-lmul=m8 -O3 -fno-schedule-insns -fno-schedule-insns2" } */
 /* { dg-final { check-function-bodies "**" "" } } */
 
 #include "def.h"
-
-/*
-** mov0:
-**	lbu\s+[a-x0-9]+,0\s*\([a-x0-9]+\)
-**	sb\s+[a-x0-9]+,0\s*\([a-x0-9]+\)
-**  ret
-*/
-void mov0 (int8_t *in, int8_t *out)
-{
-  v1qi v = *(v1qi*)in;
-  *(v1qi*)out = v;
-}
-
-/*
-** mov1:
-**	lhu\s+[a-x0-9]+,0\s*\([a-x0-9]+\)
-**	sh\s+[a-x0-9]+,0\s*\([a-x0-9]+\)
-**  ret
-*/
-void mov1 (int8_t *in, int8_t *out)
-{
-  v2qi v = *(v2qi*)in;
-  *(v2qi*)out = v;
-}
-
-/*
-** mov2:
-**	lw\s+[a-x0-9]+,0\s*\([a-x0-9]+\)
-**	sw\s+[a-x0-9]+,0\s*\([a-x0-9]+\)
-**  ret
-*/
-void mov2 (int8_t *in, int8_t *out)
-{
-  v4qi v = *(v4qi*)in;
-  *(v4qi*)out = v;
-}
-
-/*
-** mov3:
-**	ld\s+[a-x0-9]+,0\s*\([a-x0-9]+\)
-**	sd\s+[a-x0-9]+,0\s*\([a-x0-9]+\)
-**  ret
-*/
-void mov3 (int8_t *in, int8_t *out)
-{
-  v8qi v = *(v8qi*)in;
-  *(v8qi*)out = v;
-}
 
 /*
 ** mov4:

@@ -1,5 +1,5 @@
 /* Read and annotate call graph profile from the auto profile data file.
-   Copyright (C) 2014-2023 Free Software Foundation, Inc.
+   Copyright (C) 2014-2024 Free Software Foundation, Inc.
    Contributed by Dehao Chen (dehao@google.com)
 
 This file is part of GCC.
@@ -1434,7 +1434,7 @@ afdo_calculate_branch_prob (bb_set *annotated_bb)
       else
         total_count += AFDO_EINFO (e)->get_count ();
     }
-    if (num_unknown_succ == 0 && total_count > profile_count::zero ())
+    if (num_unknown_succ == 0 && total_count.nonzero_p())
       {
 	FOR_EACH_EDGE (e, ei, bb->succs)
 	  e->probability
@@ -1571,7 +1571,7 @@ afdo_annotate_cfg (const stmt_set &promoted_stmts)
       DECL_SOURCE_LOCATION (current_function_decl));
   afdo_source_profile->mark_annotated (cfun->function_start_locus);
   afdo_source_profile->mark_annotated (cfun->function_end_locus);
-  if (max_count > profile_count::zero ())
+  if (max_count.nonzero_p())
     {
       /* Calculate, propagate count and probability information on CFG.  */
       afdo_calculate_branch_prob (&annotated_bb);

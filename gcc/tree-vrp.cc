@@ -1,5 +1,5 @@
 /* Support routines for Value Range Propagation (VRP).
-   Copyright (C) 2005-2023 Free Software Foundation, Inc.
+   Copyright (C) 2005-2024 Free Software Foundation, Inc.
    Contributed by Diego Novillo <dnovillo@redhat.com>.
 
 This file is part of GCC.
@@ -52,6 +52,12 @@ along with GCC; see the file COPYING3.  If not see
 #include "gimple-fold.h"
 #include "tree-dfa.h"
 #include "tree-ssa-dce.h"
+#include "alloc-pool.h"
+#include "cgraph.h"
+#include "symbol-summary.h"
+#include "ipa-utils.h"
+#include "ipa-prop.h"
+#include "attribs.h"
 
 // This class is utilized by VRP and ranger to remove __builtin_unreachable
 // calls, and reflect any resulting global ranges.
@@ -886,8 +892,6 @@ find_case_label_range (gswitch *switch_stmt, const irange *range_of_op)
   size_t i, j;
   tree op = gimple_switch_index (switch_stmt);
   tree type = TREE_TYPE (op);
-  unsigned prec = TYPE_PRECISION (type);
-  signop sign = TYPE_SIGN (type);
   tree tmin = wide_int_to_tree (type, range_of_op->lower_bound ());
   tree tmax = wide_int_to_tree (type, range_of_op->upper_bound ());
   find_case_label_range (switch_stmt, tmin, tmax, &i, &j);
@@ -900,9 +904,7 @@ find_case_label_range (gswitch *switch_stmt, const irange *range_of_op)
 	= CASE_HIGH (label) ? CASE_HIGH (label) : CASE_LOW (label);
       wide_int wlow = wi::to_wide (CASE_LOW (label));
       wide_int whigh = wi::to_wide (case_high);
-      int_range_max label_range (type,
-				 wide_int::from (wlow, prec, sign),
-				 wide_int::from (whigh, prec, sign));
+      int_range_max label_range (TREE_TYPE (case_high), wlow, whigh);
       if (!types_compatible_p (label_range.type (), range_of_op->type ()))
 	range_cast (label_range, range_of_op->type ());
       label_range.intersect (*range_of_op);
@@ -1085,10 +1087,155 @@ execute_ranger_vrp (struct function *fun, bool warn_array_bounds_p,
       array_checker.check ();
     }
 
+
+  if (Value_Range::supports_type_p (TREE_TYPE
+				     (TREE_TYPE (current_function_decl)))
+      && flag_ipa_vrp
+      && !lookup_attribute ("noipa", DECL_ATTRIBUTES (current_function_decl)))
+    {
+      edge e;
+      edge_iterator ei;
+      bool found = false;
+      Value_Range return_range (TREE_TYPE (TREE_TYPE (current_function_decl)));
+      FOR_EACH_EDGE (e, ei, EXIT_BLOCK_PTR_FOR_FN (cfun)->preds)
+	if (greturn *ret = dyn_cast <greturn *> (*gsi_last_bb (e->src)))
+	  {
+	    tree retval = gimple_return_retval (ret);
+	    if (!retval)
+	      {
+		return_range.set_varying (TREE_TYPE (TREE_TYPE (current_function_decl)));
+		found = true;
+		continue;
+	      }
+	    Value_Range r (TREE_TYPE (retval));
+	    if (ranger->range_of_expr (r, retval, ret)
+		&& !r.undefined_p ()
+		&& !r.varying_p ())
+	      {
+		if (!found)
+		  return_range = r;
+		else
+		  return_range.union_ (r);
+	      }
+	    else
+	      return_range.set_varying (TREE_TYPE (retval));
+	    found = true;
+	  }
+      if (found && !return_range.varying_p ())
+	{
+	  ipa_record_return_value_range (return_range);
+	  if (POINTER_TYPE_P (TREE_TYPE (TREE_TYPE (current_function_decl)))
+	      && return_range.nonzero_p ()
+	      && cgraph_node::get (current_function_decl)
+			->add_detected_attribute ("returns_nonnull"))
+	    warn_function_returns_nonnull (current_function_decl);
+	}
+    }
+
   phi_analysis_finalize ();
   disable_ranger (fun);
   scev_finalize ();
   loop_optimizer_finalize ();
+  return 0;
+}
+
+// Implement a Fast VRP folder.  Not quite as effective but faster.
+
+class fvrp_folder : public substitute_and_fold_engine
+{
+public:
+  fvrp_folder (dom_ranger *dr) : substitute_and_fold_engine (),
+				 m_simplifier (dr)
+  { m_dom_ranger = dr; }
+
+  ~fvrp_folder () { }
+
+  tree value_of_expr (tree name, gimple *s = NULL) override
+  {
+    // Shortcircuit subst_and_fold callbacks for abnormal ssa_names.
+    if (TREE_CODE (name) == SSA_NAME && SSA_NAME_OCCURS_IN_ABNORMAL_PHI (name))
+      return NULL;
+    return m_dom_ranger->value_of_expr (name, s);
+  }
+
+  tree value_on_edge (edge e, tree name) override
+  {
+    // Shortcircuit subst_and_fold callbacks for abnormal ssa_names.
+    if (TREE_CODE (name) == SSA_NAME && SSA_NAME_OCCURS_IN_ABNORMAL_PHI (name))
+      return NULL;
+    return m_dom_ranger->value_on_edge (e, name);
+  }
+
+  tree value_of_stmt (gimple *s, tree name = NULL) override
+  {
+    // Shortcircuit subst_and_fold callbacks for abnormal ssa_names.
+    if (TREE_CODE (name) == SSA_NAME && SSA_NAME_OCCURS_IN_ABNORMAL_PHI (name))
+      return NULL;
+    return m_dom_ranger->value_of_stmt (s, name);
+  }
+
+  void pre_fold_bb (basic_block bb) override
+  {
+    m_dom_ranger->pre_bb (bb);
+    // Now process the PHIs in advance.
+    gphi_iterator psi = gsi_start_phis (bb);
+    for ( ; !gsi_end_p (psi); gsi_next (&psi))
+      {
+	tree name = gimple_range_ssa_p (PHI_RESULT (psi.phi ()));
+	if (name)
+	  {
+	    Value_Range vr(TREE_TYPE (name));
+	    m_dom_ranger->range_of_stmt (vr, psi.phi (), name);
+	  }
+      }
+  }
+
+  void post_fold_bb (basic_block bb) override
+  {
+    m_dom_ranger->post_bb (bb);
+  }
+
+  void pre_fold_stmt (gimple *s) override
+  {
+    // Ensure range_of_stmt has been called.
+    tree type = gimple_range_type (s);
+    if (type)
+      {
+	Value_Range vr(type);
+	m_dom_ranger->range_of_stmt (vr, s);
+      }
+  }
+
+  bool fold_stmt (gimple_stmt_iterator *gsi) override
+  {
+    bool ret = m_simplifier.simplify (gsi);
+    if (!ret)
+      ret = ::fold_stmt (gsi, follow_single_use_edges);
+    return ret;
+  }
+
+private:
+  DISABLE_COPY_AND_ASSIGN (fvrp_folder);
+  simplify_using_ranges m_simplifier;
+  dom_ranger *m_dom_ranger;
+};
+
+
+// Main entry point for a FAST VRP pass using a dom ranger.
+
+unsigned int
+execute_fast_vrp (struct function *fun)
+{
+  calculate_dominance_info (CDI_DOMINATORS);
+  dom_ranger dr;
+  fvrp_folder folder (&dr);
+
+  gcc_checking_assert (!fun->x_range_query);
+  fun->x_range_query = &dr;
+
+  folder.substitute_and_fold ();
+
+  fun->x_range_query = NULL;
   return 0;
 }
 
@@ -1120,36 +1267,50 @@ const pass_data pass_data_early_vrp =
   ( TODO_cleanup_cfg | TODO_update_ssa | TODO_verify_all ),
 };
 
-static int vrp_pass_num = 0;
+const pass_data pass_data_fast_vrp =
+{
+  GIMPLE_PASS, /* type */
+  "fvrp", /* name */
+  OPTGROUP_NONE, /* optinfo_flags */
+  TV_TREE_FAST_VRP, /* tv_id */
+  PROP_ssa, /* properties_required */
+  0, /* properties_provided */
+  0, /* properties_destroyed */
+  0, /* todo_flags_start */
+  ( TODO_cleanup_cfg | TODO_update_ssa | TODO_verify_all ),
+};
+
+
 class pass_vrp : public gimple_opt_pass
 {
 public:
-  pass_vrp (gcc::context *ctxt, const pass_data &data_)
-    : gimple_opt_pass (data_, ctxt), data (data_), warn_array_bounds_p (false),
-      my_pass (vrp_pass_num++)
-  {}
+  pass_vrp (gcc::context *ctxt, const pass_data &data_, bool warn_p)
+    : gimple_opt_pass (data_, ctxt), data (data_),
+      warn_array_bounds_p (warn_p), final_p (false)
+    { }
 
   /* opt_pass methods: */
-  opt_pass * clone () final override { return new pass_vrp (m_ctxt, data); }
+  opt_pass * clone () final override
+    { return new pass_vrp (m_ctxt, data, false); }
   void set_pass_param (unsigned int n, bool param) final override
     {
       gcc_assert (n == 0);
-      warn_array_bounds_p = param;
+      final_p = param;
     }
   bool gate (function *) final override { return flag_tree_vrp != 0; }
   unsigned int execute (function *fun) final override
     {
-      // Early VRP pass.
-      if (my_pass == 0)
-	return execute_ranger_vrp (fun, /*warn_array_bounds_p=*/false, false);
+      // Check for fast vrp.
+      if (&data == &pass_data_fast_vrp)
+	return execute_fast_vrp (fun);
 
-      return execute_ranger_vrp (fun, warn_array_bounds_p, my_pass == 2);
+      return execute_ranger_vrp (fun, warn_array_bounds_p, final_p);
     }
 
  private:
   const pass_data &data;
   bool warn_array_bounds_p;
-  int my_pass;
+  bool final_p;
 }; // class pass_vrp
 
 const pass_data pass_data_assumptions =
@@ -1219,13 +1380,19 @@ public:
 gimple_opt_pass *
 make_pass_vrp (gcc::context *ctxt)
 {
-  return new pass_vrp (ctxt, pass_data_vrp);
+  return new pass_vrp (ctxt, pass_data_vrp, true);
 }
 
 gimple_opt_pass *
 make_pass_early_vrp (gcc::context *ctxt)
 {
-  return new pass_vrp (ctxt, pass_data_early_vrp);
+  return new pass_vrp (ctxt, pass_data_early_vrp, false);
+}
+
+gimple_opt_pass *
+make_pass_fast_vrp (gcc::context *ctxt)
+{
+  return new pass_vrp (ctxt, pass_data_fast_vrp, false);
 }
 
 gimple_opt_pass *

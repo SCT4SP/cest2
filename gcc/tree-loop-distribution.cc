@@ -1,5 +1,5 @@
 /* Loop distribution.
-   Copyright (C) 2006-2023 Free Software Foundation, Inc.
+   Copyright (C) 2006-2024 Free Software Foundation, Inc.
    Contributed by Georges-Andre Silber <Georges-Andre.Silber@ensmp.fr>
    and Sebastian Pop <sebastian.pop@amd.com>.
 
@@ -949,7 +949,8 @@ copy_loop_before (class loop *loop, bool redirect_lc_phi_defs)
   edge preheader = loop_preheader_edge (loop);
 
   initialize_original_copy_tables ();
-  res = slpeel_tree_duplicate_loop_to_edge_cfg (loop, NULL, preheader);
+  res = slpeel_tree_duplicate_loop_to_edge_cfg (loop, single_exit (loop), NULL,
+						NULL, preheader, NULL, false);
   gcc_assert (res != NULL);
 
   /* When a not last partition is supposed to keep the LC PHIs computed
@@ -1439,7 +1440,7 @@ loop_distribution::data_dep_in_cycle_p (struct graph *rdg,
   else if (DDR_NUM_DIST_VECTS (ddr) > 1)
     return true;
   else if (DDR_REVERSED_P (ddr)
-	   || lambda_vector_zerop (DDR_DIST_VECT (ddr, 0), 1))
+	   || lambda_vector_zerop (DDR_DIST_VECT (ddr, 0), DDR_NB_LOOPS (ddr)))
     return false;
 
   return true;
@@ -1574,6 +1575,7 @@ find_single_drs (class loop *loop, struct graph *rdg, const bitmap &partition_st
 
   basic_block bb_ld = NULL;
   basic_block bb_st = NULL;
+  edge exit = single_exit (loop);
 
   if (single_ld)
     {
@@ -1589,6 +1591,14 @@ find_single_drs (class loop *loop, struct graph *rdg, const bitmap &partition_st
       bb_ld = gimple_bb (DR_STMT (single_ld));
       if (!dominated_by_p (CDI_DOMINATORS, loop->latch, bb_ld))
 	return false;
+
+      /* The data reference must also be executed before possibly exiting
+	 the loop as otherwise we'd for example unconditionally execute
+	 memset (ptr, 0, n) which even with n == 0 implies ptr is non-NULL.  */
+      if (bb_ld != loop->header
+	  && (!exit
+	      || !dominated_by_p (CDI_DOMINATORS, exit->src, bb_ld)))
+	return false;
     }
 
   if (single_st)
@@ -1603,6 +1613,12 @@ find_single_drs (class loop *loop, struct graph *rdg, const bitmap &partition_st
 	 loop.  */
       bb_st = gimple_bb (DR_STMT (single_st));
       if (!dominated_by_p (CDI_DOMINATORS, loop->latch, bb_st))
+	return false;
+
+      /* And before exiting the loop.  */
+      if (bb_st != loop->header
+	  && (!exit
+	      || !dominated_by_p (CDI_DOMINATORS, exit->src, bb_st)))
 	return false;
     }
 
@@ -2139,9 +2155,6 @@ loop_distribution::pg_add_dependence_edges (struct graph *rdg, int dir,
 	    }
 	  else if (DDR_ARE_DEPENDENT (ddr) == NULL_TREE)
 	    {
-	      if (DDR_REVERSED_P (ddr))
-		this_dir = -this_dir;
-
 	      /* Known dependences can still be unordered througout the
 		 iteration space, see gcc.dg/tree-ssa/ldist-16.c and
 		 gcc.dg/tree-ssa/pr94969.c.  */
@@ -2154,7 +2167,20 @@ loop_distribution::pg_add_dependence_edges (struct graph *rdg, int dir,
 	      /* Else as the distance vector is lexicographic positive swap
 		 the dependence direction.  */
 	      else
-		this_dir = -this_dir;
+		{
+		  if (DDR_REVERSED_P (ddr))
+		    this_dir = -this_dir;
+		  this_dir = -this_dir;
+
+		  /* When then dependence distance of the innermost common
+		     loop of the DRs is zero we have a conflict.  */
+		  auto l1 = gimple_bb (DR_STMT (dr1))->loop_father;
+		  auto l2 = gimple_bb (DR_STMT (dr2))->loop_father;
+		  int idx = index_in_loop_nest (find_common_loop (l1, l2)->num,
+						DDR_LOOP_NEST (ddr));
+		  if (DDR_DIST_VECT (ddr, 0)[idx] == 0)
+		    this_dir = 2;
+		}
 	    }
 	  else
 	    this_dir = 0;

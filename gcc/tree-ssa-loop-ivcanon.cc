@@ -1,5 +1,5 @@
 /* Induction variable canonicalization and loop peeling.
-   Copyright (C) 2004-2023 Free Software Foundation, Inc.
+   Copyright (C) 2004-2024 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -622,10 +622,11 @@ remove_redundant_iv_tests (class loop *loop)
 	      || !integer_zerop (niter.may_be_zero)
 	      || !niter.niter
 	      || TREE_CODE (niter.niter) != INTEGER_CST
-	      || !wi::ltu_p (loop->nb_iterations_upper_bound,
+	      || !wi::ltu_p (widest_int::from (loop->nb_iterations_upper_bound,
+					       SIGNED),
 			     wi::to_widest (niter.niter)))
 	    continue;
-	  
+
 	  if (dump_file && (dump_flags & TDF_DETAILS))
 	    {
 	      fprintf (dump_file, "Removed pointless exit: ");
@@ -666,6 +667,7 @@ static bitmap peeled_loops;
 void
 unloop_loops (vec<class loop *> &loops_to_unloop,
 	      vec<int> &loops_to_unloop_nunroll,
+	      vec<edge> &edges_to_remove,
 	      bitmap loop_closed_ssa_invalidated,
 	      bool *irred_invalidated)
 {
@@ -1360,7 +1362,7 @@ canonicalize_induction_variables (void)
     }
   gcc_assert (!need_ssa_update_p (cfun));
 
-  unloop_loops (loops_to_unloop, loops_to_unloop_nunroll,
+  unloop_loops (loops_to_unloop, loops_to_unloop_nunroll, edges_to_remove,
 		loop_closed_ssa_invalidated, &irred_invalidated);
   loops_to_unloop.release ();
   loops_to_unloop_nunroll.release ();
@@ -1510,9 +1512,8 @@ tree_unroll_loops_completely (bool may_increase_size, bool unroll_outer)
 	{
 	  unsigned i;
 
-	  unloop_loops (loops_to_unloop,
-			loops_to_unloop_nunroll,
-			loop_closed_ssa_invalidated,
+	  unloop_loops (loops_to_unloop, loops_to_unloop_nunroll,
+			edges_to_remove, loop_closed_ssa_invalidated,
 			&irred_invalidated);
 	  loops_to_unloop.release ();
 	  loops_to_unloop_nunroll.release ();

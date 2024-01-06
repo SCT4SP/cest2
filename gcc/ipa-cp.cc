@@ -1,5 +1,5 @@
 /* Interprocedural constant propagation
-   Copyright (C) 2005-2023 Free Software Foundation, Inc.
+   Copyright (C) 2005-2024 Free Software Foundation, Inc.
 
    Contributed by Razya Ladelsky <RAZYA@il.ibm.com> and Martin Jambor
    <mjambor@suse.cz>
@@ -478,27 +478,17 @@ values_equal_for_ipcp_p (tree x, tree y)
 
   if (TREE_CODE (x) == ADDR_EXPR
       && TREE_CODE (y) == ADDR_EXPR
-      && TREE_CODE (TREE_OPERAND (x, 0)) == CONST_DECL
-      && TREE_CODE (TREE_OPERAND (y, 0)) == CONST_DECL)
-    return operand_equal_p (DECL_INITIAL (TREE_OPERAND (x, 0)),
-			    DECL_INITIAL (TREE_OPERAND (y, 0)), 0);
+      && (TREE_CODE (TREE_OPERAND (x, 0)) == CONST_DECL
+	  || (TREE_CODE (TREE_OPERAND (x, 0)) == VAR_DECL
+	      && DECL_IN_CONSTANT_POOL (TREE_OPERAND (x, 0))))
+      && (TREE_CODE (TREE_OPERAND (y, 0)) == CONST_DECL
+	  || (TREE_CODE (TREE_OPERAND (y, 0)) == VAR_DECL
+	      && DECL_IN_CONSTANT_POOL (TREE_OPERAND (y, 0)))))
+    return TREE_OPERAND (x, 0) == TREE_OPERAND (y, 0)
+	   || operand_equal_p (DECL_INITIAL (TREE_OPERAND (x, 0)),
+			       DECL_INITIAL (TREE_OPERAND (y, 0)), 0);
   else
     return operand_equal_p (x, y, 0);
-}
-
-/* Print V which is extracted from a value in a lattice to F.  */
-
-static void
-print_ipcp_constant_value (FILE * f, tree v)
-{
-  if (TREE_CODE (v) == ADDR_EXPR
-      && TREE_CODE (TREE_OPERAND (v, 0)) == CONST_DECL)
-    {
-      fprintf (f, "& ");
-      print_generic_expr (f, DECL_INITIAL (TREE_OPERAND (v, 0)));
-    }
-  else
-    print_generic_expr (f, v);
 }
 
 /* Print V which is extracted from a value in a lattice to F.  */
@@ -1271,6 +1261,8 @@ ipa_argagg_value_list::dump (FILE *f)
       print_generic_expr (f, av.value);
       if (av.by_ref)
 	fprintf (f, "(by_ref)");
+      if (av.killed)
+	fprintf (f, "(killed)");
       comma = true;
     }
   fprintf (f, "\n");
@@ -1437,6 +1429,8 @@ ipa_argagg_value_list::push_adjusted_values (unsigned src_index,
 	  new_av.unit_offset = av->unit_offset - unit_delta;
 	  new_av.index = dest_index;
 	  new_av.by_ref = av->by_ref;
+	  gcc_assert (!av->killed);
+	  new_av.killed = false;
 
 	  /* Quick check that the offsets we push are indeed increasing.  */
 	  gcc_assert (first
@@ -1473,6 +1467,7 @@ push_agg_values_from_plats (ipcp_param_lattices *plats, int dest_index,
 	iav.unit_offset = aglat->offset / BITS_PER_UNIT - unit_delta;
 	iav.index = dest_index;
 	iav.by_ref = plats->aggs_by_ref;
+	iav.killed = false;
 
 	gcc_assert (first
 		    || iav.unit_offset > prev_unit_offset);
@@ -1931,7 +1926,8 @@ ipa_vr_operation_and_type_effects (vrange &dst_vr,
   Value_Range varying (dst_type);
   varying.set_varying (dst_type);
 
-  return (handler.fold_range (dst_vr, dst_type, src_vr, varying)
+  return (handler.operand_check_p (dst_type, src_type, dst_type)
+	  && handler.fold_range (dst_vr, dst_type, src_vr, varying)
 	  && !dst_vr.varying_p ()
 	  && !dst_vr.undefined_p ());
 }
@@ -2139,6 +2135,7 @@ ipa_push_agg_values_from_jfunc (ipa_node_params *info, cgraph_node *node,
       iav.unit_offset = item.offset / BITS_PER_UNIT;
       iav.index = dst_index;
       iav.by_ref = agg_jfunc->by_ref;
+      iav.killed = 0;
 
       gcc_assert (first
 		  || iav.unit_offset > prev_unit_offset);
@@ -2749,11 +2746,22 @@ propagate_bits_across_jump_function (cgraph_edge *cs, int idx,
 	}
     }
 
-  if (jfunc->bits)
-    return dest_lattice->meet_with (jfunc->bits->value, jfunc->bits->mask,
-				    precision);
-  else
-    return dest_lattice->set_to_bottom ();
+  Value_Range vr (parm_type);
+  if (jfunc->m_vr)
+    {
+      jfunc->m_vr->get_vrange (vr);
+      if (!vr.undefined_p () && !vr.varying_p ())
+	{
+	  irange &r = as_a <irange> (vr);
+	  irange_bitmask bm = r.get_bitmask ();
+	  widest_int mask
+	    = widest_int::from (bm.mask (), TYPE_SIGN (parm_type));
+	  widest_int value
+	    = widest_int::from (bm.value (), TYPE_SIGN (parm_type));
+	  return dest_lattice->meet_with (value, mask, precision);
+	}
+    }
+  return dest_lattice->set_to_bottom ();
 }
 
 /* Propagate value range across jump function JFUNC that is associated with
@@ -3970,6 +3978,7 @@ estimate_local_effects (struct cgraph_node *node)
 	      avals.m_known_aggs[j].unit_offset = unit_offset;
 	      avals.m_known_aggs[j].index = index;
 	      avals.m_known_aggs[j].by_ref = plats->aggs_by_ref;
+	      avals.m_known_aggs[j].killed = false;
 
 	      perform_estimation_of_a_value (node, &avals,
 					     removable_params_cost, 0, val);
@@ -5846,6 +5855,7 @@ push_agg_values_for_index_from_edge (struct cgraph_edge *cs, int index,
 	  iav.unit_offset = agg_jf.offset / BITS_PER_UNIT;
 	  iav.index = index;
 	  iav.by_ref = jfunc->agg.by_ref;
+	  iav.killed = false;
 
 	  gcc_assert (first
 		      || iav.unit_offset > prev_unit_offset);
@@ -6521,89 +6531,8 @@ ipcp_decision_stage (class ipa_topo_info *topo)
     }
 }
 
-/* Look up all the bits information that we have discovered and copy it over
-   to the transformation summary.  */
-
-static void
-ipcp_store_bits_results (void)
-{
-  cgraph_node *node;
-
-  FOR_EACH_FUNCTION_WITH_GIMPLE_BODY (node)
-    {
-      ipa_node_params *info = ipa_node_params_sum->get (node);
-      bool dumped_sth = false;
-      bool found_useful_result = false;
-
-      if (!opt_for_fn (node->decl, flag_ipa_bit_cp) || !info)
-	{
-	  if (dump_file)
-	    fprintf (dump_file, "Not considering %s for ipa bitwise propagation "
-				"; -fipa-bit-cp: disabled.\n",
-				node->dump_name ());
-	  continue;
-	}
-
-      if (info->ipcp_orig_node)
-	info = ipa_node_params_sum->get (info->ipcp_orig_node);
-      if (!info->lattices)
-	/* Newly expanded artificial thunks do not have lattices.  */
-	continue;
-
-      unsigned count = ipa_get_param_count (info);
-      for (unsigned i = 0; i < count; i++)
-	{
-	  ipcp_param_lattices *plats = ipa_get_parm_lattices (info, i);
-	  if (plats->bits_lattice.constant_p ())
-	    {
-	      found_useful_result = true;
-	      break;
-	    }
-	}
-
-      if (!found_useful_result)
-	continue;
-
-      ipcp_transformation_initialize ();
-      ipcp_transformation *ts = ipcp_transformation_sum->get_create (node);
-      vec_safe_reserve_exact (ts->bits, count);
-
-      for (unsigned i = 0; i < count; i++)
-	{
-	  ipcp_param_lattices *plats = ipa_get_parm_lattices (info, i);
-	  ipa_bits *jfbits;
-
-	  if (plats->bits_lattice.constant_p ())
-	    {
-	      jfbits
-		= ipa_get_ipa_bits_for_value (plats->bits_lattice.get_value (),
-					      plats->bits_lattice.get_mask ());
-	      if (!dbg_cnt (ipa_cp_bits))
-		jfbits = NULL;
-	    }
-	  else
-	    jfbits = NULL;
-
-	  ts->bits->quick_push (jfbits);
-	  if (!dump_file || !jfbits)
-	    continue;
-	  if (!dumped_sth)
-	    {
-	      fprintf (dump_file, "Propagated bits info for function %s:\n",
-		       node->dump_name ());
-	      dumped_sth = true;
-	    }
-	  fprintf (dump_file, " param %i: value = ", i);
-	  print_hex (jfbits->value, dump_file);
-	  fprintf (dump_file, ", mask = ");
-	  print_hex (jfbits->mask, dump_file);
-	  fprintf (dump_file, "\n");
-	}
-    }
-}
-
-/* Look up all VR information that we have discovered and copy it over
-   to the transformation summary.  */
+/* Look up all VR and bits information that we have discovered and copy it
+   over to the transformation summary.  */
 
 static void
 ipcp_store_vr_results (void)
@@ -6613,7 +6542,10 @@ ipcp_store_vr_results (void)
   FOR_EACH_FUNCTION_WITH_GIMPLE_BODY (node)
     {
       ipa_node_params *info = ipa_node_params_sum->get (node);
+      bool dumped_sth = false;
       bool found_useful_result = false;
+      bool do_vr = true;
+      bool do_bits = true;
 
       if (!info || !opt_for_fn (node->decl, flag_ipa_vrp))
 	{
@@ -6621,8 +6553,18 @@ ipcp_store_vr_results (void)
 	    fprintf (dump_file, "Not considering %s for VR discovery "
 		     "and propagate; -fipa-ipa-vrp: disabled.\n",
 		     node->dump_name ());
-	  continue;
+	  do_vr = false;
 	}
+      if (!info || !opt_for_fn (node->decl, flag_ipa_bit_cp))
+	{
+	  if (dump_file)
+	    fprintf (dump_file, "Not considering %s for ipa bitwise "
+				"propagation ; -fipa-bit-cp: disabled.\n",
+				node->dump_name ());
+	  do_bits = false;
+	}
+      if (!do_bits && !do_vr)
+	continue;
 
       if (info->ipcp_orig_node)
 	info = ipa_node_params_sum->get (info->ipcp_orig_node);
@@ -6634,8 +6576,14 @@ ipcp_store_vr_results (void)
       for (unsigned i = 0; i < count; i++)
 	{
 	  ipcp_param_lattices *plats = ipa_get_parm_lattices (info, i);
-	  if (!plats->m_value_range.bottom_p ()
+	  if (do_vr
+	      && !plats->m_value_range.bottom_p ()
 	      && !plats->m_value_range.top_p ())
+	    {
+	      found_useful_result = true;
+	      break;
+	    }
+	  if (do_bits && plats->bits_lattice.constant_p ())
 	    {
 	      found_useful_result = true;
 	      break;
@@ -6651,12 +6599,53 @@ ipcp_store_vr_results (void)
       for (unsigned i = 0; i < count; i++)
 	{
 	  ipcp_param_lattices *plats = ipa_get_parm_lattices (info, i);
+	  ipcp_bits_lattice *bits = NULL;
 
-	  if (!plats->m_value_range.bottom_p ()
+	  if (do_bits
+	      && plats->bits_lattice.constant_p ()
+	      && dbg_cnt (ipa_cp_bits))
+	    bits = &plats->bits_lattice;
+
+	  if (do_vr
+	      && !plats->m_value_range.bottom_p ()
 	      && !plats->m_value_range.top_p ()
 	      && dbg_cnt (ipa_cp_vr))
 	    {
-	      ipa_vr vr (plats->m_value_range.m_vr);
+	      if (bits)
+		{
+		  Value_Range tmp = plats->m_value_range.m_vr;
+		  tree type = ipa_get_type (info, i);
+		  irange &r = as_a<irange> (tmp);
+		  irange_bitmask bm (wide_int::from (bits->get_value (),
+						     TYPE_PRECISION (type),
+						     TYPE_SIGN (type)),
+				     wide_int::from (bits->get_mask (),
+						     TYPE_PRECISION (type),
+						     TYPE_SIGN (type)));
+		  r.update_bitmask (bm);
+		  ipa_vr vr (tmp);
+		  ts->m_vr->quick_push (vr);
+		}
+	      else
+		{
+		  ipa_vr vr (plats->m_value_range.m_vr);
+		  ts->m_vr->quick_push (vr);
+		}
+	    }
+	  else if (bits)
+	    {
+	      tree type = ipa_get_type (info, i);
+	      Value_Range tmp;
+	      tmp.set_varying (type);
+	      irange &r = as_a<irange> (tmp);
+	      irange_bitmask bm (wide_int::from (bits->get_value (),
+						 TYPE_PRECISION (type),
+						 TYPE_SIGN (type)),
+				 wide_int::from (bits->get_mask (),
+						 TYPE_PRECISION (type),
+						 TYPE_SIGN (type)));
+	      r.update_bitmask (bm);
+	      ipa_vr vr (tmp);
 	      ts->m_vr->quick_push (vr);
 	    }
 	  else
@@ -6664,6 +6653,21 @@ ipcp_store_vr_results (void)
 	      ipa_vr vr;
 	      ts->m_vr->quick_push (vr);
 	    }
+
+	  if (!dump_file || !bits)
+	    continue;
+
+	  if (!dumped_sth)
+	    {
+	      fprintf (dump_file, "Propagated bits info for function %s:\n",
+		       node->dump_name ());
+	      dumped_sth = true;
+	    }
+	  fprintf (dump_file, " param %i: value = ", i);
+	  print_hex (bits->get_value (), dump_file);
+	  fprintf (dump_file, ", mask = ");
+	  print_hex (bits->get_mask (), dump_file);
+	  fprintf (dump_file, "\n");
 	}
     }
 }
@@ -6696,9 +6700,7 @@ ipcp_driver (void)
   ipcp_propagate_stage (&topo);
   /* Decide what constant propagation and cloning should be performed.  */
   ipcp_decision_stage (&topo);
-  /* Store results of bits propagation.  */
-  ipcp_store_bits_results ();
-  /* Store results of value range propagation.  */
+  /* Store results of value range and bits propagation.  */
   ipcp_store_vr_results ();
 
   /* Free all IPCP structures.  */

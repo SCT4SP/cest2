@@ -1,5 +1,5 @@
 /* Optimize by combining instructions for GNU compiler.
-   Copyright (C) 1987-2023 Free Software Foundation, Inc.
+   Copyright (C) 1987-2024 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -7466,6 +7466,11 @@ expand_field_assignment (const_rtx x)
       if (!targetm.scalar_mode_supported_p (compute_mode))
 	break;
 
+      /* gen_lowpart_for_combine returns CLOBBER on failure.  */
+      rtx lowpart = gen_lowpart (compute_mode, SET_SRC (x));
+      if (GET_CODE (lowpart) == CLOBBER)
+	break;
+
       /* Now compute the equivalent expression.  Make a copy of INNER
 	 for the SET_DEST in case it is a MEM into which we will substitute;
 	 we don't want shared RTL in that case.  */
@@ -7480,9 +7485,7 @@ expand_field_assignment (const_rtx x)
 				     inner);
       masked = simplify_gen_binary (ASHIFT, compute_mode,
 				    simplify_gen_binary (
-				      AND, compute_mode,
-				      gen_lowpart (compute_mode, SET_SRC (x)),
-				      mask),
+				      AND, compute_mode, lowpart, mask),
 				    pos);
 
       x = gen_rtx_SET (copy_rtx (inner),
@@ -8224,12 +8227,20 @@ make_compound_operation_int (scalar_int_mode mode, rtx *x_ptr,
 	  int sub_width;
 	  if ((REG_P (sub) || MEM_P (sub))
 	      && GET_MODE_PRECISION (sub_mode).is_constant (&sub_width)
-	      && sub_width < mode_width)
+	      && sub_width < mode_width
+	      && (!WORD_REGISTER_OPERATIONS
+		  || sub_width >= BITS_PER_WORD
+		  /* On WORD_REGISTER_OPERATIONS targets the bits
+		     beyond sub_mode aren't considered undefined,
+		     so optimize only if it is a MEM load when MEM loads
+		     zero extend, because then the upper bits are all zero.  */
+		  || (MEM_P (sub)
+		      && load_extend_op (sub_mode) == ZERO_EXTEND)))
 	    {
 	      unsigned HOST_WIDE_INT mode_mask = GET_MODE_MASK (sub_mode);
 	      unsigned HOST_WIDE_INT mask;
 
-	      /* original AND constant with all the known zero bits set */
+	      /* Original AND constant with all the known zero bits set.  */
 	      mask = UINTVAL (XEXP (x, 1)) | (~nonzero_bits (sub, sub_mode));
 	      if ((mask & mode_mask) == mode_mask)
 		{
@@ -8449,8 +8460,8 @@ make_compound_operation (rtx x, enum rtx_code in_code)
   if (code == ZERO_EXTEND)
     {
       new_rtx = make_compound_operation (XEXP (x, 0), next_code);
-      tem = simplify_const_unary_operation (ZERO_EXTEND, GET_MODE (x),
-					    new_rtx, GET_MODE (XEXP (x, 0)));
+      tem = simplify_unary_operation (ZERO_EXTEND, GET_MODE (x),
+				      new_rtx, GET_MODE (XEXP (x, 0)));
       if (tem)
 	return tem;
       SUBST (XEXP (x, 0), new_rtx);
@@ -11923,7 +11934,7 @@ simplify_compare_const (enum rtx_code code, machine_mode mode,
       /* (unsigned) < 0x80000000 is equivalent to >= 0.  */
       else if (is_a <scalar_int_mode> (mode, &int_mode)
 	       && GET_MODE_PRECISION (int_mode) - 1 < HOST_BITS_PER_WIDE_INT
-	       && ((unsigned HOST_WIDE_INT) const_op
+	       && (((unsigned HOST_WIDE_INT) const_op & GET_MODE_MASK (int_mode))
 		   == HOST_WIDE_INT_1U << (GET_MODE_PRECISION (int_mode) - 1)))
 	{
 	  const_op = 0;
@@ -11962,7 +11973,7 @@ simplify_compare_const (enum rtx_code code, machine_mode mode,
       /* (unsigned) >= 0x80000000 is equivalent to < 0.  */
       else if (is_a <scalar_int_mode> (mode, &int_mode)
 	       && GET_MODE_PRECISION (int_mode) - 1 < HOST_BITS_PER_WIDE_INT
-	       && ((unsigned HOST_WIDE_INT) const_op
+	       && (((unsigned HOST_WIDE_INT) const_op & GET_MODE_MASK (int_mode))
 		   == HOST_WIDE_INT_1U << (GET_MODE_PRECISION (int_mode) - 1)))
 	{
 	  const_op = 0;
@@ -12003,14 +12014,15 @@ simplify_compare_const (enum rtx_code code, machine_mode mode,
       && !MEM_VOLATILE_P (op0)
       /* The optimization makes only sense for constants which are big enough
 	 so that we have a chance to chop off something at all.  */
-      && (unsigned HOST_WIDE_INT) const_op > 0xff
-      /* Bail out, if the constant does not fit into INT_MODE.  */
-      && (unsigned HOST_WIDE_INT) const_op
-	 < ((HOST_WIDE_INT_1U << (GET_MODE_PRECISION (int_mode) - 1) << 1) - 1)
+      && ((unsigned HOST_WIDE_INT) const_op & GET_MODE_MASK (int_mode)) > 0xff
       /* Ensure that we do not overflow during normalization.  */
-      && (code != GTU || (unsigned HOST_WIDE_INT) const_op < HOST_WIDE_INT_M1U))
+      && (code != GTU
+	  || ((unsigned HOST_WIDE_INT) const_op & GET_MODE_MASK (int_mode))
+	     < HOST_WIDE_INT_M1U)
+      && trunc_int_for_mode (const_op, int_mode) == const_op)
     {
-      unsigned HOST_WIDE_INT n = (unsigned HOST_WIDE_INT) const_op;
+      unsigned HOST_WIDE_INT n
+	= (unsigned HOST_WIDE_INT) const_op & GET_MODE_MASK (int_mode);
       enum rtx_code adjusted_code;
 
       /* Normalize code to either LEU or GEU.  */
@@ -12051,15 +12063,15 @@ simplify_compare_const (enum rtx_code code, machine_mode mode,
 		HOST_WIDE_INT_PRINT_HEX ") to (MEM %s "
 		HOST_WIDE_INT_PRINT_HEX ").\n", GET_MODE_NAME (int_mode),
 		GET_MODE_NAME (narrow_mode_iter), GET_RTX_NAME (code),
-		(unsigned HOST_WIDE_INT)const_op, GET_RTX_NAME (adjusted_code),
-		n);
+		(unsigned HOST_WIDE_INT) const_op & GET_MODE_MASK (int_mode),
+		GET_RTX_NAME (adjusted_code), n);
 	    }
 	  poly_int64 offset = (BYTES_BIG_ENDIAN
 			       ? 0
 			       : (GET_MODE_SIZE (int_mode)
 				  - GET_MODE_SIZE (narrow_mode_iter)));
 	  *pop0 = adjust_address_nv (op0, narrow_mode_iter, offset);
-	  *pop1 = GEN_INT (n);
+	  *pop1 = gen_int_mode (n, narrow_mode_iter);
 	  return adjusted_code;
 	}
     }
@@ -13410,27 +13422,43 @@ record_dead_and_set_regs_1 (rtx dest, const_rtx setter, void *data)
 
   if (REG_P (dest))
     {
-      /* If we are setting the whole register, we know its value.  Otherwise
-	 show that we don't know the value.  We can handle a SUBREG if it's
-	 the low part, but we must be careful with paradoxical SUBREGs on
-	 RISC architectures because we cannot strip e.g. an extension around
-	 a load and record the naked load since the RTL middle-end considers
-	 that the upper bits are defined according to LOAD_EXTEND_OP.  */
+      /* If we are setting the whole register, we know its value.  */
       if (GET_CODE (setter) == SET && dest == SET_DEST (setter))
 	record_value_for_reg (dest, record_dead_insn, SET_SRC (setter));
+      /* We can handle a SUBREG if it's the low part, but we must be
+	 careful with paradoxical SUBREGs on RISC architectures because
+	 we cannot strip e.g. an extension around a load and record the
+	 naked load since the RTL middle-end considers that the upper bits
+	 are defined according to LOAD_EXTEND_OP.  */
       else if (GET_CODE (setter) == SET
 	       && GET_CODE (SET_DEST (setter)) == SUBREG
 	       && SUBREG_REG (SET_DEST (setter)) == dest
 	       && known_le (GET_MODE_PRECISION (GET_MODE (dest)),
 			    BITS_PER_WORD)
 	       && subreg_lowpart_p (SET_DEST (setter)))
-	record_value_for_reg (dest, record_dead_insn,
-			      WORD_REGISTER_OPERATIONS
-			      && word_register_operation_p (SET_SRC (setter))
-			      && paradoxical_subreg_p (SET_DEST (setter))
-			      ? SET_SRC (setter)
-			      : gen_lowpart (GET_MODE (dest),
-					     SET_SRC (setter)));
+	{
+	  if (WORD_REGISTER_OPERATIONS
+	      && word_register_operation_p (SET_SRC (setter))
+	      && paradoxical_subreg_p (SET_DEST (setter)))
+	    record_value_for_reg (dest, record_dead_insn, SET_SRC (setter));
+	  else if (!partial_subreg_p (SET_DEST (setter)))
+	    record_value_for_reg (dest, record_dead_insn,
+				  gen_lowpart (GET_MODE (dest),
+					       SET_SRC (setter)));
+	  else
+	    {
+	      record_value_for_reg (dest, record_dead_insn,
+				    gen_lowpart (GET_MODE (dest),
+						 SET_SRC (setter)));
+
+	      unsigned HOST_WIDE_INT mask;
+	      reg_stat_type *rsp = &reg_stat[REGNO (dest)];
+	      mask = GET_MODE_MASK (GET_MODE (SET_DEST (setter)));
+	      rsp->last_set_nonzero_bits |= ~mask;
+	      rsp->last_set_sign_bit_copies = 1;
+	    }
+	}
+      /* Otherwise show that we don't know the value.  */
       else
 	record_value_for_reg (dest, record_dead_insn, NULL_RTX);
     }
