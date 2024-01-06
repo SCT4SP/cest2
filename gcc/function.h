@@ -1,5 +1,5 @@
 /* Structure for saving state for a nested function.
-   Copyright (C) 1989-2023 Free Software Foundation, Inc.
+   Copyright (C) 1989-2024 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -94,7 +94,7 @@ extern GTY ((length ("crtl->emit.x_reg_rtx_no"))) rtx * regno_reg_rtx;
 struct GTY(()) expr_status {
   /* Number of units that we should eventually pop off the stack.
      These are the arguments to function calls that have already returned.  */
-  poly_int64_pod x_pending_stack_adjust;
+  poly_int64 x_pending_stack_adjust;
 
   /* Under some ABIs, it is the caller's responsibility to pop arguments
      pushed for function calls.  A naive implementation would simply pop
@@ -117,7 +117,7 @@ struct GTY(()) expr_status {
      boundary can be momentarily unaligned while pushing the arguments.
      Record the delta since last aligned boundary here in order to get
      stack alignment in the nested function calls working right.  */
-  poly_int64_pod x_stack_pointer_delta;
+  poly_int64 x_stack_pointer_delta;
 
   /* Nonzero means __builtin_saveregs has already been done in this function.
      The value is the pseudoreg containing the value __builtin_saveregs
@@ -518,6 +518,17 @@ set_loops_for_fn (struct function *fn, struct loops *loops)
   fn->x_current_loops = loops;
 }
 
+/* Get a new unique dependence clique or zero if none is left.  */
+
+inline unsigned short
+get_new_clique (function *fn)
+{
+  unsigned short clique = fn->last_clique + 1;
+  if (clique != 0)
+    fn->last_clique = clique;
+  return clique;
+}
+
 /* For backward compatibility... eventually these should all go away.  */
 #define current_function_funcdef_no (cfun->funcdef_no)
 
@@ -537,7 +548,7 @@ extern struct machine_function * (*init_machine_status) (void);
 
 struct args_size
 {
-  poly_int64_pod constant;
+  poly_int64 constant;
   tree var;
 };
 
@@ -715,6 +726,7 @@ extern vec<edge> convert_jumps_to_returns (basic_block last_bb, bool simple_p,
 extern basic_block emit_return_for_exit (edge exit_fallthru_edge,
 					 bool simple_p);
 extern void reposition_prologue_and_epilogue_notes (void);
+extern poly_int64 get_stack_dynamic_offset ();
 
 /* Returns the name of the current function.  */
 extern const char *fndecl_name (tree);

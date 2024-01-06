@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright (C) 2020-2023 Free Software Foundation, Inc.
+# Copyright (C) 2020-2024 Free Software Foundation, Inc.
 #
 # This file is part of GCC.
 #
@@ -357,7 +357,8 @@ def update_copyright(data):
 
 
 def skip_line_in_changelog(line):
-    return FIRST_LINE_OF_END_RE.match(line) == None
+    return FIRST_LINE_OF_END_RE.match(line) is None
+
 
 if __name__ == '__main__':
     extra_args = os.getenv('GCC_MKLOG_ARGS')

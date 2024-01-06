@@ -1,6 +1,6 @@
 # Xmethods for libstdc++.
 
-# Copyright (C) 2014-2023 Free Software Foundation, Inc.
+# Copyright (C) 2014-2024 Free Software Foundation, Inc.
 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -28,6 +28,8 @@ def get_bool_type():
 def get_std_size_type():
     return gdb.lookup_type('std::size_t')
 
+_versioned_namespace = '__8::'
+
 def is_specialization_of(x, template_name):
     """
     Test whether a type is a specialization of the named class template.
@@ -37,8 +39,7 @@ def is_specialization_of(x, template_name):
     """
     if isinstance(x, gdb.Type):
         x = x.tag
-    if _versioned_namespace:
-        template_name = '(%s)?%s' % (_versioned_namespace, template_name)
+    template_name = '(%s)?%s' % (_versioned_namespace, template_name)
     return re.match(r'^std::(__\d::)?%s<.*>$' % template_name, x) is not None
 
 class LibStdCxxXMethod(gdb.xmethod.XMethod):
@@ -192,16 +193,23 @@ class DequeWorkerBase(gdb.xmethod.XMethodWorker):
         self._bufsize = 512 // val_type.sizeof or 1
 
     def size(self, obj):
-        first_node = obj['_M_impl']['_M_start']['_M_node']
-        last_node = obj['_M_impl']['_M_finish']['_M_node']
-        cur = obj['_M_impl']['_M_finish']['_M_cur']
-        first = obj['_M_impl']['_M_finish']['_M_first']
-        return (last_node - first_node) * self._bufsize + (cur - first)
+        start = obj['_M_impl']['_M_start']
+        finish = obj['_M_impl']['_M_finish']
+        if start['_M_cur'] == finish['_M_cur']:
+            return 0
+        return (self._bufsize
+                * (finish['_M_node'] - start['_M_node'] - 1)
+                + (finish['_M_cur'] - finish['_M_first'])
+                + (start['_M_last'] - start['_M_cur']))
 
     def index(self, obj, idx):
-        first_node = obj['_M_impl']['_M_start']['_M_node']
-        index_node = first_node + int(idx) // self._bufsize
-        return index_node[0][idx % self._bufsize]
+        start = obj['_M_impl']['_M_start']
+        first_node_size = start['_M_last'] - start['_M_cur']
+        if idx < first_node_size:
+            return start['_M_cur'][idx]
+        idx = idx - first_node_size
+        index_node = start['_M_node'][1 + int(idx) // self._bufsize]
+        return index_node[idx % self._bufsize]
 
 
 class DequeEmptyWorker(DequeWorkerBase):

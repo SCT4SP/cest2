@@ -1,6 +1,6 @@
 (* M2Quads.mod generates quadruples.
 
-Copyright (C) 2001-2023 Free Software Foundation, Inc.
+Copyright (C) 2001-2024 Free Software Foundation, Inc.
 Contributed by Gaius Mulley <gaius.mulley@southwales.ac.uk>.
 
 This file is part of GNU Modula-2.
@@ -2594,7 +2594,7 @@ BEGIN
    PushTtok (m2strnul, tok) ;
    PushT (1) ;
    BuildAdrFunction
-END BuildAdrFunction ;
+END BuildStringAdrParam ;
 
 
 (*
@@ -4625,7 +4625,7 @@ BEGIN
       BuildRange (InitForLoopEndRangeCheck (tsym, BySym)) ;  (* --fixme-- pass endpostok.  *)
       IncQuad := NextQuad ;
       (* we have explicitly checked using the above and also
-         this addition can legally overflow if a cardinal type
+         this addition can legitimately overflow if a cardinal type
          is counting down.  The above test will generate a more
          precise error message, so we suppress overflow detection
          here.  *)
@@ -4636,7 +4636,7 @@ BEGIN
       BuildRange (InitForLoopEndRangeCheck (IdSym, BySym)) ;
       IncQuad := NextQuad ;
       (* we have explicitly checked using the above and also
-         this addition can legally overflow if a cardinal type
+         this addition can legitimately overflow if a cardinal type
          is counting down.  The above test will generate a more
          precise error message, so we suppress overflow detection
          here.  *)
@@ -5418,7 +5418,7 @@ BEGIN
             WarnStringAt (s, paramtok)
          END ;
 
-         BuildRange(InitTypesParameterCheck(Proc, i, FormalI, Actual)) ;
+         BuildRange (InitTypesParameterCheck (paramtok, Proc, i, FormalI, Actual)) ;
          IF IsConst(Actual)
          THEN
             IF IsVarParam(Proc, i)
@@ -5482,7 +5482,7 @@ END CheckProcedureParameters ;
    CheckProcTypeAndProcedure - checks the ProcType with the call.
 *)
 
-PROCEDURE CheckProcTypeAndProcedure (ProcType: CARDINAL; call: CARDINAL) ;
+PROCEDURE CheckProcTypeAndProcedure (tokno: CARDINAL; ProcType: CARDINAL; call: CARDINAL) ;
 VAR
    n1, n2          : Name ;
    i, n, t         : CARDINAL ;
@@ -5516,14 +5516,14 @@ BEGIN
    ELSE
       i := 1 ;
       WHILE i<=n DO
-         IF IsVarParam(ProcType, i) # IsVarParam(CheckedProcedure, i)
+         IF IsVarParam (ProcType, i) # IsVarParam (CheckedProcedure, i)
          THEN
-            MetaError3('parameter {%3n} in {%1dD} causes a mismatch it was declared as a {%2d}', ProcType, GetNth(ProcType, i), i) ;
-            MetaError3('parameter {%3n} in {%1dD} causes a mismatch it was declared as a {%2d}', call, GetNth(call, i), i)
+            MetaError3 ('parameter {%3n} in {%1dD} causes a mismatch it was declared as a {%2d}', ProcType, GetNth (ProcType, i), i) ;
+            MetaError3 ('parameter {%3n} in {%1dD} causes a mismatch it was declared as a {%2d}', call, GetNth (call, i), i)
          END ;
-         BuildRange(InitTypesParameterCheck(CheckedProcedure, i,
-                                            GetParam(CheckedProcedure, i),
-                                            GetParam(ProcType, i))) ;
+         BuildRange (InitTypesParameterCheck (tokno, CheckedProcedure, i,
+                                              GetParam (CheckedProcedure, i),
+                                              GetParam (ProcType, i))) ;
          (* CheckParameter(tokpos, GetParam(CheckedProcedure, i), 0, GetParam(ProcType, i), call, i, TypeList) ; *)
          INC(i)
       END
@@ -5548,7 +5548,7 @@ END IsReallyPointer ;
 
 
 (*
-   LegalUnboundedParam - returns TRUE if the parameter, Actual, can legally be
+   LegalUnboundedParam - returns TRUE if the parameter, Actual, can legitimately be
                          passed to ProcSym, i, the, Formal, parameter.
 *)
 
@@ -5716,7 +5716,7 @@ BEGIN
          END
       END ;
       (* now to check each parameter of the proc type *)
-      CheckProcTypeAndProcedure (FormalType, Actual)
+      CheckProcTypeAndProcedure (tokpos, FormalType, Actual)
    ELSIF (ActualType#FormalType) AND (ActualType#NulSym)
    THEN
       IF IsUnknown(FormalType)
@@ -6414,6 +6414,7 @@ END ManipulateParameters ;
 
 PROCEDURE CheckParameterOrdinals ;
 VAR
+   tokno     : CARDINAL ;
    Proc,
    ProcSym   : CARDINAL ;
    Actual,
@@ -6438,13 +6439,14 @@ BEGIN
       THEN
          FormalI := GetParam (Proc, i) ;
          Actual := OperandT (pi) ;
+         tokno := OperandTok (pi) ;
          IF IsOrdinalType (GetLType (FormalI))
          THEN
             IF NOT IsSet (GetDType (FormalI))
             THEN
                (* tell code generator to test runtime values of assignment so ensure we
                   catch overflow and underflow *)
-               BuildRange (InitParameterRangeCheck (Proc, i, FormalI, Actual))
+               BuildRange (InitParameterRangeCheck (tokno, Proc, i, FormalI, Actual))
             END
          END
       END ;
@@ -9845,7 +9847,7 @@ BEGIN
       IF IsVar(Var) OR IsConst(Var)
       THEN
          ReturnVar := MakeTemporary (combinedtok, AreConstant (IsConst (Var))) ;
-         PutVar (ReturnVar, ComplexToScalar (GetSType (Var))) ;
+         PutVar (ReturnVar, ComplexToScalar (GetDType (Var))) ;
          GenQuadO (combinedtok, StandardFunctionOp, ReturnVar, Re, Var, FALSE) ;
          PopN (NoOfParam+1) ;  (* destroy arguments to this function *)
          PushTFtok (ReturnVar, GetSType (ReturnVar), combinedtok)
@@ -9913,7 +9915,7 @@ BEGIN
       IF IsVar(Var) OR IsConst(Var)
       THEN
          ReturnVar := MakeTemporary (combinedtok, AreConstant (IsConst (Var))) ;
-         PutVar (ReturnVar, ComplexToScalar (GetSType (Var))) ;
+         PutVar (ReturnVar, ComplexToScalar (GetDType (Var))) ;
          GenQuadO (combinedtok, StandardFunctionOp, ReturnVar, Im, Var, FALSE) ;
          PopN (NoOfParam+1) ;  (* destroy arguments to this function *)
          PushTFtok (ReturnVar, GetSType (ReturnVar), combinedtok)

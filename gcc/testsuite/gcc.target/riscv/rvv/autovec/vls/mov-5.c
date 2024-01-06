@@ -1,32 +1,8 @@
 /* { dg-do compile } */
-/* { dg-options "-march=rv64gcv_zvfh_zvl4096b -mabi=lp64d -O3 -fno-schedule-insns -fno-schedule-insns2" } */
+/* { dg-options "-march=rv64gcv_zvfh_zvl4096b -mabi=lp64d --param=riscv-autovec-lmul=m8 -O3 -fno-schedule-insns -fno-schedule-insns2" } */
 /* { dg-final { check-function-bodies "**" "" } } */
 
 #include "def.h"
-
-/*
-** mov0:
-**	lw\s+[a-x0-9]+,0\s*\([a-x0-9]+\)
-**	sw\s+[a-x0-9]+,0\s*\([a-x0-9]+\)
-**  ret
-*/
-void mov0 (int32_t *in, int32_t *out)
-{
-  v1si v = *(v1si*)in;
-  *(v1si*)out = v;
-}
-
-/*
-** mov1:
-**	ld\s+[a-x0-9]+,0\s*\([a-x0-9]+\)
-**	sd\s+[a-x0-9]+,0\s*\([a-x0-9]+\)
-**  ret
-*/
-void mov1 (int32_t *in, int32_t *out)
-{
-  v2si v = *(v2si*)in;
-  *(v2si*)out = v;
-}
 
 /*
 ** mov2:

@@ -1,5 +1,5 @@
 /* Vectorizer
-   Copyright (C) 2003-2023 Free Software Foundation, Inc.
+   Copyright (C) 2003-2024 Free Software Foundation, Inc.
    Contributed by Dorit Naishlos <dorit@il.ibm.com>
 
 This file is part of GCC.
@@ -943,6 +943,8 @@ set_uid_loop_bbs (loop_vec_info loop_vinfo, gimple *loop_vectorized_call,
   class loop *scalar_loop = get_loop (fun, tree_to_shwi (arg));
 
   LOOP_VINFO_SCALAR_LOOP (loop_vinfo) = scalar_loop;
+  LOOP_VINFO_SCALAR_IV_EXIT (loop_vinfo)
+    = vec_init_loop_exit_info (scalar_loop);
   gcc_checking_assert (vect_loop_vectorized_call (scalar_loop)
 		       == loop_vectorized_call);
   /* If we are going to vectorize outer loop, prevent vectorization
@@ -1379,7 +1381,9 @@ pass_vectorize::execute (function *fun)
 	 predicates that need to be shared for optimal predicate usage.
 	 However reassoc will re-order them and prevent CSE from working
 	 as it should.  CSE only the loop body, not the entry.  */
-      bitmap_set_bit (exit_bbs, single_exit (loop)->dest->index);
+      auto_vec<edge> exits = get_loop_exit_edges (loop);
+      for (edge exit : exits)
+	bitmap_set_bit (exit_bbs, exit->dest->index);
 
       edge entry = EDGE_PRED (loop_preheader_edge (loop)->src, 0);
       do_rpo_vn (fun, entry, exit_bbs);

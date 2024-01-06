@@ -1,6 +1,6 @@
 // shared_ptr and weak_ptr implementation -*- C++ -*-
 
-// Copyright (C) 2007-2023 Free Software Foundation, Inc.
+// Copyright (C) 2007-2024 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -51,10 +51,6 @@
 
 #include <iosfwd>           	  // std::basic_ostream
 #include <bits/shared_ptr_base.h>
-
-#define __glibcxx_want_shared_ptr_weak_type
-#define __glibcxx_want_enable_shared_from_this
-#include <bits/version.h>
 
 namespace std _GLIBCXX_VISIBILITY(default)
 {
@@ -119,7 +115,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
   /// @cond undocumented
 
   // Constraint for overloads taking non-array types.
-#if __cpp_concepts && __cpp_lib_type_trait_variable_templates
+#if __cpp_concepts && __glibcxx_type_trait_variable_templates
   template<typename _Tp>
     requires (!is_array_v<_Tp>)
     using _NonArray = _Tp;
@@ -128,7 +124,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     using _NonArray = __enable_if_t<!is_array<_Tp>::value, _Tp>;
 #endif
 
-#if __cpp_lib_shared_ptr_arrays >= 201707L
+#if __glibcxx_shared_ptr_arrays >= 201707L
   // Constraint for overloads taking array types with unknown bound, U[].
 #if __cpp_concepts
   template<typename _Tp>
@@ -151,7 +147,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       = __enable_if_t<__is_array_known_bounds<_Tp>::value, _Tp>;
 #endif
 
-#if __cpp_lib_smart_ptr_for_overwrite
+#if __glibcxx_smart_ptr_for_overwrite
   // Constraint for overloads taking either non-array or bounded array, U[N].
 #if __cpp_concepts
   template<typename _Tp>
@@ -205,7 +201,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       /// The type pointed to by the stored pointer, remove_extent_t<_Tp>
       using element_type = typename __shared_ptr<_Tp>::element_type;
 
-#ifdef __cpp_lib_shared_ptr_weak_type // C++ >= 17 && HOSTED
+#ifdef __glibcxx_shared_ptr_weak_type // C++ >= 17 && HOSTED
       /// The corresponding weak_ptr type for this shared_ptr
       /// @since C++17
       using weak_type = weak_ptr<_Tp>;
@@ -505,7 +501,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	friend shared_ptr<_NonArray<_Yp>>
 	make_shared(_Args&&...);
 
-#if __cpp_lib_shared_ptr_arrays >= 201707L
+#if __glibcxx_shared_ptr_arrays >= 201707L
       // This constructor is non-standard, it is used by allocate_shared<T[]>.
       template<typename _Alloc, typename _Init = const remove_extent_t<_Tp>*>
 	_GLIBCXX_CEST_CONSTEXPR
@@ -554,7 +550,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	friend shared_ptr<_BoundedArray<_Yp>>
 	make_shared(const remove_extent_t<_Yp>&);
 
-#if __cpp_lib_smart_ptr_for_overwrite
+#if __glibcxx_smart_ptr_for_overwrite
       template<typename _Yp, typename _Alloc>
 	_GLIBCXX_CEST_CONSTEXPR
 	friend shared_ptr<_NotUnboundedArray<_Yp>>
@@ -1011,7 +1007,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       shared_from_this() const
       { return shared_ptr<const _Tp>(this->_M_weak_this); }
 
-#ifdef __cpp_lib_enable_shared_from_this // C++ >= 17 && HOSTED
+#ifdef __glibcxx_enable_shared_from_this // C++ >= 17 && HOSTED
       /** @{
        * Get a `weak_ptr` referring to the object that has `*this` as its base.
        * @since C++17
@@ -1134,7 +1130,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 			     std::forward<_Args>(__args)...);
     }
 
-#if __cpp_lib_shared_ptr_arrays >= 201707L
+#if __glibcxx_shared_ptr_arrays >= 201707L
   /// @cond undocumented
   template<typename _Tp, typename _Alloc = allocator<void>>
     _GLIBCXX_CEST_CONSTEXPR
@@ -1287,7 +1283,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 			     std::__addressof(__u));
     }
 
-#if __cpp_lib_smart_ptr_for_overwrite
+#if __glibcxx_smart_ptr_for_overwrite
   template<typename _Tp, typename _Alloc>
     _GLIBCXX_CEST_CONSTEXPR
     inline shared_ptr<_NotUnboundedArray<_Tp>>
@@ -1383,6 +1379,13 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	return std::hash<typename shared_ptr<_Tp>::element_type*>()(__s.get());
       }
     };
+
+#if __cpp_variable_templates
+  template<typename _Tp>
+    static constexpr bool __is_shared_ptr = false;
+  template<typename _Tp>
+    static constexpr bool __is_shared_ptr<shared_ptr<_Tp>> = true;
+#endif
 
   /// @} relates shared_ptr
   /// @} group pointer_abstractions

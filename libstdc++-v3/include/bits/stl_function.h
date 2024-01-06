@@ -1,6 +1,6 @@
 // Functor implementations -*- C++ -*-
 
-// Copyright (C) 2001-2023 Free Software Foundation, Inc.
+// Copyright (C) 2001-2024 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -59,9 +59,6 @@
 #if __cplusplus > 201103L
 #include <bits/move.h>
 #endif
-
-#define __glibcxx_want_transparent_operators
-#include <bits/version.h>
 
 #if _GLIBCXX_CEST_VERSION && defined(__clang__)
 #include <compare> // std::strong_ordering::less and std::compare_three_way
@@ -160,7 +157,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
    *  @{
    */
 
-#if __cpp_lib_transparent_operators // C++ >= 14
+#if __glibcxx_transparent_operators // C++ >= 14
   struct __is_transparent;  // undefined
 
   template<typename _Tp = void>
@@ -248,7 +245,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     };
 #pragma GCC diagnostic pop
 
-#ifdef __cpp_lib_transparent_operators // C++ >= 14
+#ifdef __glibcxx_transparent_operators // C++ >= 14
   template<>
     struct plus<void>
     {
@@ -349,7 +346,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
    *
    *  @{
    */
-#if __cpp_lib_transparent_operators // C++ >= 14
+#if __glibcxx_transparent_operators // C++ >= 14
   template<typename _Tp = void>
     struct equal_to;
 
@@ -497,7 +494,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     };
 #pragma GCC diagnostic pop
 
-#ifdef __cpp_lib_transparent_operators // C++ >= 14
+#ifdef __glibcxx_transparent_operators // C++ >= 14
   /// One of the @link comparison_functors comparison functors@endlink.
   template<>
     struct equal_to<void>
@@ -773,7 +770,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	      is_convertible<_Tp, const volatile void*>,
 	      is_convertible<_Up, const volatile void*>>;
     };
-#endif // __cpp_lib_transparent_operators
+#endif // __glibcxx_transparent_operators
   /** @}  */
 
   // 20.3.4 logical operations
@@ -785,7 +782,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
    *
    *  @{
    */
-#ifdef __cpp_lib_transparent_operators // C++ >= 14
+#ifdef __glibcxx_transparent_operators // C++ >= 14
   template<typename _Tp = void>
     struct logical_and;
 
@@ -830,7 +827,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     };
 #pragma GCC diagnostic pop
 
-#ifdef __cpp_lib_transparent_operators // C++ >= 14
+#ifdef __glibcxx_transparent_operators // C++ >= 14
   /// One of the @link logical_functors Boolean operations functors@endlink.
   template<>
     struct logical_and<void>
@@ -875,10 +872,10 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
       typedef __is_transparent is_transparent;
     };
-#endif // __cpp_lib_transparent_operators
+#endif // __glibcxx_transparent_operators
   /** @}  */
 
-#ifdef __cpp_lib_transparent_operators // C++ >= 14
+#ifdef __glibcxx_transparent_operators // C++ >= 14
   template<typename _Tp = void>
     struct bit_and;
 
@@ -934,7 +931,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     };
 #pragma GCC diagnostic pop
 
-#ifdef __cpp_lib_transparent_operators // C++ >= 14
+#ifdef __glibcxx_transparent_operators // C++ >= 14
   template <>
     struct bit_and<void>
     {
@@ -1432,7 +1429,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
   /** @}  */
 
-#ifdef __cpp_lib_transparent_operators // C++ >= 14
+#ifdef __glibcxx_transparent_operators // C++ >= 14
   template<typename _Func, typename _SfinaeType, typename = __void_t<>>
     struct __has_is_transparent
     { };

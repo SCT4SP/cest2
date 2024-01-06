@@ -1,5 +1,5 @@
 /* Interprocedural analyses.
-   Copyright (C) 2005-2023 Free Software Foundation, Inc.
+   Copyright (C) 2005-2024 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -65,49 +65,6 @@ function_summary <ipcp_transformation *> *ipcp_transformation_sum = NULL;
 
 /* Edge summary for IPA-CP edge information.  */
 ipa_edge_args_sum_t *ipa_edge_args_sum;
-
-/* Traits for a hash table for reusing already existing ipa_bits. */
-
-struct ipa_bit_ggc_hash_traits : public ggc_cache_remove <ipa_bits *>
-{
-  typedef ipa_bits *value_type;
-  typedef ipa_bits *compare_type;
-  static hashval_t
-  hash (const ipa_bits *p)
-  {
-    hashval_t t = (hashval_t) p->value.to_shwi ();
-    return iterative_hash_host_wide_int (p->mask.to_shwi (), t);
-  }
-  static bool
-  equal (const ipa_bits *a, const ipa_bits *b)
-    {
-      return a->value == b->value && a->mask == b->mask;
-    }
-  static const bool empty_zero_p = true;
-  static void
-  mark_empty (ipa_bits *&p)
-    {
-      p = NULL;
-    }
-  static bool
-  is_empty (const ipa_bits *p)
-    {
-      return p == NULL;
-    }
-  static bool
-  is_deleted (const ipa_bits *p)
-    {
-      return p == reinterpret_cast<const ipa_bits *> (1);
-    }
-  static void
-  mark_deleted (ipa_bits *&p)
-    {
-      p = reinterpret_cast<ipa_bits *> (1);
-    }
-};
-
-/* Hash table for avoid repeated allocations of equal ipa_bits.  */
-static GTY ((cache)) hash_table<ipa_bit_ggc_hash_traits> *ipa_bits_hash_table;
 
 /* Traits for a hash table for reusing ranges.  */
 
@@ -280,6 +237,35 @@ gt_ggc_mx (ipa_vr *&x)
   return gt_ggc_mx ((ipa_vr *) x);
 }
 
+/* Analysis summery of function call return value.  */
+struct GTY(()) ipa_return_value_summary
+{
+  /* Known value range.
+     This needs to be wrapped in struccture due to specific way
+     we allocate ipa_vr. */
+  ipa_vr *vr;
+};
+
+/* Function summary for return values.  */
+class ipa_return_value_sum_t : public function_summary <ipa_return_value_summary *>
+{
+public:
+  ipa_return_value_sum_t (symbol_table *table, bool ggc):
+    function_summary <ipa_return_value_summary *> (table, ggc) { }
+
+  /* Hook that is called by summary when a node is duplicated.  */
+  void duplicate (cgraph_node *,
+		  cgraph_node *,
+		  ipa_return_value_summary *data,
+		  ipa_return_value_summary *data2) final override
+  {
+    *data2=*data;
+  }
+};
+
+/* Variable hoding the return value summary.  */
+static GTY(()) function_summary <ipa_return_value_summary *> *ipa_return_value_sum;
+
 
 /* Return true if DECL_FUNCTION_SPECIFIC_OPTIMIZATION of the decl associated
    with NODE should prevent us from analyzing it for the purposes of IPA-CP.  */
@@ -408,6 +394,24 @@ ipa_initialize_node_params (struct cgraph_node *node)
     ipa_populate_param_decls (node, *info->descriptors);
 }
 
+/* Print VAL which is extracted from a jump function to F.  */
+
+static void
+ipa_print_constant_value (FILE *f, tree val)
+{
+  print_generic_expr (f, val);
+
+  /* This is in keeping with values_equal_for_ipcp_p.  */
+  if (TREE_CODE (val) == ADDR_EXPR
+      && (TREE_CODE (TREE_OPERAND (val, 0)) == CONST_DECL
+	  || (TREE_CODE (TREE_OPERAND (val, 0)) == VAR_DECL
+	      && DECL_IN_CONSTANT_POOL (TREE_OPERAND (val, 0)))))
+    {
+      fputs (" -> ", f);
+      print_generic_expr (f, DECL_INITIAL (TREE_OPERAND (val, 0)));
+    }
+}
+
 /* Print the jump functions associated with call graph edge CS to file F.  */
 
 static void
@@ -429,15 +433,8 @@ ipa_print_node_jump_functions_for_edge (FILE *f, struct cgraph_edge *cs)
 	fprintf (f, "UNKNOWN\n");
       else if (type == IPA_JF_CONST)
 	{
-	  tree val = jump_func->value.constant.value;
 	  fprintf (f, "CONST: ");
-	  print_generic_expr (f, val);
-	  if (TREE_CODE (val) == ADDR_EXPR
-	      && TREE_CODE (TREE_OPERAND (val, 0)) == CONST_DECL)
-	    {
-	      fprintf (f, " -> ");
-	      print_generic_expr (f, DECL_INITIAL (TREE_OPERAND (val, 0)));
-	    }
+	  ipa_print_constant_value (f, jump_func->value.constant.value);
 	  fprintf (f, "\n");
 	}
       else if (type == IPA_JF_PASS_THROUGH)
@@ -511,7 +508,7 @@ ipa_print_node_jump_functions_for_edge (FILE *f, struct cgraph_edge *cs)
 	      else if (item->jftype == IPA_JF_CONST)
 		{
 		  fprintf (f, "CONST: ");
-		  print_generic_expr (f, item->value.constant);
+		  ipa_print_constant_value (f, item->value.constant);
 		}
 	      else if (item->jftype == IPA_JF_UNKNOWN)
 		fprintf (f, "UNKNOWN: " HOST_WIDE_INT_PRINT_DEC " bits",
@@ -527,17 +524,6 @@ ipa_print_node_jump_functions_for_edge (FILE *f, struct cgraph_edge *cs)
 	  fprintf (f, "         Context: ");
 	  ctx->dump (dump_file);
 	}
-
-      if (jump_func->bits)
-	{
-	  fprintf (f, "         value: ");
-	  print_hex (jump_func->bits->value, f);
-	  fprintf (f, ", mask: ");
-	  print_hex (jump_func->bits->mask, f);
-	  fprintf (f, "\n");
-	}
-      else
-	fprintf (f, "         Unknown bits\n");
 
       if (jump_func->m_vr)
 	{
@@ -2267,39 +2253,6 @@ ipa_get_callee_param_type (struct cgraph_edge *e, int i)
   return NULL;
 }
 
-/* Return ipa_bits with VALUE and MASK values, which can be either a newly
-   allocated structure or a previously existing one shared with other jump
-   functions and/or transformation summaries.  */
-
-ipa_bits *
-ipa_get_ipa_bits_for_value (const widest_int &value, const widest_int &mask)
-{
-  ipa_bits tmp;
-  tmp.value = value;
-  tmp.mask = mask;
-
-  ipa_bits **slot = ipa_bits_hash_table->find_slot (&tmp, INSERT);
-  if (*slot)
-    return *slot;
-
-  ipa_bits *res = ggc_alloc<ipa_bits> ();
-  res->value = value;
-  res->mask = mask;
-  *slot = res;
-
-  return res;
-}
-
-/* Assign to JF a pointer to ipa_bits structure with VALUE and MASK.  Use hash
-   table in order to avoid creating multiple same ipa_bits structures.  */
-
-static void
-ipa_set_jfunc_bits (ipa_jump_func *jf, const widest_int &value,
-		    const widest_int &mask)
-{
-  jf->bits = ipa_get_ipa_bits_for_value (value, mask);
-}
-
 /* Return a pointer to an ipa_vr just like TMP, but either find it in
    ipa_vr_hash_table or allocate it in GC memory.  */
 
@@ -2393,10 +2346,31 @@ ipa_compute_jump_functions_for_edge (struct ipa_func_body_info *fbi,
 	    addr_nonzero = true;
 
 	  if (addr_nonzero)
+	    vr.set_nonzero (TREE_TYPE (arg));
+
+	  unsigned HOST_WIDE_INT bitpos;
+	  unsigned align, prec = TYPE_PRECISION (TREE_TYPE (arg));
+
+	  get_pointer_alignment_1 (arg, &align, &bitpos);
+
+	  if (align > BITS_PER_UNIT
+	      && opt_for_fn (cs->caller->decl, flag_ipa_bit_cp))
 	    {
-	      vr.set_nonzero (TREE_TYPE (arg));
+	      wide_int mask
+		= wi::bit_and_not (wi::mask (prec, false, prec),
+				   wide_int::from (align / BITS_PER_UNIT - 1,
+						   prec, UNSIGNED));
+	      wide_int value = wide_int::from (bitpos / BITS_PER_UNIT, prec,
+					       UNSIGNED);
+	      irange_bitmask bm (value, mask);
+	      if (!addr_nonzero)
+		vr.set_varying (TREE_TYPE (arg));
+	      irange &r = as_a <irange> (vr);
+	      r.update_bitmask (bm);
 	      ipa_set_jfunc_vr (jfunc, vr);
 	    }
+	  else if (addr_nonzero)
+	    ipa_set_jfunc_vr (jfunc, vr);
 	  else
 	    gcc_assert (!jfunc->m_vr);
 	}
@@ -2420,30 +2394,6 @@ ipa_compute_jump_functions_for_edge (struct ipa_func_body_info *fbi,
 	  else
 	    gcc_assert (!jfunc->m_vr);
 	}
-
-      if (INTEGRAL_TYPE_P (TREE_TYPE (arg)) && !vr.undefined_p ())
-	{
-	  irange &r = as_a <irange> (vr);
-	  irange_bitmask bm = r.get_bitmask ();
-	  signop sign = TYPE_SIGN (TREE_TYPE (arg));
-	  ipa_set_jfunc_bits (jfunc,
-			      widest_int::from (bm.value (), sign),
-			      widest_int::from (bm.mask (), sign));
-	}
-      else if (POINTER_TYPE_P (TREE_TYPE (arg)))
-	{
-	  unsigned HOST_WIDE_INT bitpos;
-	  unsigned align;
-
-	  get_pointer_alignment_1 (arg, &align, &bitpos);
-	  widest_int mask = wi::bit_and_not
-	    (wi::mask<widest_int> (TYPE_PRECISION (TREE_TYPE (arg)), false),
-	     align / BITS_PER_UNIT - 1);
-	  widest_int value = bitpos / BITS_PER_UNIT;
-	  ipa_set_jfunc_bits (jfunc, value, mask);
-	}
-      else
-	gcc_assert (!jfunc->bits);
 
       if (is_gimple_ip_invariant (arg)
 	  || (VAR_P (arg)
@@ -4398,8 +4348,6 @@ ipa_check_create_edge_args (void)
     ipa_edge_args_sum
       = (new (ggc_alloc_no_dtor<ipa_edge_args_sum_t> ())
 	 ipa_edge_args_sum_t (symtab, true));
-  if (!ipa_bits_hash_table)
-    ipa_bits_hash_table = hash_table<ipa_bit_ggc_hash_traits>::create_ggc (37);
   if (!ipa_vr_hash_table)
     ipa_vr_hash_table = hash_table<ipa_vr_ggc_hash_traits>::create_ggc (37);
 }
@@ -4432,8 +4380,6 @@ ipa_free_all_node_params (void)
 void
 ipcp_transformation_initialize (void)
 {
-  if (!ipa_bits_hash_table)
-    ipa_bits_hash_table = hash_table<ipa_bit_ggc_hash_traits>::create_ggc (37);
   if (!ipa_vr_hash_table)
     ipa_vr_hash_table = hash_table<ipa_vr_ggc_hash_traits>::create_ggc (37);
   if (ipcp_transformation_sum == NULL)
@@ -4636,7 +4582,6 @@ ipcp_transformation_t::duplicate(cgraph_node *, cgraph_node *dst,
   if (dst->inlined_to)
     return;
   dst_trans->m_agg_values = vec_safe_copy (src_trans->m_agg_values);
-  dst_trans->bits = vec_safe_copy (src_trans->bits);
   dst_trans->m_vr = vec_safe_copy (src_trans->m_vr);
 }
 
@@ -4859,13 +4804,6 @@ ipa_write_jump_function (struct output_block *ob,
     }
 
   bp = bitpack_create (ob->main_stream);
-  bp_pack_value (&bp, !!jump_func->bits, 1);
-  streamer_write_bitpack (&bp);
-  if (jump_func->bits)
-    {
-      streamer_write_widest_int (ob, jump_func->bits->value);
-      streamer_write_widest_int (ob, jump_func->bits->mask);
-    }
   if (jump_func->m_vr)
     jump_func->m_vr->streamer_write (ob);
   else
@@ -4991,18 +4929,6 @@ ipa_read_jump_function (class lto_input_block *ib,
       if (prevails)
         jump_func->agg.items->quick_push (item);
     }
-
-  struct bitpack_d bp = streamer_read_bitpack (ib);
-  bool bits_known = bp_unpack_value (&bp, 1);
-  if (bits_known)
-    {
-      widest_int value = streamer_read_widest_int (ib);
-      widest_int mask = streamer_read_widest_int (ib);
-      if (prevails)
-	ipa_set_jfunc_bits (jump_func, value, mask);
-    }
-  else
-    jump_func->bits = NULL;
 
   ipa_vr vr;
   vr.streamer_read (ib, data_in);
@@ -5387,7 +5313,6 @@ useful_ipcp_transformation_info_p (ipcp_transformation *ts)
   if (!ts)
     return false;
   if (!vec_safe_is_empty (ts->m_agg_values)
-      || !vec_safe_is_empty (ts->bits)
       || !vec_safe_is_empty (ts->m_vr))
     return true;
   return false;
@@ -5414,25 +5339,13 @@ write_ipcp_transformation_info (output_block *ob, cgraph_node *node,
 
       bp = bitpack_create (ob->main_stream);
       bp_pack_value (&bp, av.by_ref, 1);
+      bp_pack_value (&bp, av.killed, 1);
       streamer_write_bitpack (&bp);
     }
 
   streamer_write_uhwi (ob, vec_safe_length (ts->m_vr));
   for (const ipa_vr &parm_vr : ts->m_vr)
     parm_vr.streamer_write (ob);
-
-  streamer_write_uhwi (ob, vec_safe_length (ts->bits));
-  for (const ipa_bits *bits_jfunc : ts->bits)
-    {
-      struct bitpack_d bp = bitpack_create (ob->main_stream);
-      bp_pack_value (&bp, !!bits_jfunc, 1);
-      streamer_write_bitpack (&bp);
-      if (bits_jfunc)
-	{
-	  streamer_write_widest_int (ob, bits_jfunc->value);
-	  streamer_write_widest_int (ob, bits_jfunc->mask);
-	}
-    }
 }
 
 /* Stream in the aggregate value replacement chain for NODE from IB.  */
@@ -5459,6 +5372,7 @@ read_ipcp_transformation_info (lto_input_block *ib, cgraph_node *node,
 
 	  bitpack_d bp = streamer_read_bitpack (ib);
 	  av->by_ref = bp_unpack_value (&bp, 1);
+	  av->killed = bp_unpack_value (&bp, 1);
 	}
     }
 
@@ -5471,24 +5385,6 @@ read_ipcp_transformation_info (lto_input_block *ib, cgraph_node *node,
 	  ipa_vr *parm_vr;
 	  parm_vr = &(*ts->m_vr)[i];
 	  parm_vr->streamer_read (ib, data_in);
-	}
-    }
-  count = streamer_read_uhwi (ib);
-  if (count > 0)
-    {
-      vec_safe_grow_cleared (ts->bits, count, true);
-      for (i = 0; i < count; i++)
-	{
-	  struct bitpack_d bp = streamer_read_bitpack (ib);
-	  bool known = bp_unpack_value (&bp, 1);
-	  if (known)
-	    {
-	      const widest_int value = streamer_read_widest_int (ib);
-	      const widest_int mask = streamer_read_widest_int (ib);
-	      ipa_bits *bits
-		= ipa_get_ipa_bits_for_value (value, mask);
-	      (*ts->bits)[i] = bits;
-	    }
 	}
     }
 }
@@ -5762,7 +5658,9 @@ ipcp_modif_dom_walker::before_dom_children (basic_block bb)
 
 /* If IPA-CP discovered a constant in parameter PARM at OFFSET of a given SIZE
    - whether passed by reference or not is given by BY_REF - return that
-   constant.  Otherwise return NULL_TREE.  */
+   constant.  Otherwise return NULL_TREE.  The is supposed to be used only
+   after clone materialization and transformation is done (because it asserts
+   that killed constants have been pruned). */
 
 tree
 ipcp_get_aggregate_const (struct function *func, tree parm, bool by_ref,
@@ -5780,7 +5678,11 @@ ipcp_get_aggregate_const (struct function *func, tree parm, bool by_ref,
 
   ipa_argagg_value_list avl (ts);
   unsigned unit_offset = bit_offset / BITS_PER_UNIT;
-  tree v = avl.get_value (index, unit_offset, by_ref);
+  const ipa_argagg_value *av = avl.get_elt (index, unit_offset);
+  if (!av || av->by_ref != by_ref)
+    return NULL_TREE;
+  gcc_assert (!av->killed);
+  tree v = av->value;
   if (!v
       || maybe_ne (tree_to_poly_int64 (TYPE_SIZE (TREE_TYPE (v))), bit_size))
     return NULL_TREE;
@@ -5796,7 +5698,9 @@ ipcp_get_parm_bits (tree parm, tree *value, widest_int *mask)
 {
   cgraph_node *cnode = cgraph_node::get (current_function_decl);
   ipcp_transformation *ts = ipcp_get_transformation_summary (cnode);
-  if (!ts || vec_safe_length (ts->bits) == 0)
+  if (!ts
+      || vec_safe_length (ts->m_vr) == 0
+      || !irange::supports_p (TREE_TYPE (parm)))
     return false;
 
   int i = ts->get_param_index (current_function_decl, parm);
@@ -5810,118 +5714,18 @@ ipcp_get_parm_bits (tree parm, tree *value, widest_int *mask)
 	return false;
     }
 
-  vec<ipa_bits *, va_gc> &bits = *ts->bits;
-  if (!bits[i])
+  vec<ipa_vr, va_gc> &vr = *ts->m_vr;
+  if (!vr[i].known_p ())
     return false;
-  *mask = bits[i]->mask;
-  *value = wide_int_to_tree (TREE_TYPE (parm), bits[i]->value);
+  Value_Range tmp;
+  vr[i].get_vrange (tmp);
+  if (tmp.undefined_p () || tmp.varying_p ())
+    return false;
+  irange &r = as_a <irange> (tmp);
+  irange_bitmask bm = r.get_bitmask ();
+  *mask = widest_int::from (bm.mask (), TYPE_SIGN (TREE_TYPE (parm)));
+  *value = wide_int_to_tree (TREE_TYPE (parm), bm.value ());
   return true;
-}
-
-/* Update bits info of formal parameters of NODE as described in TS.  */
-
-static void
-ipcp_update_bits (struct cgraph_node *node, ipcp_transformation *ts)
-{
-  if (vec_safe_is_empty (ts->bits))
-    return;
-  vec<ipa_bits *, va_gc> &bits = *ts->bits;
-  unsigned count = bits.length ();
-  if (!count)
-    return;
-
-  auto_vec<int, 16> new_indices;
-  bool need_remapping = false;
-  clone_info *cinfo = clone_info::get (node);
-  if (cinfo && cinfo->param_adjustments)
-    {
-      cinfo->param_adjustments->get_updated_indices (&new_indices);
-      need_remapping = true;
-    }
-  auto_vec <tree, 16> parm_decls;
-  push_function_arg_decls (&parm_decls, node->decl);
-
-  for (unsigned i = 0; i < count; ++i)
-    {
-      tree parm;
-      if (need_remapping)
-	{
-	  if (i >= new_indices.length ())
-	    continue;
-	  int idx = new_indices[i];
-	  if (idx < 0)
-	    continue;
-	  parm = parm_decls[idx];
-	}
-      else
-	parm = parm_decls[i];
-      gcc_checking_assert (parm);
-
-
-      if (!bits[i]
-	  || !(INTEGRAL_TYPE_P (TREE_TYPE (parm))
-	       || POINTER_TYPE_P (TREE_TYPE (parm)))
-	  || !is_gimple_reg (parm))
-	continue;
-
-      tree ddef = ssa_default_def (DECL_STRUCT_FUNCTION (node->decl), parm);
-      if (!ddef)
-	continue;
-
-      if (dump_file)
-	{
-	  fprintf (dump_file, "Adjusting mask for param %u to ", i);
-	  print_hex (bits[i]->mask, dump_file);
-	  fprintf (dump_file, "\n");
-	}
-
-      if (INTEGRAL_TYPE_P (TREE_TYPE (ddef)))
-	{
-	  unsigned prec = TYPE_PRECISION (TREE_TYPE (ddef));
-	  signop sgn = TYPE_SIGN (TREE_TYPE (ddef));
-	  wide_int mask = wide_int::from (bits[i]->mask, prec, UNSIGNED);
-	  wide_int value = wide_int::from (bits[i]->value, prec, sgn);
-	  set_bitmask (ddef, value, mask);
-	}
-      else
-	{
-	  unsigned tem = bits[i]->mask.to_uhwi ();
-	  unsigned HOST_WIDE_INT bitpos = bits[i]->value.to_uhwi ();
-	  unsigned align = tem & -tem;
-	  unsigned misalign = bitpos & (align - 1);
-
-	  if (align > 1)
-	    {
-	      if (dump_file)
-		fprintf (dump_file, "Adjusting align: %u, misalign: %u\n", align, misalign); 
-
-	      unsigned old_align, old_misalign;
-	      struct ptr_info_def *pi = get_ptr_info (ddef);
-	      bool old_known = get_ptr_info_alignment (pi, &old_align, &old_misalign);
-
-	      if (old_known
-		  && old_align > align)
-		{
-		  if (dump_file)
-		    {
-		      fprintf (dump_file, "But alignment was already %u.\n", old_align);
-		      if ((old_misalign & (align - 1)) != misalign)
-			fprintf (dump_file, "old_misalign (%u) and misalign (%u) mismatch\n",
-				 old_misalign, misalign);
-		    }
-		  continue;
-		}
-
-	      if (old_known
-		  && ((misalign & (old_align - 1)) != old_misalign)
-		  && dump_file)
-		fprintf (dump_file, "old_misalign (%u) and misalign (%u) mismatch\n",
-			 old_misalign, misalign);
-
-	      set_ptr_info_alignment (pi, align, misalign); 
-	    }
-	}
-    }
 }
 
 /* Update value range of formal parameters of NODE as described in TS.  */
@@ -5985,6 +5789,77 @@ ipcp_update_vr (struct cgraph_node *node, ipcp_transformation *ts)
 		  fprintf (dump_file, "]\n");
 		}
 	      set_range_info (ddef, tmp);
+
+	      if (POINTER_TYPE_P (TREE_TYPE (parm))
+		  && opt_for_fn (node->decl, flag_ipa_bit_cp))
+		{
+		  irange &r = as_a<irange> (tmp);
+		  irange_bitmask bm = r.get_bitmask ();
+		  unsigned tem = bm.mask ().to_uhwi ();
+		  unsigned HOST_WIDE_INT bitpos = bm.value ().to_uhwi ();
+		  unsigned align = tem & -tem;
+		  unsigned misalign = bitpos & (align - 1);
+
+		  if (align > 1)
+		    {
+		      if (dump_file)
+			{
+			  fprintf (dump_file,
+				   "Adjusting mask for param %u to ", i);
+			  print_hex (bm.mask (), dump_file);
+			  fprintf (dump_file, "\n");
+			}
+
+		      if (dump_file)
+			fprintf (dump_file,
+				 "Adjusting align: %u, misalign: %u\n",
+				 align, misalign);
+
+		      unsigned old_align, old_misalign;
+		      struct ptr_info_def *pi = get_ptr_info (ddef);
+		      bool old_known = get_ptr_info_alignment (pi, &old_align,
+							       &old_misalign);
+
+		      if (old_known && old_align > align)
+			{
+			  if (dump_file)
+			    {
+			      fprintf (dump_file,
+				       "But alignment was already %u.\n",
+				       old_align);
+			      if ((old_misalign & (align - 1)) != misalign)
+				fprintf (dump_file,
+					 "old_misalign (%u) and misalign "
+					 "(%u) mismatch\n",
+					 old_misalign, misalign);
+			    }
+			  continue;
+			}
+
+		      if (dump_file
+			  && old_known
+			  && ((misalign & (old_align - 1)) != old_misalign))
+			fprintf (dump_file,
+				 "old_misalign (%u) and misalign (%u) "
+				 "mismatch\n",
+				 old_misalign, misalign);
+
+		      set_ptr_info_alignment (pi, align, misalign);
+		    }
+		}
+	      else if (dump_file && INTEGRAL_TYPE_P (TREE_TYPE (parm)))
+		{
+		  irange &r = as_a<irange> (tmp);
+		  irange_bitmask bm = r.get_bitmask ();
+		  unsigned prec = TYPE_PRECISION (TREE_TYPE (parm));
+		  if (wi::ne_p (bm.mask (), wi::shwi (-1, prec)))
+		    {
+		      fprintf (dump_file,
+			       "Adjusting mask for param %u to ", i);
+		      print_hex (bm.mask (), dump_file);
+		      fprintf (dump_file, "\n");
+		    }
+		}
 	    }
 	}
     }
@@ -6008,12 +5883,10 @@ ipcp_transform_function (struct cgraph_node *node)
   ipcp_transformation *ts = ipcp_get_transformation_summary (node);
   if (!ts
       || (vec_safe_is_empty (ts->m_agg_values)
-	  && vec_safe_is_empty (ts->bits)
 	  && vec_safe_is_empty (ts->m_vr)))
     return 0;
 
   ts->maybe_create_parm_idx_map (cfun->decl);
-  ipcp_update_bits (node, ts);
   ipcp_update_vr (node, ts);
   if (vec_safe_is_empty (ts->m_agg_values))
       return 0;
@@ -6059,11 +5932,60 @@ ipcp_transform_function (struct cgraph_node *node)
     free_ipa_bb_info (bi);
   fbi.bb_infos.release ();
 
+  ts->remove_argaggs_if ([](const ipa_argagg_value &v)
+    {
+      return v.killed;
+    });
+
   vec_free (descriptors);
   if (cfg_changed)
     delete_unreachable_blocks_update_callgraph (node, false);
 
   return modified_mem_access ? TODO_update_ssa_only_virtuals : 0;
+}
+
+/* Record that current function return value range is VAL.  */
+
+void
+ipa_record_return_value_range (Value_Range val)
+{
+  cgraph_node *n = cgraph_node::get (current_function_decl);
+  if (!ipa_return_value_sum)
+    {
+      if (!ipa_vr_hash_table)
+	ipa_vr_hash_table = hash_table<ipa_vr_ggc_hash_traits>::create_ggc (37);
+      ipa_return_value_sum = new (ggc_alloc_no_dtor <ipa_return_value_sum_t> ())
+	      ipa_return_value_sum_t (symtab, true);
+      ipa_return_value_sum->disable_insertion_hook ();
+    }
+  ipa_return_value_sum->get_create (n)->vr = ipa_get_value_range (val);
+  if (dump_file && (dump_flags & TDF_DETAILS))
+    {
+      fprintf (dump_file, "Recording return range ");
+      val.dump (dump_file);
+      fprintf (dump_file, "\n");
+    }
+}
+
+/* Return true if value range of DECL is known and if so initialize RANGE.  */
+
+bool
+ipa_return_value_range (Value_Range &range, tree decl)
+{
+  cgraph_node *n = cgraph_node::get (decl);
+  if (!n || !ipa_return_value_sum)
+    return false;
+  enum availability avail;
+  n = n->ultimate_alias_target (&avail);
+  if (avail < AVAIL_AVAILABLE)
+    return false;
+  if (n->decl != decl && !useless_type_conversion_p (TREE_TYPE (decl), TREE_TYPE (n->decl)))
+    return false;
+  ipa_return_value_summary *v = ipa_return_value_sum->get (n);
+  if (!v)
+    return false;
+  v->vr->get_vrange (range);
+  return true;
 }
 
 

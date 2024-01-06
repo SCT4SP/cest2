@@ -1,5 +1,5 @@
 /* Simple garbage collection for the GNU compiler.
-   Copyright (C) 1999-2023 Free Software Foundation, Inc.
+   Copyright (C) 1999-2024 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -73,6 +73,18 @@ ggc_mark_root_tab (const_ggc_root_tab_t rt)
   for ( ; rt->base != NULL; rt++)
     for (i = 0; i < rt->nelt; i++)
       (*rt->cb) (*(void **) ((char *)rt->base + rt->stride * i));
+}
+
+/* Zero out all the roots in the table RT.  */
+
+static void
+ggc_zero_rtab_roots (const_ggc_root_tab_t rt)
+{
+  size_t i;
+
+  for ( ; rt->base != NULL; rt++)
+    for (i = 0; i < rt->nelt; i++)
+      (*(void **) ((char *)rt->base + rt->stride * i)) = (void*)0;
 }
 
 /* Iterate through all registered roots and mark each element.  */
@@ -1307,8 +1319,7 @@ ggc_common_finalize ()
       memset (rti->base, 0, rti->stride * rti->nelt);
 
   for (rt = gt_ggc_rtab; *rt; rt++)
-    for (rti = *rt; rti->base != NULL; rti++)
-      memset (rti->base, 0, rti->stride * rti->nelt);
+    ggc_zero_rtab_roots (*rt);
 
   for (rt = gt_pch_scalar_rtab; *rt; rt++)
     for (rti = *rt; rti->base != NULL; rti++)

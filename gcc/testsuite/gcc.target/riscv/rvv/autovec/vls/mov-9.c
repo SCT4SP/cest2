@@ -1,32 +1,8 @@
 /* { dg-do compile } */
-/* { dg-options "-march=rv64gcv_zvfh_zvl4096b -mabi=lp64d -O3 -fno-schedule-insns -fno-schedule-insns2" } */
+/* { dg-options "-march=rv64gcv_zvfh_zvl4096b -mabi=lp64d --param=riscv-autovec-lmul=m8 -O3 -fno-schedule-insns -fno-schedule-insns2" } */
 /* { dg-final { check-function-bodies "**" "" } } */
 
 #include "def.h"
-
-/*
-** mov0:
-**	flw\s+[a-x0-9]+,0\s*\([a-x0-9]+\)
-**	fsw\s+[a-x0-9]+,0\s*\([a-x0-9]+\)
-**  ret
-*/
-void mov0 (float *in, float *out)
-{
-  v1sf v = *(v1sf*)in;
-  *(v1sf*)out = v;
-}
-
-/*
-** mov1:
-**	fld\s+[a-x0-9]+,0\s*\([a-x0-9]+\)
-**	fsd\s+[a-x0-9]+,0\s*\([a-x0-9]+\)
-**  ret
-*/
-void mov1 (float *in, float *out)
-{
-  v2sf v = *(v2sf*)in;
-  *(v2sf*)out = v;
-}
 
 /*
 ** mov2:

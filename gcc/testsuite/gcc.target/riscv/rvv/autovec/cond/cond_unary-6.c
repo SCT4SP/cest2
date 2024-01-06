@@ -1,7 +1,7 @@
 /* { dg-do compile } */
 /* { dg-additional-options "-march=rv64gcv_zvfh -mabi=lp64d --param riscv-autovec-preference=scalable -fno-vect-cost-model" } */
 
-#include <stdint.h>
+#include <stdint-gcc.h>
 
 #define abs(A) ((A) < 0 ? -(A) : (A))
 #define neg(A) (-(A))
@@ -37,3 +37,5 @@ TEST_ALL (DEF_LOOP)
 /* NOTE: int abs operator is converted to vmslt + vneg.v */
 /* { dg-final { scan-assembler-times {\tvneg\.v\tv[0-9]+,v[0-9]+,v0\.t} 12 } } */
 /* { dg-final { scan-assembler-times {\tvnot\.v\tv[0-9]+,v[0-9]+,v0\.t} 6 } } */
+/* NOTE: int abs operator cannot combine the vmerge.  */
+/* { dg-final { scan-assembler-times {\tvf?merge\.v[vxi]m\t} 6 } } */

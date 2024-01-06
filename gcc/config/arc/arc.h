@@ -1,5 +1,5 @@
 /* Definitions of target machine for GNU compiler, Synopsys DesignWare ARC cpu.
-   Copyright (C) 1994-2023 Free Software Foundation, Inc.
+   Copyright (C) 1994-2024 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -956,10 +956,16 @@ arc_select_cc_mode (OP, X, Y)
 
 /* Costs.  */
 
+/* Analog of COSTS_N_INSNS when optimizing for size.  */
+#ifndef COSTS_N_BYTES
+#define COSTS_N_BYTES(N) (N)
+#endif
+
 /* The cost of a branch insn.  */
 /* ??? What's the right value here?  Branches are certainly more
    expensive than reg->reg moves.  */
-#define BRANCH_COST(speed_p, predictable_p) 2
+#define BRANCH_COST(speed_p, predictable_p) \
+	(speed_p ? COSTS_N_INSNS (2) : COSTS_N_INSNS (1))
 
 /* Scc sets the destination to 1 and then conditionally zeroes it.
    Best case, ORed SCCs can be made into clear - condset - condset.
@@ -971,11 +977,8 @@ arc_select_cc_mode (OP, X, Y)
    beging decisive of p0, we want:
    p0 * (branch_cost - 4) > (1 - p0) * 5
    ??? We don't get to see that probability to evaluate, so we can
-   only wildly guess that it might be 50%.
-   ??? The compiler also lacks the notion of branch predictability.  */
-#define LOGICAL_OP_NON_SHORT_CIRCUIT \
-  (BRANCH_COST (optimize_function_for_speed_p (cfun), \
-		false) > 9)
+   only wildly guess that it might be 50%.  */
+#define LOGICAL_OP_NON_SHORT_CIRCUIT false
 
 /* Nonzero if access to memory by bytes is slow and undesirable.
    For RISC chips, it means that access to memory by bytes is no
@@ -1312,20 +1315,6 @@ do {							\
 /* Defined to also emit an .align in elfos.h.  We don't want that.  */
 #undef ASM_OUTPUT_CASE_LABEL
 
-/* ADDR_DIFF_VECs are in the text section and thus can affect the
-   current alignment.  */
-#define ASM_OUTPUT_CASE_END(FILE, NUM, JUMPTABLE)       \
-  do                                                    \
-    {                                                   \
-      if (GET_CODE (PATTERN (JUMPTABLE)) == ADDR_DIFF_VEC \
-	  && ((GET_MODE_SIZE (as_a <scalar_int_mode>	\
-			      (GET_MODE (PATTERN (JUMPTABLE)))) \
-	       * XVECLEN (PATTERN (JUMPTABLE), 1) + 1)	\
-	      & 2))					\
-      arc_toggle_unalign ();				\
-    }                                                   \
-  while (0)
-
 #define JUMP_ALIGN(LABEL) (arc_size_opt_level < 2 ? 2 : 0)
 #define LABEL_ALIGN_AFTER_BARRIER(LABEL) \
   (JUMP_ALIGN(LABEL) \
@@ -1346,8 +1335,6 @@ do {							\
 #define ASM_OUTPUT_ALIGN(FILE,LOG) \
 do { \
   if ((LOG) != 0) fprintf (FILE, "\t.align %d\n", 1 << (LOG)); \
-  if ((LOG)  > 1) \
-    arc_clear_unalign (); \
 } while (0)
 
 /*  ASM_OUTPUT_ALIGNED_DECL_LOCAL (STREAM, DECL, NAME, SIZE, ALIGNMENT)

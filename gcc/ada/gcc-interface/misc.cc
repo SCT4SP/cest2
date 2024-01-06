@@ -269,7 +269,7 @@ gnat_post_options (const char **pfilename ATTRIBUTE_UNUSED)
 
   /* No caret by default for Ada.  */
   if (!OPTION_SET_P (flag_diagnostics_show_caret))
-    global_dc->show_caret = false;
+    global_dc->m_source_printing.enabled = false;
 
   /* Copy global settings to local versions.  */
   gnat_encodings = global_options.x_gnat_encodings;
@@ -293,7 +293,6 @@ static void
 internal_error_function (diagnostic_context *context, const char *msgid,
 			 va_list *ap)
 {
-  text_info tinfo;
   char *buffer, *p, *loc;
   String_Template temp, temp_loc;
   String_Pointer sp, sp_loc;
@@ -309,9 +308,7 @@ internal_error_function (diagnostic_context *context, const char *msgid,
   pp_clear_output_area (context->printer);
 
   /* Format the message into the pretty-printer.  */
-  tinfo.format_spec = msgid;
-  tinfo.args_ptr = ap;
-  tinfo.err_no = errno;
+  text_info tinfo (msgid, ap, errno);
   pp_format_verbatim (context->printer, &tinfo);
 
   /* Extract a (writable) pointer to the formatted text.  */
@@ -339,7 +336,7 @@ internal_error_function (diagnostic_context *context, const char *msgid,
   else
     {
       xloc = expand_location (input_location);
-      if (context->show_column && xloc.column != 0)
+      if (context->m_show_column && xloc.column != 0)
 	loc = xasprintf ("%s:%d:%d", xloc.file, xloc.line, xloc.column);
       else
 	loc = xasprintf ("%s:%d", xloc.file, xloc.line);
@@ -378,7 +375,7 @@ gnat_init (void)
   line_table->default_range_bits = 0;
 
   /* Register our internal error function.  */
-  global_dc->internal_error = &internal_error_function;
+  global_dc->m_internal_error = &internal_error_function;
 
   return true;
 }
@@ -1355,6 +1352,11 @@ get_lang_specific (tree node)
   return TYPE_LANG_SPECIFIC (node);
 }
 
+const struct scoped_attribute_specs *const gnat_attribute_table[] =
+{
+  &gnat_internal_attribute_table
+};
+
 /* Definitions for our language-specific hooks.  */
 
 #undef  LANG_HOOKS_NAME
@@ -1420,7 +1422,7 @@ get_lang_specific (tree node)
 #undef  LANG_HOOKS_GET_FIXED_POINT_TYPE_INFO
 #define LANG_HOOKS_GET_FIXED_POINT_TYPE_INFO gnat_get_fixed_point_type_info
 #undef  LANG_HOOKS_ATTRIBUTE_TABLE
-#define LANG_HOOKS_ATTRIBUTE_TABLE	gnat_internal_attribute_table
+#define LANG_HOOKS_ATTRIBUTE_TABLE	gnat_attribute_table
 #undef  LANG_HOOKS_BUILTIN_FUNCTION
 #define LANG_HOOKS_BUILTIN_FUNCTION	gnat_builtin_function
 #undef  LANG_HOOKS_INIT_TS

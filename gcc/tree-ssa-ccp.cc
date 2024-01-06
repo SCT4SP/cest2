@@ -1,5 +1,5 @@
 /* Conditional constant propagation pass for the GNU compiler.
-   Copyright (C) 2000-2023 Free Software Foundation, Inc.
+   Copyright (C) 2000-2024 Free Software Foundation, Inc.
    Adapted from original RTL SSA-CCP by Daniel Berlin <dberlin@dberlin.org>
    Adapted to GIMPLE trees by Diego Novillo <dnovillo@redhat.com>
 
@@ -1966,7 +1966,8 @@ bit_value_binop (enum tree_code code, signop sgn, int width,
 		  }
 		else
 		  {
-		    widest_int upper = wi::udiv_trunc (r1max, r2min);
+		    widest_int upper
+		      = wi::udiv_trunc (wi::zext (r1max, width), r2min);
 		    unsigned int lzcount = wi::clz (upper);
 		    unsigned int bits = wi::get_precision (upper) - lzcount;
 		    *mask = wi::mask <widest_int> (bits, false);
@@ -2345,6 +2346,7 @@ evaluate_stmt (gimple *stmt)
 	    {
 	    case BUILT_IN_MALLOC:
 	    case BUILT_IN_REALLOC:
+	    case BUILT_IN_GOMP_REALLOC:
 	    case BUILT_IN_CALLOC:
 	    case BUILT_IN_STRDUP:
 	    case BUILT_IN_STRNDUP:
@@ -2523,7 +2525,7 @@ insert_clobber_before_stack_restore (tree saved_val, tree var,
   FOR_EACH_IMM_USE_STMT (stmt, iter, saved_val)
     if (gimple_call_builtin_p (stmt, BUILT_IN_STACK_RESTORE))
       {
-	clobber = build_clobber (TREE_TYPE (var), CLOBBER_EOL);
+	clobber = build_clobber (TREE_TYPE (var), CLOBBER_STORAGE_END);
 	clobber_stmt = gimple_build_assign (var, clobber);
 
 	i = gsi_for_stmt (stmt);
@@ -3072,7 +3074,9 @@ optimize_stack_restore (gimple_stmt_iterator i)
       if (!callee
 	  || !fndecl_built_in_p (callee, BUILT_IN_NORMAL)
 	  /* All regular builtins are ok, just obviously not alloca.  */
-	  || ALLOCA_FUNCTION_CODE_P (DECL_FUNCTION_CODE (callee)))
+	  || ALLOCA_FUNCTION_CODE_P (DECL_FUNCTION_CODE (callee))
+	  /* Do not remove stack updates before strub leave.  */
+	  || fndecl_built_in_p (callee, BUILT_IN___STRUB_LEAVE))
 	return NULL_TREE;
 
       if (fndecl_built_in_p (callee, BUILT_IN_STACK_RESTORE))
