@@ -1,5 +1,5 @@
 /* Dead code elimination pass for the GNU compiler.
-   Copyright (C) 2002-2023 Free Software Foundation, Inc.
+   Copyright (C) 2002-2024 Free Software Foundation, Inc.
    Contributed by Ben Elliston <bje@redhat.com>
    and Andrew MacLeod <amacleod@redhat.com>
    Adapted to use control dependence by Steven Bosscher, SUSE Labs.
@@ -221,6 +221,14 @@ mark_stmt_if_obviously_necessary (gimple *stmt, bool aggressive)
 
     case GIMPLE_CALL:
       {
+	/* Never elide a noreturn call we pruned control-flow for.  */
+	if ((gimple_call_flags (stmt) & ECF_NORETURN)
+	    && gimple_call_ctrl_altering_p (stmt))
+	  {
+	    mark_stmt_necessary (stmt, true);
+	    return;
+	  }
+
 	tree callee = gimple_call_fndecl (stmt);
 	if (callee != NULL_TREE
 	    && fndecl_built_in_p (callee, BUILT_IN_NORMAL))
@@ -461,7 +469,8 @@ find_obviously_necessary_stmts (bool aggressive)
 static bool
 ref_may_be_aliased (tree ref)
 {
-  gcc_assert (TREE_CODE (ref) != WITH_SIZE_EXPR);
+  if (TREE_CODE (ref) == WITH_SIZE_EXPR)
+    ref = TREE_OPERAND (ref, 0);
   while (handled_component_p (ref))
     ref = TREE_OPERAND (ref, 0);
   if ((TREE_CODE (ref) == MEM_REF || TREE_CODE (ref) == TARGET_MEM_REF)
@@ -1232,9 +1241,7 @@ maybe_optimize_arith_overflow (gimple_stmt_iterator *gsi,
   tree arg1 = gimple_call_arg (stmt, 1);
   location_t loc = gimple_location (stmt);
   tree type = TREE_TYPE (TREE_TYPE (lhs));
-  tree utype = type;
-  if (!TYPE_UNSIGNED (type))
-    utype = build_nonstandard_integer_type (TYPE_PRECISION (type), 1);
+  tree utype = unsigned_type_for (type);
   tree result = fold_build2_loc (loc, subcode, utype,
 				 fold_convert_loc (loc, utype, arg0),
 				 fold_convert_loc (loc, utype, arg1));

@@ -1,5 +1,5 @@
 /* Utilities for ipa analysis.
-   Copyright (C) 2005-2023 Free Software Foundation, Inc.
+   Copyright (C) 2005-2024 Free Software Foundation, Inc.
    Contributed by Kenneth Zadeck <zadeck@naturalbridge.com>
 
 This file is part of GCC.
@@ -651,13 +651,14 @@ ipa_merge_profiles (struct cgraph_node *dst,
 		{
 		  edge srce = EDGE_SUCC (srcbb, i);
 		  edge dste = EDGE_SUCC (dstbb, i);
-		  dste->probability = 
-		    dste->probability * dstbb->count.ipa ().probability_in
-						 (dstbb->count.ipa ()
-						  + srccount.ipa ())
-		    + srce->probability * srcbb->count.ipa ().probability_in
-						 (dstbb->count.ipa ()
-						  + srccount.ipa ());
+		  profile_count sum =
+		    dstbb->count.ipa () + srccount.ipa ();
+		  if (sum.nonzero_p ())
+		    dste->probability =
+		      dste->probability * dstbb->count.ipa ().probability_in
+						   (sum)
+		      + srce->probability * srcbb->count.ipa ().probability_in
+						   (sum);
 		}
 	      dstbb->count = dstbb->count.ipa () + srccount.ipa ();
 	    }

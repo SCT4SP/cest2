@@ -1,44 +1,8 @@
 /* { dg-do compile } */
-/* { dg-options "-march=rv64gcv_zvfh_zvl4096b -mabi=lp64d -O3 -fno-schedule-insns -fno-schedule-insns2" } */
+/* { dg-options "-march=rv64gcv_zvfh_zvl4096b -mabi=lp64d --param=riscv-autovec-lmul=m8 -O3 -fno-schedule-insns -fno-schedule-insns2" } */
 /* { dg-final { check-function-bodies "**" "" } } */
 
 #include "def.h"
-
-/*
-** mov0:
-**	flh\s+[a-x0-9]+,0\s*\([a-x0-9]+\)
-**	fsh\s+[a-x0-9]+,0\s*\([a-x0-9]+\)
-**  ret
-*/
-void mov0 (_Float16 *in, _Float16 *out)
-{
-  v1hf v = *(v1hf*)in;
-  *(v1hf*)out = v;
-}
-
-/*
-** mov1:
-**	flw\s+[a-x0-9]+,0\s*\([a-x0-9]+\)
-**	fsw\s+[a-x0-9]+,0\s*\([a-x0-9]+\)
-**  ret
-*/
-void mov1 (_Float16 *in, _Float16 *out)
-{
-  v2hf v = *(v2hf*)in;
-  *(v2hf*)out = v;
-}
-
-/*
-** mov2:
-**	fld\s+[a-x0-9]+,0\s*\([a-x0-9]+\)
-**	fsd\s+[a-x0-9]+,0\s*\([a-x0-9]+\)
-**  ret
-*/
-void mov2 (_Float16 *in, _Float16 *out)
-{
-  v4hf v = *(v4hf*)in;
-  *(v4hf*)out = v;
-}
 
 /*
 ** mov3:

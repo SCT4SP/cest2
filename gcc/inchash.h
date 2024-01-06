@@ -1,5 +1,5 @@
 /* An incremental hash abstract data type.
-   Copyright (C) 2014-2023 Free Software Foundation, Inc.
+   Copyright (C) 2014-2024 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -59,7 +59,7 @@ class hash
 
   /* Add polynomial value V, treating each element as an unsigned int.  */
   template<unsigned int N, typename T>
-  void add_poly_int (const poly_int_pod<N, T> &v)
+  void add_poly_int (const poly_int<N, T> &v)
   {
     for (unsigned int i = 0; i < N; ++i)
       add_int (v.coeffs[i]);
@@ -73,7 +73,7 @@ class hash
 
   /* Add polynomial value V, treating each element as a HOST_WIDE_INT.  */
   template<unsigned int N, typename T>
-  void add_poly_hwi (const poly_int_pod<N, T> &v)
+  void add_poly_hwi (const poly_int<N, T> &v)
   {
     for (unsigned int i = 0; i < N; ++i)
       add_hwi (v.coeffs[i]);
