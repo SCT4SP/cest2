@@ -1220,7 +1220,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
       _GLIBCXX20_CONSTEXPR
       void
       clear() _GLIBCXX_NOEXCEPT
-#ifdef _GLIBCXX_CEST_CONSTEXPR
+#if _GLIBCXX_CEST_VERSION
       {
 #ifdef __clang__
       if (__builtin_is_constant_evaluated())
@@ -4083,7 +4083,8 @@ _GLIBCXX_END_NAMESPACE_CXX11
    *  writing a C string.
    */
   template<typename _CharT, typename _Traits, typename _Alloc>
-    _GLIBCXX_CEST_CONSTEXPR inline basic_ostream<_CharT, _Traits>&
+    _GLIBCXX_CEST_CONSTEXPR
+    inline basic_ostream<_CharT, _Traits>&
     operator<<(basic_ostream<_CharT, _Traits>& __os,
 	       const basic_string<_CharT, _Traits, _Alloc>& __str)
     {
