@@ -57,6 +57,7 @@ constexpr bool istringstream_test3() {
 }
 
 // Test again with recent GCC
+// (Original idea was to use a stringstream, but this is likely not possible.)
 template <bool B = true>
 constexpr bool static_assert_test()
 {
