@@ -56,6 +56,19 @@ constexpr bool istringstream_test3() {
   return b1 && b2;
 }
 
+// Test again with recent GCC
+template <bool B = true>
+constexpr bool static_assert_test()
+{
+#ifdef __clang__
+  constexpr std::string_view str = "Error message from a std::string_view.";
+  static_assert(B, "Normal string literal error message.");
+  static_assert(B, str);
+#endif
+
+  return true;
+}
+
 } // namespace ss_tests
 
 void stringstream_tests() {
@@ -69,6 +82,8 @@ void stringstream_tests() {
 
   static_assert(istringstream_test1<std::istringstream, std::string>());
   static_assert(istringstream_test2<std::istringstream, std::string>());
+
+  static_assert(static_assert_test());
 }
 
 int main(int argc, char *argv[])
