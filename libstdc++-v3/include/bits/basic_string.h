@@ -1230,10 +1230,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
       clear() _GLIBCXX_NOEXCEPT
 #if _GLIBCXX_CEST_VERSION
       {
-#ifdef __clang__
-      if (__builtin_is_constant_evaluated())
-        _M_use_local_data(); // explicates _M_local_buf union member as active
-#endif
+        _M_init_local_buf(); // explicates _M_local_buf union member as active
         _M_set_length(0);
       }
 #else
