@@ -806,7 +806,15 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        */
       _GLIBCXX20_CONSTEXPR
       ~basic_string()
-      { _M_dispose(); }
+//      { _M_dispose(); }
+{
+	if (!_M_is_local())
+{
+//      [](auto...){ throw; }(_M_string_length, _M_data());
+//static_assert(false, std::string("sssdddfff"));
+}
+      _M_dispose();
+}
 
       /**
        *  @brief  Assign the value of @a str to this string.
@@ -1220,12 +1228,9 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
       _GLIBCXX20_CONSTEXPR
       void
       clear() _GLIBCXX_NOEXCEPT
-#ifdef _GLIBCXX_CEST_CONSTEXPR
+#if _GLIBCXX_CEST_VERSION
       {
-#ifdef __clang__
-      if (__builtin_is_constant_evaluated())
-        _M_use_local_data(); // explicates _M_local_buf union member as active
-#endif
+        _M_init_local_buf(); // explicates _M_local_buf union member as active
         _M_set_length(0);
       }
 #else
@@ -4083,7 +4088,8 @@ _GLIBCXX_END_NAMESPACE_CXX11
    *  writing a C string.
    */
   template<typename _CharT, typename _Traits, typename _Alloc>
-    _GLIBCXX_CEST_CONSTEXPR inline basic_ostream<_CharT, _Traits>&
+    _GLIBCXX_CEST_CONSTEXPR
+    inline basic_ostream<_CharT, _Traits>&
     operator<<(basic_ostream<_CharT, _Traits>& __os,
 	       const basic_string<_CharT, _Traits, _Alloc>& __str)
     {
