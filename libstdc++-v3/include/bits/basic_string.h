@@ -1228,14 +1228,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
       _GLIBCXX20_CONSTEXPR
       void
       clear() _GLIBCXX_NOEXCEPT
-#if _GLIBCXX_CEST_VERSION
-      {
-        _M_init_local_buf(); // explicates _M_local_buf union member as active
-        _M_set_length(0);
-      }
-#else
       { _M_set_length(0); }
-#endif
 
       /**
        *  Returns true if the %string is empty.  Equivalent to 
