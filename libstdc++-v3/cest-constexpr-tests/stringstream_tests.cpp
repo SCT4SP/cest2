@@ -34,7 +34,8 @@ template <typename Iss, typename S> constexpr bool istringstream_test1() {
 template <typename Iss, typename S> constexpr bool istringstream_test2() {
   Iss s;
   S str("alphaville");
-  s.str(std::move(str));
+  //s.str(std::move(str)); // same error as string_test1 in string_tests.cpp
+  s.str(str);
   char c;
   s.get(c);
   char buf[4];

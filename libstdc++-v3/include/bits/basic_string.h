@@ -806,15 +806,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        */
       _GLIBCXX20_CONSTEXPR
       ~basic_string()
-//      { _M_dispose(); }
-{
-	if (!_M_is_local())
-{
-//      [](auto...){ throw; }(_M_string_length, _M_data());
-//static_assert(false, std::string("sssdddfff"));
-}
-      _M_dispose();
-}
+      { _M_dispose(); }
 
       /**
        *  @brief  Assign the value of @a str to this string.
@@ -917,7 +909,11 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
 		__str._M_capacity(__capacity);
 	      }
 	    else
+#if _GLIBCXX_CEST_VERSION
+	      __str._M_data(__str._M_use_local_data()); // cexpr: update union member
+#else
 	      __str._M_data(__str._M_local_buf);
+#endif
 	  }
 	else // Need to do a deep copy
 	  assign(__str);
@@ -1228,14 +1224,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
       _GLIBCXX20_CONSTEXPR
       void
       clear() _GLIBCXX_NOEXCEPT
-#if _GLIBCXX_CEST_VERSION
-      {
-        _M_init_local_buf(); // explicates _M_local_buf union member as active
-        _M_set_length(0);
-      }
-#else
       { _M_set_length(0); }
-#endif
 
       /**
        *  Returns true if the %string is empty.  Equivalent to 
