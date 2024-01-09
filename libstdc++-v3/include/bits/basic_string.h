@@ -909,7 +909,11 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
 		__str._M_capacity(__capacity);
 	      }
 	    else
+#if _GLIBCXX_CEST_VERSION
+	      __str._M_data(__str._M_use_local_data()); // cexpr: update union member
+#else
 	      __str._M_data(__str._M_local_buf);
+#endif
 	  }
 	else // Need to do a deep copy
 	  assign(__str);
