@@ -3,15 +3,14 @@
 
 constexpr bool string_test1()
 {
-#ifndef __clang__
-  // Clang complains of access to `_M_local_buf' of union with
-  // active member '_M_allocated_capacity'
+  // GCC and Clang both complained of access to `_M_local_buf' of union in
+  // basic_string, with active member '_M_allocated_capacity'
   {
     std::string str1;
     std::string str2 = "1234567890123456"; // 16 chars
     str1 = std::move(str2);
   }
-#endif
+
   return true;
 }
 
