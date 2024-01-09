@@ -806,15 +806,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        */
       _GLIBCXX20_CONSTEXPR
       ~basic_string()
-//      { _M_dispose(); }
-{
-	if (!_M_is_local())
-{
-//      [](auto...){ throw; }(_M_string_length, _M_data());
-//static_assert(false, std::string("sssdddfff"));
-}
-      _M_dispose();
-}
+      { _M_dispose(); }
 
       /**
        *  @brief  Assign the value of @a str to this string.
