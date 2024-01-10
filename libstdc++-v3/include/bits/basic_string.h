@@ -1183,8 +1183,12 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
       size_type
       capacity() const _GLIBCXX_NOEXCEPT
       {
-	return _M_is_local() ? size_type(_S_local_capacity)
-	                     : _M_allocated_capacity;
+//	return _M_is_local() ? size_type(_S_local_capacity)
+//	                     : _M_allocated_capacity;
+if (_M_is_local())
+  return size_type(_S_local_capacity);
+else
+  return _M_allocated_capacity;
       }
 
       /**
