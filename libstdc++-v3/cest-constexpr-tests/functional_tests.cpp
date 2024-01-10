@@ -25,7 +25,12 @@ constexpr bool function_test1()
   b1 = b1 && nullptr == f1_ref;    // null ptr comparisons
 
   std::function<int(double*,char)> f2 = forty_two;
+#ifdef __clang__
   bool b2 = 42 == f2(&d, 'q') && typeid(void) != f2.target_type();
+#else
+  // GCC bug 113306 https://gcc.gnu.org/bugzilla/show_bug.cgi?id=113306
+  bool b2 = 42 == f2(&d, 'q');
+#endif
 
   std::function<int(int, int)> myplus = std::plus<int>();
   std::function<int(int, int)> myminus = std::minus<int>();
