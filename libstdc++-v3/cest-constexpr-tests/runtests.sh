@@ -3,8 +3,9 @@
 # Adding -O3 causes iostream_tests.cpp and stringstream_tests.cpp to fail due
 # to the use of a static member in ~locale(). Fix with dlsym interposition.
 
-GNUC_ROOT="$HOME/repos/SCT4SP/gcc/install"
-#GNUC_ROOT="/opt/gcc-latest" # This doesn't work ATM
+# Contains bin, lib64, include,constexpr-std-headers, etc.
+GNUC_ROOT="$CEST2_INCLUDE/../.."
+#GNUC_ROOT="/opt/gcc-latest" # No. Need C'est 2 binaries, for runtime, for now
 CLANG_ROOT=$CLANGOZ_ROOT   # Any recent (months) clang will work
 
 # The _GLIBCXX_CEST_CONSTEXPR and _GLIBCXX_CEST_VERSION below are not required
