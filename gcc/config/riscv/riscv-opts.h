@@ -55,6 +55,8 @@ extern enum riscv_isa_spec_class riscv_isa_spec;
 enum riscv_microarchitecture_type {
   generic,
   sifive_7,
+  sifive_p400,
+  sifive_p600,
   generic_ooo
 };
 extern enum riscv_microarchitecture_type riscv_microarchitecture;
@@ -114,6 +116,17 @@ enum stringop_strategy_enum {
   STRATEGY_VECTOR = 4,
   /* Use any. */
   STRATEGY_AUTO = STRATEGY_SCALAR | STRATEGY_VECTOR
+};
+
+/* Behavior of VSETVL Pass.  */
+enum vsetvl_strategy_enum {
+  /* Optimized: Run LCM dataflow analysis to reduce vsetvl* insns and
+     delete any redundant ones generated in the process.  */
+  VSETVL_OPT,
+  /* Simple: Insert a vsetvl* instruction for each Vector instruction.  */
+  VSETVL_SIMPLE,
+  /* No fusion: Disable Phase 2 earliest global fusion.  */
+  VSETVL_OPT_NO_FUSION,
 };
 
 #define TARGET_ZICOND_LIKE (TARGET_ZICOND || (TARGET_XVENTANACONDOPS && TARGET_64BIT))

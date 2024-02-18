@@ -2,7 +2,9 @@ AC_INIT([libgrust], version-unused,,libgrust)
 AC_CONFIG_SRCDIR(Makefile.am)
 AC_CONFIG_FILES([Makefile])
 
-AM_ENABLE_MULTILIB(, ..)
+if test -n "${with_target_subdir}"; then
+  AM_ENABLE_MULTILIB(, ..)
+fi
 
 # Do not delete or change the following two lines.  For why, see
 # http://gcc.gnu.org/ml/libstdc++/2003-07/msg00451.html
@@ -102,7 +104,7 @@ AC_SUBST(toolexecdir)
 AC_SUBST(toolexeclibdir)
 
 
-AC_CONFIG_FILES(AC_FOREACH([DIR], [libproc_macro], [DIR/Makefile ]),
+AC_CONFIG_FILES(AC_FOREACH([DIR], [libproc_macro_internal], [DIR/Makefile ]),
  [ cat > vpsed$$ << \_EOF
 s!`test -f '$<' || echo '$(srcdir)/'`!!
 _EOF

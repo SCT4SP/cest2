@@ -1,3 +1,30 @@
+2024-02-05  Jakub Jelinek  <jakub@redhat.com>
+
+	* test_installed: Fill in HOSTCC, HOSTCXX, HOSTCFLAGS and
+	HOSTCXXFLAGS.
+
+2024-02-04  Jonathan Wakely  <jwakely@redhat.com>
+
+	* unicode/gen_libstdcxx_unicode_data.py: Add copyright and
+	license text to the output.
+
+2024-01-11  Paul Iannetta  <piannetta@kalrayinc.com>
+
+	* dg-extract-results.py: Make the test_run regex case
+	insensitive.
+
+2024-01-09  Jonathan Wakely  <jwakely@redhat.com>
+
+	* unicode/gen_libstdcxx_unicode_data.py: Print out Gcb_property
+	enumerators in the order they're seen, not alphabetical order.
+
+2024-01-08  Jonathan Wakely  <jwakely@redhat.com>
+
+	* unicode/README: Add notes about generating libstdc++ tables.
+	* unicode/GraphemeBreakProperty.txt: New file.
+	* unicode/emoji-data.txt: New file.
+	* unicode/gen_libstdcxx_unicode_data.py: New file.
+
 2024-01-05  Jonathan Wakely  <jwakely@redhat.com>
 
 	* analyze_brprob.py: Remove stray text at end of comment.

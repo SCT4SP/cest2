@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---          Copyright (C) 1992-2023, Free Software Foundation, Inc.         --
+--          Copyright (C) 1992-2024, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -7385,6 +7385,11 @@ package body Sem_Util is
       loop
          Decl := Parent (Decl);
       end loop;
+
+      --  cope with oddness in definition of N_Declaration
+      if Nkind (Decl) in N_Subprogram_Specification then
+         Decl := Parent (Decl);
+      end if;
 
       return Decl;
    end Enclosing_Declaration;

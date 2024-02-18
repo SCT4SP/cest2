@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---          Copyright (C) 2015-2023, Free Software Foundation, Inc.         --
+--          Copyright (C) 2015-2024, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -2529,17 +2529,9 @@ package body Contracts is
                 Pragma_Argument_Associations => Args,
                 Class_Present                => Class_Present);
 
-            Subp_Decl : Node_Id := Subp_Id;
+            Subp_Decl : constant Node_Id := Enclosing_Declaration (Subp_Id);
+            pragma Assert (Is_Declaration (Subp_Decl));
          begin
-            --  Enclosing_Declaration may return, for example,
-            --  a N_Procedure_Specification node. Cope with this.
-            loop
-               Subp_Decl := Enclosing_Declaration (Subp_Decl);
-               exit when Is_Declaration (Subp_Decl);
-               Subp_Decl := Parent (Subp_Decl);
-               pragma Assert (Present (Subp_Decl));
-            end loop;
-
             Insert_After_And_Analyze (Subp_Decl, Prag);
          end Insert_Stable_Property_Check;
 

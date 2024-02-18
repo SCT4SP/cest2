@@ -233,6 +233,7 @@ Classes used:
 /* This TU doesn't need or want to see the networking.  */
 #define CODY_NETWORKING 0
 #include "mapper-client.h"
+#include <zlib.h> // for crc32, crc32_combine
 
 #if 0 // 1 for testing no mmap
 #define MAPPED_READING 0
@@ -487,10 +488,7 @@ protected:
 unsigned
 bytes::calc_crc (unsigned l) const
 {
-  unsigned crc = 0;
-  for (size_t ix = 4; ix < l; ix++)
-    crc = crc32_byte (crc, buffer[ix]);
-  return crc;
+  return crc32 (0, (unsigned char *)buffer + 4, l - 4);
 }
 
 class elf_in;
@@ -717,7 +715,7 @@ bytes_out::set_crc (unsigned *crc_ptr)
       unsigned crc = calc_crc (pos);
       unsigned accum = *crc_ptr;
       /* Only mix the existing *CRC_PTR if it is non-zero.  */
-      accum = accum ? crc32_unsigned (accum, crc) : crc;
+      accum = accum ? crc32_combine (accum, crc, pos - 4) : crc;
       *crc_ptr = accum;
 
       /* Buffer will be sufficiently aligned.  */
@@ -2837,6 +2835,13 @@ typedef hash_map<tree,uintptr_t,
 		 simple_hashmap_traits<nodel_ptr_hash<tree_node>,uintptr_t> >
 duplicate_hash_map;
 
+/* Data needed for post-processing.  */
+struct post_process_data {
+  tree decl;
+  location_t start_locus;
+  location_t end_locus;
+};
+
 /* Tree stream reader.  Note that reading a stream doesn't mark the
    read trees with TREE_VISITED.  Thus it's quite safe to have
    multiple concurrent readers.  Which is good, because lazy
@@ -2848,7 +2853,7 @@ private:
   module_state *state;		/* Module being imported.  */
   vec<tree> back_refs;		/* Back references.  */
   duplicate_hash_map *duplicates;	/* Map from existings to duplicate.  */
-  vec<tree> post_decls;		/* Decls to post process.  */
+  vec<post_process_data> post_decls;	/* Decls to post process.  */
   unsigned unused;		/* Inhibit any interior TREE_USED
 				   marking.  */
 
@@ -2945,16 +2950,16 @@ public:
   tree odr_duplicate (tree decl, bool has_defn);
 
 public:
-  /* Return the next decl to postprocess, or NULL.  */
-  tree post_process ()
+  /* Return the decls to postprocess.  */
+  const vec<post_process_data>& post_process ()
   {
-    return post_decls.length () ? post_decls.pop () : NULL_TREE;
+    return post_decls;
   }
 private:
-  /* Register DECL for postprocessing.  */
-  void post_process (tree decl)
+  /* Register DATA for postprocessing.  */
+  void post_process (post_process_data data)
   {
-    post_decls.safe_push (decl);
+    post_decls.safe_push (data);
   }
 
 private:
@@ -5351,6 +5356,7 @@ trees_out::core_bools (tree t)
       WB (t->base.u.bits.user_align);
       WB (t->base.u.bits.nameless_flag);
       WB (t->base.u.bits.atomic_flag);
+      WB (t->base.u.bits.unavailable_flag);
       break;
     }
 
@@ -5531,6 +5537,7 @@ trees_in::core_bools (tree t)
       RB (t->base.u.bits.user_align);
       RB (t->base.u.bits.nameless_flag);
       RB (t->base.u.bits.atomic_flag);
+      RB (t->base.u.bits.unavailable_flag);
       break;
     }
 
@@ -5683,8 +5690,9 @@ trees_out::lang_decl_bools (tree t)
       WB (lang->u.fn.has_dependent_explicit_spec_p);
       WB (lang->u.fn.immediate_fn_p);
       WB (lang->u.fn.maybe_deleted);
-      WB (lang->u.fn.escalated_p);
       /* We do not stream lang->u.fn.implicit_constexpr.  */
+      WB (lang->u.fn.escalated_p);
+      WB (lang->u.fn.xobj_func);
       goto lds_min;
 
     case lds_decomp:  /* lang_decl_decomp.  */
@@ -5753,8 +5761,9 @@ trees_in::lang_decl_bools (tree t)
       RB (lang->u.fn.has_dependent_explicit_spec_p);
       RB (lang->u.fn.immediate_fn_p);
       RB (lang->u.fn.maybe_deleted);
-      RB (lang->u.fn.escalated_p);
       /* We do not stream lang->u.fn.implicit_constexpr.  */
+      RB (lang->u.fn.escalated_p);
+      RB (lang->u.fn.xobj_func);
       goto lds_min;
 
     case lds_decomp:  /* lang_decl_decomp.  */
@@ -5804,10 +5813,8 @@ trees_out::lang_type_bools (tree t)
 
   WB ((lang->gets_delete >> 0) & 1);
   WB ((lang->gets_delete >> 1) & 1);
-  // Interfaceness is recalculated upon reading.  May have to revisit?
-  // How do dllexport and dllimport interact across a module?
-  // lang->interface_only
-  // lang->interface_unknown
+  WB (lang->interface_only);
+  WB (lang->interface_unknown);
   WB (lang->contains_empty_class_p);
   WB (lang->anon_aggr);
   WB (lang->non_zero_init);
@@ -5875,9 +5882,8 @@ trees_in::lang_type_bools (tree t)
   v = b () << 0;
   v |= b () << 1;
   lang->gets_delete = v;
-  // lang->interface_only
-  // lang->interface_unknown
-  lang->interface_unknown = true; // Redetermine interface
+  RB (lang->interface_only);
+  RB (lang->interface_unknown);
   RB (lang->contains_empty_class_p);
   RB (lang->anon_aggr);
   RB (lang->non_zero_init);
@@ -6311,6 +6317,7 @@ trees_out::core_vals (tree t)
       WT (((lang_tree_node *)t)->lambda_expression.capture_list);
       WT (((lang_tree_node *)t)->lambda_expression.this_capture);
       WT (((lang_tree_node *)t)->lambda_expression.extra_scope);
+      WT (((lang_tree_node *)t)->lambda_expression.regen_info);
       /* pending_proxies is a parse-time thing.  */
       gcc_assert (!((lang_tree_node *)t)->lambda_expression.pending_proxies);
       if (state)
@@ -6812,6 +6819,7 @@ trees_in::core_vals (tree t)
       RT (((lang_tree_node *)t)->lambda_expression.capture_list);
       RT (((lang_tree_node *)t)->lambda_expression.this_capture);
       RT (((lang_tree_node *)t)->lambda_expression.extra_scope);
+      RT (((lang_tree_node *)t)->lambda_expression.regen_info);
       /* lambda_expression.pending_proxies is NULL  */
       ((lang_tree_node *)t)->lambda_expression.locus
 	= state->read_location (*this);
@@ -6948,6 +6956,9 @@ trees_out::lang_decl_vals (tree t)
 	  if (streaming_p ())
 	    wi (lang->u.fn.u5.fixed_offset);
 	}
+      else if (decl_tls_wrapper_p (t))
+	/* The wrapped variable.  */
+	WT (lang->u.fn.befriending_classes);
       else
 	WT (lang->u.fn.u5.cloned_function);
 
@@ -7027,6 +7038,8 @@ trees_in::lang_decl_vals (tree t)
 	  RT (lang->u.fn.befriending_classes);
 	  lang->u.fn.u5.fixed_offset = wi ();
 	}
+      else if (decl_tls_wrapper_p (t))
+	RT (lang->u.fn.befriending_classes);
       else
 	RT (lang->u.fn.u5.cloned_function);
 
@@ -7926,6 +7939,9 @@ trees_out::decl_value (tree decl, depset *dep)
 				   decl, cloned_p ? "" : "not ");
     }
 
+  if (streaming_p () && VAR_P (decl) && CP_DECL_THREAD_LOCAL_P (decl))
+    u (decl_tls_model (decl));
+
   if (streaming_p ())
     dump (dumper::TREE) && dump ("Written decl:%d %C:%N", tag,
 				 TREE_CODE (decl), decl);
@@ -8236,6 +8252,23 @@ trees_in::decl_value ()
 	/* Set the TEMPLATE_DECL's type.  */
 	TREE_TYPE (decl) = TREE_TYPE (inner);
 
+      /* Redetermine whether we need to import or export this declaration
+	 for this TU.  But for extern templates we know we must import:
+	 they'll be defined in a different TU.
+	 FIXME: How do dllexport and dllimport interact across a module?
+	 See also https://github.com/itanium-cxx-abi/cxx-abi/issues/170.
+	 May have to revisit?  */
+      if (type
+	  && CLASS_TYPE_P (type)
+	  && TYPE_LANG_SPECIFIC (type)
+	  && !(CLASSTYPE_EXPLICIT_INSTANTIATION (type)
+	       && CLASSTYPE_INTERFACE_KNOWN (type)
+	       && CLASSTYPE_INTERFACE_ONLY (type)))
+	{
+	  CLASSTYPE_INTERFACE_ONLY (type) = false;
+	  CLASSTYPE_INTERFACE_UNKNOWN (type) = true;
+	}
+
       /* Add to specialization tables now that constraints etc are
 	 added.  */
       if (mk == MK_partial)
@@ -8273,6 +8306,13 @@ trees_in::decl_value ()
 	   look like templates.  */
 	if (!install_implicit_member (inner))
 	  set_overrun ();
+
+      /* When importing a TLS wrapper from a header unit, we haven't
+	 actually emitted its definition yet. Remember it so we can
+	 do this later.  */
+      if (state->is_header ()
+	  && decl_tls_wrapper_p (decl))
+	note_vague_linkage_fn (decl);
     }
   else
     {
@@ -8354,6 +8394,13 @@ trees_in::decl_value ()
 				   to the class defn).  */
 				CLASSTYPE_MEMBER_VEC (DECL_CONTEXT (decl)));
 	}
+    }
+
+  if (VAR_P (decl) && CP_DECL_THREAD_LOCAL_P (decl))
+    {
+      enum tls_model model = tls_model (u ());
+      if (is_new)
+	set_decl_tls_model (decl, model);
     }
 
   if (!NAMESPACE_SCOPE_P (inner)
@@ -11629,14 +11676,24 @@ trees_out::write_function_def (tree decl)
       tree_node (cexpr->body);
     }
 
+  function* f = DECL_STRUCT_FUNCTION (decl);
+
   if (streaming_p ())
     {
       unsigned flags = 0;
 
+      if (f)
+	flags |= 2;
       if (DECL_NOT_REALLY_EXTERN (decl))
 	flags |= 1;
 
       u (flags);
+    }
+
+  if (state && f)
+    {
+      state->write_location (*this, f->function_start_locus);
+      state->write_location (*this, f->function_end_locus);
     }
 }
 
@@ -11654,6 +11711,8 @@ trees_in::read_function_def (tree decl, tree maybe_template)
   tree saved = tree_node ();
   tree context = tree_node ();
   constexpr_fundef cexpr;
+  post_process_data pdata {};
+  pdata.decl = maybe_template;
 
   tree maybe_dup = odr_duplicate (maybe_template, DECL_SAVED_TREE (decl));
   bool installing = maybe_dup && !DECL_SAVED_TREE (decl);
@@ -11670,6 +11729,12 @@ trees_in::read_function_def (tree decl, tree maybe_template)
 
   unsigned flags = u ();
 
+  if (flags & 2)
+    {
+      pdata.start_locus = state->read_location (*this);
+      pdata.end_locus = state->read_location (*this);
+    }
+
   if (get_overrun ())
     return NULL_TREE;
 
@@ -11679,14 +11744,12 @@ trees_in::read_function_def (tree decl, tree maybe_template)
       DECL_RESULT (decl) = result;
       DECL_INITIAL (decl) = initial;
       DECL_SAVED_TREE (decl) = saved;
-      if (maybe_dup)
-	DECL_ARGUMENTS (decl) = DECL_ARGUMENTS (maybe_dup);
 
       if (context)
 	SET_DECL_FRIEND_CONTEXT (decl, context);
       if (cexpr.decl)
 	register_constexpr_fundef (cexpr);
-      post_process (maybe_template);
+      post_process (pdata);
     }
   else if (maybe_dup)
     {
@@ -11707,7 +11770,8 @@ trees_out::write_var_def (tree decl)
     {
       tree dyn_init = NULL_TREE;
 
-      if (DECL_NONTRIVIALLY_INITIALIZED_P (decl))
+      /* We only need to write initializers in header modules.  */
+      if (header_module_p () && DECL_NONTRIVIALLY_INITIALIZED_P (decl))
 	{
 	  dyn_init = value_member (decl,
 				   CP_DECL_THREAD_LOCAL_P (decl)
@@ -11752,6 +11816,11 @@ trees_in::read_var_def (tree decl, tree maybe_template)
 	  DECL_INITIALIZED_P (decl) = true;
 	  if (maybe_dup && DECL_INITIALIZED_BY_CONSTANT_EXPRESSION_P (maybe_dup))
 	    DECL_INITIALIZED_BY_CONSTANT_EXPRESSION_P (decl) = true;
+	  if (DECL_IMPLICIT_INSTANTIATION (decl)
+	      || (DECL_CLASS_SCOPE_P (decl)
+		  && !DECL_VTABLE_OR_VTT_P (decl)
+		  && !DECL_TEMPLATE_INFO (decl)))
+	    note_vague_linkage_variable (decl);
 	}
       DECL_INITIAL (decl) = init;
       if (!dyn_init)
@@ -12045,15 +12114,6 @@ trees_in::read_class_def (tree defn, tree maybe_template)
   bool installing = maybe_dup && !TYPE_SIZE (type);
   if (installing)
     {
-      if (DECL_EXTERNAL (defn) && TYPE_LANG_SPECIFIC (type))
-	{
-	  /* We don't deal with not-really-extern, because, for a
-	     module you want the import to be the interface, and for a
-	     header-unit, you're doing it wrong.  */
-	  CLASSTYPE_INTERFACE_UNKNOWN (type) = false;
-	  CLASSTYPE_INTERFACE_ONLY (type) = true;
-	}
-
       if (maybe_dup != defn)
 	{
 	  // FIXME: This is needed on other defns too, almost
@@ -12120,8 +12180,16 @@ trees_in::read_class_def (tree defn, tree maybe_template)
 
 	      if (TREE_CODE (decl) == FIELD_DECL
 		  && ANON_AGGR_TYPE_P (TREE_TYPE (decl)))
-		ANON_AGGR_TYPE_FIELD
-		  (TYPE_MAIN_VARIANT (TREE_TYPE (decl))) = decl;
+		{
+		  tree anon_type = TYPE_MAIN_VARIANT (TREE_TYPE (decl));
+		  if (DECL_NAME (defn) == as_base_identifier)
+		    /* ANON_AGGR_TYPE_FIELD should already point to the
+		       original FIELD_DECL; don't overwrite it to point
+		       to the as-base FIELD_DECL copy.  */
+		    gcc_checking_assert (ANON_AGGR_TYPE_FIELD (anon_type));
+		  else
+		    ANON_AGGR_TYPE_FIELD (anon_type) = decl;
+		}
 
 	      if (TREE_CODE (decl) == USING_DECL
 		  && TREE_CODE (USING_DECL_SCOPE (decl)) == RECORD_TYPE)
@@ -12832,8 +12900,10 @@ depset::hash::add_binding_entity (tree decl, WMB_Flags flags, void *data_)
       else if (TREE_CODE (inner) == TEMPLATE_DECL)
 	inner = DECL_TEMPLATE_RESULT (inner);
 
-      if (!DECL_LANG_SPECIFIC (inner) || !DECL_MODULE_PURVIEW_P (inner))
-	/* Ignore global module fragment entities.  */
+      if ((!DECL_LANG_SPECIFIC (inner) || !DECL_MODULE_PURVIEW_P (inner))
+	  && !(flags & (WMB_Using | WMB_Export)))
+	/* Ignore global module fragment entities unless explicitly
+	   exported with a using declaration.  */
 	return false;
 
       if (VAR_OR_FUNCTION_DECL_P (inner)
@@ -13188,7 +13258,7 @@ depset::hash::add_specializations (bool decl_p)
       if (use_tpl == 1)
 	/* Implicit instantiations only walked if we reach them.  */
 	needs_reaching = true;
-      else if (!DECL_LANG_SPECIFIC (spec)
+      else if (!DECL_LANG_SPECIFIC (STRIP_TEMPLATE (spec))
 	       || !DECL_MODULE_PURVIEW_P (STRIP_TEMPLATE (spec)))
 	/* Likewise, GMF explicit or partial specializations.  */
 	needs_reaching = true;
@@ -13990,6 +14060,12 @@ get_primary (module_state *parent)
 module_state *
 get_module (tree name, module_state *parent, bool partition)
 {
+  /* We might be given an empty NAME if preprocessing fails to handle
+     a header-name token.  */
+  if (name && TREE_CODE (name) == STRING_CST
+      && TREE_STRING_LENGTH (name) == 0)
+    return nullptr;
+
   if (partition)
     {
       if (!parent)
@@ -15065,8 +15141,10 @@ module_state::read_cluster (unsigned snum)
      push_function_context does too much work.   */
   tree old_cfd = current_function_decl;
   struct function *old_cfun = cfun;
-  while (tree decl = sec.post_process ())
+  for (const post_process_data& pdata : sec.post_process ())
     {
+      tree decl = pdata.decl;
+
       bool abstract = false;
       if (TREE_CODE (decl) == TEMPLATE_DECL)
 	{
@@ -15078,6 +15156,8 @@ module_state::read_cluster (unsigned snum)
       allocate_struct_function (decl, abstract);
       cfun->language = ggc_cleared_alloc<language_function> ();
       cfun->language->base.x_stmt_tree.stmts_are_full_exprs_p = 1;
+      cfun->function_start_locus = pdata.start_locus;
+      cfun->function_end_locus = pdata.end_locus;
 
       if (abstract)
 	;
@@ -18638,7 +18718,8 @@ get_originating_module_decl (tree decl)
       && (TREE_CODE (DECL_CONTEXT (decl)) == ENUMERAL_TYPE))
     decl = TYPE_NAME (DECL_CONTEXT (decl));
   else if (TREE_CODE (decl) == FIELD_DECL
-	   || TREE_CODE (decl) == USING_DECL)
+	   || TREE_CODE (decl) == USING_DECL
+	   || CONST_DECL_USING_P (decl))
     {
       decl = DECL_CONTEXT (decl);
       if (TREE_CODE (decl) != FUNCTION_DECL)
@@ -18835,8 +18916,11 @@ set_defining_module (tree decl)
   gcc_checking_assert (!DECL_LANG_SPECIFIC (decl)
 		       || !DECL_MODULE_IMPORT_P (decl));
 
-  if (module_has_cmi_p ())
+  if (module_p ())
     {
+      /* We need to track all declarations within a module, not just those
+	 in the module purview, because we don't necessarily know yet if
+	 this module will require a CMI while in the global fragment.  */
       tree ctx = DECL_CONTEXT (decl);
       if (ctx
 	  && (TREE_CODE (ctx) == RECORD_TYPE || TREE_CODE (ctx) == UNION_TYPE)
