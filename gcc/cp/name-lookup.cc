@@ -3275,6 +3275,23 @@ check_local_shadow (tree decl)
   if (TREE_CODE (decl) == PARM_DECL && !DECL_CONTEXT (decl))
     return NULL_TREE;
 
+  if (DECL_FUNCTION_SCOPE_P (decl))
+    {
+      tree ctx = DECL_CONTEXT (decl);
+      if (DECL_CLONED_FUNCTION_P (ctx)
+	  || DECL_TEMPLATE_INSTANTIATED (ctx)
+	  || (DECL_LANG_SPECIFIC (ctx)
+	      && DECL_DEFAULTED_FN (ctx))
+	  || (LAMBDA_FUNCTION_P (ctx)
+	      && LAMBDA_EXPR_REGEN_INFO (CLASSTYPE_LAMBDA_EXPR
+					 (DECL_CONTEXT (ctx)))))
+	/* It suffices to check shadowing only when actually parsing.
+	   So punt for clones, instantiations, defaulted functions and
+	   regenerated lambdas.  This optimization helps reduce lazy
+	   loading cascades with modules.  */
+	return NULL_TREE;
+    }
+
   tree old = NULL_TREE;
   cp_binding_level *old_scope = NULL;
   if (cxx_binding *binding = outer_binding (DECL_NAME (decl), NULL, true))
@@ -4464,14 +4481,23 @@ cp_binding_level_descriptor (cp_binding_level *scope)
     "try-scope",
     "catch-scope",
     "for-scope",
+    "cond-init-scope",
+    "stmt-expr-scope",
     "function-parameter-scope",
     "class-scope",
+    "enum-scope",
     "namespace-scope",
     "template-parameter-scope",
-    "template-explicit-spec-scope"
+    "template-explicit-spec-scope",
+    "transaction-scope",
+    "openmp-scope"
   };
-  const scope_kind kind = scope->explicit_spec_p
-    ? sk_template_spec : scope->kind;
+  static_assert (ARRAY_SIZE (scope_kind_names) == sk_count,
+		 "must keep names aligned with scope_kind enum");
+
+  scope_kind kind = scope->kind;
+  if (kind == sk_template_parms && scope->explicit_spec_p)
+    kind = sk_template_spec;
 
   return scope_kind_names[kind];
 }
@@ -8089,9 +8115,19 @@ lookup_elaborated_type (tree name, TAG_how how)
 	    {
 	      /* We're in the global module, perhaps there's a tag
 		 there?  */
-	      // FIXME: This isn't quite right, if we find something
-	      // here, from the language PoV we're not supposed to
-	      // know it?
+
+	      /* FIXME: In general we should probably merge global module
+		 classes in check_module_override rather than here, but for
+		 GCC14 let's just fix lazy declarations of __class_type_info in
+		 build_dynamic_cast_1.  */
+	      if (current_namespace == abi_node)
+		{
+		  tree g = (BINDING_VECTOR_CLUSTER (*slot, 0)
+			    .slots[BINDING_SLOT_GLOBAL]);
+		  for (ovl_iterator iter (g); iter; ++iter)
+		    if (qualify_lookup (*iter, LOOK_want::TYPE))
+		      return *iter;
+		}
 	    }
 	}
     }
@@ -9070,7 +9106,6 @@ add_imported_namespace (tree ctx, tree name, location_t loc, unsigned import,
   if (!decl)
     {
       decl = make_namespace (ctx, name, loc, inline_p);
-      DECL_MODULE_IMPORT_P (decl) = true;
       make_namespace_finish (decl, slot, true);
     }
   else if (DECL_NAMESPACE_INLINE_P (decl) != inline_p)

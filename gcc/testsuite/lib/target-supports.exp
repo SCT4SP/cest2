@@ -1304,10 +1304,6 @@ proc check_stack_check_available { stack_kind } {
 
 # Return 1 if the target supports stack scrubbing.
 proc check_effective_target_strub {} {
-    # strub is not supported on AIX.
-    if { [istarget powerpc*-*-aix*] } {
-	return 0
-    }
     return [check_no_compiler_messages strub assembly {
 	void __attribute__ ((__strub__)) fn (void) {}
     } ""]
@@ -1389,13 +1385,26 @@ proc check_effective_target_aarch64_tlsle32 { } {
 # emitted, 0 otherwise.
 
 proc check_effective_target_shared { } {
+    # Darwin's linker defaults to error on undefined (which makes it look as
+    # if we do not support shared) but we can tell it to allow the symbols used
+    # here to be undefined.
+    set extra_flags ""
+    if { [istarget *-*-darwin\[912\]*] } {
+      set extra_flags "-Wl,-U,_foo,-U,_bar"
+    }
     # Note that M68K has a multilib that supports -fpic but not
     # -fPIC, so we need to check both.  We test with a program that
-    # requires GOT references.
+    # requires GOT references, and with a libc symbol that would
+    # bring in significant parts of a static-only libc.  Absent a
+    # shared libc, this would make -shared tests fail, so we don't
+    # want to enable the shared effective target then.
     return [check_no_compiler_messages shared executable {
+	#include <stdlib.h>
 	extern int foo (void); extern int bar;
-	int baz (void) { return foo () + bar; }
-    } "-shared -fpic"]
+	char *baz (void) {
+	    return foo () + (char*) malloc (bar);
+	}
+    } "-shared -fpic $extra_flags"]
 }
 
 # Return 1 if -pie, -fpie and -fPIE are supported, 0 otherwise.
@@ -1955,6 +1964,18 @@ proc check_effective_target_riscv_zbb { } {
        #endif
     }]
 }
+
+# Return 1 if the target arch supports the XTheadVector extension, 0 otherwise.
+# Cache the result.
+
+proc check_effective_target_riscv_xtheadvector { } {
+    return [check_no_compiler_messages riscv_ext_xtheadvector assembly {
+       #ifndef __riscv_xtheadvector
+       #error "Not __riscv_xtheadvector"
+       #endif
+    }]
+}
+
 
 # Return 1 if we can execute code when using dg-add-options riscv_v
 
@@ -3858,6 +3879,15 @@ proc check_effective_target_bitint575 { } {
     } "-std=c23"]
 }
 
+# Return 1 if the target supports _BitInt(65535), 0 otherwise.
+
+proc check_effective_target_bitint65535 { } {
+    return [check_no_compiler_messages bitint65535 object {
+        _BitInt (2) a = 1wb;
+        unsigned _BitInt (65535) b = 0uwb;
+    } "-std=c23"]
+}
+
 # Return 1 if the target supports compiling decimal floating point,
 # 0 otherwise.
 
@@ -4069,6 +4099,7 @@ proc check_effective_target_vect_early_break { } {
     return [check_cached_effective_target_indexed vect_early_break {
       expr {
 	[istarget aarch64*-*-*]
+	|| [check_effective_target_arm_v8_neon_ok]
 	|| [check_effective_target_sse4]
 	}}]
 }
@@ -4082,6 +4113,7 @@ proc check_effective_target_vect_early_break_hw { } {
     return [check_cached_effective_target_indexed vect_early_break_hw {
       expr {
 	[istarget aarch64*-*-*]
+	|| [check_effective_target_arm_v8_neon_hw]
 	|| [check_sse4_hw_available]
 	}}]
 }
@@ -4089,6 +4121,11 @@ proc check_effective_target_vect_early_break_hw { } {
 proc add_options_for_vect_early_break { flags } {
     if { ! [check_effective_target_vect_early_break] } {
 	return "$flags"
+    }
+
+    if { [check_effective_target_arm_v8_neon_ok] } {
+	global et_arm_v8_neon_flags
+	return "$flags $et_arm_v8_neon_flags -march=armv8-a"
     }
 
     if { [check_effective_target_sse4] } {
@@ -5210,25 +5247,25 @@ proc add_options_for_aarch64_sve { flags } {
 
 # Return 1 if this is an ARM target supporting the FP16 alternative
 # format.  Some multilibs may be incompatible with the options needed.  Also
-# set et_arm_neon_fp16_flags to the best options to add.
+# set et_arm_fp16_alternative_flags to the best options to add.
 
 proc check_effective_target_arm_fp16_alternative_ok_nocache { } {
     if { [istarget *-*-vxworks7*] } {
 	# Not supported by the target system.
 	return 0
     }
-    global et_arm_neon_fp16_flags
-    set et_arm_neon_fp16_flags ""
+    global et_arm_fp16_alternative_flags
+    set et_arm_fp16_alternative_flags ""
     if { [check_effective_target_arm32] } {
 	foreach flags {"" "-mfloat-abi=softfp" "-mfpu=neon-fp16"
 		       "-mfpu=neon-fp16 -mfloat-abi=softfp"} {
 	    if { [check_no_compiler_messages_nocache \
 		      arm_fp16_alternative_ok object {
-		#if !defined (__ARM_FP16_FORMAT_ALTERNATIVE)
+		#if !defined (__ARM_FP16_FORMAT_ALTERNATIVE) || ! (__ARM_FP & 2)
 		#error __ARM_FP16_FORMAT_ALTERNATIVE not defined
 		#endif
 	    } "$flags -mfp16-format=alternative"] } {
-		set et_arm_neon_fp16_flags "$flags -mfp16-format=alternative"
+		set et_arm_fp16_alternative_flags "$flags -mfp16-format=alternative"
 		return 1
 	    }
 	}
@@ -5367,11 +5404,11 @@ proc add_options_for_arm_fp16_ieee { flags } {
 # half-precision support.  This is valid for ARM targets.
 
 proc add_options_for_arm_fp16_alternative { flags } {
-    if { ! [check_effective_target_arm_fp16_ok] } {
+    if { ! [check_effective_target_arm_fp16_alternative_ok] } {
 	return "$flags"
     }
-    global et_arm_fp16_flags
-    return "$flags $et_arm_fp16_flags -mfp16-format=alternative"
+    global et_arm_fp16_alternative_flags
+    return "$flags $et_arm_fp16_alternative_flags"
 }
 
 # Return 1 if this is an ARM target that can support a VFP fp16 variant.
@@ -5496,6 +5533,8 @@ foreach { armfunc armflag armdefs } {
 		__ARM_ARCH_8M_BASE__
 	v8m_main "-march=armv8-m.main+fp -mthumb" __ARM_ARCH_8M_MAIN__
 	v8_1m_main "-march=armv8.1-m.main+fp -mthumb" __ARM_ARCH_8M_MAIN__
+	v8_1m_main_pacbti "-march=armv8.1-m.main+pacbti+fp -mthumb"
+		"__ARM_ARCH_8M_MAIN__ && __ARM_FEATURE_BTI && __ARM_FEATURE_PAUTH"
 	v9a "-march=armv9-a+simd" __ARM_ARCH_9A__ } {
     eval [string map [list FUNC $armfunc FLAG $armflag DEFS $armdefs ] {
 	proc check_effective_target_arm_arch_FUNC_ok { } {
@@ -7919,6 +7958,30 @@ proc check_effective_target_xorsign { } {
 	     || [istarget aarch64*-*-*] || [istarget arm*-*-*] }}]
 }
 
+# Return 1 if the target plus current options supports folding of
+# copysign into IFN_COPYSIGN.
+#
+# This won't change for different subtargets so cache the result.
+
+proc check_effective_target_ifn_copysign { } {
+    return [check_cached_effective_target_indexed ifn_copysign {
+      expr {
+	 (([istarget i?86-*-*] || [istarget x86_64-*-*])
+	   && [is-effective-target sse])
+	 || ([istarget loongarch*-*-*]
+	     && [check_effective_target_hard_float])
+	 || ([istarget powerpc*-*-*]
+	     && ![istarget powerpc-*-linux*paired*])
+	 || [istarget alpha*-*-*]
+	 || [istarget aarch64*-*-*]
+	 || [is-effective-target arm_neon]
+	 || ([istarget s390*-*-*]
+	     && [check_effective_target_s390_vx])
+	 || ([istarget riscv*-*-*]
+	     && [check_effective_target_hard_float])
+	}}]
+}
+
 # Return 1 if the target plus current options supports a vector
 # widening summation of *short* args into *int* result, 0 otherwise.
 #
@@ -7994,7 +8057,6 @@ proc check_effective_target_vect_widen_mult_qi_to_hi { } {
 		  || ([istarget aarch64*-*-*]
 		      && ![check_effective_target_aarch64_sve])
 		  || [is-effective-target arm_neon]
-		  || [is-effective-target loongarch*-*-*]
 		  || ([istarget s390*-*-*]
 		      && [check_effective_target_s390_vx])) 
 	      || [istarget amdgcn-*-*] }}]
@@ -8019,7 +8081,6 @@ proc check_effective_target_vect_widen_mult_hi_to_si { } {
 		     && ![check_effective_target_aarch64_sve])
 		 || [istarget i?86-*-*] || [istarget x86_64-*-*]
 		 || [is-effective-target arm_neon]
-		 || [is-effective-target loongarch*-*-*]
 		 || ([istarget s390*-*-*]
 		     && [check_effective_target_s390_vx]))
 	     || [istarget amdgcn-*-*] }}]
@@ -9035,12 +9096,15 @@ proc check_effective_target_vect_int_mult { } {
 
 proc check_effective_target_vect_long_mult { } {
     if { [istarget i?86-*-*] || [istarget x86_64-*-*]
-	 || (([istarget powerpc*-*-*]
-              && ![istarget powerpc-*-linux*paired*])
-              && [check_effective_target_ilp32])
+	 || ([istarget powerpc*-*-*]
+	      && ([check_effective_target_ilp32]
+		  || ([check_effective_target_powerpc_vsx_ok]
+		      && [check_effective_target_has_arch_pwr10])))
 	 || [is-effective-target arm_neon]
 	 || ([istarget sparc*-*-*] && [check_effective_target_ilp32])
-	 || [istarget aarch64*-*-*]
+	 || ([istarget aarch64*-*-*]
+	     && ([check_effective_target_ilp32]
+		 || [check_effective_target_aarch64_sve]))
 	 || ([istarget mips*-*-*]
 	      && [et-is-effective-target mips_msa])
 	 || ([istarget riscv*-*-*]
@@ -9850,6 +9914,7 @@ proc is-effective-target { arg } {
 	  "htm_hw"         { set selected [check_htm_hw_available] }
 	  "named_sections" { set selected [check_named_sections_available] }
 	  "gc_sections"    { set selected [check_gc_sections_available] }
+	  "linker_plugin"  { set selected [check_linker_plugin_available] }
 	  "cxa_atexit"     { set selected [check_cxa_atexit_available] }
 	  default          { error "unknown effective target keyword `$arg'" }
 	}
@@ -11717,13 +11782,11 @@ proc check_vect_support_and_set_flags { } {
         set dg-do-what-default run
     } elseif [istarget riscv*-*-*] {
 	if [check_effective_target_riscv_v] {
-	    lappend DEFAULT_VECTCFLAGS "--param" "riscv-vector-abi"
 	    set dg-do-what-default run
 	} else {
 	    foreach item [add_options_for_riscv_v ""] {
 		lappend DEFAULT_VECTCFLAGS $item
 	    }
-	    lappend DEFAULT_VECTCFLAGS "--param" "riscv-vector-abi"
 	    set dg-do-what-default compile
 	}
     } elseif [istarget loongarch*-*-*] {
@@ -13153,10 +13216,17 @@ proc check_effective_target_powerpc_as_p10_htm { } {
 # return 1 if LRA is supported.
 
 proc check_effective_target_lra { } {
-    if { [istarget hppa*-*-*] || [istarget avr-*-*] } {
-	return 0
+    # Start with heavily used targets which are known to always use LRA.
+    if { [istarget i?86-*-*] || [istarget x86_64-*-*]
+	 || [istarget aarch64*-*-*] || [istarget arm*-*-*]
+	 || [istarget powerpc*-*-*] || [istarget riscv*-*-*] } {
+	return 1
     }
-    return 1
+
+    # Otherwise check the reload dump for messages emitted solely by LRA.
+    return [check_no_messages_and_pattern lra "\\\*{9} Local #1: \\\*{9}" rtl-reload {
+        void foo (void) {}
+    } {-O2 -fdump-rtl-reload-details}] ;# LRA notes requires a detailed dump.
 }
 
 # Test whether optimizations are enabled ('__OPTIMIZE__') per the
@@ -13307,6 +13377,19 @@ proc check_effective_target_cv_elw { } {
     } "-march=rv32i_xcvelw" ]
 }
 
+# Return 1 if the CORE-V SIMD extension is available.
+proc check_effective_target_cv_simd { } {
+    if { !([istarget riscv*-*-*]) } {
+         return 0
+     }
+    return [check_no_compiler_messages cv_simd object {
+        void foo (void)
+        {
+          asm ("cv.add.sc.b x0, x0, x0");
+        }
+    } "-march=rv32i_xcvsimd" ]
+}
+
 proc check_effective_target_loongarch_sx { } {
     return [check_no_compiler_messages loongarch_lsx assembly {
        #if !defined(__loongarch_sx)
@@ -13401,4 +13484,16 @@ proc dg-require-python-h { args } {
     verbose "Before appending, extra-tool-flags: ${extra-tool-flags}" 3
     eval lappend extra-tool-flags $python_flags
     verbose "After appending, extra-tool-flags: ${extra-tool-flags}" 3
+}
+
+# Return 1 if the target supports heap-trampoline, 0 otherwise.
+proc check_effective_target_heap_trampoline {} {
+    if { [istarget aarch64*-*-linux*]
+	 || [istarget i?86-*-darwin*]
+	 || [istarget x86_64-*-darwin*]
+	 || [istarget i?86-*-linux*]
+	 || [istarget x86_64-*-linux*] } {
+	return 1
+    }
+    return 0
 }

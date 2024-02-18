@@ -132,6 +132,7 @@ FROM SymbolTable IMPORT ModeOfAddr, GetMode, PutMode, GetSymName, IsUnknown,
 
                         ForeachFieldEnumerationDo, ForeachLocalSymDo,
                         GetExported, PutImported, GetSym, GetLibName,
+                        GetTypeMode,
                         IsUnused,
                         NulSym ;
 
@@ -266,7 +267,7 @@ IMPORT M2Error ;
 CONST
    DebugStackOn = TRUE ;
    DebugVarients = FALSE ;
-   BreakAtQuad = 53 ;
+   BreakAtQuad = 189 ;
    DebugTokPos = FALSE ;
 
 TYPE
@@ -3606,7 +3607,6 @@ BEGIN
       PopTrwtok (Des, w, destok) ;
       MarkAsWrite (w) ;
       CheckCompatibleWithBecomes (Des, Exp, destok, exptok) ;
-      combinedtok := MakeVirtualTok (becomesTokNo, destok, exptok) ;
       IF DebugTokPos
       THEN
          MetaErrorT1 (becomesTokNo, 'becomestok {%1Oad}', Des) ;
@@ -3629,7 +3629,7 @@ BEGIN
          CheckBecomesMeta (Des, Exp, combinedtok, destok, exptok)
       END ;
       (* Simple assignment.  *)
-      MoveWithMode (becomesTokNo, Des, Exp, Array, destok, exptok, checkOverflow) ;
+      MoveWithMode (combinedtok, Des, Exp, Array, destok, exptok, checkOverflow) ;
       IF checkTypes
       THEN
          (*
@@ -4629,9 +4629,11 @@ BEGIN
          is counting down.  The above test will generate a more
          precise error message, so we suppress overflow detection
          here.  *)
-      GenQuadO (bytok, AddOp, tsym, tsym, BySym, FALSE) ;
+      GenQuadOtok (bytok, AddOp, tsym, tsym, BySym, FALSE,
+                   bytok, bytok, bytok) ;
       CheckPointerThroughNil (idtok, IdSym) ;
-      GenQuadO (idtok, XIndrOp, IdSym, GetSType (IdSym), tsym, FALSE)
+      GenQuadOtok (idtok, XIndrOp, IdSym, GetSType (IdSym), tsym, FALSE,
+                   idtok, idtok, idtok)
    ELSE
       BuildRange (InitForLoopEndRangeCheck (IdSym, BySym)) ;
       IncQuad := NextQuad ;
@@ -4640,7 +4642,8 @@ BEGIN
          is counting down.  The above test will generate a more
          precise error message, so we suppress overflow detection
          here.  *)
-      GenQuadO (idtok, AddOp, IdSym, IdSym, BySym, FALSE)
+      GenQuadOtok (idtok, AddOp, IdSym, IdSym, BySym, FALSE,
+                   bytok, bytok, bytok)
    END ;
    GenQuadO (endpostok, GotoOp, NulSym, NulSym, ForQuad, FALSE) ;
    BackPatch (PopFor (), NextQuad) ;
@@ -5428,13 +5431,14 @@ BEGIN
                               Actual, FormalI, Proc, i)
             ELSIF IsConstString (Actual)
             THEN
-               IF (GetStringLength (Actual) = 0)   (* if = 0 then it maybe unknown at this time *)
+               IF (GetStringLength (Actual) = 0)   (* If = 0 then it maybe unknown at this time.  *)
                THEN
-                  (* dont check this yet *)
+                  (* We dont check this yet, it is checked in M2GenGCC.mod:CodeParam
+                     after the string has been created.  *)
                ELSIF IsArray(GetDType(FormalI)) AND (GetSType(GetDType(FormalI))=Char)
                THEN
-                  (* allow string literals to be passed to ARRAY [0..n] OF CHAR *)
-               ELSIF (GetStringLength(Actual) = 1)   (* if = 1 then it maybe treated as a char *)
+                  (* Allow string literals to be passed to ARRAY [0..n] OF CHAR.  *)
+               ELSIF (GetStringLength(Actual) = 1)   (* If = 1 then it maybe treated as a char.  *)
                THEN
                   CheckParameter (paramtok, Actual, Dim, FormalI, Proc, i, NIL)
                ELSIF NOT IsUnboundedParam(Proc, i)
@@ -5864,8 +5868,9 @@ VAR
    ExpectType: CARDINAL ;
    s, s1, s2 : String ;
 BEGIN
-   MetaError2 ('parameter mismatch between the {%2N} parameter of procedure {%1Ead}',
-               ProcedureSym, ParameterNo) ;
+   MetaErrorT2 (tokpos,
+                'parameter mismatch between the {%2N} parameter of procedure {%1Ead}',
+                ProcedureSym, ParameterNo) ;
    s := InitString ('{%kPROCEDURE} {%1Eau} (') ;
    IF NoOfParam(ProcedureSym)>=ParameterNo
    THEN
@@ -5905,7 +5910,13 @@ BEGIN
    s := ConCat (s, Mark (InitString ('){%1Tau:% : {%1Tau}} ;'))) ;
    MetaErrorStringT1 (First, Dup (s), ProcedureSym) ;
    MetaErrorStringT1 (tokpos, s, ProcedureSym) ;
-   MetaError1 ('item being passed is {%1EDda} {%1Dad} of type {%1Dtsd}', Given)
+   IF GetLType (Given) = NulSym
+   THEN
+      MetaError1 ('item being passed is {%1EDda} {%1Dad}', Given)
+   ELSE
+      MetaError1 ('item being passed is {%1EDda} {%1Dad} of type {%1Dts}',
+                  Given)
+   END
 END FailParameter ;
 
 
@@ -7097,6 +7108,11 @@ VAR
 BEGIN
    dtype := GetDType(des) ;
    etype := GetDType(expr) ;
+   IF (etype = NulSym) AND IsPointer (GetTypeMode (des))
+   THEN
+      expr := ConvertToAddress (tokenpos, expr) ;
+      etype := Address
+   END ;
    IF WholeValueChecking AND (NOT MustNotCheckBounds)
    THEN
       IF tok=PlusTok
@@ -7959,6 +7975,7 @@ VAR
    combinedtok,
    functok,
    optok      : CARDINAL ;
+   opa,
    ReturnVar,
    NoOfParam,
    OperandSym,
@@ -7979,7 +7996,9 @@ BEGIN
          THEN
             ReturnVar := MakeTemporary (combinedtok, RightValue) ;
             PutVar (ReturnVar, Address) ;
-            GenQuad (AddOp, ReturnVar, VarSym, DereferenceLValue (optok, OperandSym)) ;
+            opa := ConvertToAddress (optok, DereferenceLValue (optok, OperandSym)) ;
+            GenQuadOtok (combinedtok, AddOp, ReturnVar, VarSym, opa, TRUE,
+                         combinedtok, combinedtok, combinedtok) ;
             PushTFtok (ReturnVar, Address, combinedtok)
          ELSE
             MetaErrorT1 (functok,
@@ -8034,6 +8053,7 @@ VAR
    ReturnVar,
    NoOfParam,
    OperandSym,
+   opa,
    VarSym     : CARDINAL ;
 BEGIN
    PopT (NoOfParam) ;
@@ -8052,7 +8072,9 @@ BEGIN
          THEN
             ReturnVar := MakeTemporary (combinedtok, RightValue) ;
             PutVar (ReturnVar, Address) ;
-            GenQuad (SubOp, ReturnVar, VarSym, DereferenceLValue (optok, OperandSym)) ;
+            opa := ConvertToAddress (optok, DereferenceLValue (optok, OperandSym)) ;
+            GenQuadOtok (combinedtok, SubOp, ReturnVar, VarSym, opa, TRUE,
+                         combinedtok, combinedtok, combinedtok) ;
             PushTFtok (ReturnVar, Address, combinedtok)
          ELSE
             MetaErrorT1 (functok,
@@ -8112,6 +8134,7 @@ VAR
    TempVar,
    NoOfParam,
    OperandSym,
+   opa,
    VarSym     : CARDINAL ;
 BEGIN
    PopT (NoOfParam) ;
@@ -8132,7 +8155,9 @@ BEGIN
             THEN
                TempVar := MakeTemporary (vartok, RightValue) ;
                PutVar (TempVar, Address) ;
-               GenQuad (SubOp, TempVar, VarSym, DereferenceLValue (optok, OperandSym)) ;
+               opa := ConvertToAddress (optok, DereferenceLValue (optok, OperandSym)) ;
+               GenQuadOtok (combinedtok, SubOp, TempVar, VarSym, opa, TRUE,
+                            combinedtok, combinedtok, combinedtok) ;
                (*
                   Build macro: CONVERT( INTEGER, TempVar )
                *)
@@ -9032,14 +9057,14 @@ BEGIN
       MarkAsRead (r) ;
       PopTtok (varSet, vartok) ;
       PopT (procSym) ;
-      combinedtok := MakeVirtualTok (functok, exptok, vartok) ;
+      combinedtok := MakeVirtualTok (functok, functok, exptok) ;
       IF (GetSType (varSet) # NulSym) AND IsSet (GetDType (varSet))
       THEN
          derefExp := DereferenceLValue (exptok, Exp) ;
          BuildRange (InitShiftCheck (varSet, derefExp)) ;
          returnVar := MakeTemporary (combinedtok, RightValue) ;
          PutVar (returnVar, GetSType (varSet)) ;
-         GenQuad (LogicalShiftOp, returnVar, varSet, derefExp) ;
+         GenQuadO (combinedtok, LogicalShiftOp, returnVar, varSet, derefExp, TRUE) ;
          PushTFtok (returnVar, GetSType (varSet), combinedtok)
       ELSE
          MetaErrorT1 (vartok,
@@ -10274,10 +10299,12 @@ BEGIN
       IF IsAModula2Type (OperandT (1))
       THEN
          ReturnVar := MakeTemporary (resulttok, ImmediateValue) ;
+         PutVar (ReturnVar, Cardinal) ;
          GenQuadO (resulttok, SizeOp, ReturnVar, NulSym, OperandT (1), FALSE)
       ELSIF IsVar (OperandT (1))
       THEN
          ReturnVar := MakeTemporary (resulttok, ImmediateValue) ;
+         PutVar (ReturnVar, Cardinal) ;
          GenQuadO (resulttok, SizeOp, ReturnVar, NulSym, GetSType (OperandT (1)), FALSE)
       ELSE
          MetaErrorT1 (resulttok,
@@ -10300,6 +10327,7 @@ BEGIN
          paramtok := OperandTtok (1) ;
          resulttok := MakeVirtualTok (functok, functok, paramtok) ;
          ReturnVar := MakeTemporary (resulttok, ImmediateValue) ;
+         PutVar (ReturnVar, Cardinal) ;
          GenQuadO (resulttok, SizeOp, ReturnVar, NulSym, Record, FALSE)
       ELSE
          resulttok := MakeVirtualTok (functok, functok, paramtok) ;
@@ -11205,7 +11233,8 @@ BEGIN
       GenHigh (tok, tk, dim, arraySym) ;
       tl := MakeTemporary (tok, RightValue) ;
       PutVar (tl, Cardinal) ;
-      GenQuadO (tok, AddOp, tl, tk, MakeConstLit (tok, MakeKey ('1'), Cardinal), TRUE) ;
+      GenQuadOtok (tok, AddOp, tl, tk, MakeConstLit (tok, MakeKey ('1'), Cardinal), TRUE,
+                   tok, tok, tok) ;
       tj := calculateMultipicand (tok, arraySym, arrayType, dim) ;
       ti := MakeTemporary (tok, RightValue) ;
       PutVar (ti, Cardinal) ;
@@ -11213,6 +11242,29 @@ BEGIN
    END ;
    RETURN ti
 END calculateMultipicand ;
+
+
+(*
+   ConvertToAddress - convert sym to an address.
+*)
+
+PROCEDURE ConvertToAddress (tokpos: CARDINAL; sym: CARDINAL) : CARDINAL ;
+VAR
+   adr: CARDINAL ;
+BEGIN
+   IF GetSType (sym) = Address
+   THEN
+      RETURN sym
+   ELSE
+      PushTF (RequestSym (tokpos, MakeKey ('CONVERT')), NulSym) ;
+      PushT (Address) ;
+      PushTtok (sym, tokpos) ;
+      PushT(2) ;          (* Two parameters *)
+      BuildConvertFunction ;
+      PopT (adr) ;
+      RETURN adr
+   END
+END ConvertToAddress ;
 
 
 (*
@@ -11252,7 +11304,8 @@ VAR
    PtrToBase,
    Base,
    Dim, rw,
-   ti, tj, tk   : CARDINAL ;
+   ti, tj, tk,
+   tka          : CARDINAL ;
 BEGIN
    DisplayStack ;
    Sym  := OperandT (2) ;
@@ -11342,19 +11395,23 @@ BEGIN
    *)
    BackEndType := MakePointer (combinedTok, NulName) ;
    PutPointer (BackEndType, GetSType (Type)) ;
+   (* Create a temporary pointer for addition.  *)
+   tka := ConvertToAddress (combinedTok, tk) ;
 
    IF Dim = GetDimension (Type)
    THEN
       PutLeftValueFrontBackType (Adr, GetSType(Type), BackEndType) ;
 
-      GenQuad (AddOp, Adr, Base, tk) ;
+      GenQuadOtok (combinedTok, AddOp, Adr, Base, tka, FALSE,
+                   combinedTok, combinedTok, combinedTok) ;
       PopN (2) ;
       PushTFADrwtok (Adr, GetSType(Adr), ArraySym, Dim, rw, combinedTok)
    ELSE
       (* more to index *)
       PutLeftValueFrontBackType (Adr, Type, BackEndType) ;
 
-      GenQuad (AddOp, Adr, Base, tk) ;
+      GenQuadOtok (combinedTok, AddOp, Adr, Base, tka, FALSE,
+                   combinedTok, combinedTok, combinedTok) ;
       PopN (2) ;
       PushTFADrwtok (Adr, GetSType(Adr), ArraySym, Dim, rw, combinedTok)
    END
@@ -12461,6 +12518,8 @@ BEGIN
       ELSE
          (* CheckForGenericNulSet(e1, e2, t1, t2) *)
       END ;
+      OldPos := OperatorPos ;
+      OperatorPos := MakeVirtualTok (OperatorPos, leftpos, rightpos) ;
       IF (Operator = PlusTok) AND IsConstString(left) AND IsConstString(right)
       THEN
          (* handle special addition for constant strings *)
@@ -12469,8 +12528,6 @@ BEGIN
          value := MakeConstLitString (OperatorPos, makekey (string (s))) ;
          s := KillString (s)
       ELSE
-         OldPos := OperatorPos ;
-         OperatorPos := MakeVirtualTok (OperatorPos, leftpos, rightpos) ;
          IF checkTypes
          THEN
             BuildRange (InitTypesExpressionCheck (OperatorPos, left, right, FALSE, FALSE))

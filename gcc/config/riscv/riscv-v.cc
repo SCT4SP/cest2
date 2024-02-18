@@ -207,6 +207,13 @@ public:
     add_input_operand (frm_rtx, Pmode);
   }
 
+  void
+  add_rounding_mode_operand (enum fixed_point_rounding_mode rounding_mode)
+  {
+    rtx frm_rtx = gen_int_mode (rounding_mode, Pmode);
+    add_input_operand (frm_rtx, Pmode);
+  }
+
   /* Return the vtype mode based on insn_flags.
      vtype mode mean the mode vsetvl insn set. */
   machine_mode
@@ -334,6 +341,10 @@ public:
       add_rounding_mode_operand (FRM_RMM);
     else if (m_insn_flags & FRM_RNE_P)
       add_rounding_mode_operand (FRM_RNE);
+    else if (m_insn_flags & VXRM_RNU_P)
+      add_rounding_mode_operand (VXRM_RNU);
+    else if (m_insn_flags & VXRM_RDN_P)
+      add_rounding_mode_operand (VXRM_RDN);
 
     gcc_assert (insn_data[(int) icode].n_operands == m_opno);
     expand (icode, any_mem_p);
@@ -4140,13 +4151,15 @@ expand_reduction (unsigned unspec, unsigned insn_flags, rtx *ops, rtx init)
 
   rtx m1_tmp = gen_reg_rtx (m1_mode);
   rtx scalar_move_ops[] = {m1_tmp, init};
-  emit_nonvlmax_insn (code_for_pred_broadcast (m1_mode), SCALAR_MOVE_OP,
-		      scalar_move_ops,
-		      need_mask_operand_p (insn_flags) ? ops[3]
-						       : CONST1_RTX (Pmode));
+  insn_code icode = code_for_pred_broadcast (m1_mode);
+  if (need_mask_operand_p (insn_flags))
+    emit_nonvlmax_insn (icode, SCALAR_MOVE_OP, scalar_move_ops, ops[3]);
+  else
+    emit_vlmax_insn (icode, SCALAR_MOVE_OP, scalar_move_ops);
+
   rtx m1_tmp2 = gen_reg_rtx (m1_mode);
   rtx reduc_ops[] = {m1_tmp2, vector_src, m1_tmp};
-  insn_code icode = code_for_pred (unspec, vmode);
+  icode = code_for_pred (unspec, vmode);
 
   if (need_mask_operand_p (insn_flags))
     {
@@ -4392,7 +4405,7 @@ cmp_lmul_gt_one (machine_mode mode)
 bool
 vls_mode_valid_p (machine_mode vls_mode)
 {
-  if (!TARGET_VECTOR)
+  if (!TARGET_VECTOR || TARGET_XTHEADVECTOR)
     return false;
 
   if (riscv_autovec_preference == RVV_SCALABLE)
@@ -5138,6 +5151,18 @@ whole_reg_to_reg_move_p (rtx *ops, machine_mode mode, int avl_type_index)
 	return true;
     }
   return false;
+}
+
+/* Return true if we can transform vmv.v.x/vfmv.v.f to vmv.s.x/vfmv.s.f.  */
+bool
+splat_to_scalar_move_p (rtx *ops)
+{
+  return satisfies_constraint_Wc1 (ops[1])
+	 && satisfies_constraint_vu (ops[2])
+	 && !MEM_P (ops[3])
+	 && satisfies_constraint_c01 (ops[4])
+	 && INTVAL (ops[7]) == NONVLMAX
+	 && known_ge (GET_MODE_SIZE (Pmode), GET_MODE_SIZE (GET_MODE (ops[3])));
 }
 
 } // namespace riscv_vector
