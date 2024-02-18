@@ -110,7 +110,6 @@ static constexpr cp_feature_info cp_feature_table[] =
   { "cxx_alignof", cxx11 },
   { "cxx_attributes", cxx11 },
   { "cxx_constexpr", cxx11 },
-  { "cxx_constexpr_string_builtins", cxx11 },
   { "cxx_decltype", cxx11 },
   { "cxx_decltype_incomplete_return_types", cxx11 },
   { "cxx_default_function_template_args", cxx11 },
@@ -349,7 +348,7 @@ cp_decl_dwarf_attribute (const_tree decl, int attr)
 
     case DW_AT_reference:
       if (TREE_CODE (decl) == FUNCTION_DECL
-	  && DECL_NONSTATIC_MEMBER_FUNCTION_P (decl)
+	  && DECL_IOBJ_MEMBER_FUNCTION_P (decl)
 	  && FUNCTION_REF_QUALIFIED (TREE_TYPE (decl))
 	  && !FUNCTION_RVALUE_QUALIFIED (TREE_TYPE (decl)))
 	return 1;
@@ -357,7 +356,7 @@ cp_decl_dwarf_attribute (const_tree decl, int attr)
 
     case DW_AT_rvalue_reference:
       if (TREE_CODE (decl) == FUNCTION_DECL
-	  && DECL_NONSTATIC_MEMBER_FUNCTION_P (decl)
+	  && DECL_IOBJ_MEMBER_FUNCTION_P (decl)
 	  && FUNCTION_REF_QUALIFIED (TREE_TYPE (decl))
 	  && FUNCTION_RVALUE_QUALIFIED (TREE_TYPE (decl)))
 	return 1;

@@ -89,6 +89,10 @@
 
   ;; Workaround for HFmode without hardware extension
   UNSPEC_FMV_SFP16_X
+
+  ;; XTheadFmv moves
+  UNSPEC_XTHEADFMV
+  UNSPEC_XTHEADFMV_HW
 ])
 
 (define_c_enum "unspecv" [
@@ -127,9 +131,9 @@
   ;; Zihintpause unspec
   UNSPECV_PAUSE
 
-  ;; XTheadFmv unspec
-  UNSPEC_XTHEADFMV
-  UNSPEC_XTHEADFMV_HW
+  ;; XTheadInt unspec
+  UNSPECV_XTHEADINT_PUSH
+  UNSPECV_XTHEADINT_POP
 ])
 
 (define_constants
@@ -310,6 +314,8 @@
 ;; fdiv		floating point divide
 ;; fcmp		floating point compare
 ;; fcvt		floating point convert
+;; fcvt_i2f	integer to floating point convert
+;; fcvt_f2i	floating point to integer convert
 ;; fsqrt	floating point square root
 ;; multi	multiword sequence (or user asm statements)
 ;; auipc	integer addition to PC
@@ -462,8 +468,8 @@
 (define_attr "type"
   "unknown,branch,jump,jalr,ret,call,load,fpload,store,fpstore,
    mtc,mfc,const,arith,logical,shift,slt,imul,idiv,move,fmove,fadd,fmul,
-   fmadd,fdiv,fcmp,fcvt,fsqrt,multi,auipc,sfb_alu,nop,trap,ghost,bitmanip,
-   rotate,clmul,min,max,minu,maxu,clz,ctz,cpop,
+   fmadd,fdiv,fcmp,fcvt,fcvt_i2f,fcvt_f2i,fsqrt,multi,auipc,sfb_alu,nop,trap,
+   ghost,bitmanip,rotate,clmul,min,max,minu,maxu,clz,ctz,cpop,
    atomic,condmove,cbo,crypto,pushpop,mvpair,zicond,rdvlenb,rdvl,wrvxrm,wrfrm,
    rdfrm,vsetvl,vsetvl_pre,vlde,vste,vldm,vstm,vlds,vsts,
    vldux,vldox,vstux,vstox,vldff,vldr,vstr,
@@ -579,6 +585,25 @@
         ]
        (const_string "yes")))
 
+;; This attribute marks the alternatives not matching the constraints
+;; described in spec as disabled.
+(define_attr "spec_restriction" "none,thv,rvv"
+  (const_string "none"))
+
+(define_attr "spec_restriction_disabled" "no,yes"
+  (cond [(eq_attr "spec_restriction" "none")
+	 (const_string "no")
+
+	 (and (eq_attr "spec_restriction" "thv")
+	      (match_test "TARGET_XTHEADVECTOR"))
+	 (const_string "yes")
+
+	 (and (eq_attr "spec_restriction" "rvv")
+	      (match_test "TARGET_VECTOR && !TARGET_XTHEADVECTOR"))
+	 (const_string "yes")
+	]
+       (const_string "no")))
+
 ;; Attribute to control enable or disable instructions.
 (define_attr "enabled" "no,yes"
   (cond [
@@ -589,6 +614,9 @@
     (const_string "no")
 
     (eq_attr "group_overlap_valid" "no")
+    (const_string "no")
+
+    (eq_attr "spec_restriction_disabled" "yes")
     (const_string "no")
   ]
   (const_string "yes")))
@@ -659,7 +687,7 @@
 ;; Microarchitectures we know how to tune for.
 ;; Keep this in sync with enum riscv_microarchitecture.
 (define_attr "tune"
-  "generic,sifive_7,generic_ooo"
+  "generic,sifive_7,sifive_p400,sifive_p600,generic_ooo"
   (const (symbol_ref "((enum attr_tune) riscv_microarchitecture)")))
 
 ;; Describe a user's asm statement.
@@ -1750,8 +1778,7 @@
 	(zero_extend:DI
 	    (match_operand:SI 1 "nonimmediate_operand" " r,m")))]
   "TARGET_64BIT && !TARGET_ZBA && !TARGET_XTHEADBB && !TARGET_XTHEADMEMIDX
-   && !(register_operand (operands[1], SImode)
-        && reg_or_subregno (operands[1]) == VL_REGNUM)"
+   && !(REG_P (operands[1]) && VL_REG_P (REGNO (operands[1])))"
   "@
    #
    lwu\t%0,%1"
@@ -1948,7 +1975,7 @@
 	    (match_operand:ANYF 1 "register_operand" " f")))]
   "TARGET_HARD_FLOAT || TARGET_ZFINX"
   "fcvt.<GPR:ifmt>.<ANYF:fmt> %0,%1,rtz"
-  [(set_attr "type" "fcvt")
+  [(set_attr "type" "fcvt_f2i")
    (set_attr "mode" "<ANYF:MODE>")])
 
 (define_insn "fixuns_trunc<ANYF:mode><GPR:mode>2"
@@ -1957,7 +1984,7 @@
 	    (match_operand:ANYF 1 "register_operand" " f")))]
   "TARGET_HARD_FLOAT  || TARGET_ZFINX"
   "fcvt.<GPR:ifmt>u.<ANYF:fmt> %0,%1,rtz"
-  [(set_attr "type" "fcvt")
+  [(set_attr "type" "fcvt_f2i")
    (set_attr "mode" "<ANYF:MODE>")])
 
 (define_insn "float<GPR:mode><ANYF:mode>2"
@@ -1966,7 +1993,7 @@
 	    (match_operand:GPR 1 "reg_or_0_operand" " rJ")))]
   "TARGET_HARD_FLOAT || TARGET_ZFINX"
   "fcvt.<ANYF:fmt>.<GPR:ifmt>\t%0,%z1"
-  [(set_attr "type" "fcvt")
+  [(set_attr "type" "fcvt_i2f")
    (set_attr "mode" "<ANYF:MODE>")])
 
 (define_insn "floatuns<GPR:mode><ANYF:mode>2"
@@ -1975,7 +2002,7 @@
 	    (match_operand:GPR 1 "reg_or_0_operand" " rJ")))]
   "TARGET_HARD_FLOAT || TARGET_ZFINX"
   "fcvt.<ANYF:fmt>.<GPR:ifmt>u\t%0,%z1"
-  [(set_attr "type" "fcvt")
+  [(set_attr "type" "fcvt_i2f")
    (set_attr "mode" "<ANYF:MODE>")])
 
 (define_insn "l<rint_pattern><ANYF:mode><GPR:mode>2"
@@ -1985,7 +2012,7 @@
 	    RINT))]
   "TARGET_HARD_FLOAT || TARGET_ZFINX"
   "fcvt.<GPR:ifmt>.<ANYF:fmt> %0,%1,<rint_rm>"
-  [(set_attr "type" "fcvt")
+  [(set_attr "type" "fcvt_f2i")
    (set_attr "mode" "<ANYF:MODE>")])
 
 (define_insn "<round_pattern><ANYF:mode>2"
@@ -2188,8 +2215,7 @@
 	(match_operand:SI 1 "move_operand"         " r,T,m,rJ,*r*J,*m,*f,*f,vp"))]
   "(register_operand (operands[0], SImode)
     || reg_or_0_operand (operands[1], SImode))
-    && !(register_operand (operands[1], SImode)
-         && reg_or_subregno (operands[1]) == VL_REGNUM)"
+    && !(REG_P (operands[1]) && VL_REG_P (REGNO (operands[1])))"
   { return riscv_output_move (operands[0], operands[1]); }
   [(set_attr "move_type" "move,const,load,store,mtc,fpload,mfc,fpstore,rdvlenb")
    (set_attr "mode" "SI")
@@ -3081,7 +3107,7 @@
 	(any_ge:GPR (match_operand:X 1 "register_operand" " r")
 		    (const_int 1)))]
   ""
-  "slt%i2<u>\t%0,zero,%1"
+  "slti<u>\t%0,zero,%1"
   [(set_attr "type" "slt")
    (set_attr "mode" "<X:MODE>")])
 
@@ -3824,6 +3850,8 @@
 (include "pic.md")
 (include "generic.md")
 (include "sifive-7.md")
+(include "sifive-p400.md")
+(include "sifive-p600.md")
 (include "thead.md")
 (include "generic-ooo.md")
 (include "vector.md")

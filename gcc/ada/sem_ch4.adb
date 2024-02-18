@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---          Copyright (C) 1992-2023, Free Software Foundation, Inc.         --
+--          Copyright (C) 1992-2024, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -2304,7 +2304,9 @@ package body Sem_Ch4 is
             while Present (It.Nam) loop
                T := It.Typ;
 
-               if No (First_Formal (Base_Type (Designated_Type (T)))) then
+               if Is_Access_Type (T)
+                 and then No (First_Formal (Base_Type (Designated_Type (T))))
+               then
                   Set_Etype (P, T);
                else
                   Remove_Interp (I);

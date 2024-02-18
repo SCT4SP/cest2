@@ -767,6 +767,15 @@ ftms = {
 };
 
 ftms = {
+  name = bind_back;
+  values = {
+    v = 202202;
+    cxxmin = 23;
+    extra_cond = "__cpp_explicit_this_parameter";
+  };
+};
+
+ftms = {
   name = starts_ends_with;
   values = {
     v = 201711;
@@ -1166,6 +1175,15 @@ ftms = {
   };
 };
 
+ftms = {
+  name = format_uchar;
+  values = {
+    v = 202311;
+    cxxmin = 20;
+    hosted = yes;
+  };
+};
+
 // FIXME: #define __glibcxx_execution 201902L
 
 ftms = {
@@ -1530,7 +1548,7 @@ ftms = {
 ftms = {
   name = ranges_as_const;
   values = {
-    v = 202207;
+    v = 202311;
     cxxmin = 23;
   };
 };
@@ -1734,6 +1752,16 @@ ftms = {
 };
 
 ftms = {
+  name = text_encoding;
+  values = {
+    v = 202306;
+    cxxmin = 26;
+    hosted = yes;
+    extra_cond = "_GLIBCXX_USE_NL_LANGINFO_L";
+  };
+};
+
+ftms = {
   name = to_string;
   values = {
     v = 202306;
@@ -1749,6 +1777,14 @@ ftms = {
     v = 202207;
     cxxmin = 23;
     extra_cond = "__glibcxx_coroutine";
+  };
+};
+
+ftms = {
+  name = tuple_like;
+  values = {
+    v = 202207;
+    cxxmin = 23;
   };
 };
 

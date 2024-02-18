@@ -1679,10 +1679,22 @@
 #endif
 
 
+/* Define if your linker supports emulation avrxmega2_flmap. */
+#ifndef USED_FOR_TARGET
+#undef HAVE_LD_AVR_AVRXMEGA2_FLMAP
+#endif
+
+
 /* Define if your default avr linker script for avrxmega3 leaves .rodata in
    flash. */
 #ifndef USED_FOR_TARGET
 #undef HAVE_LD_AVR_AVRXMEGA3_RODATA_IN_FLASH
+#endif
+
+
+/* Define if your linker supports emulation avrxmega4_flmap. */
+#ifndef USED_FOR_TARGET
+#undef HAVE_LD_AVR_AVRXMEGA4_FLMAP
 #endif
 
 
@@ -2341,6 +2353,12 @@
 /* Value to set mingw's _dowildcard to. */
 #ifndef USED_FOR_TARGET
 #undef MINGW_DOWILDCARD
+#endif
+
+
+/* Define if assembler supports %reloc. */
+#ifndef USED_FOR_TARGET
+#undef MIPS_EXPLICIT_RELOCS
 #endif
 
 
