@@ -1235,6 +1235,7 @@ _GLIBCXX_BEGIN_INLINE_ABI_NAMESPACE(_V2)
 
       static constexpr bool is_steady = false;
 
+      _GLIBCXX_CEST_CONSTEXPR
       static time_point
       now() noexcept;
 
@@ -1271,6 +1272,7 @@ _GLIBCXX_BEGIN_INLINE_ABI_NAMESPACE(_V2)
 
       static constexpr bool is_steady = true;
 
+      _GLIBCXX_CEST_CONSTEXPR
       static time_point
       now() noexcept;
     };
@@ -1498,6 +1500,70 @@ _GLIBCXX_END_INLINE_ABI_NAMESPACE(_V2)
     };
   } // namespace filesystem
 #endif // C++17
+
+  // C'est 2 constexpr support for system_clock::now() and steady_clock::now()
+  // via libstdc++-v3/src/c++11/chrono.cc
+  namespace chrono
+  {
+_GLIBCXX_BEGIN_INLINE_ABI_NAMESPACE(_V2)
+
+  _GLIBCXX_CEST_CONSTEXPR
+  system_clock::time_point
+  system_clock::now() noexcept
+  {
+#ifdef _GLIBCXX_CEST_VERSION
+    if (std::is_constant_evaluated())
+      return {};
+#endif
+
+#ifdef _GLIBCXX_USE_CLOCK_REALTIME
+    timespec tp;
+    // -EINVAL, -EFAULT
+#ifdef _GLIBCXX_USE_CLOCK_GETTIME_SYSCALL
+    syscall(SYS_clock_gettime, CLOCK_REALTIME, &tp);
+#else
+    clock_gettime(CLOCK_REALTIME, &tp);
+#endif
+    return time_point(duration(chrono::seconds(tp.tv_sec)
+       + chrono::nanoseconds(tp.tv_nsec)));
+#elif defined(_GLIBCXX_USE_GETTIMEOFDAY)
+    timeval tv;
+    // EINVAL, EFAULT
+    gettimeofday(&tv, 0);
+    return time_point(duration(chrono::seconds(tv.tv_sec)
+       + chrono::microseconds(tv.tv_usec)));
+#else
+    std::time_t __sec = std::time(0);
+    return system_clock::from_time_t(__sec);
+#endif
+  }
+
+  _GLIBCXX_CEST_CONSTEXPR
+  steady_clock::time_point
+  steady_clock::now() noexcept
+  {
+#ifdef _GLIBCXX_CEST_VERSION
+    if (std::is_constant_evaluated())
+      return {};
+#endif
+
+#ifdef _GLIBCXX_USE_CLOCK_MONOTONIC
+    timespec tp;
+    // -EINVAL, -EFAULT
+#ifdef _GLIBCXX_USE_CLOCK_GETTIME_SYSCALL
+    syscall(SYS_clock_gettime, CLOCK_MONOTONIC, &tp);
+#else
+    clock_gettime(CLOCK_MONOTONIC, &tp);
+#endif
+    return time_point(duration(chrono::seconds(tp.tv_sec)
+       + chrono::nanoseconds(tp.tv_nsec)));
+#else
+    return time_point(system_clock::now().time_since_epoch());
+#endif
+  }
+
+_GLIBCXX_END_INLINE_ABI_NAMESPACE(_V2)
+  } // namespace chrono
 
 _GLIBCXX_END_NAMESPACE_VERSION
 } // namespace std
