@@ -3,7 +3,7 @@
  *
  * Specification: $(LINK2 https://dlang.org/spec/grammar.html, D Grammar)
  *
- * Copyright:   Copyright (C) 1999-2023 by The D Language Foundation, All Rights Reserved
+ * Copyright:   Copyright (C) 1999-2024 by The D Language Foundation, All Rights Reserved
  * Authors:     $(LINK2 https://www.digitalmars.com, Walter Bright)
  * License:     $(LINK2 https://www.boost.org/LICENSE_1_0.txt, Boost License 1.0)
  * Source:      $(LINK2 https://github.com/dlang/dmd/blob/master/src/dmd/parse.d, _parse.d)
@@ -1675,7 +1675,7 @@ class Parser(AST, Lexer = dmd.lexer.Lexer) : Lexer
                     if (token.value == TOK.assign) // = CondExpression
                     {
                         nextToken();
-                        tp_defaultvalue = parseDefaultInitExp();
+                        tp_defaultvalue = parseAssignExp();
                     }
                     tp = new AST.TemplateValueParameter(loc, tp_ident, tp_valtype, tp_specvalue, tp_defaultvalue);
                 }
@@ -2015,6 +2015,7 @@ class Parser(AST, Lexer = dmd.lexer.Lexer) : Lexer
         case TOK.wcharLiteral:
         case TOK.dcharLiteral:
         case TOK.string_:
+        case TOK.interpolated:
         case TOK.hexadecimalString:
         case TOK.file:
         case TOK.fileFullPath:
@@ -2899,6 +2900,8 @@ class Parser(AST, Lexer = dmd.lexer.Lexer) : Lexer
                     if (transitionIn)
                         eSink.message(scanloc, "Usage of 'in' on parameter");
                     stc = STC.in_;
+                    if (compileEnv.previewIn)
+                        stc |= STC.constscoperef;
                     goto L2;
 
                 case TOK.out_:
@@ -2936,9 +2939,9 @@ class Parser(AST, Lexer = dmd.lexer.Lexer) : Lexer
 
                 default:
                     {
-                        stc = storageClass & (STC.IOR | STC.lazy_);
-                        // if stc is not a power of 2
-                        if (stc & (stc - 1) && !(stc == (STC.in_ | STC.ref_)))
+                        const stcx = storageClass & (STC.in_ | STC.ref_ | STC.out_ | STC.lazy_);
+                        // if stcx is not a power of 2
+                        if (stcx & (stcx - 1) && !(stcx == (STC.in_ | STC.ref_)))
                             error("incompatible parameter storage classes");
                         //if ((storageClass & STC.scope_) && (storageClass & (STC.ref_ | STC.out_)))
                             //error("scope cannot be ref or out");
@@ -2967,7 +2970,7 @@ class Parser(AST, Lexer = dmd.lexer.Lexer) : Lexer
                         if (token.value == TOK.assign) // = defaultArg
                         {
                             nextToken();
-                            ae = parseDefaultInitExp();
+                            ae = parseAssignExp();
                         }
                         auto param = new AST.Parameter(loc, storageClass | STC.parameter, at, ai, ae, null);
                         if (udas)
@@ -5818,6 +5821,7 @@ class Parser(AST, Lexer = dmd.lexer.Lexer) : Lexer
         case TOK.true_:
         case TOK.false_:
         case TOK.string_:
+        case TOK.interpolated:
         case TOK.hexadecimalString:
         case TOK.leftParenthesis:
         case TOK.cast_:
@@ -6947,33 +6951,6 @@ class Parser(AST, Lexer = dmd.lexer.Lexer) : Lexer
         }
     }
 
-    /*****************************************
-     * Parses default argument initializer expression that is an assign expression,
-     * with special handling for __FILE__, __FILE_DIR__, __LINE__, __MODULE__, __FUNCTION__, and __PRETTY_FUNCTION__.
-     */
-    private AST.Expression parseDefaultInitExp()
-    {
-        AST.Expression e = null;
-        const tv = peekNext();
-        if (tv == TOK.comma || tv == TOK.rightParenthesis)
-        {
-            switch (token.value)
-            {
-            case TOK.file:           e = new AST.FileInitExp(token.loc, EXP.file); break;
-            case TOK.fileFullPath:   e = new AST.FileInitExp(token.loc, EXP.fileFullPath); break;
-            case TOK.line:           e = new AST.LineInitExp(token.loc); break;
-            case TOK.moduleString:   e = new AST.ModuleInitExp(token.loc); break;
-            case TOK.functionString: e = new AST.FuncInitExp(token.loc); break;
-            case TOK.prettyFunction: e = new AST.PrettyFuncInitExp(token.loc); break;
-            default: goto LExp;
-            }
-            nextToken();
-            return e;
-        }
-        LExp:
-        return parseAssignExp();
-    }
-
     /********************
      * Parse inline assembler block.
      * Enters with token on the `asm`.
@@ -7203,6 +7180,9 @@ class Parser(AST, Lexer = dmd.lexer.Lexer) : Lexer
         }
         if (!isDeclarator(&t, &haveId, &haveTpl, endtok, needId != NeedDeclaratorId.mustIfDstyle))
             goto Lisnot;
+        // needed for `__traits(compiles, arr[0] = 0)`
+        if (!haveId && t.value == TOK.assign)
+            goto Lisnot;
         if ((needId == NeedDeclaratorId.no && !haveId) ||
             (needId == NeedDeclaratorId.opt) ||
             (needId == NeedDeclaratorId.must && haveId) ||
@@ -7338,6 +7318,7 @@ class Parser(AST, Lexer = dmd.lexer.Lexer) : Lexer
                     case TOK.wcharLiteral:
                     case TOK.dcharLiteral:
                     case TOK.string_:
+                    case TOK.interpolated:
                     case TOK.hexadecimalString:
                     case TOK.file:
                     case TOK.fileFullPath:
@@ -8150,33 +8131,23 @@ class Parser(AST, Lexer = dmd.lexer.Lexer) : Lexer
             break;
 
         case TOK.file:
-            {
-                const(char)* s = loc.filename ? loc.filename : mod.ident.toChars();
-                e = new AST.StringExp(loc, s.toDString());
-                nextToken();
-                break;
-            }
+            e = new AST.FileInitExp(loc, EXP.file);
+            nextToken();
+            break;
         case TOK.fileFullPath:
-            {
-                assert(loc.isValid(), "__FILE_FULL_PATH__ does not work with an invalid location");
-                const s = FileName.toAbsolute(loc.filename);
-                e = new AST.StringExp(loc, s.toDString());
-                nextToken();
-                break;
-            }
+            e = new AST.FileInitExp(loc, EXP.fileFullPath);
+            nextToken();
+            break;
 
         case TOK.line:
-            e = new AST.IntegerExp(loc, loc.linnum, AST.Type.tint32);
+            e = new AST.LineInitExp(loc);
             nextToken();
             break;
 
         case TOK.moduleString:
-            {
-                const(char)* s = md ? md.toChars() : mod.toChars();
-                e = new AST.StringExp(loc, s.toDString());
-                nextToken();
-                break;
-            }
+            e = new AST.ModuleInitExp(loc);
+            nextToken();
+            break;
         case TOK.functionString:
             e = new AST.FuncInitExp(loc);
             nextToken();
@@ -8209,6 +8180,11 @@ class Parser(AST, Lexer = dmd.lexer.Lexer) : Lexer
 
         case TOK.dcharLiteral:
             e = new AST.IntegerExp(loc, token.unsvalue, AST.Type.tdchar);
+            nextToken();
+            break;
+
+        case TOK.interpolated:
+            e = new AST.InterpExp(loc, token.interpolatedSet, token.postfix);
             nextToken();
             break;
 
@@ -8757,7 +8733,7 @@ class Parser(AST, Lexer = dmd.lexer.Lexer) : Lexer
                 else
                 {
                     AST.Type t = parseType(); // cast( type )
-                    t = t.addMod(m); // cast( const type )
+                    t = t.addSTC(AST.ModToStc(m)); // cast( const type )
                     check(TOK.rightParenthesis);
                     e = parseUnaryExp();
                     e = new AST.CastExp(loc, e, t);
@@ -8845,6 +8821,7 @@ class Parser(AST, Lexer = dmd.lexer.Lexer) : Lexer
                         case TOK.wcharLiteral:
                         case TOK.dcharLiteral:
                         case TOK.string_:
+                        case TOK.interpolated:
                         case TOK.function_:
                         case TOK.delegate_:
                         case TOK.typeof_:

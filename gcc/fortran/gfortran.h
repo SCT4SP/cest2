@@ -999,6 +999,7 @@ typedef struct
   /* Mentioned in OMP DECLARE TARGET.  */
   unsigned omp_declare_target:1;
   unsigned omp_declare_target_link:1;
+  unsigned omp_declare_target_indirect:1;
   ENUM_BITFIELD (gfc_omp_device_type) omp_device_type:2;
   unsigned omp_allocate:1;
 
@@ -1584,7 +1585,7 @@ typedef struct gfc_omp_clauses
   unsigned grainsize_strict:1, num_tasks_strict:1, compare:1, weak:1;
   unsigned non_rectangular:1, order_concurrent:1;
   unsigned contains_teams_construct:1, target_first_st_is_teams:1;
-  unsigned contained_in_target_construct:1;
+  unsigned contained_in_target_construct:1, indirect:1;
   ENUM_BITFIELD (gfc_omp_sched_kind) sched_kind:3;
   ENUM_BITFIELD (gfc_omp_device_type) device_type:2;
   ENUM_BITFIELD (gfc_omp_memorder) memorder:3;
@@ -2830,13 +2831,21 @@ gfc_case;
 #define gfc_get_case() XCNEW (gfc_case)
 
 
+/* Annotations for loop constructs.  */
 typedef struct
 {
-  gfc_expr *var, *start, *end, *step;
   unsigned short unroll;
   bool ivdep;
   bool vector;
   bool novector;
+}
+gfc_loop_annot;
+
+
+typedef struct
+{
+  gfc_expr *var, *start, *end, *step;
+  gfc_loop_annot annot;
 }
 gfc_iterator;
 
@@ -2926,6 +2935,7 @@ gfc_dt;
 typedef struct gfc_forall_iterator
 {
   gfc_expr *var, *start, *end, *stride;
+  gfc_loop_annot annot;
   struct gfc_forall_iterator *next;
 }
 gfc_forall_iterator;

@@ -1843,9 +1843,20 @@ void
 assemble_function_label_raw (FILE *file, const char *name)
 {
   ASM_OUTPUT_LABEL (file, name);
+  assemble_function_label_final ();
+}
+
+/* Finish outputting function label.  Needs to be called when outputting
+   function label without using assemble_function_label_raw ().  */
+
+void
+assemble_function_label_final (void)
+{
   if ((flag_sanitize & SANITIZE_ADDRESS)
       /* Notify ASAN only about the first function label.  */
-      && (in_cold_section_p == first_function_block_is_cold))
+      && (in_cold_section_p == first_function_block_is_cold)
+      /* Do not notify ASAN when called from, e.g., code_end ().  */
+      && cfun)
     asan_function_start ();
 }
 
@@ -1928,6 +1939,11 @@ assemble_start_function (tree decl, const char *fnname)
 
   /* Tell assembler to move to target machine's alignment for functions.  */
   align = floor_log2 (align / BITS_PER_UNIT);
+  /* Handle forced alignment.  This really ought to apply to all functions,
+     since it is used by patchable entries.  */
+  if (flag_min_function_alignment)
+    align = MAX (align, floor_log2 (flag_min_function_alignment));
+
   if (align > 0)
     {
       ASM_OUTPUT_ALIGN (asm_out_file, align);
@@ -2541,7 +2557,8 @@ process_pending_assemble_externals (void)
   for (rtx list = pending_libcall_symbols; list; list = XEXP (list, 1))
     {
       rtx symbol = XEXP (list, 0);
-      tree id = get_identifier (XSTR (symbol, 0));
+      const char *name = targetm.strip_name_encoding (XSTR (symbol, 0));
+      tree id = get_identifier (name);
       if (TREE_SYMBOL_REFERENCED (id))
 	targetm.asm_out.external_libcall (symbol);
     }
@@ -2629,7 +2646,8 @@ assemble_external_libcall (rtx fun)
          reference to it will mark its tree node as referenced, via
          assemble_name_resolve.  These are eventually emitted, if
          used, in process_pending_assemble_externals. */
-      get_identifier (XSTR (fun, 0));
+      const char *name = targetm.strip_name_encoding (XSTR (fun, 0));
+      get_identifier (name);
       pending_libcall_symbols = gen_rtx_EXPR_LIST (VOIDmode, fun,
 						   pending_libcall_symbols);
     }
@@ -4347,7 +4365,7 @@ output_constant_pool_contents (struct rtx_constant_pool *pool)
 	p = label;
 	if (desc->offset)
 	  {
-	    sprintf (buffer, "%s+%ld", p, (long) (desc->offset));
+	    sprintf (buffer, "%s+" HOST_WIDE_INT_PRINT_DEC, p, desc->offset);
 	    p = buffer;
 	  }
 	ASM_OUTPUT_DEF (asm_out_file, name, p);

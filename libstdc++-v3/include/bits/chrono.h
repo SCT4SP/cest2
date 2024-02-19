@@ -1235,6 +1235,7 @@ _GLIBCXX_BEGIN_INLINE_ABI_NAMESPACE(_V2)
 
       static constexpr bool is_steady = false;
 
+      _GLIBCXX_CEST_CONSTEXPR
       static time_point
       now() noexcept;
 
@@ -1271,6 +1272,7 @@ _GLIBCXX_BEGIN_INLINE_ABI_NAMESPACE(_V2)
 
       static constexpr bool is_steady = true;
 
+      _GLIBCXX_CEST_CONSTEXPR
       static time_point
       now() noexcept;
     };
@@ -1453,14 +1455,14 @@ _GLIBCXX_END_INLINE_ABI_NAMESPACE(_V2)
 #if __cplusplus > 201703L
       template<typename _Dur>
 	static
-	chrono::file_time<_Dur>
+	chrono::file_time<common_type_t<_Dur, chrono::seconds>>
 	from_sys(const chrono::sys_time<_Dur>& __t) noexcept
 	{ return _S_from_sys(__t); }
 
       // For internal use only
       template<typename _Dur>
 	static
-	chrono::sys_time<_Dur>
+	chrono::sys_time<common_type_t<_Dur, chrono::seconds>>
 	to_sys(const chrono::file_time<_Dur>& __t) noexcept
 	{ return _S_to_sys(__t); }
 #endif // C++20
@@ -1477,25 +1479,91 @@ _GLIBCXX_END_INLINE_ABI_NAMESPACE(_V2)
       // For internal use only
       template<typename _Dur>
 	static
-	chrono::time_point<__file_clock, _Dur>
+	chrono::time_point<__file_clock, common_type_t<_Dur, chrono::seconds>>
 	_S_from_sys(const chrono::time_point<__sys_clock, _Dur>& __t) noexcept
 	{
-	  using __file_time = chrono::time_point<__file_clock, _Dur>;
+	  using _CDur = common_type_t<_Dur, chrono::seconds>;
+	  using __file_time = chrono::time_point<__file_clock, _CDur>;
 	  return __file_time{__t.time_since_epoch()} - _S_epoch_diff;
 	}
 
       // For internal use only
       template<typename _Dur>
 	static
-	chrono::time_point<__sys_clock, _Dur>
+	chrono::time_point<__sys_clock, common_type_t<_Dur, chrono::seconds>>
 	_S_to_sys(const chrono::time_point<__file_clock, _Dur>& __t) noexcept
 	{
-	  using __sys_time = chrono::time_point<__sys_clock, _Dur>;
+	  using _CDur = common_type_t<_Dur, chrono::seconds>;
+	  using __sys_time = chrono::time_point<__sys_clock, _CDur>;
 	  return __sys_time{__t.time_since_epoch()} + _S_epoch_diff;
 	}
     };
   } // namespace filesystem
 #endif // C++17
+
+  // C'est 2 constexpr support for system_clock::now() and steady_clock::now()
+  // via libstdc++-v3/src/c++11/chrono.cc
+  namespace chrono
+  {
+_GLIBCXX_BEGIN_INLINE_ABI_NAMESPACE(_V2)
+
+  _GLIBCXX_CEST_CONSTEXPR
+  system_clock::time_point
+  system_clock::now() noexcept
+  {
+#ifdef _GLIBCXX_CEST_VERSION
+    if (std::is_constant_evaluated())
+      return {};
+#endif
+
+#ifdef _GLIBCXX_USE_CLOCK_REALTIME
+    timespec tp;
+    // -EINVAL, -EFAULT
+#ifdef _GLIBCXX_USE_CLOCK_GETTIME_SYSCALL
+    syscall(SYS_clock_gettime, CLOCK_REALTIME, &tp);
+#else
+    clock_gettime(CLOCK_REALTIME, &tp);
+#endif
+    return time_point(duration(chrono::seconds(tp.tv_sec)
+       + chrono::nanoseconds(tp.tv_nsec)));
+#elif defined(_GLIBCXX_USE_GETTIMEOFDAY)
+    timeval tv;
+    // EINVAL, EFAULT
+    gettimeofday(&tv, 0);
+    return time_point(duration(chrono::seconds(tv.tv_sec)
+       + chrono::microseconds(tv.tv_usec)));
+#else
+    std::time_t __sec = std::time(0);
+    return system_clock::from_time_t(__sec);
+#endif
+  }
+
+  _GLIBCXX_CEST_CONSTEXPR
+  steady_clock::time_point
+  steady_clock::now() noexcept
+  {
+#ifdef _GLIBCXX_CEST_VERSION
+    if (std::is_constant_evaluated())
+      return {};
+#endif
+
+#ifdef _GLIBCXX_USE_CLOCK_MONOTONIC
+    timespec tp;
+    // -EINVAL, -EFAULT
+#ifdef _GLIBCXX_USE_CLOCK_GETTIME_SYSCALL
+    syscall(SYS_clock_gettime, CLOCK_MONOTONIC, &tp);
+#else
+    clock_gettime(CLOCK_MONOTONIC, &tp);
+#endif
+    return time_point(duration(chrono::seconds(tp.tv_sec)
+       + chrono::nanoseconds(tp.tv_nsec)));
+#else
+    return time_point(system_clock::now().time_since_epoch());
+#endif
+  }
+
+_GLIBCXX_END_INLINE_ABI_NAMESPACE(_V2)
+  } // namespace chrono
 
 _GLIBCXX_END_NAMESPACE_VERSION
 } // namespace std

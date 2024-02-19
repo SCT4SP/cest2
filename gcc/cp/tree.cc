@@ -298,7 +298,7 @@ lvalue_kind (const_tree ref)
     case FUNCTION_DECL:
       /* All functions (except non-static-member functions) are
 	 lvalues.  */
-      return (DECL_NONSTATIC_MEMBER_FUNCTION_P (ref)
+      return (DECL_IOBJ_MEMBER_FUNCTION_P (ref)
 	      ? clk_none : clk_ordinary);
 
     case BASELINK:
@@ -977,11 +977,12 @@ rvalue (tree expr)
 
   expr = mark_rvalue_use (expr);
 
-  /* [basic.lval]
-
-     Non-class rvalues always have cv-unqualified types.  */
+  /* [expr.type]: "If a prvalue initially has the type "cv T", where T is a
+     cv-unqualified non-class, non-array type, the type of the expression is
+     adjusted to T prior to any further analysis.  */
   type = TREE_TYPE (expr);
-  if (!CLASS_TYPE_P (type) && cv_qualified_p (type))
+  if (!CLASS_TYPE_P (type) && TREE_CODE (type) != ARRAY_TYPE
+      && cv_qualified_p (type))
     type = cv_unqualified (type);
 
   /* We need to do this for rvalue refs as well to get the right answer
@@ -2252,9 +2253,10 @@ debug_binfo (tree elem)
   while (virtuals)
     {
       tree fndecl = TREE_VALUE (virtuals);
-      fprintf (stderr, "%s [%ld =? %ld]\n",
+      fprintf (stderr, "%s [" HOST_WIDE_INT_PRINT_DEC " =? "
+		       HOST_WIDE_INT_PRINT_DEC "]\n",
 	       IDENTIFIER_POINTER (DECL_ASSEMBLER_NAME (fndecl)),
-	       (long) n, (long) TREE_INT_CST_LOW (DECL_VINDEX (fndecl)));
+	       n, TREE_INT_CST_LOW (DECL_VINDEX (fndecl)));
       ++n;
       virtuals = TREE_CHAIN (virtuals);
     }
@@ -3677,7 +3679,7 @@ build_min_non_dep_op_overload (enum tree_code op,
   nargs = call_expr_nargs (non_dep);
 
   expected_nargs = cp_tree_code_length (op);
-  if (TREE_CODE (TREE_TYPE (overload)) == METHOD_TYPE
+  if (DECL_OBJECT_MEMBER_FUNCTION_P (overload)
       /* For ARRAY_REF, operator[] is either a non-static member or newly
 	 static member, never out of class and for the static member case
 	 if user uses single index the operator[] needs to have a single
@@ -3695,7 +3697,7 @@ build_min_non_dep_op_overload (enum tree_code op,
   releasing_vec args;
   va_start (p, overload);
 
-  if (TREE_CODE (TREE_TYPE (overload)) == FUNCTION_TYPE)
+  if (!DECL_OBJECT_MEMBER_FUNCTION_P (overload))
     {
       fn = overload;
       if (op == ARRAY_REF)
@@ -3706,7 +3708,7 @@ build_min_non_dep_op_overload (enum tree_code op,
 	  vec_safe_push (args, arg);
 	}
     }
-  else if (TREE_CODE (TREE_TYPE (overload)) == METHOD_TYPE)
+  else
     {
       tree object = va_arg (p, tree);
       tree binfo = TYPE_BINFO (TREE_TYPE (object));
@@ -3719,8 +3721,6 @@ build_min_non_dep_op_overload (enum tree_code op,
 	  vec_safe_push (args, arg);
 	}
     }
-  else
-    gcc_unreachable ();
 
   va_end (p);
   call = build_min_non_dep_call_vec (non_dep, fn, args);
@@ -3747,7 +3747,7 @@ build_min_non_dep_op_overload (tree non_dep, tree overload, tree object,
 
   unsigned int nargs = call_expr_nargs (non_dep);
   tree fn = overload;
-  if (TREE_CODE (TREE_TYPE (overload)) == METHOD_TYPE)
+  if (DECL_OBJECT_MEMBER_FUNCTION_P (overload))
     {
       tree binfo = TYPE_BINFO (TREE_TYPE (object));
       tree method = build_baselink (binfo, binfo, overload, NULL_TREE);
@@ -4086,11 +4086,15 @@ cp_tree_equal (tree t1, tree t2)
 	}
       return false;
 
+    case TEMPLATE_DECL:
+      if (DECL_TEMPLATE_TEMPLATE_PARM_P (t1)
+	  && DECL_TEMPLATE_TEMPLATE_PARM_P (t2))
+	return cp_tree_equal (TREE_TYPE (t1), TREE_TYPE (t2));
+      /* Fall through.  */
     case VAR_DECL:
     case CONST_DECL:
     case FIELD_DECL:
     case FUNCTION_DECL:
-    case TEMPLATE_DECL:
     case IDENTIFIER_NODE:
     case SSA_NAME:
     case USING_DECL:

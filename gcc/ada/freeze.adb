@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---          Copyright (C) 1992-2023, Free Software Foundation, Inc.         --
+--          Copyright (C) 1992-2024, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -8141,10 +8141,19 @@ package body Freeze is
          Decl_Node : Node_Id;
 
       begin
-         --  If E is an itype, pretend that it is declared in N
+         --  If E is an itype, pretend that it is declared in N except for a
+         --  class-wide subtype with an equivalent type, because this latter
+         --  type comes with a bona-fide declaration node.
 
          if Is_Itype (E) then
-            Decl_Node := N;
+            if Ekind (E) = E_Class_Wide_Subtype
+              and then Present (Equivalent_Type (E))
+            then
+               Decl_Node := Declaration_Node (Equivalent_Type (E));
+            else
+               Decl_Node := N;
+            end if;
+
          else
             Decl_Node := Declaration_Node (E);
          end if;
