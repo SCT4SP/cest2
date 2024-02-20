@@ -81,7 +81,13 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
   using ::memmove;
   using ::memset;
   using ::strcat;
+#ifdef _GLIBCXX_CEST_VERSION
+  _GLIBCXX_CEST_CONSTEXPR int
+  strcmp(const char* __s1, const char* __s2)
+  { return __builtin_strcmp(__s1, __s2); }
+#else
   using ::strcmp;
+#endif
   using ::strcoll;
   using ::strcpy;
   using ::strcspn;
