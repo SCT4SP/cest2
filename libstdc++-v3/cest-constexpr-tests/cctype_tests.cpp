@@ -11,7 +11,7 @@ void cctype_tests() {
   static_assert(std::isupper('a') == 0);
   static_assert(std::isupper('!') == 0);
 
-  static_assert(std::isspace(' ') != 0);
+  static_assert(std::isspace('\n') != 0 and std::isblank('\n') == 0);
 
   assert(std::isalnum('q') != 0);
   assert(std::isalnum('!') == 0);
@@ -20,7 +20,7 @@ void cctype_tests() {
   assert(std::isupper('a') == 0);
   assert(std::isupper('!') == 0);
 
-  assert(std::isspace(' ') != 0);
+  assert(std::isspace('\n') != 0 and std::isblank('\n') == 0);
 
   for (auto c = std::numeric_limits<char>::lowest();; ++c) {
     assert(std::isalnum(c) == std::isalnum(c));
