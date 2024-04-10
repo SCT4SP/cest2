@@ -69,6 +69,12 @@ constexpr bool static_assert_test()
   return true;
 }
 
+constexpr bool ostringstream_test1()
+{
+  std::ostringstream o;
+  return true;
+}
+
 void stringstream_tests() {
 
   using std_isbi = std::istreambuf_iterator<char>;
@@ -76,9 +82,11 @@ void stringstream_tests() {
   assert((istringstream_test1<std::istringstream, std::string>()));
   assert((istringstream_test2<std::istringstream, std::string>()));
   assert((istringstream_test3<std::ifstream, std::string, std_isbi>()));
+  assert(ostringstream_test1());
 
   static_assert(istringstream_test1<std::istringstream, std::string>());
   static_assert(istringstream_test2<std::istringstream, std::string>());
+  static_assert(ostringstream_test1());
 
   static_assert(static_assert_test());
 }
