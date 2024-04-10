@@ -72,6 +72,8 @@ constexpr bool static_assert_test()
 constexpr bool ostringstream_test1()
 {
   std::ostringstream o;
+  //o << 42; // No: use of sentry in _M_insert(_ValueT __v) in ostream.tcc
+  //o << "Jamaica";
   return true;
 }
 
