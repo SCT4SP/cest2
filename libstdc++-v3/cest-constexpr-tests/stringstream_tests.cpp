@@ -4,8 +4,6 @@
 #include <string>
 #include <iostream>
 
-namespace ss_tests {
-
 template <typename Iss, typename S> constexpr bool istringstream_test1() {
   S str("def");
   std::stringbuf sb("ok"); // This was not in the C'est tests
@@ -71,10 +69,7 @@ constexpr bool static_assert_test()
   return true;
 }
 
-} // namespace ss_tests
-
 void stringstream_tests() {
-  using namespace ss_tests;
 
   using std_isbi = std::istreambuf_iterator<char>;
 
