@@ -43,6 +43,8 @@ along with GCC; see the file COPYING3.  If not see
 #include "cgraph.h"
 #include "alloc-pool.h"
 #include "symbol-summary.h"
+#include "sreal.h"
+#include "ipa-cp.h"
 #include "ipa-prop.h"
 #include "ipa-fnsummary.h"
 #include "gimple-fold.h"
@@ -938,7 +940,7 @@ can_strub_internally_p (cgraph_node *node, bool report = false)
     }
 
   if (list_length (TYPE_ARG_TYPES (TREE_TYPE (node->decl)))
-      >= (((HOST_WIDE_INT) 1 << IPA_PARAM_MAX_INDEX_BITS)
+      >= ((HOST_WIDE_INT_1 << IPA_PARAM_MAX_INDEX_BITS)
 	  - STRUB_INTERNAL_MAX_EXTRA_ARGS))
     {
       result = false;
@@ -1938,6 +1940,9 @@ maybe_make_indirect (indirect_parms_t &indirect_parms, tree op, int *rec)
 			  TREE_TYPE (TREE_TYPE (op)),
 			  op,
 			  build_int_cst (TREE_TYPE (op), 0));
+	  if (TYPE_VOLATILE (TREE_TYPE (TREE_TYPE (op)))
+	      && !TREE_THIS_VOLATILE (ret))
+	    TREE_SIDE_EFFECTS (ret) = TREE_THIS_VOLATILE (ret) = 1;
 	  return ret;
 	}
     }
@@ -2892,6 +2897,10 @@ pass_ipa_strub::execute (function *)
 	     probably drop the TREE_ADDRESSABLE and keep the TRUE.  */
 	  tree ref_type = build_ref_type_for (nparm);
 
+	  if (TREE_THIS_VOLATILE (nparm)
+	      && TYPE_VOLATILE (TREE_TYPE (nparm))
+	      && !TYPE_VOLATILE (ref_type))
+	    TREE_SIDE_EFFECTS (nparm) = TREE_THIS_VOLATILE (nparm) = 0;
 	  DECL_ARG_TYPE (nparm) = TREE_TYPE (nparm) = ref_type;
 	  relayout_decl (nparm);
 	  TREE_ADDRESSABLE (nparm) = 0;

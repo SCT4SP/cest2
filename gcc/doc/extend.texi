@@ -6314,6 +6314,16 @@ Permissible values for this parameter are @code{user}, @code{supervisor},
 and @code{machine}.  If there is no parameter, then it defaults to
 @code{machine}.
 
+@cindex @code{riscv_vector_cc} function attribute, RISC-V
+@item riscv_vector_cc
+Use this attribute to force the function to use the vector calling
+convention variant.
+
+@smallexample
+void foo() __attribute__((riscv_vector_cc));
+[[riscv::vector_cc]] void foo(); // For C++11 and C23
+@end smallexample
+
 @end table
 
 The following target-specific function attributes are available for the
@@ -12626,10 +12636,7 @@ In C, writing:
 @end smallexample
 
 suppresses warnings about using @samp{[[]]} attributes in C versions
-that predate C23@.  Since the scope token @samp{::} is not a single
-lexing token in earlier versions of C, this construct also allows two colons
-to be used in place of @code{::}.  GCC does not check whether the two
-colons are immediately adjacent.
+that predate C23@.
 @end itemize
 
 @code{__extension__} has no effect aside from this.
@@ -12894,12 +12901,13 @@ typedef int v4si __attribute__ ((vector_size (16)));
 @end smallexample
 
 @noindent
-The @code{int} type specifies the @dfn{base type}, while the attribute specifies
-the vector size for the variable, measured in bytes.  For example, the
-declaration above causes the compiler to set the mode for the @code{v4si}
-type to be 16 bytes wide and divided into @code{int} sized units.  For
-a 32-bit @code{int} this means a vector of 4 units of 4 bytes, and the
-corresponding mode of @code{foo} is @acronym{V4SI}.
+The @code{int} type specifies the @dfn{base type} (which can be a
+@code{typedef}), while the attribute specifies the vector size for the
+variable, measured in bytes. For example, the declaration above causes
+the compiler to set the mode for the @code{v4si} type to be 16 bytes wide
+and divided into @code{int} sized units.  For a 32-bit @code{int} this
+means a vector of 4 units of 4 bytes, and the corresponding mode of
+@code{foo} is @acronym{V4SI}.
 
 The @code{vector_size} attribute is only applicable to integral and
 floating scalars, although arrays, pointers, and function return values
@@ -16782,37 +16790,39 @@ or if not a specific built-in is implemented or not. For example, if
 @code{__builtin_avr_nop} is available the macro
 @code{__BUILTIN_AVR_NOP} is defined to @code{1} and undefined otherwise.
 
-@table @code
+@defbuiltin{void __builtin_avr_nop (void)}
+@defbuiltinx{void __builtin_avr_sei (void)}
+@defbuiltinx{void __builtin_avr_cli (void)}
+@defbuiltinx{void __builtin_avr_sleep (void)}
+@defbuiltinx{void __builtin_avr_wdr (void)}
+@defbuiltinx{uint8_t __builtin_avr_swap (uint8_t)}
+@defbuiltinx{uint16_t __builtin_avr_fmul (uint8_t, uint8_t)}
+@defbuiltinx{int16_t __builtin_avr_fmuls (int8_t, int8_t)}
+@defbuiltinx{int16_t __builtin_avr_fmulsu (int8_t, uint8_t)}
 
-@item void __builtin_avr_nop (void)
-@itemx void __builtin_avr_sei (void)
-@itemx void __builtin_avr_cli (void)
-@itemx void __builtin_avr_sleep (void)
-@itemx void __builtin_avr_wdr (void)
-@itemx unsigned char __builtin_avr_swap (unsigned char)
-@itemx unsigned int __builtin_avr_fmul (unsigned char, unsigned char)
-@itemx int __builtin_avr_fmuls (char, char)
-@itemx int __builtin_avr_fmulsu (char, unsigned char)
 These built-in functions map to the respective machine
 instruction, i.e.@: @code{nop}, @code{sei}, @code{cli}, @code{sleep},
 @code{wdr}, @code{swap}, @code{fmul}, @code{fmuls}
 resp. @code{fmulsu}. The three @code{fmul*} built-ins are implemented
 as library call if no hardware multiplier is available.
+@enddefbuiltin
 
-@item void __builtin_avr_delay_cycles (unsigned long ticks)
+@defbuiltin{void __builtin_avr_delay_cycles (uint32_t @var{ticks})}
 Delay execution for @var{ticks} cycles. Note that this
 built-in does not take into account the effect of interrupts that
 might increase delay time. @var{ticks} must be a compile-time
 integer constant; delays with a variable number of cycles are not supported.
+@enddefbuiltin
 
-@item char __builtin_avr_flash_segment (const __memx void*)
+@defbuiltin{int8_t __builtin_avr_flash_segment (const __memx void*)}
 This built-in takes a byte address to the 24-bit
 @ref{AVR Named Address Spaces,address space} @code{__memx} and returns
 the number of the flash segment (the 64 KiB chunk) where the address
 points to.  Counting starts at @code{0}.
 If the address does not point to flash memory, return @code{-1}.
+@enddefbuiltin
 
-@item uint8_t __builtin_avr_insert_bits (uint32_t map, uint8_t bits, uint8_t val)
+@defbuiltin{uint8_t __builtin_avr_insert_bits (uint32_t @var{map}, uint8_t @var{bits}, uint8_t @var{val})}
 Insert bits from @var{bits} into @var{val} and return the resulting
 value. The nibbles of @var{map} determine how the insertion is
 performed: Let @var{X} be the @var{n}-th nibble of @var{map}
@@ -16856,12 +16866,12 @@ __builtin_avr_insert_bits (0xffff3210, bits, val);
 // reverse the bit order of bits
 __builtin_avr_insert_bits (0x01234567, bits, 0);
 @end smallexample
+@enddefbuiltin
 
-@item void __builtin_avr_nops (unsigned count)
+@defbuiltin{void __builtin_avr_nops (uint16_t @var{count})}
 Insert @var{count} @code{NOP} instructions.
 The number of instructions must be a compile-time integer constant.
-
-@end table
+@enddefbuiltin
 
 @noindent
 There are many more AVR-specific built-in functions that are used to
@@ -21379,8 +21389,8 @@ available on the PowerPC family of processors starting with ISA 2.07
 or later.  Unless specific options are explicitly disabled on the
 command line, specifying option @option{-mcpu=power8} has the effect of
 enabling all the same options as for @option{-mcpu=power7} in
-addition to the @option{-mpower8-fusion}, @option{-mpower8-vector},
-@option{-mcrypto}, @option{-mhtm}, @option{-mquad-memory}, and
+addition to the @option{-mpower8-fusion}, @option{-mcrypto},
+@option{-mhtm}, @option{-mquad-memory}, and
 @option{-mquad-memory-atomic} options.
 
 This section intentionally empty.
@@ -26185,6 +26195,9 @@ AMD Family 19h Zen version 3.
 
 @item znver4
 AMD Family 19h Zen version 4.
+
+@item znver5
+AMD Family 1ah Zen version 5.
 @end table
 
 Here is an example:
@@ -29317,6 +29330,55 @@ Some_Class  B  __attribute__ ((init_priority (543)));
 @noindent
 Note that the particular values of @var{priority} do not matter; only their
 relative ordering.
+
+@cindex @code{no_dangling} type attribute
+@cindex @code{no_dangling} function attribute
+@item no_dangling
+
+This attribute can be applied on a class type, function, or member
+function.  Dangling references to classes marked with this attribute
+will have the @option{-Wdangling-reference} diagnostic suppressed; so
+will references returned from the @code{gnu::no_dangling}-marked
+functions.  For example:
+
+@smallexample
+class [[gnu::no_dangling]] S @{ @dots{} @};
+@end smallexample
+
+Or:
+
+@smallexample
+class A @{
+  int *p;
+  [[gnu::no_dangling]] int &foo() @{ return *p; @}
+@};
+
+[[gnu::no_dangling]] const int &
+foo (const int &i)
+@{
+  @dots{}
+@}
+@end smallexample
+
+This attribute takes an optional argument, which must be an expression that
+evaluates to true or false:
+
+@smallexample
+template <typename T>
+struct [[gnu::no_dangling(std::is_reference_v<T>)]] S @{
+  @dots{}
+@};
+@end smallexample
+
+Or:
+
+@smallexample
+template <typename T>
+[[gnu::no_dangling(std::is_lvalue_reference_v<T>)]]
+decltype(auto) foo(T&& t) @{
+  @dots{}
+@};
+@end smallexample
 
 @cindex @code{warn_unused} type attribute
 @item warn_unused
