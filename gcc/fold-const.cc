@@ -6420,7 +6420,6 @@ static tree
 merge_truthop_with_opposite_arm (location_t loc, tree op, tree cmpop,
 				 bool rhs_only)
 {
-  tree type = TREE_TYPE (cmpop);
   enum tree_code code = TREE_CODE (cmpop);
   enum tree_code truthop_code = TREE_CODE (op);
   tree lhs = TREE_OPERAND (op, 0);
@@ -6435,6 +6434,8 @@ merge_truthop_with_opposite_arm (location_t loc, tree op, tree cmpop,
 
   if (TREE_CODE_CLASS (code) != tcc_comparison)
     return NULL_TREE;
+
+  tree type = TREE_TYPE (TREE_OPERAND (cmpop, 0));
 
   if (rhs_code == truthop_code)
     {
@@ -7101,6 +7102,27 @@ extract_muldiv_1 (tree t, tree c, enum tree_code code, tree wide_type,
       /* If widening the type changes the signedness, then we can't perform
 	 this optimization as that changes the result.  */
       if (TYPE_UNSIGNED (ctype) != TYPE_UNSIGNED (type))
+	break;
+
+      /* Punt for multiplication altogether.
+	 MAX (1U + INT_MAX, 1U) * 2U is not equivalent to
+	 MAX ((1U + INT_MAX) * 2U, 1U * 2U), the former is
+	 0U, the latter is 2U.
+	 MAX (INT_MIN / 2, 0) * -2 is not equivalent to
+	 MIN (INT_MIN / 2 * -2, 0 * -2), the former is
+	 well defined 0, the latter invokes UB.
+	 MAX (INT_MIN / 2, 5) * 5 is not equivalent to
+	 MAX (INT_MIN / 2 * 5, 5 * 5), the former is
+	 well defined 25, the latter invokes UB.  */
+      if (code == MULT_EXPR)
+	break;
+      /* For division/modulo, punt on c being -1 for MAX, as
+	 MAX (INT_MIN, 0) / -1 is not equivalent to
+	 MIN (INT_MIN / -1, 0 / -1), the former is well defined
+	 0, the latter invokes UB (or for -fwrapv is INT_MIN).
+	 MIN (INT_MIN, 0) / -1 already invokes UB, so the
+	 transformation won't make it worse.  */
+      else if (tcode == MAX_EXPR && integer_minus_onep (c))
 	break;
 
       /* MIN (a, b) / 5 -> MIN (a / 5, b / 5)  */
@@ -8579,6 +8601,8 @@ native_encode_initializer (tree init, unsigned char *ptr, int len,
 		  if (BYTES_BIG_ENDIAN != WORDS_BIG_ENDIAN)
 		    return 0;
 
+		  if (TREE_CODE (val) == NON_LVALUE_EXPR)
+		    val = TREE_OPERAND (val, 0);
 		  if (TREE_CODE (val) != INTEGER_CST)
 		    return 0;
 
@@ -11779,6 +11803,15 @@ fold_binary_loc (location_t loc, enum tree_code code, tree type,
 		  + (lit0 != 0) + (lit1 != 0)
 		  + (minus_lit0 != 0) + (minus_lit1 != 0)) > 2)
 	    {
+	      int var0_origin = (var0 != 0) + 2 * (var1 != 0);
+	      int minus_var0_origin
+		= (minus_var0 != 0) + 2 * (minus_var1 != 0);
+	      int con0_origin = (con0 != 0) + 2 * (con1 != 0);
+	      int minus_con0_origin
+		= (minus_con0 != 0) + 2 * (minus_con1 != 0);
+	      int lit0_origin = (lit0 != 0) + 2 * (lit1 != 0);
+	      int minus_lit0_origin
+		= (minus_lit0 != 0) + 2 * (minus_lit1 != 0);
 	      var0 = associate_trees (loc, var0, var1, code, atype);
 	      minus_var0 = associate_trees (loc, minus_var0, minus_var1,
 					    code, atype);
@@ -11791,15 +11824,19 @@ fold_binary_loc (location_t loc, enum tree_code code, tree type,
 
 	      if (minus_var0 && var0)
 		{
+		  var0_origin |= minus_var0_origin;
 		  var0 = associate_trees (loc, var0, minus_var0,
 					  MINUS_EXPR, atype);
 		  minus_var0 = 0;
+		  minus_var0_origin = 0;
 		}
 	      if (minus_con0 && con0)
 		{
+		  con0_origin |= minus_con0_origin;
 		  con0 = associate_trees (loc, con0, minus_con0,
 					  MINUS_EXPR, atype);
 		  minus_con0 = 0;
+		  minus_con0_origin = 0;
 		}
 
 	      /* Preserve the MINUS_EXPR if the negative part of the literal is
@@ -11815,15 +11852,19 @@ fold_binary_loc (location_t loc, enum tree_code code, tree type,
 		      /* But avoid ending up with only negated parts.  */
 		      && (var0 || con0))
 		    {
+		      minus_lit0_origin |= lit0_origin;
 		      minus_lit0 = associate_trees (loc, minus_lit0, lit0,
 						    MINUS_EXPR, atype);
 		      lit0 = 0;
+		      lit0_origin = 0;
 		    }
 		  else
 		    {
+		      lit0_origin |= minus_lit0_origin;
 		      lit0 = associate_trees (loc, lit0, minus_lit0,
 					      MINUS_EXPR, atype);
 		      minus_lit0 = 0;
+		      minus_lit0_origin = 0;
 		    }
 		}
 
@@ -11833,36 +11874,50 @@ fold_binary_loc (location_t loc, enum tree_code code, tree type,
 		return NULL_TREE;
 
 	      /* Eliminate lit0 and minus_lit0 to con0 and minus_con0. */
+	      con0_origin |= lit0_origin;
 	      con0 = associate_trees (loc, con0, lit0, code, atype);
-	      lit0 = 0;
+	      minus_con0_origin |= minus_lit0_origin;
 	      minus_con0 = associate_trees (loc, minus_con0, minus_lit0,
 					    code, atype);
-	      minus_lit0 = 0;
 
 	      /* Eliminate minus_con0.  */
 	      if (minus_con0)
 		{
 		  if (con0)
-		    con0 = associate_trees (loc, con0, minus_con0,
-					    MINUS_EXPR, atype);
+		    {
+		      con0_origin |= minus_con0_origin;
+		      con0 = associate_trees (loc, con0, minus_con0,
+					      MINUS_EXPR, atype);
+		    }
 		  else if (var0)
-		    var0 = associate_trees (loc, var0, minus_con0,
-					    MINUS_EXPR, atype);
+		    {
+		      var0_origin |= minus_con0_origin;
+		      var0 = associate_trees (loc, var0, minus_con0,
+					      MINUS_EXPR, atype);
+		    }
 		  else
 		    gcc_unreachable ();
-		  minus_con0 = 0;
 		}
 
 	      /* Eliminate minus_var0.  */
 	      if (minus_var0)
 		{
 		  if (con0)
-		    con0 = associate_trees (loc, con0, minus_var0,
-					    MINUS_EXPR, atype);
+		    {
+		      con0_origin |= minus_var0_origin;
+		      con0 = associate_trees (loc, con0, minus_var0,
+					      MINUS_EXPR, atype);
+		    }
 		  else
 		    gcc_unreachable ();
-		  minus_var0 = 0;
 		}
+
+	      /* Reassociate only if there has been any actual association
+		 between subtrees from op0 and subtrees from op1 in at
+		 least one of the operands, otherwise we risk infinite
+		 recursion.  See PR114084.  */
+	      if (var0_origin != 3 && con0_origin != 3)
+		return NULL_TREE;
 
 	      return
 		fold_convert_loc (loc, type, associate_trees (loc, var0, con0,

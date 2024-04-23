@@ -370,7 +370,7 @@ remap_decl (tree decl, copy_body_data *id)
 	 need this decl for TYPE_STUB_DECL.  */
       insert_decl_map (id, decl, t);
 
-      if (!DECL_P (t))
+      if (!DECL_P (t) || t == decl)
 	return t;
 
       /* Remap types, if necessary.  */
@@ -765,7 +765,7 @@ remap_decls (tree decls, vec<tree, va_gc> **nonlocalized_list,
 	 TREE_CHAIN.  If we remapped this variable to the return slot, it's
 	 already declared somewhere else, so don't declare it here.  */
 
-      if (new_var == id->retvar)
+      if (new_var == old_var || new_var == id->retvar)
 	;
       else if (!new_var)
         {
@@ -2049,6 +2049,17 @@ copy_bb (copy_body_data *id, basic_block bb,
 
   copy_gsi = gsi_start_bb (copy_basic_block);
 
+  unsigned min_cond_uid = 0;
+  if (id->src_cfun->cond_uids)
+    {
+      if (!cfun->cond_uids)
+	cfun->cond_uids = new hash_map <gcond*, unsigned> ();
+
+      for (auto itr : *id->src_cfun->cond_uids)
+	if (itr.second >= min_cond_uid)
+	  min_cond_uid = itr.second + 1;
+    }
+
   for (gsi = gsi_start_bb (bb); !gsi_end_p (gsi); gsi_next (&gsi))
     {
       gimple_seq stmts;
@@ -2075,6 +2086,18 @@ copy_bb (copy_body_data *id, basic_block bb,
 
 	  if (gimple_nop_p (stmt))
 	      continue;
+
+	  /* If -fcondition-coverage is used, register the inlined conditions
+	     in the cond->expression mapping of the caller.  The expression tag
+	     is shifted conditions from the two bodies are not mixed.  */
+	  if (id->src_cfun->cond_uids && is_a <gcond*> (stmt))
+	    {
+	      gcond *orig_cond = as_a <gcond*> (orig_stmt);
+	      gcond *cond = as_a <gcond*> (stmt);
+	      unsigned *v = id->src_cfun->cond_uids->get (orig_cond);
+	      if (v)
+		cfun->cond_uids->put (cond, *v + min_cond_uid);
+	    }
 
 	  gimple_duplicate_stmt_histograms (cfun, stmt, id->src_cfun,
 					    orig_stmt);
@@ -2984,23 +3007,13 @@ redirect_all_calls (copy_body_data * id, basic_block bb)
       gimple *stmt = gsi_stmt (si);
       if (is_gimple_call (stmt))
 	{
-	  tree old_lhs = gimple_call_lhs (stmt);
 	  struct cgraph_edge *edge = id->dst_node->get_edge (stmt);
 	  if (edge)
 	    {
 	      if (!id->killed_new_ssa_names)
 		id->killed_new_ssa_names = new hash_set<tree> (16);
-	      gimple *new_stmt
-		= cgraph_edge::redirect_call_stmt_to_callee (edge,
-		    id->killed_new_ssa_names);
-	      if (old_lhs
-		  && TREE_CODE (old_lhs) == SSA_NAME
-		  && !gimple_call_lhs (new_stmt))
-		/* In case of IPA-SRA removing the LHS, the name should have
-		   been already added to the hash.  But in case of redirecting
-		   to builtin_unreachable it was not and the name still should
-		   be pruned from debug statements.  */
-		id->killed_new_ssa_names->add (old_lhs);
+	      cgraph_edge::redirect_call_stmt_to_callee (edge,
+		id->killed_new_ssa_names);
 
 	      if (stmt == last && id->call_stmt && maybe_clean_eh_stmt (stmt))
 		gimple_purge_dead_eh_edges (bb);
@@ -6610,7 +6623,15 @@ copy_fn (tree fn, tree& parms, tree& result)
   id.src_cfun = DECL_STRUCT_FUNCTION (fn);
   id.decl_map = &decl_map;
 
-  id.copy_decl = copy_decl_no_change;
+  id.copy_decl = [] (tree decl, copy_body_data *id)
+    {
+      if (TREE_CODE (decl) == TYPE_DECL || TREE_CODE (decl) == CONST_DECL)
+	/* Don't make copies of local types or injected enumerators,
+	   the C++ constexpr evaluator doesn't need them and they
+	   confuse modules streaming.  */
+	return decl;
+      return copy_decl_no_change (decl, id);
+    };
   id.transform_call_graph_edges = CB_CGE_DUPLICATE;
   id.transform_new_cfg = false;
   id.transform_return_to_modify = false;

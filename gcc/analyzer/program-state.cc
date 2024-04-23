@@ -877,7 +877,7 @@ program_state::program_state (const extrinsic_state &ext_state)
     }
 }
 
-/* Attempt to to use R to replay SUMMARY into this object.
+/* Attempt to use R to replay SUMMARY into this object.
    Return true if it is possible.  */
 
 bool
@@ -1143,14 +1143,14 @@ program_state::to_json (const extrinsic_state &ext_state) const
 
 void
 program_state::push_frame (const extrinsic_state &ext_state ATTRIBUTE_UNUSED,
-			   function *fun)
+			   const function &fun)
 {
   m_region_model->push_frame (fun, NULL, NULL);
 }
 
 /* Get the current function of this state.  */
 
-function *
+const function *
 program_state::get_current_function () const
 {
   return m_region_model->get_current_function ();
@@ -1625,7 +1625,7 @@ program_state::detect_leaks (const program_state &src_state,
 	dest_state.m_region_model->unset_dynamic_extents (reg);
 }
 
-/* Attempt to to use R to replay SUMMARY into this object.
+/* Attempt to use R to replay SUMMARY into this object.
    Return true if it is possible.  */
 
 bool

@@ -1596,7 +1596,9 @@ standard_conversion (tree to, tree from, tree expr, bool c_cast_p,
   return conv;
 }
 
-/* Returns nonzero if T1 is reference-related to T2.  */
+/* Returns nonzero if T1 is reference-related to T2.
+
+   This is considered when a reference to T1 is initialized by a T2.  */
 
 bool
 reference_related_p (tree t1, tree t2)
@@ -1757,6 +1759,7 @@ reference_binding (tree rto, tree rfrom, tree expr, bool c_cast_p, int flags,
     }
 
   bool copy_list_init = false;
+  bool single_list_conv = false;
   if (expr && BRACE_ENCLOSED_INITIALIZER_P (expr))
     {
       maybe_warn_cpp0x (CPP0X_INITIALIZER_LISTS);
@@ -1783,6 +1786,11 @@ reference_binding (tree rto, tree rfrom, tree expr, bool c_cast_p, int flags,
 	      from = etype;
 	      goto skip;
 	    }
+	  else if (CLASS_TYPE_P (etype) && TYPE_HAS_CONVERSION (etype))
+	    /* CWG1996: jason's proposed drafting adds "or initializing T from E
+	       would bind directly".  We check that in the direct binding with
+	       conversion code below.  */
+	    single_list_conv = true;
 	}
       /* Otherwise, if T is a reference type, a prvalue temporary of the type
 	 referenced by T is copy-list-initialized, and the reference is bound
@@ -1907,9 +1915,14 @@ reference_binding (tree rto, tree rfrom, tree expr, bool c_cast_p, int flags,
      (possibly cv-qualified) object to the (possibly cv-qualified) same
      object type (or a reference to it), to a (possibly cv-qualified) base
      class of that type (or a reference to it).... */
-  else if (CLASS_TYPE_P (from) && !related_p
-	   && !(flags & LOOKUP_NO_CONVERSION))
+  else if (!related_p
+	   && !(flags & LOOKUP_NO_CONVERSION)
+	   && (CLASS_TYPE_P (from) || single_list_conv))
     {
+      tree rexpr = expr;
+      if (single_list_conv)
+	rexpr = CONSTRUCTOR_ELT (expr, 0)->value;
+
       /* [dcl.init.ref]
 
 	 If the initializer expression
@@ -1923,7 +1936,7 @@ reference_binding (tree rto, tree rfrom, tree expr, bool c_cast_p, int flags,
 
 	the reference is bound to the lvalue result of the conversion
 	in the second case.  */
-      z_candidate *cand = build_user_type_conversion_1 (rto, expr, flags,
+      z_candidate *cand = build_user_type_conversion_1 (rto, rexpr, flags,
 							complain);
       if (cand)
 	{
@@ -2021,7 +2034,17 @@ reference_binding (tree rto, tree rfrom, tree expr, bool c_cast_p, int flags,
 	 recalculate the second conversion sequence.  */
       for (conversion *t = conv; t; t = next_conversion (t))
 	if (t->kind == ck_user
-	    && DECL_CONV_FN_P (t->cand->fn))
+	    && c_cast_p && !maybe_valid_p)
+	  {
+	    if (complain & tf_warning)
+	      warning (OPT_Wcast_user_defined,
+		       "casting %qT to %qT does not use %qD",
+		       from, rto, t->cand->fn);
+	    /* Don't let recalculation try to make this valid.  */
+	    break;
+	  }
+	else if (t->kind == ck_user
+		 && DECL_CONV_FN_P (t->cand->fn))
 	  {
 	    tree ftype = TREE_TYPE (TREE_TYPE (t->cand->fn));
 	    /* A prvalue of non-class type is cv-unqualified.  */
@@ -8742,7 +8765,15 @@ convert_like_internal (conversion *convs, tree expr, tree fn, int argnum,
       break;
     };
 
-  expr = convert_like (next_conversion (convs), expr, fn, argnum,
+  conversion *nc = next_conversion (convs);
+  if (convs->kind == ck_ref_bind && nc->kind == ck_qual
+      && !convs->need_temporary_p)
+    /* direct_reference_binding might have inserted a ck_qual under
+       this ck_ref_bind for the benefit of conversion sequence ranking.
+       Don't actually perform that conversion.  */
+    nc = next_conversion (nc);
+
+  expr = convert_like (nc, expr, fn, argnum,
 		       convs->kind == ck_ref_bind
 		       ? issue_conversion_warnings : false,
 		       c_cast_p, /*nested_p=*/true, complain & ~tf_no_cleanup);
@@ -8819,19 +8850,6 @@ convert_like_internal (conversion *convs, tree expr, tree fn, int argnum,
     case ck_ref_bind:
       {
 	tree ref_type = totype;
-
-	/* direct_reference_binding might have inserted a ck_qual under
-	   this ck_ref_bind for the benefit of conversion sequence ranking.
-	   Ignore the conversion; we'll create our own below.  */
-	if (next_conversion (convs)->kind == ck_qual
-	    && !convs->need_temporary_p)
-	  {
-	    gcc_assert (same_type_p (TREE_TYPE (expr),
-				     next_conversion (convs)->type));
-	    /* Strip the cast created by the ck_qual; cp_build_addr_expr
-	       below expects an lvalue.  */
-	    STRIP_NOPS (expr);
-	  }
 
 	if (convs->bad_p && !next_conversion (convs)->bad_p)
 	  {
@@ -14033,11 +14051,7 @@ std_pair_ref_ref_p (tree t)
   return true;
 }
 
-/* Return true if a class CTYPE is either std::reference_wrapper or
-   std::ref_view, or a reference wrapper class.  We consider a class
-   a reference wrapper class if it has a reference member.  We no
-   longer check that it has a constructor taking the same reference type
-   since that approach still generated too many false positives.  */
+/* Return true if a class T has a reference member.  */
 
 static bool
 class_has_reference_member_p (tree t)
@@ -14061,11 +14075,40 @@ class_has_reference_member_p_r (tree binfo, void *)
 	  ? integer_one_node : NULL_TREE);
 }
 
+
+/* Return true if T (either a class or a function) has been marked as
+   not-dangling.  */
+
+static bool
+no_dangling_p (tree t)
+{
+  t = lookup_attribute ("no_dangling", TYPE_ATTRIBUTES (t));
+  if (!t)
+    return false;
+
+  t = TREE_VALUE (t);
+  if (!t)
+    return true;
+
+  t = build_converted_constant_bool_expr (TREE_VALUE (t), tf_warning_or_error);
+  t = cxx_constant_value (t);
+  return t == boolean_true_node;
+}
+
+/* Return true if a class CTYPE is either std::reference_wrapper or
+   std::ref_view, or a reference wrapper class.  We consider a class
+   a reference wrapper class if it has a reference member.  We no
+   longer check that it has a constructor taking the same reference type
+   since that approach still generated too many false positives.  */
+
 static bool
 reference_like_class_p (tree ctype)
 {
   if (!CLASS_TYPE_P (ctype))
     return false;
+
+  if (no_dangling_p (ctype))
+    return true;
 
   /* Also accept a std::pair<const T&, const T&>.  */
   if (std_pair_ref_ref_p (ctype))
@@ -14173,7 +14216,8 @@ do_warn_dangling_reference (tree expr, bool arg_p)
 	       but probably not to one of its arguments.  */
 	    || (DECL_OBJECT_MEMBER_FUNCTION_P (fndecl)
 		&& DECL_OVERLOADED_OPERATOR_P (fndecl)
-		&& DECL_OVERLOADED_OPERATOR_IS (fndecl, INDIRECT_REF)))
+		&& DECL_OVERLOADED_OPERATOR_IS (fndecl, INDIRECT_REF))
+	    || no_dangling_p (TREE_TYPE (fndecl)))
 	  return NULL_TREE;
 
 	tree rettype = TREE_TYPE (TREE_TYPE (fndecl));
@@ -14549,6 +14593,30 @@ maybe_show_nonconverting_candidate (tree to, tree from, tree arg, int flags)
 	  && DECL_NONCONVERTING_P (c->cand->fn))
 	inform (DECL_SOURCE_LOCATION (c->cand->fn), "explicit conversion "
 		"function was not considered");
+}
+
+/* We're converting EXPR to TYPE.  If that conversion involves a conversion
+   function and we're binding EXPR to a reference parameter of that function,
+   return true.  */
+
+bool
+conv_binds_to_reference_parm_p (tree type, tree expr)
+{
+  conversion_obstack_sentinel cos;
+  conversion *c = implicit_conversion (type, TREE_TYPE (expr), expr,
+				       /*c_cast_p=*/false, LOOKUP_NORMAL,
+				       tf_none);
+  if (c && !c->bad_p && c->user_conv_p)
+    for (; c; c = next_conversion (c))
+      if (c->kind == ck_user)
+	for (z_candidate *cand = c->cand; cand; cand = cand->next)
+	  if (cand->viable == 1)
+	    for (size_t i = 0; i < cand->num_convs; ++i)
+	      if (cand->convs[i]->kind == ck_ref_bind
+		  && conv_get_original_expr (cand->convs[i]) == expr)
+		return true;
+
+  return false;
 }
 
 #include "gt-cp-call.h"
