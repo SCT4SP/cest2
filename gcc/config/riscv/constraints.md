@@ -173,14 +173,14 @@
 (define_register_constraint "W84" "TARGET_VECTOR ? V_REGS : NO_REGS"
   "A vector register has register number % 8 == 4." "regno % 8 == 4")
 
-(define_register_constraint "W43" "TARGET_VECTOR ? V_REGS : NO_REGS"
-  "A vector register has register number % 4 == 3." "regno % 4 == 3")
+(define_register_constraint "W41" "TARGET_VECTOR ? V_REGS : NO_REGS"
+  "A vector register has register number % 4 == 1." "regno % 4 == 1")
 
-(define_register_constraint "W86" "TARGET_VECTOR ? V_REGS : NO_REGS"
-  "A vector register has register number % 8 == 6." "regno % 8 == 6")
+(define_register_constraint "W81" "TARGET_VECTOR ? V_REGS : NO_REGS"
+  "A vector register has register number % 8 == 1." "regno % 8 == 1")
 
-(define_register_constraint "W87" "TARGET_VECTOR ? V_REGS : NO_REGS"
-  "A vector register has register number % 8 == 7." "regno % 8 == 7")
+(define_register_constraint "W82" "TARGET_VECTOR ? V_REGS : NO_REGS"
+  "A vector register has register number % 8 == 2." "regno % 8 == 2")
 
 ;; This constraint is used to match instruction "csrr %0, vlenb" which is generated in "mov<mode>".
 ;; VLENB is a run-time constant which represent the vector register length in bytes.
@@ -267,6 +267,12 @@
   (and (match_code "const_int")
        (and (match_test "IN_RANGE (ival, 0, 1073741823)")
             (match_test "exact_log2 (ival + 1) != -1"))))
+
+(define_constraint "CV_bi_sign5"
+  "@internal
+   A 5-bit signed immediate for CORE-V Immediate Branch."
+  (and (match_code "const_int")
+       (match_test "IN_RANGE (ival, -16, 15)")))
 
 (define_constraint "CV_simd_si6"
   "A 6-bit signed immediate for SIMD."

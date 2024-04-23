@@ -241,13 +241,25 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *  These functions use the stream's current locale (specifically, the
        *  @c num_get facet) to perform numeric formatting.
       */
+      _GLIBCXX_CEST_CONSTEXPR
       __ostream_type&
       operator<<(double __f)
-      { return _M_insert(__f); }
+      {
+#if _GLIBCXX_CEST_VERSION
+        if (__builtin_is_constant_evaluated())
+          return *this;
+#endif
+        return _M_insert(__f);
+      }
 
+      _GLIBCXX_CEST_CONSTEXPR
       __ostream_type&
       operator<<(float __f)
       {
+#if _GLIBCXX_CEST_VERSION
+	if (__builtin_is_constant_evaluated())
+	  return *this;
+#endif
 	// _GLIBCXX_RESOLVE_LIB_DEFECTS
 	// 117. basic_ostream uses nonexistent num_put member functions.
 	return _M_insert(static_cast<double>(__f));
@@ -935,7 +947,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
   inline void
   vprint_unicode(ostream& __os, string_view __fmt, format_args __args)
   {
-#ifndef _WIN32
+#if !defined(_WIN32) || defined(__CYGWIN__)
     // For most targets we don't need to do anything special to write
     // Unicode to a terminal.
     std::vprint_nonunicode(__os, __fmt, __args);
@@ -952,7 +964,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	// If stream refers to a terminal, write a Unicode string to it.
 	if (auto __term = __open_terminal(__os.rdbuf()))
 	  {
-#ifndef _WIN32
+#if !defined(_WIN32) || defined(__CYGWIN__)
 	    // For POSIX, __open_terminal(streambuf*) uses fdopen to open a
 	    // new file, so we would need to close it here. This code is not
 	    // actually compiled because it's inside an #ifdef _WIN32 group,
@@ -1024,6 +1036,18 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       std::print(__os, "{}\n",
 		 std::format(__fmt, std::forward<_Args>(__args)...));
     }
+
+  // Defined for C++26, supported as an extension to C++23.
+  inline void println(ostream& __os)
+  {
+#if defined(_WIN32) && !defined(__CYGWIN__)
+    if constexpr (__unicode::__literal_encoding_is_utf8())
+      std::vprint_unicode(__os, "\n", std::make_format_args());
+    else
+#endif
+      __os.put('\n');
+  }
+
 #endif // __cpp_lib_print
 
 #endif // C++11

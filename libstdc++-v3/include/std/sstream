@@ -821,6 +821,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        *  That's a lie.  We initialize the base class with NULL, because the
        *  string class does its own memory management.
       */
+      _GLIBCXX_CEST_CONSTEXPR
       basic_ostringstream()
       : __ostream_type(), _M_stringbuf(ios_base::out)
       { this->init(&_M_stringbuf); }
@@ -867,6 +868,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        *  The buffer is deallocated by the stringbuf object, not the
        *  formatting stream.
       */
+      _GLIBCXX_CEST_CONSTEXPR
       ~basic_ostringstream()
       { }
 

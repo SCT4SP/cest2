@@ -6092,10 +6092,10 @@ start_decl (const cp_declarator *declarator,
     {
       /* A function-scope decl of some namespace-scope decl.  */
       DECL_LOCAL_DECL_P (decl) = true;
-      if (named_module_purview_p ())
+      if (named_module_attach_p ())
 	error_at (declarator->id_loc,
-		  "block-scope extern declaration %q#D not permitted"
-		  " in module purview", decl);
+		  "block-scope extern declaration %q#D must not be"
+		  " attached to a named module", decl);
     }
 
   /* Enter this declaration into the symbol table.  Don't push the plain
@@ -7954,10 +7954,6 @@ make_rtl_for_nonlocal_decl (tree decl, tree init, const char* asmspec)
       && DECL_IMPLICIT_INSTANTIATION (decl))
     defer_p = 1;
 
-  /* Defer vague-linkage variables.  */
-  if (DECL_INLINE_VAR_P (decl))
-    defer_p = 1;
-
   /* If we're not deferring, go ahead and assemble the variable.  */
   if (!defer_p)
     rest_of_decl_compilation (decl, toplev, at_eof);
@@ -9266,7 +9262,9 @@ static GTY((cache)) decl_tree_cache_map *decomp_type_table;
 tree
 lookup_decomp_type (tree v)
 {
-  return *decomp_type_table->get (v);
+  if (tree *slot = decomp_type_table->get (v))
+    return *slot;
+  return NULL_TREE;
 }
 
 /* Mangle a decomposition declaration if needed.  Arguments like
@@ -10758,9 +10756,15 @@ grokfndecl (tree ctype,
 
   /* Members of anonymous types and local classes have no linkage; make
      them internal.  If a typedef is made later, this will be changed.  */
-  if (ctype && (!TREE_PUBLIC (TYPE_MAIN_DECL (ctype))
-		|| decl_function_context (TYPE_MAIN_DECL (ctype))))
+  if (ctype && !TREE_PUBLIC (TYPE_MAIN_DECL (ctype)))
     publicp = 0;
+  else if (ctype && decl_function_context (TYPE_MAIN_DECL (ctype)))
+    /* But members of local classes in a module CMI should have their
+       definitions exported, in case they are (directly or indirectly)
+       used by an importer.  We don't just use module_has_cmi_p here
+       because for entities in the GMF we don't yet know whether this
+       module will have a CMI, so we'll conservatively assume it might.  */
+    publicp = module_maybe_has_cmi_p ();
 
   if (publicp && cxx_dialect == cxx98)
     {
@@ -13724,6 +13728,12 @@ grokdeclarator (const cp_declarator *declarator,
 			inform (DECL_SOURCE_LOCATION (xobj_parm),
 				"explicit object parameter declared here");
 		      }
+		    if (unqualified_id
+			&& identifier_p (unqualified_id)
+			&& IDENTIFIER_NEWDEL_OP_P (unqualified_id))
+		      error_at (DECL_SOURCE_LOCATION (xobj_parm),
+				"%qD cannot be an explicit object member "
+				"function", unqualified_id);
 		  }
 	      }
 	    tree pushed_scope = NULL_TREE;
@@ -15263,7 +15273,12 @@ grokdeclarator (const cp_declarator *declarator,
     /* Record constancy and volatility on the DECL itself .  There's
        no need to do this when processing a template; we'll do this
        for the instantiated declaration based on the type of DECL.  */
-    if (!processing_template_decl)
+    if (!processing_template_decl
+	/* Don't do it for instantiated variable templates either,
+	   cp_apply_type_quals_to_decl should have been called on it
+	   already and might have been overridden in cp_finish_decl
+	   if initializer needs runtime initialization.  */
+	&& (!VAR_P (decl) || !DECL_TEMPLATE_INSTANTIATED (decl)))
       cp_apply_type_quals_to_decl (type_quals, decl);
 
     return decl;
@@ -18904,10 +18919,10 @@ grokmethod (cp_decl_specifier_seq *declspecs,
   check_template_shadow (fndecl);
 
   /* p1779 ABI-Isolation makes inline not a default for in-class
-     definitions in named module purview.  If the user explicitly
+     definitions attached to a named module.  If the user explicitly
      made it inline, grokdeclarator will already have done the right
      things.  */
-  if ((!named_module_purview_p ()
+  if ((!named_module_attach_p ()
        || flag_module_implicit_inline
       /* Lambda's operator function remains inline.  */
        || LAMBDA_TYPE_P (DECL_CONTEXT (fndecl)))
@@ -18976,6 +18991,8 @@ maybe_register_incomplete_var (tree var)
 	  vec_safe_push (incomplete_vars, iv);
 	}
       else if (!(DECL_LANG_SPECIFIC (var) && DECL_TEMPLATE_INFO (var))
+	       && DECL_CLASS_SCOPE_P (var)
+	       && TYPE_BEING_DEFINED (DECL_CONTEXT (var))
 	       && decl_constant_var_p (var)
 	       && (TYPE_PTRMEM_P (inner_type) || CLASS_TYPE_P (inner_type)))
 	{

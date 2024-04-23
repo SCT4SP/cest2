@@ -4,8 +4,6 @@
 #include <string>
 #include <iostream>
 
-namespace ss_tests {
-
 template <typename Iss, typename S> constexpr bool istringstream_test1() {
   S str("def");
   std::stringbuf sb("ok"); // This was not in the C'est tests
@@ -71,19 +69,26 @@ constexpr bool static_assert_test()
   return true;
 }
 
-} // namespace ss_tests
+constexpr bool ostringstream_test1()
+{
+  std::ostringstream o;
+  //o << 42; // No: use of sentry in _M_insert(_ValueT __v) in ostream.tcc
+  //o << "Jamaica";
+  return true;
+}
 
 void stringstream_tests() {
-  using namespace ss_tests;
 
   using std_isbi = std::istreambuf_iterator<char>;
 
   assert((istringstream_test1<std::istringstream, std::string>()));
   assert((istringstream_test2<std::istringstream, std::string>()));
   assert((istringstream_test3<std::ifstream, std::string, std_isbi>()));
+  assert(ostringstream_test1());
 
   static_assert(istringstream_test1<std::istringstream, std::string>());
   static_assert(istringstream_test2<std::istringstream, std::string>());
+  static_assert(ostringstream_test1());
 
   static_assert(static_assert_test());
 }

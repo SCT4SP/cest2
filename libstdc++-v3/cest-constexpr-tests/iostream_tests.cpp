@@ -8,6 +8,7 @@ constexpr bool iostream_test1()
   std::cout << "World!" << std::endl;
   std::cerr << "Fire and ";
   std::cerr << "Brimstone!" << std::endl;
+  std::cout << 3.142 << ' ' << 3.142f << std::endl;
   std::cout << std::hex << 66 << ' ' << 66U << std::endl; // 42
   std::cerr << std::hex << 66 << ' ' << 66U << std::endl;
   return true;
