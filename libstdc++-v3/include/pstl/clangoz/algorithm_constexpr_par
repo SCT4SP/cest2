@@ -60,23 +60,23 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 //    passed around as a parameter. It'll pick it up and try parallelize where
 //    it shouldn't.
 //    1) Either we still need to filter by function name or namespace as well
-//    2) Come up with some other indicator, like a wrapper function or function 
+//    2) Come up with some other indicator, like a wrapper function or function
 //       attribute to indicate it's in a constexpr parallel scope
 //    3) Some segment of the execution policy that is perhaps switched on inside
 //       of the function when we want to use it in a constexpr fashion
-//    I am pretty sure the second one is the most apt... while I suppose in 
+//    I am pretty sure the second one is the most apt... while I suppose in
 //    theory you could do the 3rd, it feels like a slightly more hacky solution.
 //    currently number 1) is partially implemented it requires it to be in the
 //    std:: library namespace and have an execution policy parameter
 
 // TODO: Compiler
 // 2) Fix the fact that the APValues actually get changed on the original at the
-//    moment, even if they get set back correctly they really shouldn't be 
-//    altered in the original until the end incase it creates some sideaffects.
-// 3) test removal of:     __IteratorLoopStep(__result, 1); from 
-//    set_intersection, there is a solid chance there will be a problem when 
-//    everything is trying to write to the same point in the array but this 
-//    is likely an issue that needs to be overcoem
+//    moment, even if they get set back correctly they really shouldn't be
+//    altered in the original until the end incase it creates some side effects.
+// 3) test removal of:     __IteratorLoopStep(__result, 1); from
+//    set_intersection, there is a solid chance there will be a problem when
+//    everything is trying to write to the same point in the array but this
+//    is likely an issue that needs to be overcome
 
 
 // all_of
@@ -996,9 +996,7 @@ set_intersection(_ExecutionPolicy&& __exec, _InputIterator1 __first1,
                  _InputIterator2 __last2, _OutputIterator __result)
 {
     return _VSTD::set_intersection(__exec, __first1, __last1, __first2, __last2,
-                                  __result, 
-               __less<typename iterator_traits<_InputIterator1>::value_type,
-                      typename iterator_traits<_InputIterator2>::value_type>());
+                                  __result, std::less<>());
 }
 
 // fill_n
@@ -1358,11 +1356,10 @@ inline constexpr
 __cep::experimental::__internal::__enable_if_constexpr_par_execution_policy<
                                                              _ExecutionPolicy,
                                                              _ForwardIterator>
-is_sorted_until(_ExecutionPolicy&& __exec,  _ForwardIterator __first, 
+is_sorted_until(_ExecutionPolicy&& __exec,  _ForwardIterator __first,
                 _ForwardIterator __last)
 {
-    return _VSTD::is_sorted_until(__exec, __first, __last, 
-        __less<typename iterator_traits<_ForwardIterator>::value_type>());
+    return _VSTD::is_sorted_until(__exec, __first, __last, std::less<>());
 }
 
 // is_sorted
@@ -1372,7 +1369,7 @@ inline constexpr
 __cep::experimental::__internal::__enable_if_constexpr_par_execution_policy<
                                                              _ExecutionPolicy,
                                                              bool>
-is_sorted(_ExecutionPolicy&& __exec, _ForwardIterator __first, 
+is_sorted(_ExecutionPolicy&& __exec, _ForwardIterator __first,
           _ForwardIterator __last, _Compare __comp)
 {
     return _VSTD::is_sorted_until(__exec, __first, __last, __comp) == __last;
@@ -1383,11 +1380,10 @@ inline constexpr
 __cep::experimental::__internal::__enable_if_constexpr_par_execution_policy<
                                                              _ExecutionPolicy,
                                                              bool>
-is_sorted(_ExecutionPolicy&& __exec, _ForwardIterator __first, 
+is_sorted(_ExecutionPolicy&& __exec, _ForwardIterator __first,
           _ForwardIterator __last)
 {
-    return _VSTD::is_sorted(__exec, __first, __last, 
-        __less<typename iterator_traits<_ForwardIterator>::value_type>());
+    return _VSTD::is_sorted(__exec, __first, __last, std::less<>());
 }
 
 template <class _ExecutionPolicy, class _InputIterator, class _Predicate>
@@ -1484,14 +1480,12 @@ inline constexpr
 __cep::experimental::__internal::__enable_if_constexpr_par_execution_policy<
                                                              _ExecutionPolicy,
                                                              bool>
-lexicographical_compare(_ExecutionPolicy&& __exec, _InputIterator1 __first1, 
-                        _InputIterator1 __last1, _InputIterator2 __first2, 
+lexicographical_compare(_ExecutionPolicy&& __exec, _InputIterator1 __first1,
+                        _InputIterator1 __last1, _InputIterator2 __first2,
                         _InputIterator2 __last2)
 {
-    return _VSTD::lexicographical_compare(__exec, __first1, __last1, __first2, 
-                                          __last2,
-                                         __less<typename iterator_traits<_InputIterator1>::value_type,
-                                                typename iterator_traits<_InputIterator2>::value_type>());
+    return _VSTD::lexicographical_compare(__exec, __first1, __last1, __first2,
+                                          __last2, std::less<>());
 }
 
 // includes
@@ -1541,8 +1535,7 @@ includes(_ExecutionPolicy&& __exec, _InputIterator1 __first1,
          _InputIterator2 __last2)
 {
     return _VSTD::includes(__exec, __first1, __last1, __first2, __last2,
-                          __less<typename iterator_traits<_InputIterator1>::value_type,
-                                 typename iterator_traits<_InputIterator2>::value_type>());
+                           std::less<>());
 }
 
 // _LIBCPP_END_NAMESPACE_STD
