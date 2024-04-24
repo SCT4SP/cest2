@@ -38,8 +38,8 @@ none_of(_ExecutionPolicy&& __exec, _ForwardIterator __first, _ForwardIterator __
 // [alg.foreach]
 
 template <class _ExecutionPolicy, class _ForwardIterator, class _Function>
-__pstl::__internal::__enable_if_execution_policy<_ExecutionPolicy, void>
 _GLIBCXX_CEST_CONSTEXPR
+__pstl::__internal::__enable_if_execution_policy<_ExecutionPolicy, void>
 for_each(_ExecutionPolicy&& __exec, _ForwardIterator __first, _ForwardIterator __last, _Function __f);
 
 template <class _ExecutionPolicy, class _ForwardIterator, class _Size, class _Function>
