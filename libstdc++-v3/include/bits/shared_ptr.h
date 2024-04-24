@@ -1057,22 +1057,34 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     using _Alloc_traits2 = _Alloc_traits::template rebind_traits<_Up>;
     using _Ptr = typename _Alloc_traits2::pointer;
 
-    _Alloc2 __a2 = __a;
-    auto __del = [__a2, __n](_Ptr __p) mutable {
-      for (size_t __i = 0; __i < __n; ++__i)
-        _Alloc_traits2::destroy(__a2, addressof(__p[__i]));
-      _Alloc_traits2::deallocate(__a2, __p, __n);
+    struct _Del {
+      constexpr void operator()(const _Ptr __p) {
+        size_t __i = _M_i;
+        while (__i--)
+          _Alloc_traits2::destroy(_M_a2, addressof(__p[__i]));
+        _Alloc_traits2::deallocate(_M_a2, __p, _M_n);
+      };
+
+      _Alloc2 _M_a2;
+      const size_t _M_i;
+      const size_t _M_n;
     };
-    _Ptr __p = _Alloc_traits2::allocate(__a2, __n);
+
+    size_t __i{};
+    _Ptr __p{};
+    _Alloc2 __a2 = __a; 
+
     try {
-      for (size_t __i = 0; __i < __n; ++__i)
+      __p = _Alloc_traits2::allocate(__a2, __n);
+      for (; __i < __n; ++__i)
         _Alloc_traits2::construct(__a2, addressof(__p[__i]),
           std::forward<_Args>(__args)...);
-      return shared_ptr<_Tp>(__p, __del, __a2);
     } catch (...) {
-      _Alloc_traits2::deallocate(__a2, __p, __n);
+      _Del{__a2, __i, __n}(__p);
       throw;
     }
+
+    return shared_ptr<_Tp>(__p, _Del{__a2, __i, __n}, __a2);
   }
 #endif
 
