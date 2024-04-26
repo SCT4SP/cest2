@@ -76,6 +76,7 @@ __pattern_any_of(__parallel_tag<_IsVector> __tag, _ExecutionPolicy&& __exec, _Ra
 // for_each_n with no policy
 
 template <class _ForwardIterator, class _Size, class _Function>
+_GLIBCXX_CEST_CONSTEXPR
 _ForwardIterator
 __for_each_n_it_serial(_ForwardIterator __first, _Size __n, _Function __f)
 {
@@ -157,6 +158,7 @@ __pattern_walk_brick(__parallel_tag<_IsVector> __tag, _ExecutionPolicy&& __exec,
 // walk1_n
 //------------------------------------------------------------------------
 template <class _ForwardIterator, class _Size, class _Function>
+_GLIBCXX_CEST_CONSTEXPR
 _ForwardIterator
 __brick_walk1_n(_ForwardIterator __first, _Size __n, _Function __f, /*_IsVectorTag=*/std::false_type)
 {
@@ -173,6 +175,7 @@ __brick_walk1_n(_RandomAccessIterator __first, _DifferenceType __n, _Function __
 }
 
 template <class _Tag, class _ExecutionPolicy, class _ForwardIterator, class _Size, class _Function>
+_GLIBCXX_CEST_CONSTEXPR
 _ForwardIterator
 __pattern_walk1_n(_Tag, _ExecutionPolicy&&, _ForwardIterator __first, _Size __n, _Function __f) noexcept
 {
