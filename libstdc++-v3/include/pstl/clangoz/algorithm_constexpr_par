@@ -30,6 +30,7 @@
 //#include <__utility/convert_to_integral.h>
 
 #include "loop_wrapper.h"
+#include "convert_to_integral.h" // modified to operate using only std
 
 using namespace cest::loop_wrapper;
 
