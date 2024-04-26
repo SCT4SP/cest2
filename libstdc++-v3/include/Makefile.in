@@ -679,7 +679,8 @@ clangoz_headers = \
 	${clangoz_srcdir}/algorithm_constexpr_par \
 	${clangoz_srcdir}/__cep_execution \
 	${clangoz_srcdir}/loop_wrapper.h \
-	${clangoz_srcdir}/numeric_constexpr_par
+	${clangoz_srcdir}/numeric_constexpr_par \
+	${clangoz_srcdir}/convert_to_integral.h
 
 backward_srcdir = ${glibcxx_srcdir}/include/backward
 backward_builddir = ./backward
