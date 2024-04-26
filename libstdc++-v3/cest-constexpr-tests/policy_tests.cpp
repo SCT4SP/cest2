@@ -29,7 +29,10 @@ constexpr bool policy_test1()
     std::plus{},
     [](int x, int y) { return y - x; } // always 1 with the input data
   );
-  return b && x1a==40320 && x1b==40320 && x1c==64 && x2==7;
+
+  std::for_each_n(std::execution::seq, v.begin(), 4, [](auto& x) { x=0; });
+  bool b2 = v == std::vector{0,0,0,0,6,7,8,9};
+  return b && b2 && x1a==40320 && x1b==40320 && x1c==64 && x2==7;
 }
 
 int main(int argc, char *argv[])

@@ -63,6 +63,7 @@ for_each(_ExecutionPolicy&& __exec, _ForwardIterator __first, _ForwardIterator _
 }
 
 template <class _ExecutionPolicy, class _ForwardIterator, class _Size, class _Function>
+_GLIBCXX_CEST_CONSTEXPR
 __pstl::__internal::__enable_if_execution_policy<_ExecutionPolicy, _ForwardIterator>
 for_each_n(_ExecutionPolicy&& __exec, _ForwardIterator __first, _Size __n, _Function __f)
 {
