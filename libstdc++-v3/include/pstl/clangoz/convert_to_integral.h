@@ -31,7 +31,7 @@ long long __convert_to_integral(long long __val) { return __val; }
 constexpr
 unsigned long long __convert_to_integral(unsigned long long __val) {return __val; }
 
-template<typename _Fp, __enable_if_t<is_floating_point<_Fp>::value, int> = 0>
+template<typename _Fp, std::enable_if_t<std::is_floating_point<_Fp>::value, int> = 0>
 constexpr
 long long
  __convert_to_integral(_Fp __val) { return __val; }
