@@ -115,6 +115,7 @@ __pattern_walk1(_Tag, _ExecutionPolicy&&, _ForwardIterator __first, _ForwardIter
 }
 
 template <class _IsVector, class _ExecutionPolicy, class _RandomAccessIterator, class _Function>
+_GLIBCXX_CEST_CONSTEXPR
 void
 __pattern_walk1(__parallel_tag<_IsVector> __tag, _ExecutionPolicy&& __exec, _RandomAccessIterator __first,
                 _RandomAccessIterator __last, _Function __f)
@@ -183,6 +184,7 @@ __pattern_walk1_n(_Tag, _ExecutionPolicy&&, _ForwardIterator __first, _Size __n,
 }
 
 template <class _IsVector, class _ExecutionPolicy, class _RandomAccessIterator, class _Size, class _Function>
+_GLIBCXX_CEST_CONSTEXPR
 _RandomAccessIterator
 __pattern_walk1_n(__parallel_tag<_IsVector> __tag, _ExecutionPolicy&& __exec, _RandomAccessIterator __first, _Size __n,
                   _Function __f)

@@ -19,6 +19,7 @@ namespace __internal
 {
 
 template <typename _Fp>
+_GLIBCXX_CEST_CONSTEXPR
 auto
 __except_handler(_Fp __f) -> decltype(__f())
 {

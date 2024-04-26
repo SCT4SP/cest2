@@ -77,6 +77,15 @@ _GLIBCXX_CEST_CONSTEXPR
 __pstl::__internal::__enable_if_execution_policy<_ExecutionPolicy, _ForwardIterator>
 for_each_n(_ExecutionPolicy&& __exec, _ForwardIterator __first, _Size __n, _Function __f)
 {
+    if constexpr (std::is_same_v<std::__remove_cvref_t<_ExecutionPolicy>,
+                                 execution::parallel_policy>) // execution::par
+    {
+        if (__builtin_is_constant_evaluated()) {
+            using namespace __cep::experimental::execution;   // for ce_par
+            return std::for_each_n(ce_par, __first, __n, __f);
+        }
+    }
+
     auto __dispatch_tag = __pstl::__internal::__select_backend(__exec, __first);
 
     return __pstl::__internal::__pattern_walk1_n(__dispatch_tag, std::forward<_ExecutionPolicy>(__exec), __first, __n,
