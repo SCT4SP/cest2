@@ -87,7 +87,8 @@ transform_reduce(_ExecutionPolicy&& __exec, _ForwardIterator1 __first1, _Forward
         if (__builtin_is_constant_evaluated()) {
             using namespace __cep::experimental::execution;   // for ce_par
             return std::transform_reduce(ce_par,
-              __first1, __last1, __first2, std::move(__init),
+              __first1, __last1, __first2,
+              std::move(__init),
               std::move(__binary_op1), std::move(__binary_op2));
         }
     }
