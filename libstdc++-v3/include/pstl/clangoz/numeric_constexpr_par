@@ -57,6 +57,35 @@ iota(_ExecutionPolicy&& __exec, _ForwardIterator __first,
 
 // transform_reduce (from __numeric/transform_reduce.h)
 
+template <
+  class _ExecutionPolicy,
+  class _InputIterator,
+  class _Tp,
+  class _BinaryOp,
+  class _UnaryOp
+>
+constexpr
+__cep::experimental::__internal::__enable_if_constexpr_par_execution_policy<
+                                                              _ExecutionPolicy,
+                                                              _Tp>
+transform_reduce(
+  _ExecutionPolicy&& __exec,
+  _InputIterator __first,
+  _InputIterator __last,
+  _Tp __init,
+  _BinaryOp __b,
+  _UnaryOp __u
+  )
+{
+  __BeginEndIteratorPair(__first, __last);
+  __ReduceVariable(__init, ReductionType::Accumulate, OperatorType::PreInc);
+
+  for (; __first != __last; ++__first)
+    __init = __b(std::move(__init), __u(*__first));
+  return __init;
+}
+
+
 /*
 template <class _InputIterator, class _Tp, class _BinaryOp, class _UnaryOp>
 constexpr

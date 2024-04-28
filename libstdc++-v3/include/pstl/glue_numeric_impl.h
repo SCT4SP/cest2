@@ -104,6 +104,17 @@ __pstl::__internal::__enable_if_execution_policy<_ExecutionPolicy, _Tp>
 transform_reduce(_ExecutionPolicy&& __exec, _ForwardIterator __first, _ForwardIterator __last, _Tp __init,
                  _BinaryOperation __binary_op, _UnaryOperation __unary_op)
 {
+    if constexpr (std::is_same_v<std::__remove_cvref_t<_ExecutionPolicy>,
+                                 execution::parallel_policy>) // execution::par
+    {
+        if (__builtin_is_constant_evaluated()) {
+            using namespace __cep::experimental::execution;   // for ce_par
+            return std::transform_reduce(ce_par,
+              __first, __last,
+              std::move(__init), std::move(__binary_op), std::move(__unary_op));
+        }
+    }
+
     auto __dispatch_tag = __pstl::__internal::__select_backend(__exec, __first);
     return __pstl::__internal::__pattern_transform_reduce(__dispatch_tag, std::forward<_ExecutionPolicy>(__exec),
                                                           __first, __last, __init, __binary_op, __unary_op);
