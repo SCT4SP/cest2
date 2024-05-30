@@ -80,6 +80,9 @@ namespace __gnu_cxx
       { return static_cast<const _Tp*>(_M_addr()); }
     };
 
+// As below for the __aligned_buffer *struct*: the pragmas reduce cmdline noise
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
   // As casts are not permitted from void* to _Tp* during constant evaluation,
   // this class template emulates the functionality of __aligned_buffer,
   // by using compile-time dynamic memory allocation via std::allocator.
@@ -127,6 +130,7 @@ namespace __gnu_cxx
       _M_ptr() const noexcept
       { return _M_storage_ptr; }
     };
+#pragma GCC diagnostic pop
 
 #if _GLIBCXX_CEST_VERSION
   template<typename _Tp>
