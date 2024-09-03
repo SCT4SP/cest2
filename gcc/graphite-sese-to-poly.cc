@@ -19,6 +19,7 @@ along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
 #define INCLUDE_ISL
+#define INCLUDE_MEMORY
 
 #include "config.h"
 
@@ -420,7 +421,7 @@ static void
 add_param_constraints (scop_p scop, graphite_dim_t p, tree parameter)
 {
   tree type = TREE_TYPE (parameter);
-  value_range r;
+  int_range_max r;
   wide_int min, max;
 
   gcc_assert (INTEGRAL_TYPE_P (type) || POINTER_TYPE_P (type));

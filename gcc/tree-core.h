@@ -497,6 +497,15 @@ enum omp_clause_code {
   /* OpenMP clause: indirect [(constant-integer-expression)].  */
   OMP_CLAUSE_INDIRECT,
 
+  /* OpenMP clause: partial (constant-integer-expression).  */
+  OMP_CLAUSE_PARTIAL,
+
+  /* OpenMP clause: full.  */
+  OMP_CLAUSE_FULL,
+
+  /* OpenMP clause: sizes (constant-integer-expression-list).  */
+  OMP_CLAUSE_SIZES,
+
   /* Internally used only clause, holding SIMD uid.  */
   OMP_CLAUSE__SIMDUID_,
 
@@ -624,7 +633,7 @@ enum cv_qualifier {
 };
 
 /* Standard named or nameless data types of the C compiler.  */
-enum tree_index {
+enum tree_index : unsigned {
   TI_ERROR_MARK,
   TI_INTQI_TYPE,
   TI_INTHI_TYPE,
@@ -653,7 +662,6 @@ enum tree_index {
 
   TI_INTEGER_ZERO,
   TI_INTEGER_ONE,
-  TI_INTEGER_THREE,
   TI_INTEGER_MINUS_ONE,
   TI_NULL_POINTER,
 
@@ -691,17 +699,18 @@ enum tree_index {
   TI_FLOAT64_TYPE,
   TI_FLOAT128_TYPE,
   TI_FLOATN_TYPE_LAST = TI_FLOAT128_TYPE,
-#define NUM_FLOATN_TYPES (TI_FLOATN_TYPE_LAST - TI_FLOATN_TYPE_FIRST + 1)
+#define NUM_FLOATN_TYPES ((int) (TI_FLOATN_TYPE_LAST		\
+				 - TI_FLOATN_TYPE_FIRST + 1))
   TI_FLOAT32X_TYPE,
   TI_FLOATNX_TYPE_FIRST = TI_FLOAT32X_TYPE,
   TI_FLOAT64X_TYPE,
   TI_FLOAT128X_TYPE,
   TI_FLOATNX_TYPE_LAST = TI_FLOAT128X_TYPE,
   TI_FLOATN_NX_TYPE_LAST = TI_FLOAT128X_TYPE,
-#define NUM_FLOATNX_TYPES (TI_FLOATNX_TYPE_LAST - TI_FLOATNX_TYPE_FIRST + 1)
-#define NUM_FLOATN_NX_TYPES (TI_FLOATN_NX_TYPE_LAST		\
-			     - TI_FLOATN_NX_TYPE_FIRST		\
-			     + 1)
+#define NUM_FLOATNX_TYPES ((int) (TI_FLOATNX_TYPE_LAST		\
+				  - TI_FLOATNX_TYPE_FIRST + 1))
+#define NUM_FLOATN_NX_TYPES ((int) (TI_FLOATN_NX_TYPE_LAST	\
+				  - TI_FLOATN_NX_TYPE_FIRST + 1))
 
   /* Type used by certain backends for __float128, which in C++ should be
      distinct type from _Float128 for backwards compatibility reasons.  */
@@ -1204,7 +1213,7 @@ struct GTY(()) tree_base {
        TRY_CATCH_IS_CLEANUP in
            TRY_CATCH_EXPR
 
-       ASM_INPUT_P in
+       ASM_BASIC_P in
            ASM_EXPR
 
        TYPE_REF_CAN_ALIAS_ALL in

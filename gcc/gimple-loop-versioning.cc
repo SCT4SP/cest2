@@ -18,6 +18,7 @@ along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
 #include "config.h"
+#define INCLUDE_MEMORY
 #include "system.h"
 #include "coretypes.h"
 #include "backend.h"
@@ -322,9 +323,6 @@ private:
   /* An obstack to use for general allocation.  */
   obstack m_obstack;
 
-  /* The number of loops in the function.  */
-  unsigned int m_nloops;
-
   /* The total number of loop version conditions we've found.  */
   unsigned int m_num_conditions;
 
@@ -525,10 +523,10 @@ loop_versioning::name_prop::value_of_expr (tree val, gimple *)
 
 loop_versioning::loop_versioning (function *fn)
   : m_fn (fn),
-    m_nloops (number_of_loops (fn)),
     m_num_conditions (0),
     m_address_table (31)
 {
+  unsigned m_nloops = number_of_loops (fn);
   bitmap_obstack_initialize (&m_bitmap_obstack);
   gcc_obstack_init (&m_obstack);
 
@@ -1437,7 +1435,7 @@ loop_versioning::analyze_blocks ()
 	      {
 		linfo.rejected_p = true;
 		break;
-	    }
+	      }
 
 	  if (!linfo.rejected_p)
 	    {

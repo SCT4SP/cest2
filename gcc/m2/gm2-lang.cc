@@ -16,9 +16,8 @@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
 General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with GNU Modula-2; see the file COPYING.  If not, write to the
-Free Software Foundation, 51 Franklin Street, Fifth Floor, Boston, MA
-02110-1301, USA.  */
+along with GCC; see the file COPYING3.  If not see
+<http://www.gnu.org/licenses/>.  */
 
 #define INCLUDE_VECTOR
 #include "gm2-gcc/gcc-consolidation.h"
@@ -41,8 +40,6 @@ Free Software Foundation, 51 Franklin Street, Fifth Floor, Boston, MA
 #include "m2-tree.h"
 #include "convert.h"
 #include "rtegraph.h"
-
-#undef ENABLE_M2DUMP_ALL
 
 static void write_globals (void);
 
@@ -521,7 +518,6 @@ gm2_langhook_handle_option (
     case OPT_fm2_debug_trace_:
       M2Options_SetM2DebugTraceFilter (value, arg);
       return 1;
-#ifdef ENABLE_M2DUMP_ALL
     case OPT_fm2_dump_:
       return M2Options_SetM2Dump (value, arg);
     case OPT_fm2_dump_decl_:
@@ -536,7 +532,6 @@ gm2_langhook_handle_option (
     case OPT_fm2_dump_filter_:
       M2Options_SetM2DumpFilter (value, arg);
       return 1;
-#endif
     case OPT_Wall:
       M2Options_SetWall (value);
       return 1;

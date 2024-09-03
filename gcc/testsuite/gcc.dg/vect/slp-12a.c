@@ -40,6 +40,10 @@ main1 ()
       out[i*8 + 3] = b3 - 1;
       out[i*8 + 4] = b4 - 8;
       out[i*8 + 5] = b5 - 7;
+      /* Due to the use in the ia[i] store we keep the feeding expression
+         in the form ((in[i*8 + 6] + 11) * 3 - 3) while other expressions
+	 got associated as for example (in[i*5 + 5] * 4 + 33).  That
+	 causes SLP discovery to fail.  */
       out[i*8 + 6] = b6 - 3;
       out[i*8 + 7] = b7 - 7;
 

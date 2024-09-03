@@ -35,15 +35,20 @@ file, or in a ``.adc`` file corresponding to your project.
 * The ``-gnatX`` option, that you can pass to the compiler directly, will
   activate the curated subset of extensions.
 
-.. attention:: You can activate the extended set of extensions by using either
+.. attention:: You can activate the experimental set of extensions
+   in addition by using either
    the ``-gnatX0`` command line flag, or the pragma ``Extensions_Allowed`` with
-   ``All`` as an argument. However, it is not recommended you use this subset
-   for serious projects, and is only means as a playground/technology preview.
+   ``All_Extensions`` as an argument. However, it is not recommended you use
+   this subset for serious projects; it is only meant as a technology preview
+   for use in playground experiments.
 
 .. _Curated_Language_Extensions:
 
 Curated Extensions
 ==================
+
+Features activated via ``-gnatX`` or
+``pragma Extensions_Allowed (On)``.
 
 Local Declarations Without Block
 --------------------------------
@@ -52,8 +57,6 @@ A basic_declarative_item may appear at the place of any statement.
 This avoids the heavy syntax of block_statements just to declare
 something locally.
 
-Link to the original RFC:
-https://github.com/AdaCore/ada-spark-rfcs/blob/master/prototyped/rfc-local-vars-without-block.md
 For example:
 
 .. code-block:: ada
@@ -66,194 +69,8 @@ For example:
       X := X + Squared;
    end if;
 
-Conditional when constructs
----------------------------
-
-This feature extends the use of ``when`` as a way to condition a control-flow
-related statement, to all control-flow related statements.
-
-To do a conditional return in a procedure the following syntax should be used:
-
-.. code-block:: ada
-
-   procedure P (Condition : Boolean) is
-   begin
-      return when Condition;
-   end;
-
-This will return from the procedure if ``Condition`` is true.
-
-When being used in a function the conditional part comes after the return value:
-
-.. code-block:: ada
-
-   function Is_Null (I : Integer) return Boolean is
-   begin
-      return True when I = 0;
-      return False;
-   end;
-
-In a similar way to the ``exit when`` a ``goto ... when`` can be employed:
-
-.. code-block:: ada
-
-   procedure Low_Level_Optimized is
-      Flags : Bitmapping;
-   begin
-      Do_1 (Flags);
-      goto Cleanup when Flags (1);
-
-      Do_2 (Flags);
-      goto Cleanup when Flags (32);
-
-      --  ...
-
-   <<Cleanup>>
-      --  ...
-   end;
-
-.. code-block
-
-To use a conditional raise construct:
-
-.. code-block:: ada
-
-   procedure Foo is
-   begin
-      raise Error when Imported_C_Func /= 0;
-   end;
-
-An exception message can also be added:
-
-.. code-block:: ada
-
-   procedure Foo is
-   begin
-      raise Error with "Unix Error"
-        when Imported_C_Func /= 0;
-   end;
-
-
 Link to the original RFC:
-https://github.com/AdaCore/ada-spark-rfcs/blob/master/prototyped/rfc-conditional-when-constructs.rst
-
-Case pattern matching
----------------------
-
-The selector for a case statement (but not yet for a case expression) may be of a composite type, subject to
-some restrictions (described below). Aggregate syntax is used for choices
-of such a case statement; however, in cases where a "normal" aggregate would
-require a discrete value, a discrete subtype may be used instead; box
-notation can also be used to match all values.
-
-Consider this example:
-
-.. code-block:: ada
-
-  type Rec is record
-     F1, F2 : Integer;
-  end record;
-
-  procedure Caser_1 (X : Rec) is
-  begin
-     case X is
-        when (F1 => Positive, F2 => Positive) =>
-           Do_This;
-        when (F1 => Natural, F2 => <>) | (F1 => <>, F2 => Natural) =>
-           Do_That;
-        when others =>
-            Do_The_Other_Thing;
-     end case;
-  end Caser_1;
-
-If ``Caser_1`` is called and both components of X are positive, then
-``Do_This`` will be called; otherwise, if either component is nonnegative
-then ``Do_That`` will be called; otherwise, ``Do_The_Other_Thing`` will be
-called.
-
-In addition, pattern bindings are supported. This is a mechanism
-for binding a name to a component of a matching value for use within
-an alternative of a case statement. For a component association
-that occurs within a case choice, the expression may be followed by
-``is <identifier>``. In the special case of a "box" component association,
-the identifier may instead be provided within the box. Either of these
-indicates that the given identifier denotes (a constant view of) the matching
-subcomponent of the case selector.
-
-.. attention:: Binding is not yet supported for arrays or subcomponents
-   thereof.
-
-Consider this example (which uses type ``Rec`` from the previous example):
-
-.. code-block:: ada
-
-  procedure Caser_2 (X : Rec) is
-  begin
-     case X is
-        when (F1 => Positive is Abc, F2 => Positive) =>
-           Do_This (Abc)
-        when (F1 => Natural is N1, F2 => <N2>) |
-             (F1 => <N2>, F2 => Natural is N1) =>
-           Do_That (Param_1 => N1, Param_2 => N2);
-        when others =>
-           Do_The_Other_Thing;
-     end case;
-  end Caser_2;
-
-This example is the same as the previous one with respect to determining
-whether ``Do_This``, ``Do_That``, or ``Do_The_Other_Thing`` will be called. But
-for this version, ``Do_This`` takes a parameter and ``Do_That`` takes two
-parameters. If ``Do_This`` is called, the actual parameter in the call will be
-``X.F1``.
-
-If ``Do_That`` is called, the situation is more complex because there are two
-choices for that alternative. If ``Do_That`` is called because the first choice
-matched (i.e., because ``X.F1`` is nonnegative and either ``X.F1`` or ``X.F2``
-is zero or negative), then the actual parameters of the call will be (in order)
-``X.F1`` and ``X.F2``. If ``Do_That`` is called because the second choice
-matched (and the first one did not), then the actual parameters will be
-reversed.
-
-Within the choice list for single alternative, each choice must define the same
-set of bindings and the component subtypes for for a given identifer must all
-statically match. Currently, the case of a binding for a nondiscrete component
-is not implemented.
-
-If the set of values that match the choice(s) of an earlier alternative
-overlaps the corresponding set of a later alternative, then the first set shall
-be a proper subset of the second (and the later alternative will not be
-executed if the earlier alternative "matches"). All possible values of the
-composite type shall be covered. The composite type of the selector shall be an
-array or record type that is neither limited nor class-wide. Currently, a "when
-others =>" case choice is required; it is intended that this requirement will
-be relaxed at some point.
-
-If a subcomponent's subtype does not meet certain restrictions, then the only
-value that can be specified for that subcomponent in a case choice expression
-is a "box" component association (which matches all possible values for the
-subcomponent). This restriction applies if:
-
-- the component subtype is not a record, array, or discrete type; or
-
-- the component subtype is subject to a non-static constraint or has a
-  predicate; or:
-
-- the component type is an enumeration type that is subject to an enumeration
-  representation clause; or
-
-- the component type is a multidimensional array type or an array type with a
-  nonstatic index subtype.
-
-Support for casing on arrays (and on records that contain arrays) is
-currently subject to some restrictions. Non-positional
-array aggregates are not supported as (or within) case choices. Likewise
-for array type and subtype names. The current implementation exceeds
-compile-time capacity limits in some annoyingly common scenarios; the
-message generated in such cases is usually "Capacity exceeded in compiling
-case statement with composite selector type".
-
-Link to the original RFC:
-https://github.com/AdaCore/ada-spark-rfcs/blob/master/prototyped/rfc-pattern-matching.rst
+https://github.com/AdaCore/ada-spark-rfcs/blob/master/prototyped/rfc-local-vars-without-block.md
 
 Fixed lower bounds for array types and subtypes
 -----------------------------------------------
@@ -440,20 +257,8 @@ For example:
        f" a double quote is \" and" &
        f" an open brace is \{");
 
-Finally, a syntax is provided for creating multi-line string literals,
-without having to explicitly use an escape sequence such as ``\n``. For
-example:
-
-.. code-block:: ada
-
-    Put_Line
-      (f"This is a multi-line"
-        "string literal"
-        "There is no ambiguity about how many"
-        "spaces are included in each line");
-
-Here is a link to the original RFC   :
-https://github.com/AdaCore/ada-spark-rfcs/blob/master/prototyped/rfc-string-interpolation.rst
+Link to the original RFC:
+https://github.com/AdaCore/ada-spark-rfcs/blob/master/prototyped/rfc-string-interpolation.md
 
 Constrained attribute for generic objects
 -----------------------------------------
@@ -468,13 +273,168 @@ The Ada 202x ``Static`` aspect can be specified on Intrinsic imported functions
 and the compiler will evaluate some of these intrinsics statically, in
 particular the ``Shift_Left`` and ``Shift_Right`` intrinsics.
 
+First Controlling Parameter
+---------------------------
+
+A new pragma/aspect, ``First_Controlling_Parameter``, is introduced for tagged
+types, altering the semantics of primitive/controlling parameters. When a
+tagged type is marked with this aspect, only subprograms where the first
+parameter is of that type will be considered dispatching primitives. This
+pragma/aspect applies to the entire hierarchy, starting from the specified
+type, without affecting inherited primitives.
+
+Here is an example of this feature:
+
+.. code-block:: ada
+
+    package Example is
+       type Root is tagged private;
+
+       procedure P (V : Integer; V2 : Root);
+       -- Primitive
+
+       type Child is tagged private
+         with First_Controlling_Parameter;
+
+    private
+       type Root is tagged null record;
+       type Child is new Root with null record;
+
+       overriding
+       procedure P (V : Integer; V2 : Child);
+       -- Primitive
+
+       procedure P2 (V : Integer; V2 : Child);
+       -- NOT Primitive
+
+       function F return Child; -- NOT Primitive
+
+       function F2 (V : Child) return Child;
+       -- Primitive, but only controlling on the first parameter
+    end;
+
+Note that ``function F2 (V : Child) return Child;`` differs from ``F2 (V : Child)
+return Child'Class;`` in that the return type is a specific, definite type. This
+is also distinct from the legacy semantics, where further derivations with
+added fields would require overriding the function.
+
+The option ``-gnatw_j``, that you can pass to the compiler directly, enables
+warnings related to this new language feature. For instance, compiling the
+example above without this switch produces no warnings, but compiling it with
+``-gnatw_j`` generates the following warning on the declaration of procedure P2:
+
+.. code-block:: ada
+
+    warning: not a dispatching primitive of tagged type "Child"
+    warning: disallowed by First_Controlling_Parameter on "Child"
+
+For generic formal tagged types, you can specify whether the type has the
+First_Controlling_Parameter aspect enabled:
+
+.. code-block:: ada
+
+    generic
+       type T is tagged private with First_Controlling_Parameter;
+    package T is
+        type U is new T with null record;
+        function Foo return U; -- Not a primitive
+    end T;
+
+For tagged partial views, the value of the aspect must be consistent between
+the partial and full views:
+
+.. code-block:: ada
+
+    package R is
+       type T is tagged private;
+    ...
+    private
+       type T is tagged null record with First_Controlling_Parameter; -- ILLEGAL
+    end R;
+
+Link to the original RFC:
+https://github.com/AdaCore/ada-spark-rfcs/blob/master/considered/rfc-oop-first-controlling.rst
+
 .. _Experimental_Language_Extensions:
 
 Experimental Language Extensions
 ================================
 
-Pragma Storage_Model
---------------------
+Features activated via ``-gnatX0`` or
+``pragma Extensions_Allowed (All_Extensions)``.
+
+Conditional when constructs
+---------------------------
+
+This feature extends the use of ``when`` as a way to condition a control-flow
+related statement, to all control-flow related statements.
+
+To do a conditional return in a procedure the following syntax should be used:
+
+.. code-block:: ada
+
+   procedure P (Condition : Boolean) is
+   begin
+      return when Condition;
+   end;
+
+This will return from the procedure if ``Condition`` is true.
+
+When being used in a function the conditional part comes after the return value:
+
+.. code-block:: ada
+
+   function Is_Null (I : Integer) return Boolean is
+   begin
+      return True when I = 0;
+      return False;
+   end;
+
+In a similar way to the ``exit when`` a ``goto ... when`` can be employed:
+
+.. code-block:: ada
+
+   procedure Low_Level_Optimized is
+      Flags : Bitmapping;
+   begin
+      Do_1 (Flags);
+      goto Cleanup when Flags (1);
+
+      Do_2 (Flags);
+      goto Cleanup when Flags (32);
+
+      --  ...
+
+   <<Cleanup>>
+      --  ...
+   end;
+
+.. code-block
+
+To use a conditional raise construct:
+
+.. code-block:: ada
+
+   procedure Foo is
+   begin
+      raise Error when Imported_C_Func /= 0;
+   end;
+
+An exception message can also be added:
+
+.. code-block:: ada
+
+   procedure Foo is
+   begin
+      raise Error with "Unix Error"
+        when Imported_C_Func /= 0;
+   end;
+
+Link to the original RFC:
+https://github.com/AdaCore/ada-spark-rfcs/blob/master/prototyped/rfc-conditional-when-constructs.rst
+
+Storage Model
+-------------
 
 This feature proposes to redesign the concepts of Storage Pools into a more
 efficient model allowing higher performances and easier integration with low
@@ -486,6 +446,33 @@ support interactions with GPU.
 Here is a link to the full RFC:
 https://github.com/AdaCore/ada-spark-rfcs/blob/master/prototyped/rfc-storage-model.rst
 
+Attribute Super
+---------------
+.. index:: Super
+
+The ``Super`` attribute can be applied to objects of tagged types in order
+to obtain a view conversion to the most immediate specific parent type.
+
+It cannot be applied to objects of types without any ancestors, or types whose
+immediate parent is abstract.
+
+.. code-block:: ada
+
+  type T1 is tagged null record;
+  procedure P (V : T1);
+
+  type T2 is new T1 with null record;
+  procedure P (V : T2);
+
+  procedure Call (V : T2'Class) is
+  begin
+    V'Super.P; --  Equivalent to "P (T1 (V));", a nondispatching call
+               --  to T1's primitive procedure P.
+  end;
+
+Here is a link to the full RFC:
+https://github.com/QuentinOchem/ada-spark-rfcs/blob/oop/considered/rfc-oop-super.rst
+
 Simpler accessibility model
 ---------------------------
 
@@ -496,3 +483,260 @@ while removing dynamic accessibility checking.
 
 Here is a link to the full RFC:
 https://github.com/AdaCore/ada-spark-rfcs/blob/master/prototyped/rfc-simpler-accessibility.md
+
+Case pattern matching
+---------------------
+
+The selector for a case statement (but not yet for a case expression) may be of a composite type, subject to
+some restrictions (described below). Aggregate syntax is used for choices
+of such a case statement; however, in cases where a "normal" aggregate would
+require a discrete value, a discrete subtype may be used instead; box
+notation can also be used to match all values.
+
+Consider this example:
+
+.. code-block:: ada
+
+  type Rec is record
+     F1, F2 : Integer;
+  end record;
+
+  procedure Caser_1 (X : Rec) is
+  begin
+     case X is
+        when (F1 => Positive, F2 => Positive) =>
+           Do_This;
+        when (F1 => Natural, F2 => <>) | (F1 => <>, F2 => Natural) =>
+           Do_That;
+        when others =>
+            Do_The_Other_Thing;
+     end case;
+  end Caser_1;
+
+If ``Caser_1`` is called and both components of X are positive, then
+``Do_This`` will be called; otherwise, if either component is nonnegative
+then ``Do_That`` will be called; otherwise, ``Do_The_Other_Thing`` will be
+called.
+
+In addition, pattern bindings are supported. This is a mechanism
+for binding a name to a component of a matching value for use within
+an alternative of a case statement. For a component association
+that occurs within a case choice, the expression may be followed by
+``is <identifier>``. In the special case of a "box" component association,
+the identifier may instead be provided within the box. Either of these
+indicates that the given identifier denotes (a constant view of) the matching
+subcomponent of the case selector.
+
+.. attention:: Binding is not yet supported for arrays or subcomponents
+   thereof.
+
+Consider this example (which uses type ``Rec`` from the previous example):
+
+.. code-block:: ada
+
+  procedure Caser_2 (X : Rec) is
+  begin
+     case X is
+        when (F1 => Positive is Abc, F2 => Positive) =>
+           Do_This (Abc)
+        when (F1 => Natural is N1, F2 => <N2>) |
+             (F1 => <N2>, F2 => Natural is N1) =>
+           Do_That (Param_1 => N1, Param_2 => N2);
+        when others =>
+           Do_The_Other_Thing;
+     end case;
+  end Caser_2;
+
+This example is the same as the previous one with respect to determining
+whether ``Do_This``, ``Do_That``, or ``Do_The_Other_Thing`` will be called. But
+for this version, ``Do_This`` takes a parameter and ``Do_That`` takes two
+parameters. If ``Do_This`` is called, the actual parameter in the call will be
+``X.F1``.
+
+If ``Do_That`` is called, the situation is more complex because there are two
+choices for that alternative. If ``Do_That`` is called because the first choice
+matched (i.e., because ``X.F1`` is nonnegative and either ``X.F1`` or ``X.F2``
+is zero or negative), then the actual parameters of the call will be (in order)
+``X.F1`` and ``X.F2``. If ``Do_That`` is called because the second choice
+matched (and the first one did not), then the actual parameters will be
+reversed.
+
+Within the choice list for single alternative, each choice must define the same
+set of bindings and the component subtypes for for a given identifer must all
+statically match. Currently, the case of a binding for a nondiscrete component
+is not implemented.
+
+If the set of values that match the choice(s) of an earlier alternative
+overlaps the corresponding set of a later alternative, then the first set shall
+be a proper subset of the second (and the later alternative will not be
+executed if the earlier alternative "matches"). All possible values of the
+composite type shall be covered. The composite type of the selector shall be an
+array or record type that is neither limited nor class-wide. Currently, a "when
+others =>" case choice is required; it is intended that this requirement will
+be relaxed at some point.
+
+If a subcomponent's subtype does not meet certain restrictions, then the only
+value that can be specified for that subcomponent in a case choice expression
+is a "box" component association (which matches all possible values for the
+subcomponent). This restriction applies if:
+
+- the component subtype is not a record, array, or discrete type; or
+
+- the component subtype is subject to a non-static constraint or has a
+  predicate; or:
+
+- the component type is an enumeration type that is subject to an enumeration
+  representation clause; or
+
+- the component type is a multidimensional array type or an array type with a
+  nonstatic index subtype.
+
+Support for casing on arrays (and on records that contain arrays) is
+currently subject to some restrictions. Non-positional
+array aggregates are not supported as (or within) case choices. Likewise
+for array type and subtype names. The current implementation exceeds
+compile-time capacity limits in some annoyingly common scenarios; the
+message generated in such cases is usually "Capacity exceeded in compiling
+case statement with composite selector type".
+
+Link to the original RFC:
+https://github.com/AdaCore/ada-spark-rfcs/blob/master/prototyped/rfc-pattern-matching.rst
+
+Mutably Tagged Types with Size'Class Aspect
+-------------------------------------------
+
+The `Size'Class` aspect can be applied to a tagged type to specify a size
+constraint for the type and its descendants. When this aspect is specified
+on a tagged type, the class-wide type of that type is considered to be a
+"mutably tagged" type - meaning that objects of the class-wide type can have
+their tag changed by assignment from objects with a different tag.
+
+When the aspect is applied to a type, the size of each of its descendant types
+must not exceed the size specified for the aspect.
+
+Example:
+
+.. code-block:: ada
+
+    type Base is tagged null record
+        with Size'Class => 16 * 8;  -- Size in bits (128 bits, or 16 bytes)
+
+    type Derived_Type is new Base with record
+       Data_Field : Integer;
+    end record;  -- ERROR if Derived_Type exceeds 16 bytes
+
+Class-wide types with a specified `Size'Class` can be used as the type of
+array components, record components, and stand-alone objects.
+
+.. code-block:: ada
+
+    Inst : Base'Class;
+    type Array_of_Base is array (Positive range <>) of Base'Class;
+
+Note: Legality of the `Size'Class` aspect is subject to certain restrictions on
+the tagged type, such as being undiscriminated, having no dynamic composite
+subcomponents, among others detailed in the RFC.
+
+Link to the original RFC:
+https://github.com/AdaCore/ada-spark-rfcs/blob/topic/rfc-finally/considered/rfc-class-size.md
+
+Generalized Finalization
+------------------------
+
+The `Finalizable` aspect can be applied to any record type, tagged or not,
+to specify that it provides the same level of control on the operations of initialization, finalization, and assignment of objects as the controlled
+types (see RM 7.6(2) for a high-level overview). The only restriction is
+that the record type must be a root type, in other words not a derived type.
+
+The aspect additionally makes it possible to specify relaxed semantics for
+the finalization operations by means of the `Relaxed_Finalization` setting.
+
+Example:
+
+.. code-block:: ada
+
+    type Ctrl is record
+      Id : Natural := 0;
+    end record
+      with Finalizable => (Initialize           => Initialize,
+                           Adjust               => Adjust,
+                           Finalize             => Finalize,
+                           Relaxed_Finalization => True);
+
+    procedure Adjust     (Obj : in out Ctrl);
+    procedure Finalize   (Obj : in out Ctrl);
+    procedure Initialize (Obj : in out Ctrl);
+
+Link to the original RFC:
+https://github.com/AdaCore/ada-spark-rfcs/blob/topic/finalization-rehaul/considered/rfc-generalized-finalization.md
+
+Inference of Dependent Types in Generic Instantiations
+------------------------------------------------------
+
+If a generic formal type T2 depends on another formal type T1,
+the actual for T1 can be inferred from the actual for T2.
+That is, you can give the actual for T2, and leave out the one
+for T1.
+
+For example, ``Ada.Unchecked_Deallocation`` has two generic formals:
+
+.. code-block:: ada
+
+    generic
+       type Object (<>) is limited private;
+       type Name is access Object;
+    procedure Ada.Unchecked_Deallocation (X : in out Name);
+
+where ``Name`` depends on ``Object``. With this language extension,
+you can leave out the actual for ``Object``, as in:
+
+.. code-block:: ada
+
+    type Integer_Access is access all Integer;
+
+    procedure Free is new Unchecked_Deallocation (Name => Integer_Access);
+
+The compiler will infer that the actual type for ``Object`` is ``Integer``.
+Note that named notation is always required when using inference.
+
+The following inferences are allowed:
+
+- For a formal access type, the designated type can be inferred.
+
+- For a formal array type, the index type(s) and the component
+  type can be inferred.
+
+- For a formal type with discriminats, the type(s) of the discriminants
+  can be inferred.
+
+Example for arrays:
+
+.. code-block:: ada
+
+    generic
+        type Element_Type is private;
+        type Index_Type is (<>);
+        type Array_Type is array (Index_Type range <>) of Element_Type;
+    package Array_Operations is
+        ...
+    end Array_Operations;
+
+    ...
+
+    type Int_Array is array (Positive range <>) of Integer;
+
+    package Int_Array_Operations is new Array_Operations (Array_Type => Int_Array);
+
+The index and component types of ``Array_Type`` are inferred from
+``Int_Array``, so that the above instantiation is equivalent to
+the following standard-Ada instantiation:
+
+.. code-block:: ada
+
+    package Int_Array_Operations is new Array_Operations
+      (Element_Type => Integer,
+       Index_Type   => Positive,
+       Array_Type   => Int_Array);
+
+Link to the original RFC:
+https://github.com/AdaCore/ada-spark-rfcs/blob/topic/generic_instantiations/considered/rfc-inference-of-dependent-types.md

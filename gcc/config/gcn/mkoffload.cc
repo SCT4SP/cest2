@@ -49,8 +49,6 @@
 #undef  ELFABIVERSION_AMDGPU_HSA_V4
 #define ELFABIVERSION_AMDGPU_HSA_V4 2
 
-#undef  EF_AMDGPU_MACH_AMDGCN_GFX803
-#define EF_AMDGPU_MACH_AMDGCN_GFX803 0x2a
 #undef  EF_AMDGPU_MACH_AMDGCN_GFX900
 #define EF_AMDGPU_MACH_AMDGCN_GFX900 0x2c
 #undef  EF_AMDGPU_MACH_AMDGCN_GFX906
@@ -59,6 +57,8 @@
 #define EF_AMDGPU_MACH_AMDGCN_GFX908 0x30
 #undef  EF_AMDGPU_MACH_AMDGCN_GFX90a
 #define EF_AMDGPU_MACH_AMDGCN_GFX90a 0x3f
+#undef  EF_AMDGPU_MACH_AMDGCN_GFX90c
+#define EF_AMDGPU_MACH_AMDGCN_GFX90c 0x32
 #undef  EF_AMDGPU_MACH_AMDGCN_GFX1030
 #define EF_AMDGPU_MACH_AMDGCN_GFX1030 0x36
 #undef  EF_AMDGPU_MACH_AMDGCN_GFX1036
@@ -350,18 +350,12 @@ copy_early_debug_info (const char *infile, const char *outfile)
   /* We only support host relocations of x86_64, for now.  */
   gcc_assert (ehdr.e_machine == EM_X86_64);
 
-  /* Fiji devices use HSACOv3 regardless of the assembler.  */
-  uint32_t elf_flags_actual = (elf_arch == EF_AMDGPU_MACH_AMDGCN_GFX803
-			       ? 0 : elf_flags);
-
   /* Patch the correct elf architecture flag into the file.  */
   ehdr.e_ident[7] = ELFOSABI_AMDGPU_HSA;
-  ehdr.e_ident[8] = (elf_arch == EF_AMDGPU_MACH_AMDGCN_GFX803
-		     ? ELFABIVERSION_AMDGPU_HSA_V3
-		     : ELFABIVERSION_AMDGPU_HSA_V4);
+  ehdr.e_ident[8] = ELFABIVERSION_AMDGPU_HSA_V4;
   ehdr.e_type = ET_REL;
   ehdr.e_machine = EM_AMDGPU;
-  ehdr.e_flags = elf_arch | elf_flags_actual;
+  ehdr.e_flags = elf_arch | elf_flags;
 
   /* Load the section headers so we can walk them later.  */
   Elf64_Shdr *sections = (Elf64_Shdr *)xmalloc (sizeof (Elf64_Shdr)
@@ -851,9 +845,7 @@ compile_native (const char *infile, const char *outfile, const char *compiler,
 static int
 get_arch (const char *str, const char *with_arch_str)
 {
-  if (strcmp (str, "fiji") == 0)
-    return EF_AMDGPU_MACH_AMDGCN_GFX803;
-  else if (strcmp (str, "gfx900") == 0)
+  if (strcmp (str, "gfx900") == 0)
     return EF_AMDGPU_MACH_AMDGCN_GFX900;
   else if (strcmp (str, "gfx906") == 0)
     return EF_AMDGPU_MACH_AMDGCN_GFX906;
@@ -861,6 +853,8 @@ get_arch (const char *str, const char *with_arch_str)
     return EF_AMDGPU_MACH_AMDGCN_GFX908;
   else if (strcmp (str, "gfx90a") == 0)
     return EF_AMDGPU_MACH_AMDGCN_GFX90a;
+  else if (strcmp (str, "gfx90c") == 0)
+    return EF_AMDGPU_MACH_AMDGCN_GFX90c;
   else if (strcmp (str, "gfx1030") == 0)
     return EF_AMDGPU_MACH_AMDGCN_GFX1030;
   else if (strcmp (str, "gfx1036") == 0)
@@ -1072,7 +1066,6 @@ main (int argc, char **argv)
      and ASM_SPEC.  */
   switch (elf_arch)
     {
-    case EF_AMDGPU_MACH_AMDGCN_GFX803:
     case EF_AMDGPU_MACH_AMDGCN_GFX1030:
     case EF_AMDGPU_MACH_AMDGCN_GFX1036:
     case EF_AMDGPU_MACH_AMDGCN_GFX1100:
@@ -1098,6 +1091,11 @@ main (int argc, char **argv)
 	SET_XNACK_ANY (elf_flags);
       if (TEST_SRAM_ECC_UNSET (elf_flags))
 	SET_SRAM_ECC_ANY (elf_flags);
+      break;
+    case EF_AMDGPU_MACH_AMDGCN_GFX90c:
+      if (TEST_XNACK_UNSET (elf_flags))
+	SET_XNACK_ANY (elf_flags);
+      SET_SRAM_ECC_UNSET (elf_flags);
       break;
     default:
       fatal_error (input_location, "unhandled architecture");

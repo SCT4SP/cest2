@@ -205,6 +205,7 @@ along with GCC; see the file COPYING3.  If not see
    i * i with ii_last + 2 * i + 1), to generalize strength reduction.  */
 
 #include "config.h"
+#define INCLUDE_MEMORY
 #include "system.h"
 #include "coretypes.h"
 #include "backend.h"
@@ -3521,6 +3522,9 @@ tree_predictive_commoning (bool allow_unroll_p)
 	  ret |= TODO_cleanup_cfg;
 	}
     }
+
+  if (ret != 0)
+    cfun->pending_TODOs |= PENDING_TODO_force_next_scalar_cleanup;
 
   return ret;
 }

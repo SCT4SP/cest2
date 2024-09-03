@@ -23,4 +23,8 @@ export void use() {
   h();
 }
 
-// { dg-prune-output "not writing module" }
+// Additionally, unnamed types have no linkage but are also TU-local, and thus
+// cannot be exposed in a module interface unit.  The non-TU-local entity 's'
+// here is an exposure of this type, so this should be an error; we don't yet
+// implement this checking however.
+struct {} s;  // { dg-error "TU-local" "" { xfail *-*-* } }
