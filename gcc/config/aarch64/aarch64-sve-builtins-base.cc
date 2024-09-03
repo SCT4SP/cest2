@@ -271,7 +271,7 @@ public:
       }
 
     if (e.pred == PRED_x)
-      return e.use_unpred_insn (code_for_aarch64_bic (e.vector_mode (0)));
+      return e.use_unpred_insn (e.direct_optab_handler (andn_optab));
 
     return e.use_cond_insn (code_for_cond_bic (e.vector_mode (0)));
   }
@@ -746,6 +746,58 @@ public:
   }
 };
 
+class svdiv_impl : public rtx_code_function
+{
+public:
+  CONSTEXPR svdiv_impl ()
+    : rtx_code_function (DIV, UDIV, UNSPEC_COND_FDIV) {}
+
+  gimple *
+  fold (gimple_folder &f) const override
+  {
+    if (auto *res = f.fold_const_binary (TRUNC_DIV_EXPR))
+      return res;
+
+    /* If the divisor is a uniform power of 2, fold to a shift
+       instruction.  */
+    tree op2 = gimple_call_arg (f.call, 2);
+    tree divisor_cst = uniform_integer_cst_p (op2);
+
+    if (!divisor_cst || !integer_pow2p (divisor_cst))
+      return NULL;
+
+    tree new_divisor;
+    gcall *call;
+
+    if (f.type_suffix (0).unsigned_p && tree_to_uhwi (divisor_cst) != 1)
+      {
+	function_instance instance ("svlsr", functions::svlsr,
+				    shapes::binary_uint_opt_n, MODE_n,
+				    f.type_suffix_ids, GROUP_none, f.pred);
+	call = f.redirect_call (instance);
+	tree d = INTEGRAL_TYPE_P (TREE_TYPE (op2)) ? op2 : divisor_cst;
+	new_divisor = wide_int_to_tree (TREE_TYPE (d), tree_log2 (d));
+      }
+    else
+      {
+	if (tree_int_cst_sign_bit (divisor_cst)
+	    || tree_to_shwi (divisor_cst) == 1)
+	  return NULL;
+
+	function_instance instance ("svasrd", functions::svasrd,
+				    shapes::shift_right_imm, MODE_n,
+				    f.type_suffix_ids, GROUP_none, f.pred);
+	call = f.redirect_call (instance);
+	new_divisor = wide_int_to_tree (scalar_types[VECTOR_TYPE_svuint64_t],
+					tree_log2 (divisor_cst));
+      }
+
+    gimple_call_set_arg (call, 2, new_divisor);
+    return call;
+  }
+};
+
+
 class svdot_impl : public function_base
 {
 public:
@@ -1121,9 +1173,8 @@ public:
   expand (function_expander &e) const override
   {
     /* Fold the access into a subreg rvalue.  */
-    return simplify_gen_subreg (e.vector_mode (0), e.args[0],
-				GET_MODE (e.args[0]),
-				INTVAL (e.args[1]) * BYTES_PER_SVE_VECTOR);
+    return force_subreg (e.vector_mode (0), e.args[0], GET_MODE (e.args[0]),
+			 INTVAL (e.args[1]) * BYTES_PER_SVE_VECTOR);
   }
 };
 
@@ -1157,8 +1208,7 @@ public:
 	e.add_fixed_operand (indices);
 	return e.generate_insn (icode);
       }
-    return simplify_gen_subreg (e.result_mode (), e.args[0],
-				GET_MODE (e.args[0]), 0);
+    return force_subreg (e.result_mode (), e.args[0], GET_MODE (e.args[0]), 0);
   }
 };
 
@@ -1174,7 +1224,7 @@ public:
        Advanced SIMD argument as an SVE vector.  */
     if (!BYTES_BIG_ENDIAN
 	&& is_undef (CALL_EXPR_ARG (e.call_expr, 0)))
-      return simplify_gen_subreg (mode, e.args[1], GET_MODE (e.args[1]), 0);
+      return force_subreg (mode, e.args[1], GET_MODE (e.args[1]), 0);
 
     rtx_vector_builder builder (VNx16BImode, 16, 2);
     for (unsigned int i = 0; i < 16; i++)
@@ -1185,7 +1235,7 @@ public:
     if (BYTES_BIG_ENDIAN)
       return e.use_exact_insn (code_for_aarch64_sve_set_neonq (mode));
     insn_code icode = code_for_vcond_mask (mode, mode);
-    e.args[1] = lowpart_subreg (mode, e.args[1], GET_MODE (e.args[1]));
+    e.args[1] = force_lowpart_subreg (mode, e.args[1], GET_MODE (e.args[1]));
     e.add_output_operand (icode);
     e.add_input_operand (icode, e.args[1]);
     e.add_input_operand (icode, e.args[0]);
@@ -1947,6 +1997,19 @@ public:
   expand (function_expander &e) const override
   {
     return expand_msb (e);
+  }
+};
+
+class svmul_impl : public rtx_code_function
+{
+public:
+  CONSTEXPR svmul_impl ()
+    : rtx_code_function (MULT, MULT, UNSPEC_COND_FMUL) {}
+
+  gimple *
+  fold (gimple_folder &f) const override
+  {
+    return f.fold_const_binary (MULT_EXPR);
   }
 };
 
@@ -3045,7 +3108,7 @@ FUNCTION (svcreate3, svcreate_impl, (3))
 FUNCTION (svcreate4, svcreate_impl, (4))
 FUNCTION (svcvt, svcvt_impl,)
 FUNCTION (svcvtnt, CODE_FOR_MODE0 (aarch64_sve_cvtnt),)
-FUNCTION (svdiv, rtx_code_function, (DIV, UDIV, UNSPEC_COND_FDIV))
+FUNCTION (svdiv, svdiv_impl,)
 FUNCTION (svdivr, rtx_code_function_rotated, (DIV, UDIV, UNSPEC_COND_FDIV))
 FUNCTION (svdot, svdot_impl,)
 FUNCTION (svdot_lane, svdotprod_lane_impl, (UNSPEC_SDOT, UNSPEC_UDOT,
@@ -3134,7 +3197,7 @@ FUNCTION (svmls_lane, svmls_lane_impl,)
 FUNCTION (svmmla, svmmla_impl,)
 FUNCTION (svmov, svmov_impl,)
 FUNCTION (svmsb, svmsb_impl,)
-FUNCTION (svmul, rtx_code_function, (MULT, MULT, UNSPEC_COND_FMUL))
+FUNCTION (svmul, svmul_impl,)
 FUNCTION (svmul_lane, CODE_FOR_MODE0 (aarch64_mul_lane),)
 FUNCTION (svmulh, unspec_based_function, (UNSPEC_SMUL_HIGHPART,
 					  UNSPEC_UMUL_HIGHPART, -1))
@@ -3186,7 +3249,7 @@ FUNCTION (svqincp, svqdecp_svqincp_impl, (SS_PLUS, US_PLUS))
 FUNCTION (svqincw, svqinc_bhwd_impl, (SImode))
 FUNCTION (svqincw_pat, svqinc_bhwd_impl, (SImode))
 FUNCTION (svqsub, rtx_code_function, (SS_MINUS, US_MINUS, -1))
-FUNCTION (svrbit, unspec_based_function, (UNSPEC_RBIT, UNSPEC_RBIT, -1))
+FUNCTION (svrbit, rtx_code_function, (BITREVERSE, BITREVERSE, -1))
 FUNCTION (svrdffr, svrdffr_impl,)
 FUNCTION (svrecpe, unspec_based_function, (-1, UNSPEC_URECPE, UNSPEC_FRECPE))
 FUNCTION (svrecps, unspec_based_function, (-1, -1, UNSPEC_FRECPS))

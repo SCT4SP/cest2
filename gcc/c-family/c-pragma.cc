@@ -964,6 +964,8 @@ handle_pragma_diagnostic_impl ()
   unsigned int option_index = find_opt (data.option_str + 1, lang_mask);
 
   if (early && !(c_option_is_from_cpp_diagnostics (option_index)
+		 /* For interpret_float.  */
+		 || option_index == OPT_Wc__23_extensions
 		 || option_index == OPT_Wunknown_pragmas))
     return;
 
@@ -1556,6 +1558,8 @@ static const struct omp_pragma_def omp_pragmas_simd[] = {
   { "target", PRAGMA_OMP_TARGET },
   { "taskloop", PRAGMA_OMP_TASKLOOP },
   { "teams", PRAGMA_OMP_TEAMS },
+  { "tile", PRAGMA_OMP_TILE },
+  { "unroll", PRAGMA_OMP_UNROLL },
 };
 
 void
@@ -1563,8 +1567,7 @@ c_pp_lookup_pragma (unsigned int id, const char **space, const char **name)
 {
   const int n_oacc_pragmas = ARRAY_SIZE (oacc_pragmas);
   const int n_omp_pragmas = ARRAY_SIZE (omp_pragmas);
-  const int n_omp_pragmas_simd = sizeof (omp_pragmas_simd)
-				 / sizeof (*omp_pragmas);
+  const int n_omp_pragmas_simd = ARRAY_SIZE (omp_pragmas_simd);
   int i;
 
   for (i = 0; i < n_oacc_pragmas; ++i)
@@ -1805,8 +1808,7 @@ init_pragma (void)
 	}
       if (flag_openmp || flag_openmp_simd)
 	{
-	  const int n_omp_pragmas_simd
-	    = sizeof (omp_pragmas_simd) / sizeof (*omp_pragmas);
+	  const int n_omp_pragmas_simd = ARRAY_SIZE (omp_pragmas_simd);
 	  int i;
 
 	  for (i = 0; i < n_omp_pragmas_simd; ++i)

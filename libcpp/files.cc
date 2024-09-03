@@ -693,7 +693,7 @@ static bool
 read_file_guts (cpp_reader *pfile, _cpp_file *file, location_t loc,
 		const char *input_charset)
 {
-  ssize_t size, total, count;
+  ssize_t size, pad, total, count;
   uchar *buf;
   bool regular;
 
@@ -732,11 +732,10 @@ read_file_guts (cpp_reader *pfile, _cpp_file *file, location_t loc,
        the majority of C source files.  */
     size = 8 * 1024;
 
-  /* The + 16 here is space for the final '\n' and 15 bytes of padding,
-     used to quiet warnings from valgrind or Address Sanitizer, when the
-     optimized lexer accesses aligned 16-byte memory chunks, including
-     the bytes after the malloced, area, and stops lexing on '\n'.  */
-  buf = XNEWVEC (uchar, size + 16);
+  pad = CPP_BUFFER_PADDING;
+  /* The '+ PAD' here is space for the final '\n' and PAD-1 bytes of padding,
+     allowing search_line_fast to use (possibly misaligned) vector loads.  */
+  buf = XNEWVEC (uchar, size + pad);
   total = 0;
   while ((count = read (file->fd, buf + total, size - total)) > 0)
     {
@@ -747,7 +746,7 @@ read_file_guts (cpp_reader *pfile, _cpp_file *file, location_t loc,
 	  if (regular)
 	    break;
 	  size *= 2;
-	  buf = XRESIZEVEC (uchar, buf, size + 16);
+	  buf = XRESIZEVEC (uchar, buf, size + pad);
 	}
     }
 
@@ -765,7 +764,7 @@ read_file_guts (cpp_reader *pfile, _cpp_file *file, location_t loc,
 
   file->buffer = _cpp_convert_input (pfile,
 				     input_charset,
-				     buf, size + 16, total,
+				     buf, size + pad, total,
 				     &file->buffer_start,
 				     &file->st.st_size);
   file->buffer_valid = file->buffer;
@@ -1008,7 +1007,10 @@ _cpp_stack_file (cpp_reader *pfile, _cpp_file *file, include_type type,
   if (decrement)
     pfile->line_table->highest_location--;
 
-  if (file->header_unit <= 0)
+  /* Normally a header unit becomes an __import directive in the current file,
+     but with -include we need something to LC_LEAVE to trigger the file_change
+     hook and continue to the next -include or the main source file.  */
+  if (file->header_unit <= 0 || type == IT_CMDLINE)
     /* Add line map and do callbacks.  */
     _cpp_do_file_change (pfile, LC_ENTER, file->path,
 		       /* With preamble injection, start on line zero,

@@ -177,7 +177,7 @@ minmax_from_comparison (tree_code cmp, tree exp0, tree exp1, tree exp2, tree exp
 	  /* a != MIN_RANGE<a> ? a : MIN_RANGE<a>+1 -> MAX_EXPR<MIN_RANGE<a>+1, a> */
 	  if (cmp == NE_EXPR && TREE_CODE (exp0) == SSA_NAME)
 	    {
-	      value_range r;
+	      int_range_max r;
 	      get_range_query (cfun)->range_of_expr (r, exp0);
 	      if (r.undefined_p ())
 		r.set_varying (TREE_TYPE (exp0));
@@ -199,7 +199,7 @@ minmax_from_comparison (tree_code cmp, tree exp0, tree exp1, tree exp2, tree exp
 	  /* a != MAX_RANGE<a> ? a : MAX_RANGE<a>-1 -> MIN_EXPR<MIN_RANGE<a>-1, a> */
 	  if (cmp == NE_EXPR && TREE_CODE (exp0) == SSA_NAME)
 	    {
-	      value_range r;
+	      int_range_max r;
 	      get_range_query (cfun)->range_of_expr (r, exp0);
 	      if (r.undefined_p ())
 		r.set_varying (TREE_TYPE (exp0));
@@ -1236,13 +1236,25 @@ can_min_p (const_tree arg1, const_tree arg2, poly_wide_int &res)
    produce a new constant in RES.  Return FALSE if we don't know how
    to evaluate CODE at compile-time.  */
 
-static bool
+bool
 poly_int_binop (poly_wide_int &res, enum tree_code code,
 		const_tree arg1, const_tree arg2,
 		signop sign, wi::overflow_type *overflow)
 {
-  gcc_assert (NUM_POLY_INT_COEFFS != 1);
   gcc_assert (poly_int_tree_p (arg1) && poly_int_tree_p (arg2));
+
+  if (TREE_CODE (arg1) == INTEGER_CST && TREE_CODE (arg2) == INTEGER_CST)
+    {
+      wide_int warg1 = wi::to_wide (arg1), wi_res;
+      wide_int warg2 = wi::to_wide (arg2, TYPE_PRECISION (TREE_TYPE (arg1)));
+      if (!wide_int_binop (wi_res, code, warg1, warg2, sign, overflow))
+	return NULL_TREE;
+      res = wi_res;
+      return true;
+    }
+
+  gcc_assert (NUM_POLY_INT_COEFFS != 1);
+
   switch (code)
     {
     case PLUS_EXPR:
@@ -1304,17 +1316,9 @@ int_const_binop (enum tree_code code, const_tree arg1, const_tree arg2,
   signop sign = TYPE_SIGN (type);
   wi::overflow_type overflow = wi::OVF_NONE;
 
-  if (TREE_CODE (arg1) == INTEGER_CST && TREE_CODE (arg2) == INTEGER_CST)
-    {
-      wide_int warg1 = wi::to_wide (arg1), res;
-      wide_int warg2 = wi::to_wide (arg2, TYPE_PRECISION (type));
-      if (!wide_int_binop (res, code, warg1, warg2, sign, &overflow))
-	return NULL_TREE;
-      poly_res = res;
-    }
-  else if (!poly_int_tree_p (arg1)
-	   || !poly_int_tree_p (arg2)
-	   || !poly_int_binop (poly_res, code, arg1, arg2, sign, &overflow))
+  if (!poly_int_tree_p (arg1)
+      || !poly_int_tree_p (arg2)
+      || !poly_int_binop (poly_res, code, arg1, arg2, sign, &overflow))
     return NULL_TREE;
   return force_fit_type (type, poly_res, overflowable,
 			 (((sign == SIGNED || overflowable == -1)
@@ -1365,6 +1369,90 @@ simplify_const_binop (tree_code code, tree op, tree other_op,
   return NULL_TREE;
 }
 
+/* If ARG1 and ARG2 are constants, and if performing CODE on them would
+   be an elementwise vector operation, try to fold the operation to a
+   constant vector, using ELT_CONST_BINOP to fold each element.  Return
+   the folded value on success, otherwise return null.  */
+tree
+vector_const_binop (tree_code code, tree arg1, tree arg2,
+		    tree (*elt_const_binop) (enum tree_code, tree, tree))
+{
+  if (TREE_CODE (arg1) == VECTOR_CST && TREE_CODE (arg2) == VECTOR_CST
+      && known_eq (TYPE_VECTOR_SUBPARTS (TREE_TYPE (arg1)),
+		   TYPE_VECTOR_SUBPARTS (TREE_TYPE (arg2))))
+    {
+      tree type = TREE_TYPE (arg1);
+      bool step_ok_p;
+      if (VECTOR_CST_STEPPED_P (arg1)
+	  && VECTOR_CST_STEPPED_P (arg2))
+      /* We can operate directly on the encoding if:
+
+      a3 - a2 == a2 - a1 && b3 - b2 == b2 - b1
+      implies
+      (a3 op b3) - (a2 op b2) == (a2 op b2) - (a1 op b1)
+
+      Addition and subtraction are the supported operators
+      for which this is true.  */
+	step_ok_p = (code == PLUS_EXPR || code == MINUS_EXPR);
+      else if (VECTOR_CST_STEPPED_P (arg1))
+      /* We can operate directly on stepped encodings if:
+
+      a3 - a2 == a2 - a1
+      implies:
+      (a3 op c) - (a2 op c) == (a2 op c) - (a1 op c)
+
+      which is true if (x -> x op c) distributes over addition.  */
+	step_ok_p = distributes_over_addition_p (code, 1);
+      else
+      /* Similarly in reverse.  */
+	step_ok_p = distributes_over_addition_p (code, 2);
+      tree_vector_builder elts;
+      if (!elts.new_binary_operation (type, arg1, arg2, step_ok_p))
+	return NULL_TREE;
+      unsigned int count = elts.encoded_nelts ();
+      for (unsigned int i = 0; i < count; ++i)
+	{
+	  tree elem1 = VECTOR_CST_ELT (arg1, i);
+	  tree elem2 = VECTOR_CST_ELT (arg2, i);
+
+	  tree elt = elt_const_binop (code, elem1, elem2);
+
+      /* It is possible that const_binop cannot handle the given
+      code and return NULL_TREE */
+	  if (elt == NULL_TREE)
+	    return NULL_TREE;
+	  elts.quick_push (elt);
+	}
+
+      return elts.build ();
+    }
+
+  if (TREE_CODE (arg1) == VECTOR_CST
+      && TREE_CODE (arg2) == INTEGER_CST)
+    {
+      tree type = TREE_TYPE (arg1);
+      bool step_ok_p = distributes_over_addition_p (code, 1);
+      tree_vector_builder elts;
+      if (!elts.new_unary_operation (type, arg1, step_ok_p))
+	return NULL_TREE;
+      unsigned int count = elts.encoded_nelts ();
+      for (unsigned int i = 0; i < count; ++i)
+	{
+	  tree elem1 = VECTOR_CST_ELT (arg1, i);
+
+	  tree elt = elt_const_binop (code, elem1, arg2);
+
+	  /* It is possible that const_binop cannot handle the given
+	     code and return NULL_TREE.  */
+	  if (elt == NULL_TREE)
+	    return NULL_TREE;
+	  elts.quick_push (elt);
+	}
+
+      return elts.build ();
+    }
+  return NULL_TREE;
+}
 
 /* Combine two constants ARG1 and ARG2 under operation CODE to produce a new
    constant.  We assume ARG1 and ARG2 have the same data type, or at least
@@ -1677,83 +1765,7 @@ const_binop (enum tree_code code, tree arg1, tree arg2)
       && (simplified = simplify_const_binop (code, arg2, arg1, 1)))
     return simplified;
 
-  if (TREE_CODE (arg1) == VECTOR_CST
-      && TREE_CODE (arg2) == VECTOR_CST
-      && known_eq (TYPE_VECTOR_SUBPARTS (TREE_TYPE (arg1)),
-		   TYPE_VECTOR_SUBPARTS (TREE_TYPE (arg2))))
-    {
-      tree type = TREE_TYPE (arg1);
-      bool step_ok_p;
-      if (VECTOR_CST_STEPPED_P (arg1)
-	  && VECTOR_CST_STEPPED_P (arg2))
-	/* We can operate directly on the encoding if:
-
-	      a3 - a2 == a2 - a1 && b3 - b2 == b2 - b1
-	    implies
-	      (a3 op b3) - (a2 op b2) == (a2 op b2) - (a1 op b1)
-
-	   Addition and subtraction are the supported operators
-	   for which this is true.  */
-	step_ok_p = (code == PLUS_EXPR || code == MINUS_EXPR);
-      else if (VECTOR_CST_STEPPED_P (arg1))
-	/* We can operate directly on stepped encodings if:
-
-	     a3 - a2 == a2 - a1
-	   implies:
-	     (a3 op c) - (a2 op c) == (a2 op c) - (a1 op c)
-
-	   which is true if (x -> x op c) distributes over addition.  */
-	step_ok_p = distributes_over_addition_p (code, 1);
-      else
-	/* Similarly in reverse.  */
-	step_ok_p = distributes_over_addition_p (code, 2);
-      tree_vector_builder elts;
-      if (!elts.new_binary_operation (type, arg1, arg2, step_ok_p))
-	return NULL_TREE;
-      unsigned int count = elts.encoded_nelts ();
-      for (unsigned int i = 0; i < count; ++i)
-	{
-	  tree elem1 = VECTOR_CST_ELT (arg1, i);
-	  tree elem2 = VECTOR_CST_ELT (arg2, i);
-
-	  tree elt = const_binop (code, elem1, elem2);
-
-	  /* It is possible that const_binop cannot handle the given
-	     code and return NULL_TREE */
-	  if (elt == NULL_TREE)
-	    return NULL_TREE;
-	  elts.quick_push (elt);
-	}
-
-      return elts.build ();
-    }
-
-  /* Shifts allow a scalar offset for a vector.  */
-  if (TREE_CODE (arg1) == VECTOR_CST
-      && TREE_CODE (arg2) == INTEGER_CST)
-    {
-      tree type = TREE_TYPE (arg1);
-      bool step_ok_p = distributes_over_addition_p (code, 1);
-      tree_vector_builder elts;
-      if (!elts.new_unary_operation (type, arg1, step_ok_p))
-	return NULL_TREE;
-      unsigned int count = elts.encoded_nelts ();
-      for (unsigned int i = 0; i < count; ++i)
-	{
-	  tree elem1 = VECTOR_CST_ELT (arg1, i);
-
-	  tree elt = const_binop (code, elem1, arg2);
-
-	  /* It is possible that const_binop cannot handle the given
-	     code and return NULL_TREE.  */
-	  if (elt == NULL_TREE)
-	    return NULL_TREE;
-	  elts.quick_push (elt);
-	}
-
-      return elts.build ();
-    }
-  return NULL_TREE;
+  return vector_const_binop (code, arg1, arg2, const_binop);
 }
 
 /* Overload that adds a TYPE parameter to be able to dispatch
@@ -2246,7 +2258,18 @@ fold_convert_const_int_from_real (enum tree_code code, tree type, const_tree arg
   if (! overflow)
     val = real_to_integer (&r, &overflow, TYPE_PRECISION (type));
 
-  t = force_fit_type (type, val, -1, overflow | TREE_OVERFLOW (arg1));
+  /* According to IEEE standard, for conversions from floating point to
+     integer. When a NaN or infinite operand cannot be represented in the
+     destination format and this cannot otherwise be indicated, the invalid
+     operation exception shall be signaled. When a numeric operand would
+     convert to an integer outside the range of the destination format, the
+     invalid operation exception shall be signaled if this situation cannot
+     otherwise be indicated.  */
+  if (!flag_trapping_math || !overflow)
+    t = force_fit_type (type, val, -1, overflow | TREE_OVERFLOW (arg1));
+  else
+    t = NULL_TREE;
+
   return t;
 }
 
@@ -4112,7 +4135,7 @@ operand_compare::hash_operand (const_tree t, inchash::hash &hstate,
 		hash_operand (TREE_OPERAND (t, 0), one, flags);
 		hash_operand (TREE_OPERAND (t, 1), two, flags);
 		hstate.add_commutative (one, two);
-		hash_operand (TREE_OPERAND (t, 2), two, flags);
+		hash_operand (TREE_OPERAND (t, 2), hstate, flags);
 		return;
 	      }
 
@@ -4992,6 +5015,9 @@ decode_field_reference (location_t loc, tree *exp_, HOST_WIDE_INT *pbitsize,
       || *pbitsize < 0
       || offset != 0
       || TREE_CODE (inner) == PLACEHOLDER_EXPR
+      /* We eventually want to build a larger reference and need to take
+	 the address of this.  */
+      || (!REFERENCE_CLASS_P (inner) && !DECL_P (inner))
       /* Reject out-of-bound accesses (PR79731).  */
       || (! AGGREGATE_TYPE_P (TREE_TYPE (inner))
 	  && compare_tree_int (TYPE_SIZE (TREE_TYPE (inner)),
@@ -8086,16 +8112,17 @@ native_encode_vector_part (const_tree expr, unsigned char *ptr, int len,
       unsigned int elts_per_byte = BITS_PER_UNIT / elt_bits;
       unsigned int first_elt = off * elts_per_byte;
       unsigned int extract_elts = extract_bytes * elts_per_byte;
+      unsigned int elt_mask = (1 << elt_bits) - 1;
       for (unsigned int i = 0; i < extract_elts; ++i)
 	{
 	  tree elt = VECTOR_CST_ELT (expr, first_elt + i);
 	  if (TREE_CODE (elt) != INTEGER_CST)
 	    return 0;
 
-	  if (ptr && wi::extract_uhwi (wi::to_wide (elt), 0, 1))
+	  if (ptr && integer_nonzerop (elt))
 	    {
 	      unsigned int bit = i * elt_bits;
-	      ptr[bit / BITS_PER_UNIT] |= 1 << (bit % BITS_PER_UNIT);
+	      ptr[bit / BITS_PER_UNIT] |= elt_mask << (bit % BITS_PER_UNIT);
 	    }
 	}
       return extract_bytes;
@@ -8178,6 +8205,39 @@ native_encode_string (const_tree expr, unsigned char *ptr, int len, int off)
   return len;
 }
 
+/* Subroutine of native_encode_expr.  Encode the CONSTRUCTOR
+   specified by EXPR into the buffer PTR of length LEN bytes.
+   Return the number of bytes placed in the buffer, or zero
+   upon failure.  */
+
+static int
+native_encode_constructor (const_tree expr, unsigned char *ptr, int len, int off)
+{
+  /* We are only concerned with zero-initialization constructors here.  That's
+     all we expect to see in GIMPLE, so that's all native_encode_expr should
+     deal with.  For more general handling of constructors, there is
+     native_encode_initializer.  */
+  if (CONSTRUCTOR_NELTS (expr))
+    return 0;
+
+  /* Wide-char strings are encoded in target byte-order so native
+     encoding them is trivial.  */
+  if (BITS_PER_UNIT != CHAR_BIT
+      || !tree_fits_shwi_p (TYPE_SIZE_UNIT (TREE_TYPE (expr))))
+    return 0;
+
+  HOST_WIDE_INT total_bytes = tree_to_shwi (TYPE_SIZE_UNIT (TREE_TYPE (expr)));
+  if ((off == -1 && total_bytes > len) || off >= total_bytes)
+    return 0;
+  if (off == -1)
+    off = 0;
+  len = MIN (total_bytes - off, len);
+  if (ptr == NULL)
+    /* Dry run.  */;
+  else
+    memset (ptr, 0, len);
+  return len;
+}
 
 /* Subroutine of fold_view_convert_expr.  Encode the INTEGER_CST, REAL_CST,
    FIXED_CST, COMPLEX_CST, STRING_CST, or VECTOR_CST specified by EXPR into
@@ -8213,6 +8273,9 @@ native_encode_expr (const_tree expr, unsigned char *ptr, int len, int off)
 
     case STRING_CST:
       return native_encode_string (expr, ptr, len, off);
+
+    case CONSTRUCTOR:
+      return native_encode_constructor (expr, ptr, len, off);
 
     default:
       return 0;
@@ -12078,17 +12141,29 @@ fold_binary_loc (location_t loc, enum tree_code code, tree type,
 	    {
 	      tree rtype = TREE_TYPE (TREE_TYPE (arg0));
 	      if (real_onep (TREE_IMAGPART (arg1)))
-		return
-		  fold_build2_loc (loc, COMPLEX_EXPR, type,
-			       negate_expr (fold_build1_loc (loc, IMAGPART_EXPR,
-							     rtype, arg0)),
-			       fold_build1_loc (loc, REALPART_EXPR, rtype, arg0));
+		{
+		  if (TREE_CODE (arg0) != COMPLEX_EXPR)
+		    arg0 = save_expr (arg0);
+		  tree iarg0 = fold_build1_loc (loc, IMAGPART_EXPR,
+						rtype, arg0);
+		  tree rarg0 = fold_build1_loc (loc, REALPART_EXPR,
+						rtype, arg0);
+		  return fold_build2_loc (loc, COMPLEX_EXPR, type,
+					  negate_expr (iarg0),
+					  rarg0);
+		}
 	      else if (real_minus_onep (TREE_IMAGPART (arg1)))
-		return
-		  fold_build2_loc (loc, COMPLEX_EXPR, type,
-			       fold_build1_loc (loc, IMAGPART_EXPR, rtype, arg0),
-			       negate_expr (fold_build1_loc (loc, REALPART_EXPR,
-							     rtype, arg0)));
+		{
+		  if (TREE_CODE (arg0) != COMPLEX_EXPR)
+		    arg0 = save_expr (arg0);
+		  tree iarg0 = fold_build1_loc (loc, IMAGPART_EXPR,
+						rtype, arg0);
+		  tree rarg0 = fold_build1_loc (loc, REALPART_EXPR,
+						rtype, arg0);
+		  return fold_build2_loc (loc, COMPLEX_EXPR, type,
+					  iarg0,
+					  negate_expr (rarg0));
+		}
 	    }
 
 	  /* Optimize z * conj(z) for floating point complex numbers.
@@ -15241,13 +15316,18 @@ tree_call_nonnegative_warnv_p (tree type, combined_fn fn, tree arg0, tree arg1,
     CASE_CFN_FFS:
     CASE_CFN_PARITY:
     CASE_CFN_POPCOUNT:
-    CASE_CFN_CLZ:
     CASE_CFN_CLRSB:
     case CFN_BUILT_IN_BSWAP16:
     case CFN_BUILT_IN_BSWAP32:
     case CFN_BUILT_IN_BSWAP64:
     case CFN_BUILT_IN_BSWAP128:
       /* Always true.  */
+      return true;
+
+    CASE_CFN_CLZ:
+    CASE_CFN_CTZ:
+      if (arg1)
+	return RECURSE (arg1);
       return true;
 
     CASE_CFN_SQRT:
@@ -15327,8 +15407,8 @@ tree_call_nonnegative_warnv_p (tree type, combined_fn fn, tree arg0, tree arg1,
 	 non-negative if both operands are non-negative.  In the presence
 	 of qNaNs, we're non-negative if either operand is non-negative
 	 and can't be a qNaN, or if both operands are non-negative.  */
-      if (tree_expr_maybe_signaling_nan_p (arg0) ||
-	  tree_expr_maybe_signaling_nan_p (arg1))
+      if (tree_expr_maybe_signaling_nan_p (arg0)
+	  || tree_expr_maybe_signaling_nan_p (arg1))
         return RECURSE (arg0) && RECURSE (arg1);
       return RECURSE (arg0) ? (!tree_expr_maybe_nan_p (arg0)
 			       || RECURSE (arg1))
@@ -15427,8 +15507,8 @@ tree_invalid_nonnegative_warnv_p (tree t, bool *strict_overflow_p, int depth)
 
     case CALL_EXPR:
       {
-	tree arg0 = call_expr_nargs (t) > 0 ?  CALL_EXPR_ARG (t, 0) : NULL_TREE;
-	tree arg1 = call_expr_nargs (t) > 1 ?  CALL_EXPR_ARG (t, 1) : NULL_TREE;
+	tree arg0 = call_expr_nargs (t) > 0 ? CALL_EXPR_ARG (t, 0) : NULL_TREE;
+	tree arg1 = call_expr_nargs (t) > 1 ? CALL_EXPR_ARG (t, 1) : NULL_TREE;
 
 	return tree_call_nonnegative_warnv_p (TREE_TYPE (t),
 					      get_call_combined_fn (t),

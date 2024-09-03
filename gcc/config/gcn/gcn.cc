@@ -68,7 +68,7 @@ static bool ext_gcn_constants_init = 0;
 
 /* Holds the ISA variant, derived from the command line parameters.  */
 
-enum gcn_isa gcn_isa = ISA_GCN3;	/* Default to GCN3.  */
+enum gcn_isa gcn_isa = ISA_GCN5;	/* Default to GCN5.  */
 
 /* Reserve this much space for LDS (for propagating variables from
    worker-single mode to worker-partitioned mode), per workgroup.  Global
@@ -133,11 +133,11 @@ gcn_option_override (void)
   if (!flag_pic)
     flag_pic = flag_pie;
 
-  gcn_isa = (gcn_arch == PROCESSOR_FIJI ? ISA_GCN3
-      : gcn_arch == PROCESSOR_VEGA10 ? ISA_GCN5
+  gcn_isa = (gcn_arch == PROCESSOR_VEGA10 ? ISA_GCN5
       : gcn_arch == PROCESSOR_VEGA20 ? ISA_GCN5
       : gcn_arch == PROCESSOR_GFX908 ? ISA_CDNA1
       : gcn_arch == PROCESSOR_GFX90a ? ISA_CDNA2
+      : gcn_arch == PROCESSOR_GFX90c ? ISA_GCN5
       : gcn_arch == PROCESSOR_GFX1030 ? ISA_RDNA2
       : gcn_arch == PROCESSOR_GFX1036 ? ISA_RDNA2
       : gcn_arch == PROCESSOR_GFX1100 ? ISA_RDNA3
@@ -163,17 +163,15 @@ gcn_option_override (void)
 	acc_lds_size = 32768;
     }
 
-  /* gfx803 "Fiji", gfx1030 and gfx1100 do not support XNACK.  */
-  if (gcn_arch == PROCESSOR_FIJI
-      || gcn_arch == PROCESSOR_GFX1030
+  /* gfx1030 and gfx1100 do not support XNACK.  */
+  if (gcn_arch == PROCESSOR_GFX1030
       || gcn_arch == PROCESSOR_GFX1036
       || gcn_arch == PROCESSOR_GFX1100
       || gcn_arch == PROCESSOR_GFX1103)
     {
       if (flag_xnack == HSACO_ATTR_ON)
 	error ("%<-mxnack=on%> is incompatible with %<-march=%s%>",
-	       (gcn_arch == PROCESSOR_FIJI ? "fiji"
-		: gcn_arch == PROCESSOR_GFX1030 ? "gfx1030"
+	       (gcn_arch == PROCESSOR_GFX1030 ? "gfx1030"
 		: gcn_arch == PROCESSOR_GFX1036 ? "gfx1036"
 		: gcn_arch == PROCESSOR_GFX1100 ? "gfx1100"
 		: gcn_arch == PROCESSOR_GFX1103 ? "gfx1103"
@@ -189,13 +187,13 @@ gcn_option_override (void)
   if (flag_xnack == HSACO_ATTR_DEFAULT)
     switch (gcn_arch)
       {
-      case PROCESSOR_FIJI:
       case PROCESSOR_VEGA10:
       case PROCESSOR_VEGA20:
       case PROCESSOR_GFX908:
 	flag_xnack = HSACO_ATTR_OFF;
 	break;
       case PROCESSOR_GFX90a:
+      case PROCESSOR_GFX90c:
 	flag_xnack = HSACO_ATTR_ANY;
 	break;
       default:
@@ -623,7 +621,7 @@ gcn_hard_regno_mode_ok (unsigned int regno, machine_mode mode)
     return (sgpr_1reg_mode_p (mode)
 	    || (!((regno - FIRST_SGPR_REG) & 1) && sgpr_2reg_mode_p (mode))
 	    || (((regno - FIRST_SGPR_REG) & 3) == 0 && mode == TImode));
-  if (VGPR_REGNO_P (regno) || (AVGPR_REGNO_P (regno) && TARGET_CDNA1_PLUS))
+  if (VGPR_REGNO_P (regno) || (AVGPR_REGNO_P (regno) && TARGET_AVGPRS))
     /* Vector instructions do not care about the alignment of register
        pairs, but where there is no 64-bit instruction, many of the
        define_split do not work if the input and output registers partially
@@ -855,7 +853,7 @@ gcn_spill_class (reg_class_t c, machine_mode /*mode */ )
       || c == VCC_CONDITIONAL_REG || c == EXEC_MASK_REG)
     return SGPR_REGS;
   else
-    return c == VGPR_REGS && TARGET_CDNA1_PLUS ? AVGPR_REGS : NO_REGS;
+    return c == VGPR_REGS && TARGET_AVGPRS ? AVGPR_REGS : NO_REGS;
 }
 
 /* Implement TARGET_IRA_CHANGE_PSEUDO_ALLOCNO_CLASS.
@@ -1530,8 +1528,7 @@ gcn_flat_address_p (rtx x, machine_mode mode)
   if (!vec_mode && gcn_vec_address_register_p (x, DImode, false))
     return true;
 
-  if (TARGET_GCN5_PLUS
-      && GET_CODE (x) == PLUS
+  if (GET_CODE (x) == PLUS
       && gcn_vec_address_register_p (XEXP (x, 0), DImode, false)
       && CONST_INT_P (XEXP (x, 1)))
     return true;
@@ -1601,7 +1598,7 @@ gcn_global_address_p (rtx addr)
     {
       rtx base = XEXP (addr, 0);
       rtx offset = XEXP (addr, 1);
-      int offsetbits = (TARGET_RDNA2_PLUS ? 11 : 12);
+      int offsetbits = (TARGET_11BIT_GLOBAL_OFFSET ? 11 : 12);
       bool immediate_p = (CONST_INT_P (offset)
 			  && INTVAL (offset) >= -(1 << offsetbits)
 			  && INTVAL (offset) < (1 << offsetbits));
@@ -1642,10 +1639,6 @@ static bool
 gcn_addr_space_legitimate_address_p (machine_mode mode, rtx x, bool strict,
 				     addr_space_t as, code_helper = ERROR_MARK)
 {
-  /* All vector instructions need to work on addresses in registers.  */
-  if (!TARGET_GCN5_PLUS && (vgpr_vector_mode_p (mode) && !REG_P (x)))
-    return false;
-
   if (AS_SCALAR_FLAT_P (as))
     {
       if (mode == QImode || mode == HImode)
@@ -1691,15 +1684,13 @@ gcn_addr_space_legitimate_address_p (machine_mode mode, rtx x, bool strict,
     return gcn_address_register_p (x, SImode, strict);
   else if (AS_FLAT_P (as) || AS_FLAT_SCRATCH_P (as))
     {
-      if (TARGET_GCN3 || GET_CODE (x) == REG)
+      if (GET_CODE (x) == REG)
        return ((GET_MODE_CLASS (mode) == MODE_VECTOR_INT
 		|| GET_MODE_CLASS (mode) == MODE_VECTOR_FLOAT)
 	       ? gcn_address_register_p (x, DImode, strict)
 	       : gcn_vec_address_register_p (x, DImode, strict));
       else
 	{
-	  gcc_assert (TARGET_GCN5_PLUS);
-
 	  if (GET_CODE (x) == PLUS)
 	    {
 	      rtx x1 = XEXP (x, 1);
@@ -1723,8 +1714,6 @@ gcn_addr_space_legitimate_address_p (machine_mode mode, rtx x, bool strict,
     }
   else if (AS_GLOBAL_P (as))
     {
-      gcc_assert (TARGET_GCN5_PLUS);
-
       if (GET_CODE (x) == REG)
        return (gcn_address_register_p (x, DImode, strict)
 	       || (!VECTOR_MODE_P (mode)
@@ -1734,7 +1723,7 @@ gcn_addr_space_legitimate_address_p (machine_mode mode, rtx x, bool strict,
 	  rtx base = XEXP (x, 0);
 	  rtx offset = XEXP (x, 1);
 
-	  int offsetbits = (TARGET_RDNA2_PLUS ? 11 : 12);
+	  int offsetbits = (TARGET_11BIT_GLOBAL_OFFSET ? 11 : 12);
 	  bool immediate_p = (GET_CODE (offset) == CONST_INT
 			      /* Signed 12/13-bit immediate.  */
 			      && INTVAL (offset) >= -(1 << offsetbits)
@@ -2201,7 +2190,7 @@ gcn_addr_space_legitimize_address (rtx x, rtx old, machine_mode mode,
     case ADDR_SPACE_FLAT:
     case ADDR_SPACE_FLAT_SCRATCH:
     case ADDR_SPACE_GLOBAL:
-      return TARGET_GCN3 ? force_reg (DImode, x) : x;
+      return x;
     case ADDR_SPACE_LDS:
     case ADDR_SPACE_GDS:
       /* FIXME: LDS support offsets, handle them!.  */
@@ -2238,13 +2227,6 @@ gcn_expand_scalar_to_vector_address (machine_mode mode, rtx exec, rtx mem,
   gcc_assert (MEM_P (mem));
   rtx mem_base = XEXP (mem, 0);
   rtx mem_index = NULL_RTX;
-
-  if (!TARGET_GCN5_PLUS)
-    {
-      /* gcn_addr_space_legitimize_address should have put the address in a
-         register.  If not, it is too late to do anything about it.  */
-      gcc_assert (REG_P (mem_base));
-    }
 
   if (GET_CODE (mem_base) == PLUS)
     {
@@ -2472,7 +2454,8 @@ gcn_secondary_reload (bool in_p, rtx x, reg_class_t rclass,
 
       /* CDNA1 doesn't have an instruction for going between the accumulator
 	 registers and memory.  Go via a VGPR in this case.  */
-      if (TARGET_CDNA1 && rclass == AVGPR_REGS && result != VGPR_REGS)
+      if (!TARGET_AVGPR_MEMOPS
+	  && rclass == AVGPR_REGS && result != VGPR_REGS)
 	result = VGPR_REGS;
     }
 
@@ -2490,6 +2473,13 @@ gcn_secondary_reload (bool in_p, rtx x, reg_class_t rclass,
 static void
 gcn_conditional_register_usage (void)
 {
+  /* Some architectures have a register allocation granularity that does not
+     permit use of the full register count.  */
+  for (int i = 256 - (256 % TARGET_VGPR_GRANULARITY);
+       i < 256;
+       i++)
+    fixed_regs[VGPR_REGNO (i)] = call_used_regs[VGPR_REGNO (i)] = 1;
+
   if (!cfun || !cfun->machine)
     return;
 
@@ -2566,7 +2556,7 @@ gcn_vgpr_equivalent_register_operand (rtx x, machine_mode mode)
 {
   if (gcn_vgpr_register_operand (x, mode))
     return true;
-  if (TARGET_CDNA2_PLUS && gcn_avgpr_register_operand (x, mode))
+  if (TARGET_AVGPR_MEMOPS && gcn_avgpr_register_operand (x, mode))
     return true;
   return false;
 }
@@ -2586,7 +2576,7 @@ gcn_valid_move_p (machine_mode mode, rtx dest, rtx src)
       if (gcn_avgpr_register_operand (src, mode)
 	  && gcn_vgpr_register_operand (dest, mode))
 	return true;
-      if (TARGET_CDNA2_PLUS
+      if (TARGET_AVGPR_MEMOPS
 	  && gcn_avgpr_register_operand (src, mode)
 	  && gcn_avgpr_register_operand (dest, mode))
 	return true;
@@ -3040,8 +3030,6 @@ gcn_omp_device_kind_arch_isa (enum omp_device_kind_arch_isa trait,
     case omp_device_arch:
       return strcmp (name, "amdgcn") == 0 || strcmp (name, "gcn") == 0;
     case omp_device_isa:
-      if (strcmp (name, "fiji") == 0 || strcmp (name, "gfx803") == 0)
-	return gcn_arch == PROCESSOR_FIJI;
       if (strcmp (name, "gfx900") == 0)
 	return gcn_arch == PROCESSOR_VEGA10;
       if (strcmp (name, "gfx906") == 0)
@@ -3050,6 +3038,8 @@ gcn_omp_device_kind_arch_isa (enum omp_device_kind_arch_isa trait,
 	return gcn_arch == PROCESSOR_GFX908;
       if (strcmp (name, "gfx90a") == 0)
 	return gcn_arch == PROCESSOR_GFX90a;
+      if (strcmp (name, "gfx90c") == 0)
+	return gcn_arch == PROCESSOR_GFX90c;
       if (strcmp (name, "gfx1030") == 0)
 	return gcn_arch == PROCESSOR_GFX1030;
       if (strcmp (name, "gfx1036") == 0)
@@ -3550,17 +3540,6 @@ gcn_expand_prologue ()
   /* Ensure that the scheduler doesn't do anything unexpected.  */
   emit_insn (gen_blockage ());
 
-  if (TARGET_M0_LDS_LIMIT)
-  {
-    /* m0 is initialized for the usual LDS DS and FLAT memory case.
-       The low-part is the address of the topmost addressable byte, which is
-       size-1.  The high-part is an offset and should be zero.  */
-    emit_move_insn (gen_rtx_REG (SImode, M0_REG),
-	gen_int_mode (LDS_SIZE, SImode));
-
-    emit_insn (gen_prologue_use (gen_rtx_REG (SImode, M0_REG)));
-  }
-
   if (cfun && cfun->machine && !cfun->machine->normal_function && flag_openmp)
     {
       /* OpenMP kernels have an implicit call to gomp_gcn_enter_kernel.  */
@@ -3782,6 +3761,7 @@ gcn_asm_trampoline_template (FILE *f)
   asm_fprintf (f, "\ts_mov_b32\ts%i, 0xffff\n", CC_SAVE_REG);
   asm_fprintf (f, "\ts_mov_b32\ts%i, 0xffff\n", CC_SAVE_REG + 1);
   asm_fprintf (f, "\ts_setpc_b64\ts[%i:%i]\n", CC_SAVE_REG, CC_SAVE_REG + 1);
+  asm_fprintf (f, "\t.align 8\n");
 }
 
 /* Implement TARGET_TRAMPOLINE_INIT.
@@ -3794,10 +3774,6 @@ gcn_asm_trampoline_template (FILE *f)
 static void
 gcn_trampoline_init (rtx m_tramp, tree fndecl, rtx chain_value)
 {
-  if (TARGET_GCN5_PLUS)
-    sorry ("nested function trampolines not supported on GCN5 due to"
-           " non-executable stacks");
-
   emit_block_move (m_tramp, assemble_trampoline_template (),
 		   GEN_INT (TRAMPOLINE_SIZE), BLOCK_OP_NORMAL);
 
@@ -4040,8 +4016,8 @@ gcn_memory_move_cost (machine_mode mode, reg_class_t regclass, bool in)
     case AVGPR_REGS:
     case ALL_VGPR_REGS:
       if (in)
-	return (LOAD_COST + (TARGET_CDNA2_PLUS ? 2 : 4)) * nregs;
-      return (STORE_COST + (TARGET_CDNA2_PLUS ? 0 : 2)) * nregs;
+	return (LOAD_COST + (TARGET_CDNA2_MEM_COSTS ? 2 : 4)) * nregs;
+      return (STORE_COST + (TARGET_CDNA2_MEM_COSTS ? 0 : 2)) * nregs;
     case ALL_REGS:
     case ALL_GPR_REGS:
     case SRCDST_REGS:
@@ -4064,7 +4040,7 @@ gcn_register_move_cost (machine_mode, reg_class_t dst, reg_class_t src)
   if (src == AVGPR_REGS)
     {
       if (dst == AVGPR_REGS)
-	return TARGET_CDNA1 ? 6 : 2;
+	return !TARGET_AVGPR_MEMOPS ? 6 : 2;
       if (dst != VGPR_REGS)
 	return 6;
     }
@@ -5128,9 +5104,9 @@ gcn_vectorize_vec_perm_const (machine_mode vmode, machine_mode op_mode,
 
   /* RDNA devices can only do permutations within each group of 32-lanes.
      Reject permutations that cross the boundary.  */
-  if (TARGET_RDNA2_PLUS)
+  if (TARGET_WAVE64_COMPAT)
     for (unsigned int i = 0; i < nelt; i++)
-      if (i < 31 ? perm[i] > 31 : perm[i] < 32)
+      if (i < 32 ? (perm[i] % nelt) > 31 : (perm[i] % nelt) < 32)
 	return false;
 
   /* All vector permutations are possible on other architectures,
@@ -5238,7 +5214,7 @@ gcn_vectorize_preferred_simd_mode (scalar_mode mode)
     v32 = false;
   else if (gcn_preferred_vectorization_factor != -1)
     gcc_unreachable ();
-  else if (TARGET_RDNA2_PLUS)
+  else if (TARGET_WAVE64_COMPAT)
   /* RDNA devices have 32-lane vectors with limited support for 64-bit vectors
      (in particular, permute operations are only available for cases that don't
      span the 32-lane boundary).
@@ -5496,7 +5472,7 @@ char *
 gcn_expand_dpp_shr_insn (machine_mode mode, const char *insn,
 			 int unspec, int shift)
 {
-  gcc_checking_assert (!TARGET_RDNA2_PLUS);
+  gcc_checking_assert (TARGET_DPP_FULL);
 
   static char buf[128];
   const char *dpp;
@@ -5559,7 +5535,7 @@ gcn_expand_dpp_shr_insn (machine_mode mode, const char *insn,
 rtx
 gcn_expand_reduc_scalar (machine_mode mode, rtx src, int unspec)
 {
-  gcc_checking_assert (!TARGET_RDNA2_PLUS);
+  gcc_checking_assert (TARGET_DPP_FULL);
 
   machine_mode orig_mode = mode;
   machine_mode scalar_mode = GET_MODE_INNER (mode);
@@ -5588,7 +5564,7 @@ gcn_expand_reduc_scalar (machine_mode mode, rtx src, int unspec)
 		    || unspec == UNSPEC_UMAX_DPP_SHR);
   bool use_plus_carry = unspec == UNSPEC_PLUS_DPP_SHR
 			&& GET_MODE_CLASS (mode) == MODE_VECTOR_INT
-			&& (TARGET_GCN3 || scalar_mode == DImode);
+			&& scalar_mode == DImode;
 
   if (use_plus_carry)
     unspec = UNSPEC_PLUS_CARRY_DPP_SHR;
@@ -6301,7 +6277,7 @@ gcn_md_reorg (void)
 	    nops_rqd = ivccwait - prev_insn->age;
 
 	  /* CDNA1: write VGPR before v_accvgpr_write reads it.  */
-	  if (TARGET_CDNA1
+	  if (TARGET_AVGPR_CDNA1_NOPS
 	      && (prev_insn->age + nops_rqd) < 2
 	      && hard_reg_set_intersect_p
 		  (depregs, reg_class_contents[(int) VGPR_REGS])
@@ -6310,7 +6286,7 @@ gcn_md_reorg (void)
 	    nops_rqd = 2 - prev_insn->age;
 
 	  /* CDNA1: v_accvgpr_write writes AVGPR before v_accvgpr_read.  */
-	  if (TARGET_CDNA1
+	  if (TARGET_AVGPR_CDNA1_NOPS
 	      && (prev_insn->age + nops_rqd) < 3
 	      && hard_reg_set_intersect_p
 		  (depregs, reg_class_contents[(int) AVGPR_REGS])
@@ -6321,7 +6297,7 @@ gcn_md_reorg (void)
 	  /* CDNA1: Undocumented(?!) read-after-write when restoring values
 	     from AVGPRs to VGPRS.  Observed problem was for address register
 	     of flat_load instruction, but others may be affected?  */
-	  if (TARGET_CDNA1
+	  if (TARGET_AVGPR_CDNA1_NOPS
 	      && (prev_insn->age + nops_rqd) < 2
 	      && hard_reg_set_intersect_p
 		   (prev_insn->reads, reg_class_contents[(int) AVGPR_REGS])
@@ -6577,11 +6553,6 @@ output_file_start (void)
   const char *cpu;
   switch (gcn_arch)
     {
-    case PROCESSOR_FIJI:
-      cpu = "gfx803";
-      xnack = "";
-      sram_ecc = "";
-      break;
     case PROCESSOR_VEGA10:
       cpu = "gfx900";
       sram_ecc = "";
@@ -6595,6 +6566,10 @@ output_file_start (void)
       break;
     case PROCESSOR_GFX90a:
       cpu = "gfx90a";
+      break;
+    case PROCESSOR_GFX90c:
+      cpu = "gfx90c";
+      sram_ecc = "";
       break;
     case PROCESSOR_GFX1030:
       cpu = "gfx1030";
@@ -6681,13 +6656,11 @@ gcn_hsa_declare_function_name (FILE *file, const char *name,
     }
 
   /* SIMD32 devices count double in wavefront64 mode.  */
-  if (TARGET_RDNA2_PLUS)
+  if (TARGET_WAVE64_COMPAT)
     vgpr *= 2;
 
   /* Round up to the allocation block size.  */
-  int vgpr_block_size = (TARGET_RDNA3 ? 12
-			 : TARGET_RDNA2_PLUS || TARGET_CDNA2_PLUS ? 8
-			 : 4);
+  int vgpr_block_size = TARGET_VGPR_GRANULARITY;
   if (vgpr % vgpr_block_size)
     vgpr += vgpr_block_size - (vgpr % vgpr_block_size);
   if (avgpr % vgpr_block_size)
@@ -6745,10 +6718,10 @@ gcn_hsa_declare_function_name (FILE *file, const char *name,
 	   : cfun->machine->args.requested & (1 << WORK_ITEM_ID_Y_ARG)
 	   ? 1 : 0);
   int next_free_vgpr = vgpr;
-  if (TARGET_CDNA1 && avgpr > vgpr)
-    next_free_vgpr = avgpr;
-  if (TARGET_CDNA2_PLUS)
+  if (TARGET_AVGPR_COMBINED)
     next_free_vgpr += avgpr;
+  else if (TARGET_AVGPRS && avgpr > vgpr)
+    next_free_vgpr = avgpr;
   fprintf (file,
 	   "\t  .amdhsa_next_free_vgpr\t%i\n"
 	   "\t  .amdhsa_next_free_sgpr\t%i\n"
@@ -6763,7 +6736,7 @@ gcn_hsa_declare_function_name (FILE *file, const char *name,
 	   xnack_enabled,
 	   LDS_SIZE);
   /* Not supported with 'architected flat scratch'.  */
-  if (!TARGET_RDNA3)
+  if (!TARGET_ARCHITECTED_FLAT_SCRATCH)
     fprintf (file,
 	   "\t  .amdhsa_reserve_flat_scratch\t0\n");
   if (gcn_arch == PROCESSOR_GFX90a)
@@ -6798,7 +6771,8 @@ gcn_hsa_declare_function_name (FILE *file, const char *name,
 	   cfun->machine->kernarg_segment_alignment,
 	   LDS_SIZE,
 	   sgpr, next_free_vgpr,
-	   (TARGET_RDNA2_PLUS ? " ; wavefrontsize64 counts double on SIMD32"
+	   (TARGET_WAVE64_COMPAT
+	    ? " ; wavefrontsize64 counts double on SIMD32"
 	    : ""));
   if (gcn_arch == PROCESSOR_GFX90a || gcn_arch == PROCESSOR_GFX908)
     fprintf (file, "            .agpr_count: %i\n", avgpr);
@@ -7057,15 +7031,10 @@ print_operand_address (FILE *file, rtx mem)
       if (GET_CODE (addr) == REG)
 	print_reg (file, addr);
       else
-	{
-	  gcc_assert (TARGET_GCN5_PLUS);
-	  print_reg (file, XEXP (addr, 0));
-	}
+	print_reg (file, XEXP (addr, 0));
     }
   else if (AS_GLOBAL_P (as))
     {
-      gcc_assert (TARGET_GCN5_PLUS);
-
       rtx base = addr;
       rtx vgpr_offset = NULL_RTX;
 
@@ -7177,7 +7146,6 @@ print_operand_address (FILE *file, rtx mem)
    E - print conditional code for v_cmp (eq_u64/ne_u64...)
    A - print address in formatting suitable for given address space.
    O - print offset:n for data share operations.
-   ^ - print "_co" suffix for GCN5 mnemonics
    g - print "glc", if appropriate for given MEM
    L - print low-part of a multi-reg value
    H - print second part of a multi-reg value (high-part of 2-reg value)
@@ -7426,8 +7394,6 @@ print_operand (FILE *file, rtx x, int code)
 	rtx x0 = XEXP (x, 0);
 	if (AS_GLOBAL_P (MEM_ADDR_SPACE (x)))
 	  {
-	    gcc_assert (TARGET_GCN5_PLUS);
-
 	    fprintf (file, ", ");
 
 	    rtx base = x0;
@@ -7795,10 +7761,6 @@ print_operand (FILE *file, rtx x, int code)
 	}
       else
 	output_addr_const (file, x);
-      return;
-    case '^':
-      if (TARGET_GCN5_PLUS)
-	fputs ("_co", file);
       return;
     case 'g':
       gcc_assert (xcode == MEM);

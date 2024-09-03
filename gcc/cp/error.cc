@@ -30,13 +30,16 @@ along with GCC; see the file COPYING3.  If not see
 #include "intl.h"
 #include "cxx-pretty-print.h"
 #include "tree-pretty-print.h"
+#include "tree-pretty-print-markup.h"
 #include "gimple-pretty-print.h"
 #include "c-family/c-objc.h"
 #include "ubsan.h"
 #include "internal-fn.h"
-#include "gcc-rich-location.h"
+#include "c-family/c-type-mismatch.h"
 #include "cp-name-hint.h"
 #include "attribs.h"
+#include "pretty-print-format-impl.h"
+#include "make-unique.h"
 
 #define pp_separate_with_comma(PP) pp_cxx_separate_with (PP, ',')
 #define pp_separate_with_semicolon(PP) pp_cxx_separate_with (PP, ';')
@@ -62,7 +65,8 @@ static const char *decl_to_string (tree, int, bool);
 static const char *fndecl_to_string (tree, int);
 static const char *op_to_string	(bool, enum tree_code);
 static const char *parm_to_string (int);
-static const char *type_to_string (tree, int, bool, bool *, bool);
+static const char *type_to_string (tree, int, bool, bool *, bool,
+				   const char * = nullptr);
 
 static void dump_alias_template_specialization (cxx_pretty_printer *, tree, int);
 static void dump_type (cxx_pretty_printer *, tree, int);
@@ -107,7 +111,12 @@ static void cp_print_error_function (diagnostic_context *,
 				     const diagnostic_info *);
 
 static bool cp_printer (pretty_printer *, text_info *, const char *,
-			int, bool, bool, bool, bool *, const char **);
+			int, bool, bool, bool, bool *, pp_token_list &);
+
+/* Color names for highlighting "%qH" vs "%qI" values,
+   and ranges corresponding to them.  */
+const char *const highlight_colors::percent_h = "highlight-a";
+const char *const highlight_colors::percent_i = "highlight-b";
 
 /* Struct for handling %H or %I, which require delaying printing the
    type until a postprocessing stage.  */
@@ -116,22 +125,50 @@ class deferred_printed_type
 {
 public:
   deferred_printed_type ()
-  : m_tree (NULL_TREE), m_buffer_ptr (NULL), m_verbose (false), m_quote (false)
+  : m_tree (NULL_TREE),
+    m_printed_text (),
+    m_token_list (nullptr),
+    m_verbose (false), m_quote (false)
   {}
 
-  deferred_printed_type (tree type, const char **buffer_ptr, bool verbose,
+  deferred_printed_type (tree type,
+			 pp_token_list &token_list,
+			 bool verbose,
 			 bool quote)
-  : m_tree (type), m_buffer_ptr (buffer_ptr), m_verbose (verbose),
+  : m_tree (type),
+    m_printed_text (),
+    m_token_list (&token_list),
+    m_verbose (verbose),
     m_quote (quote)
   {
     gcc_assert (type);
-    gcc_assert (buffer_ptr);
+  }
+
+  void set_text_for_token_list (const char *text, bool quote)
+  {
+    /* Replace the contents of m_token_list with a text token for TEXT,
+       possibly wrapped by BEGIN_QUOTE/END_QUOTE (if QUOTE is true).
+       This allows us to ignore any {BEGIN,END}_QUOTE tokens added
+       by %qH and %qI, and instead use the quoting from type_to_string,
+       and its logic for "aka".  */
+    while (m_token_list->m_first)
+      m_token_list->pop_front ();
+
+    if (quote)
+      m_token_list->push_back<pp_token_begin_quote> ();
+
+    // TEXT is gc-allocated, so we can borrow it
+    m_token_list->push_back_text (label_text::borrow (text));
+
+    if (quote)
+      m_token_list->push_back<pp_token_end_quote> ();
   }
 
   /* The tree is not GTY-marked: they are only non-NULL within a
      call to pp_format.  */
   tree m_tree;
-  const char **m_buffer_ptr;
+  label_text m_printed_text;
+  pp_token_list *m_token_list;
   bool m_verbose;
   bool m_quote;
 };
@@ -158,6 +195,76 @@ class cxx_format_postprocessor : public format_postprocessor
   deferred_printed_type m_type_b;
 };
 
+/* Return the in-scope template that's currently being parsed, or
+   NULL_TREE otherwise.  */
+
+static tree
+get_current_template ()
+{
+  if (scope_chain && in_template_context && !current_instantiation ())
+    if (tree ti = get_template_info (current_scope ()))
+      {
+	if (PRIMARY_TEMPLATE_P (TI_TEMPLATE (ti)) && TI_PARTIAL_INFO (ti))
+	  ti = TI_PARTIAL_INFO (ti);
+	return TI_TEMPLATE (ti);
+      }
+
+  return NULL_TREE;
+}
+
+/* A map from TEMPLATE_DECLs that we've determined to be erroneous
+   at parse time to the location of the first error within.  */
+
+erroneous_templates_t *erroneous_templates;
+
+/* Callback function diagnostic_context::m_adjust_diagnostic_info.
+
+   Errors issued when parsing a template are automatically treated like
+   permerrors associated with the -Wtemplate-body flag and can be
+   downgraded into warnings accordingly, in which case we'll still
+   issue an error if we later need to instantiate the template.  */
+
+static void
+cp_adjust_diagnostic_info (diagnostic_context *context,
+			   diagnostic_info *diagnostic)
+{
+  if (diagnostic->kind == DK_ERROR)
+    if (tree tmpl = get_current_template ())
+      {
+	diagnostic->option_index = OPT_Wtemplate_body;
+
+	if (context->m_permissive)
+	  diagnostic->kind = DK_WARNING;
+
+	bool existed;
+	location_t &error_loc
+	  = hash_map_safe_get_or_insert<false> (erroneous_templates,
+						tmpl, &existed);
+	if (!existed)
+	  /* Remember that this template had a parse-time error so
+	     that we'll ensure a hard error has been issued upon
+	     its instantiation.  */
+	  error_loc = diagnostic->richloc->get_loc ();
+      }
+}
+
+/* A generalization of seen_error which also returns true if we've
+   permissively downgraded an error to a warning inside a template.  */
+
+bool
+cp_seen_error ()
+{
+  if ((seen_error) ())
+    return true;
+
+  if (erroneous_templates)
+    if (tree tmpl = get_current_template ())
+      if (erroneous_templates->get (tmpl))
+	return true;
+
+  return false;
+}
+
 /* CONTEXT->printer is a basic pretty printer that was constructed
    presumably by diagnostic_initialize(), called early in the
    compiler's initialization process (in general_init) Before the FE
@@ -180,7 +287,8 @@ cxx_initialize_diagnostics (diagnostic_context *context)
   diagnostic_starter (context) = cp_diagnostic_starter;
   /* diagnostic_finalizer is already c_diagnostic_finalizer.  */
   diagnostic_format_decoder (context) = cp_printer;
-  pp->m_format_postprocessor = new cxx_format_postprocessor ();
+  context->m_adjust_diagnostic_info = cp_adjust_diagnostic_info;
+  pp_format_postprocessor (pp) = new cxx_format_postprocessor ();
 }
 
 /* Dump an '@module' name suffix for DECL, if any.  */
@@ -210,7 +318,7 @@ dump_module_suffix (cxx_pretty_printer *pp, tree decl)
     if (const char *n = module_name (m, false))
       {
 	pp_character (pp, '@');
-	pp->padding = pp_none;
+	pp->set_padding (pp_none);
 	pp_string (pp, n);
       }
 }
@@ -921,7 +1029,7 @@ dump_type_prefix (cxx_pretty_printer *pp, tree t, int flags)
 	    else
 	      pp_ampersand (pp);
 	  }
-	pp->padding = pp_before;
+	pp->set_padding (pp_before);
 	pp_cxx_cv_qualifier_seq (pp, t);
       }
       break;
@@ -939,7 +1047,7 @@ dump_type_prefix (cxx_pretty_printer *pp, tree t, int flags)
 	}
       pp_cxx_star (pp);
       pp_cxx_cv_qualifier_seq (pp, t);
-      pp->padding = pp_before;
+      pp->set_padding (pp_before);
       break;
 
       /* This can be reached without a pointer when dealing with
@@ -986,7 +1094,7 @@ dump_type_prefix (cxx_pretty_printer *pp, tree t, int flags)
     case FIXED_POINT_TYPE:
     case NULLPTR_TYPE:
       dump_type (pp, t, flags);
-      pp->padding = pp_before;
+      pp->set_padding (pp_before);
       break;
 
     default:
@@ -1035,7 +1143,7 @@ dump_type_suffix (cxx_pretty_printer *pp, tree t, int flags)
 	   anyway; they may in g++, but we'll just pretend otherwise.  */
 	dump_parameters (pp, arg, flags & ~TFF_FUNCTION_DEFAULT_ARGUMENTS);
 
-	pp->padding = pp_before;
+	pp->set_padding (pp_before);
 	pp_cxx_cv_qualifiers (pp, type_memfn_quals (t),
 			      TREE_CODE (t) == FUNCTION_TYPE
 			      && (flags & TFF_POINTER));
@@ -1049,7 +1157,7 @@ dump_type_suffix (cxx_pretty_printer *pp, tree t, int flags)
 	  {
 	    pp_space (pp);
 	    pp_c_attributes_display (pp, TYPE_ATTRIBUTES (t));
-	    pp->padding = pp_before;
+	    pp->set_padding (pp_before);
 	  }
 	dump_type_suffix (pp, TREE_TYPE (t), flags);
 	break;
@@ -1156,7 +1264,7 @@ dump_simple_decl (cxx_pretty_printer *pp, tree t, tree type, int flags)
       else if (VAR_P (t) && DECL_DECLARED_CONSTEXPR_P (t))
 	pp_cxx_ws_string (pp, "constexpr");
 
-      if (!standard_concept_p (t))
+      if (!concept_definition_p (t))
 	dump_type_prefix (pp, type, flags & ~TFF_UNQUALIFIED_NAME);
       pp_maybe_space (pp);
     }
@@ -1407,10 +1515,8 @@ dump_decl (cxx_pretty_printer *pp, tree t, int flags)
 	  break;
 	}
 
-      /* If there's only one function, just treat it like an ordinary
-	 FUNCTION_DECL.  */
-      t = OVL_FIRST (t);
-      /* Fall through.  */
+      /* If there's only one function, dump that.  */
+      return dump_decl (pp, OVL_FIRST (t), flags);
 
     case FUNCTION_DECL:
       if (! DECL_LANG_SPECIFIC (t))
@@ -1720,13 +1826,13 @@ dump_lambda_function (cxx_pretty_printer *pp,
     /* Early escape.  */;
   else if (TREE_CODE (TREE_TYPE (fn)) == FUNCTION_TYPE)
     {
-      pp->padding = pp_before;
+      pp->set_padding (pp_before);
       pp_c_ws_string (pp, "static");
     }
   else if (!(TYPE_QUALS (class_of_this_parm (TREE_TYPE (fn)))
 	     & TYPE_QUAL_CONST))
     {
-      pp->padding = pp_before;
+      pp->set_padding (pp_before);
       pp_c_ws_string (pp, "mutable");
     }
   dump_substitution (pp, fn, template_parms, template_args, flags);
@@ -1801,9 +1907,7 @@ dump_function_decl (cxx_pretty_printer *pp, tree t, int flags)
 
       if (constexpr_p)
         {
-          if (DECL_DECLARED_CONCEPT_P (t))
-            pp_cxx_ws_string (pp, "concept");
-	  else if (DECL_IMMEDIATE_FUNCTION_P (t))
+	  if (DECL_IMMEDIATE_FUNCTION_P (t))
 	    pp_cxx_ws_string (pp, "consteval");
 	  else
 	    pp_cxx_ws_string (pp, "constexpr");
@@ -1845,20 +1949,20 @@ dump_function_decl (cxx_pretty_printer *pp, tree t, int flags)
 
       if (TREE_CODE (fntype) == METHOD_TYPE)
 	{
-	  pp->padding = pp_before;
+	  pp->set_padding (pp_before);
 	  pp_cxx_cv_qualifier_seq (pp, class_of_this_parm (fntype));
 	  dump_ref_qualifier (pp, fntype, flags);
 	}
 
       if (tx_safe_fn_type_p (fntype))
 	{
-	  pp->padding = pp_before;
+	  pp->set_padding (pp_before);
 	  pp_cxx_ws_string (pp, "transaction_safe");
 	}
 
       if (flags & TFF_EXCEPTION_SPECIFICATION)
 	{
-	  pp->padding = pp_before;
+	  pp->set_padding (pp_before);
 	  dump_exception_spec (pp, exceptions, flags);
 	}
 
@@ -1866,6 +1970,7 @@ dump_function_decl (cxx_pretty_printer *pp, tree t, int flags)
 	dump_type_suffix (pp, ret, flags);
       else if (deduction_guide_p (t))
 	{
+	  pp->set_padding (pp_before);
 	  pp_cxx_ws_string (pp, "->");
 	  dump_type (pp, TREE_TYPE (TREE_TYPE (t)), flags);
 	}
@@ -1952,7 +2057,7 @@ dump_ref_qualifier (cxx_pretty_printer *pp, tree t, int flags ATTRIBUTE_UNUSED)
 {
   if (FUNCTION_REF_QUALIFIED (t))
     {
-      pp->padding = pp_before;
+      pp->set_padding (pp_before);
       if (FUNCTION_RVALUE_QUALIFIED (t))
         pp_cxx_ws_string (pp, "&&");
       else
@@ -3090,7 +3195,6 @@ dump_expr (cxx_pretty_printer *pp, tree t, int flags)
       break;
 
     case ATOMIC_CONSTR:
-    case CHECK_CONSTR:
     case CONJ_CONSTR:
     case DISJ_CONSTR:
       {
@@ -3156,7 +3260,7 @@ static void
 reinit_cxx_pp (void)
 {
   pp_clear_output_area (cxx_pp);
-  cxx_pp->padding = pp_none;
+  cxx_pp->set_padding (pp_none);
   pp_indentation (cxx_pp) = 0;
   pp_needs_newline (cxx_pp) = false;
   pp_show_color (cxx_pp) = false;
@@ -3407,12 +3511,12 @@ op_to_string (bool assop, enum tree_code p)
    pp_format, or is not needed due to QUOTE being NULL (for template arguments
    within %H and %I).
 
-   SHOW_COLOR is used to determine the colorization of any quotes that
-   are added.  */
+   SHOW_COLOR and HIGHLIGHT_COLOR are used to determine the colorization of
+   any quotes that are added.  */
 
 static const char *
 type_to_string (tree typ, int verbose, bool postprocessed, bool *quote,
-		bool show_color)
+		bool show_color, const char *highlight_color)
 {
   int flags = 0;
   if (verbose)
@@ -3423,7 +3527,11 @@ type_to_string (tree typ, int verbose, bool postprocessed, bool *quote,
   pp_show_color (cxx_pp) = show_color;
 
   if (postprocessed && quote && *quote)
-    pp_begin_quote (cxx_pp, show_color);
+    {
+      pp_begin_quote (cxx_pp, show_color);
+      if (show_color && highlight_color)
+	pp_string (cxx_pp, colorize_start (show_color, highlight_color));
+    }
 
   struct obstack *ob = pp_buffer (cxx_pp)->obstack;
   int type_start, type_len;
@@ -3449,6 +3557,8 @@ type_to_string (tree typ, int verbose, bool postprocessed, bool *quote,
       pp_cxx_whitespace (cxx_pp);
       if (quote && *quote)
 	pp_begin_quote (cxx_pp, show_color);
+      if (highlight_color)
+	pp_string (cxx_pp, colorize_start (show_color, highlight_color));
       /* And remember the start of the aka dump.  */
       aka_start = obstack_object_size (ob);
       dump_type (cxx_pp, aka, flags);
@@ -3478,6 +3588,8 @@ type_to_string (tree typ, int verbose, bool postprocessed, bool *quote,
 
   if (quote && *quote)
     {
+      if (show_color && highlight_color)
+	pp_string (cxx_pp, colorize_stop (show_color));
       pp_end_quote (cxx_pp, show_color);
       *quote = false;
     }
@@ -3537,7 +3649,7 @@ static const char *
 cv_to_string (tree p, int v)
 {
   reinit_cxx_pp ();
-  cxx_pp->padding = v ? pp_before : pp_none;
+  cxx_pp->set_padding (v ? pp_before : pp_none);
   pp_cxx_cv_qualifier_seq (cxx_pp, p);
   return pp_ggc_formatted_text (cxx_pp);
 }
@@ -3682,8 +3794,7 @@ cp_print_error_function (diagnostic_context *context,
       pp_newline (context->printer);
 
       diagnostic_set_last_function (context, diagnostic);
-      pp_destroy_prefix (context->printer);
-      context->printer->prefix = old_prefix;
+      context->printer->set_prefix (old_prefix);
     }
 }
 
@@ -3793,7 +3904,9 @@ print_instantiation_partial_context_line (diagnostic_context *context,
 		   : _("required from here\n"));
     }
   gcc_rich_location rich_loc (loc);
+  char *saved_prefix = pp_take_prefix (context->printer);
   diagnostic_show_locus (context, &rich_loc, DK_NOTE);
+  pp_set_prefix (context->printer, saved_prefix);
 }
 
 /* Same as print_instantiation_full_context but less verbose.  */
@@ -3939,10 +4052,7 @@ print_concept_check_info (diagnostic_context *context, tree expr, tree map, tree
 {
   gcc_assert (concept_check_p (expr));
 
-  tree id = unpack_concept_check (expr);
-  tree tmpl = TREE_OPERAND (id, 0);
-  if (OVL_P (tmpl))
-    tmpl = OVL_FIRST (tmpl);
+  tree tmpl = TREE_OPERAND (expr, 0);
 
   print_location (context, DECL_SOURCE_LOCATION (tmpl));
 
@@ -4101,13 +4211,17 @@ arg_to_string (tree arg, bool verbose)
    print_template_tree_comparison.
 
    Print a representation of ARG (an expression or type) to PP,
-   colorizing it as "type-diff" if PP->show_color.  */
+   colorizing it if PP->show_color, using HIGHLIGHT_COLOR,
+   or "type-diff" if the latter is NULL.  */
 
 static void
-print_nonequal_arg (pretty_printer *pp, tree arg, bool verbose)
+print_nonequal_arg (pretty_printer *pp, tree arg, bool verbose,
+		    const char *highlight_color)
 {
+  if (!highlight_color)
+    highlight_color = "type-diff";
   pp_printf (pp, "%r%s%R",
-	     "type-diff",
+	     highlight_color,
 	     (arg
 	      ? arg_to_string (arg, verbose)
 	      : G_("(no argument)")));
@@ -4159,7 +4273,9 @@ print_nonequal_arg (pretty_printer *pp, tree arg, bool verbose)
 
 static void
 print_template_differences (pretty_printer *pp, tree type_a, tree type_b,
-			    bool verbose, int indent)
+			    bool verbose, int indent,
+			    const char *highlight_color_a,
+			    const char *highlight_color_b)
 {
   if (indent)
     newline_and_indent (pp, indent);
@@ -4210,19 +4326,20 @@ print_template_differences (pretty_printer *pp, tree type_a, tree type_b,
 	{
 	  int new_indent = indent ? indent + 2 : 0;
 	  if (comparable_template_types_p (arg_a, arg_b))
-	    print_template_differences (pp, arg_a, arg_b, verbose, new_indent);
+	    print_template_differences (pp, arg_a, arg_b, verbose, new_indent,
+					highlight_color_a, highlight_color_b);
 	  else
 	    if (indent)
 	      {
 		newline_and_indent (pp, indent + 2);
 		pp_character (pp, '[');
-		print_nonequal_arg (pp, arg_a, verbose);
+		print_nonequal_arg (pp, arg_a, verbose, highlight_color_a);
 		pp_string (pp, " != ");
-		print_nonequal_arg (pp, arg_b, verbose);
+		print_nonequal_arg (pp, arg_b, verbose, highlight_color_b);
 		pp_character (pp, ']');
 	      }
 	    else
-	      print_nonequal_arg (pp, arg_a, verbose);
+	      print_nonequal_arg (pp, arg_a, verbose, highlight_color_a);
 	}
     }
   pp_printf (pp, ">");
@@ -4248,13 +4365,16 @@ print_template_differences (pretty_printer *pp, tree type_a, tree type_b,
 
 static const char *
 type_to_string_with_compare (tree type, tree peer, bool verbose,
-			     bool show_color)
+			     bool show_color,
+			     const char *this_highlight_color,
+			     const char *peer_highlight_color)
 {
   pretty_printer inner_pp;
   pretty_printer *pp = &inner_pp;
   pp_show_color (pp) = show_color;
 
-  print_template_differences (pp, type, peer, verbose, 0);
+  print_template_differences (pp, type, peer, verbose, 0,
+			      this_highlight_color, peer_highlight_color);
   return pp_ggc_formatted_text (pp);
 }
 
@@ -4292,9 +4412,13 @@ type_to_string_with_compare (tree type, tree peer, bool verbose,
 
 static void
 print_template_tree_comparison (pretty_printer *pp, tree type_a, tree type_b,
-				bool verbose, int indent)
+				bool verbose, int indent,
+				const char *highlight_color_a,
+				const char *highlight_color_b)
 {
-  print_template_differences (pp, type_a, type_b, verbose, indent);
+  print_template_differences (pp, type_a, type_b, verbose, indent,
+			      highlight_color_a,
+			      highlight_color_b);
 }
 
 /* Subroutine for use in a format_postprocessor::handle
@@ -4306,33 +4430,8 @@ static void
 append_formatted_chunk (pretty_printer *pp, const char *content)
 {
   output_buffer *buffer = pp_buffer (pp);
-  struct chunk_info *chunk_array = buffer->cur_chunk_array;
-  const char **args = chunk_array->args;
-
-  unsigned int chunk_idx;
-  for (chunk_idx = 0; args[chunk_idx]; chunk_idx++)
-    ;
-  args[chunk_idx++] = content;
-  args[chunk_idx] = NULL;
-}
-
-/* Create a copy of CONTENT, with quotes added, and,
-   potentially, with colorization.
-   No escaped is performed on CONTENT.
-   The result is in a GC-allocated buffer. */
-
-static const char *
-add_quotes (const char *content, bool show_color)
-{
-  pretty_printer tmp_pp;
-  pp_show_color (&tmp_pp) = show_color;
-
-  /* We have to use "%<%s%>" rather than "%qs" here in order to avoid
-     quoting colorization bytes within the results and using either
-     pp_quote or pp_begin_quote doesn't work the same.  */
-  pp_printf (&tmp_pp, "%<%s%>", content);
-
-  return pp_ggc_formatted_text (&tmp_pp);
+  chunk_info *chunk_array = buffer->cur_chunk_array;
+  chunk_array->append_formatted_chunk (buffer->chunk_obstack, content);
 }
 
 #if __GNUC__ >= 10
@@ -4340,8 +4439,8 @@ add_quotes (const char *content, bool show_color)
 #endif
 
 /* If we had %H and %I, and hence deferred printing them,
-   print them now, storing the result into the chunk_info
-   for pp_format.  Quote them if 'q' was provided.
+   print them now, storing the result into custom_token_value
+   for the custom pp_token.  Quote them if 'q' was provided.
    Also print the difference in tree form, adding it as
    an additional chunk.  */
 
@@ -4352,15 +4451,20 @@ cxx_format_postprocessor::handle (pretty_printer *pp)
      been present.  */
   if (m_type_a.m_tree || m_type_b.m_tree)
     {
+      const bool show_highlight_colors = pp_show_highlight_colors (pp);
+      const char *percent_h
+	= show_highlight_colors ? highlight_colors::percent_h : nullptr;
+      const char *percent_i
+	= show_highlight_colors ? highlight_colors::percent_i : nullptr;
       /* Avoid reentrancy issues by working with a copy of
 	 m_type_a and m_type_b, resetting them now.  */
-      deferred_printed_type type_a = m_type_a;
-      deferred_printed_type type_b = m_type_b;
+      deferred_printed_type type_a = std::move (m_type_a);
+      deferred_printed_type type_b = std::move (m_type_b);
       m_type_a = deferred_printed_type ();
       m_type_b = deferred_printed_type ();
 
-      gcc_assert (type_a.m_buffer_ptr);
-      gcc_assert (type_b.m_buffer_ptr);
+      gcc_assert (type_a.m_token_list);
+      gcc_assert (type_b.m_token_list);
 
       bool show_color = pp_show_color (pp);
 
@@ -4369,19 +4473,22 @@ cxx_format_postprocessor::handle (pretty_printer *pp)
 
       if (comparable_template_types_p (type_a.m_tree, type_b.m_tree))
 	{
-	  type_a_text
-	    = type_to_string_with_compare (type_a.m_tree, type_b.m_tree,
-					   type_a.m_verbose, show_color);
-	  type_b_text
-	    = type_to_string_with_compare (type_b.m_tree, type_a.m_tree,
-					   type_b.m_verbose, show_color);
+	  type_a_text = type_to_string_with_compare
+	    (type_a.m_tree, type_b.m_tree,
+	     type_a.m_verbose, show_color,
+	     percent_h, percent_i);
+	  type_b_text = type_to_string_with_compare
+	    (type_b.m_tree, type_a.m_tree,
+	     type_b.m_verbose, show_color,
+	     percent_i, percent_h);
 
 	  if (flag_diagnostics_show_template_tree)
 	    {
 	      pretty_printer inner_pp;
 	      pp_show_color (&inner_pp) = pp_show_color (pp);
 	      print_template_tree_comparison
-		(&inner_pp, type_a.m_tree, type_b.m_tree, type_a.m_verbose, 2);
+		(&inner_pp, type_a.m_tree, type_b.m_tree, type_a.m_verbose, 2,
+		 percent_h, percent_i);
 	      append_formatted_chunk (pp, pp_ggc_formatted_text (&inner_pp));
 	    }
 	}
@@ -4391,18 +4498,15 @@ cxx_format_postprocessor::handle (pretty_printer *pp)
 	     provided), they are printed normally, and no difference tree
 	     is printed.  */
 	  type_a_text = type_to_string (type_a.m_tree, type_a.m_verbose,
-					true, &type_a.m_quote, show_color);
+					true, &type_a.m_quote, show_color,
+					percent_h);
 	  type_b_text = type_to_string (type_b.m_tree, type_b.m_verbose,
-					true, &type_b.m_quote, show_color);
+					true, &type_b.m_quote, show_color,
+					percent_i);
 	}
 
-      if (type_a.m_quote)
-	type_a_text = add_quotes (type_a_text, show_color);
-      *type_a.m_buffer_ptr = type_a_text;
-
-       if (type_b.m_quote)
-	type_b_text = add_quotes (type_b_text, show_color);
-      *type_b.m_buffer_ptr = type_b_text;
+      type_a.set_text_for_token_list (type_a_text, type_a.m_quote);
+      type_b.set_text_for_token_list (type_b_text, type_b.m_quote);
    }
 }
 
@@ -4427,9 +4531,12 @@ cxx_format_postprocessor::handle (pretty_printer *pp)
    pretty_printer's m_format_postprocessor hook.
 
    This is called in phase 2 of pp_format, when it is accumulating
-   a series of formatted chunks.  We stash the location of the chunk
-   we're meant to have written to, so that we can write to it in the
-   m_format_postprocessor hook.
+   a series of pp_token lists.  Since we have to interact with the
+   fiddly quoting logic for "aka", we store the pp_token_list *
+   and in the m_format_postprocessor hook we generate text for the type
+   (possibly with quotes and colors), then replace all tokens in that token list
+   (such as [BEGIN_QUOTE, END_QUOTE]) with a text token containing the
+   freshly generated text.
 
    We also need to stash whether a 'q' prefix was provided (the QUOTE
    param)  so that we can add the quotes when writing out the delayed
@@ -4437,14 +4544,28 @@ cxx_format_postprocessor::handle (pretty_printer *pp)
 
 static void
 defer_phase_2_of_type_diff (deferred_printed_type *deferred,
-			    tree type, const char **buffer_ptr,
+			    tree type,
+			    pp_token_list &formatted_token_list,
 			    bool verbose, bool quote)
 {
   gcc_assert (deferred->m_tree == NULL_TREE);
-  gcc_assert (deferred->m_buffer_ptr == NULL);
-  *deferred = deferred_printed_type (type, buffer_ptr, verbose, quote);
+  *deferred = deferred_printed_type (type, formatted_token_list,
+				     verbose, quote);
 }
 
+/* Implementation of pp_markup::element_quoted_type::print_type
+   for C++/ObjC++.  */
+
+void
+pp_markup::element_quoted_type::print_type (pp_markup::context &ctxt)
+{
+  const char *highlight_color
+    = pp_show_highlight_colors (&ctxt.m_pp) ? m_highlight_color : nullptr;
+  const char *result
+    = type_to_string (m_type, false, false, &ctxt.m_quoted,
+		      pp_show_color (&ctxt.m_pp), highlight_color);
+  pp_string (&ctxt.m_pp, result);
+}
 
 /* Called from output_format -- during diagnostic message processing --
    to handle C++ specific format specifier with the following meanings:
@@ -4466,11 +4587,11 @@ defer_phase_2_of_type_diff (deferred_printed_type *deferred,
 static bool
 cp_printer (pretty_printer *pp, text_info *text, const char *spec,
 	    int precision, bool wide, bool set_locus, bool verbose,
-	    bool *quoted, const char **buffer_ptr)
+	    bool *quoted, pp_token_list &formatted_token_list)
 {
-  gcc_assert (pp->m_format_postprocessor);
+  gcc_assert (pp_format_postprocessor (pp));
   cxx_format_postprocessor *postprocessor
-    = static_cast <cxx_format_postprocessor *> (pp->m_format_postprocessor);
+    = static_cast <cxx_format_postprocessor *> (pp_format_postprocessor (pp));
 
   const char *result;
   tree t = NULL;
@@ -4506,11 +4627,11 @@ cp_printer (pretty_printer *pp, text_info *text, const char *spec,
     case 'F': result = fndecl_to_string (next_tree, verbose);	break;
     case 'H':
       defer_phase_2_of_type_diff (&postprocessor->m_type_a, next_tree,
-				  buffer_ptr, verbose, *quoted);
+				  formatted_token_list, verbose, *quoted);
       return true;
     case 'I':
       defer_phase_2_of_type_diff (&postprocessor->m_type_b, next_tree,
-				  buffer_ptr, verbose, *quoted);
+				  formatted_token_list, verbose, *quoted);
       return true;
     case 'L': result = language_to_string (next_lang);		break;
     case 'O': result = op_to_string (false, next_tcode);	break;
@@ -4669,7 +4790,8 @@ qualified_name_lookup_error (tree scope, tree name,
     ; /* We already complained.  */
   else if (TYPE_P (scope))
     {
-      if (!COMPLETE_TYPE_P (scope))
+      if (!COMPLETE_TYPE_P (scope)
+	  && !currently_open_class (scope))
 	error_at (location, "incomplete type %qT used in nested name specifier",
 		  scope);
       else if (TREE_CODE (decl) == TREE_LIST)
@@ -4755,7 +4877,8 @@ range_label_for_type_mismatch::get_text (unsigned /*range_idx*/) const
   if (m_other_type
       && comparable_template_types_p (m_labelled_type, m_other_type))
     result = type_to_string_with_compare (m_labelled_type, m_other_type,
-					  verbose, show_color);
+					  verbose, show_color,
+					  nullptr, nullptr);
   else
     result = type_to_string (m_labelled_type, verbose, true, NULL, show_color);
 

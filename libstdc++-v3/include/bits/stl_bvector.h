@@ -81,6 +81,14 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 
   struct _Bit_reference
   {
+  private:
+    template<typename, typename> friend class vector;
+    friend struct _Bit_iterator;
+    friend struct _Bit_const_iterator;
+
+    _GLIBCXX20_CONSTEXPR
+    _Bit_reference() _GLIBCXX_NOEXCEPT : _M_p(0), _M_mask(0) { }
+
     _Bit_type * _M_p;
     _Bit_type _M_mask;
 
@@ -88,9 +96,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
     _Bit_reference(_Bit_type * __x, _Bit_type __y)
     : _M_p(__x), _M_mask(__y) { }
 
-    _GLIBCXX20_CONSTEXPR
-    _Bit_reference() _GLIBCXX_NOEXCEPT : _M_p(0), _M_mask(0) { }
-
+  public:
 #if __cplusplus >= 201103L
     _Bit_reference(const _Bit_reference&) = default;
 #endif
@@ -185,7 +191,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
     void
     _M_assume_normalized() const
     {
-#if __has_attribute(__assume__) && !defined(__clang__)
+#if __has_attribute(__assume__) && !defined(_GLIBCXX_CLANG)
       unsigned int __ofst = _M_offset;
       __attribute__ ((__assume__ (__ofst < unsigned(_S_word_bit))));
 #endif
@@ -593,7 +599,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 	_GLIBCXX20_CONSTEXPR
 	_Bvector_impl() _GLIBCXX_NOEXCEPT_IF(
 	  is_nothrow_default_constructible<_Bit_alloc_type>::value)
-#if __cpp_concepts
+#if __cpp_concepts && __glibcxx_type_trait_variable_templates
 	requires is_default_constructible_v<_Bit_alloc_type>
 #endif
 	: _Bit_alloc_type()
@@ -654,7 +660,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 
       _GLIBCXX20_CONSTEXPR
       _Bvector_base(const allocator_type& __a)
-      : _M_impl(__a) { }
+      : _M_impl(_Bit_alloc_type(__a)) { }
 
 #if __cplusplus >= 201103L
       _Bvector_base(_Bvector_base&&) = default;
@@ -1084,12 +1090,18 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
       _GLIBCXX_NODISCARD _GLIBCXX20_CONSTEXPR
       reference
       operator[](size_type __n)
-      { return begin()[__n]; }
+      {
+	__glibcxx_requires_subscript(__n);
+	return begin()[__n];
+      }
 
       _GLIBCXX_NODISCARD _GLIBCXX20_CONSTEXPR
       const_reference
       operator[](size_type __n) const
-      { return begin()[__n]; }
+      {
+	__glibcxx_requires_subscript(__n);
+	return begin()[__n];
+      }
 
     protected:
       _GLIBCXX20_CONSTEXPR
@@ -1133,22 +1145,34 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
       _GLIBCXX_NODISCARD _GLIBCXX20_CONSTEXPR
       reference
       front()
-      { return *begin(); }
+      {
+	__glibcxx_requires_nonempty();
+	return *begin();
+      }
 
       _GLIBCXX_NODISCARD _GLIBCXX20_CONSTEXPR
       const_reference
       front() const
-      { return *begin(); }
+      {
+	__glibcxx_requires_nonempty();
+	return *begin();
+      }
 
       _GLIBCXX_NODISCARD _GLIBCXX20_CONSTEXPR
       reference
       back()
-      { return *(end() - 1); }
+      {
+	__glibcxx_requires_nonempty();
+	return *(end() - 1);
+      }
 
       _GLIBCXX_NODISCARD _GLIBCXX20_CONSTEXPR
       const_reference
       back() const
-      { return *(end() - 1); }
+      {
+	__glibcxx_requires_nonempty();
+	return *(end() - 1);
+      }
 
       _GLIBCXX20_CONSTEXPR
       void

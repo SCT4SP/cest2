@@ -18,6 +18,7 @@ along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
 #include "config.h"
+#define INCLUDE_MEMORY
 #include "system.h"
 #include "coretypes.h"
 #include "backend.h"
@@ -763,8 +764,8 @@ evaluate_control_stmt_using_entry_checks (gimple *stmt,
 	    continue;
 
 	  int_range_max r;
-	  if (!ranger->gori ().outgoing_edge_range_p (r, e, idx,
-						      *get_global_range_query ()))
+	  if (!ranger->gori ().edge_range_p (r, e, idx,
+					     *get_global_range_query ()))
 	    continue;
 	  r.intersect (path_range);
 	  if (r.undefined_p ())
