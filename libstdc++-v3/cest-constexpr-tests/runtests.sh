@@ -6,7 +6,7 @@
 # Contains bin, lib64, include,constexpr-std-headers, etc.
 GNUC_ROOT="$CEST2_INCLUDE/../.."
 #GNUC_ROOT="/opt/gcc-latest" # No. Need C'est 2 binaries, for runtime, for now
-VER=14.0.1    # previously 14.0.0
+VER=15.0.0    # previously 14.0.0
 
 # The _GLIBCXX_CEST_CONSTEXPR and _GLIBCXX_CEST_VERSION below are not required
 # when using SCT4SP/gcc/install, but
