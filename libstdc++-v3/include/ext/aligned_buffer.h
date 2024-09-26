@@ -89,7 +89,6 @@ namespace __gnu_cxx
   // by using compile-time dynamic memory allocation via std::allocator.
   template<typename _Tp>
     struct __constexpr_buffer
-    : std::aligned_storage<sizeof(_Tp), __alignof__(_Tp)>
     {
       _Tp* _M_storage_ptr;
 
