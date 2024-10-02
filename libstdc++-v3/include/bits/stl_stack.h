@@ -109,6 +109,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 #endif
 
       template<typename _Tp1, typename _Seq1>
+	_GLIBCXX_CEST_CONSTEXPR
 	friend bool
 	operator==(const stack<_Tp1, _Seq1>&, const stack<_Tp1, _Seq1>&);
 
@@ -118,6 +119,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
 #if __cpp_lib_three_way_comparison
       template<typename _Tp1, three_way_comparable _Seq1>
+	_GLIBCXX_CEST_CONSTEXPR
 	friend compare_three_way_result_t<_Seq1>
 	operator<=>(const stack<_Tp1, _Seq1>&, const stack<_Tp1, _Seq1>&);
 #endif
@@ -159,6 +161,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 #else
       template<typename _Seq = _Sequence, typename _Requires = typename
 	       enable_if<is_default_constructible<_Seq>::value>::type>
+	_GLIBCXX_CEST_CONSTEXPR
 	stack()
 	: c() { }
 
@@ -173,29 +176,35 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 #ifdef __glibcxx_adaptor_iterator_pair_constructor // C++ >= 23 && HOSTED
       template<typename _InputIterator,
 	       typename = _RequireInputIter<_InputIterator>>
+	_GLIBCXX_CEST_CONSTEXPR
 	stack(_InputIterator __first, _InputIterator __last)
 	: c(__first, __last) { }
 #endif
 
 
       template<typename _Alloc, typename _Requires = _Uses<_Alloc>>
+	_GLIBCXX_CEST_CONSTEXPR
 	explicit
 	stack(const _Alloc& __a)
 	: c(__a) { }
 
       template<typename _Alloc, typename _Requires = _Uses<_Alloc>>
+	_GLIBCXX_CEST_CONSTEXPR
 	stack(const _Sequence& __c, const _Alloc& __a)
 	: c(__c, __a) { }
 
       template<typename _Alloc, typename _Requires = _Uses<_Alloc>>
+	_GLIBCXX_CEST_CONSTEXPR
 	stack(_Sequence&& __c, const _Alloc& __a)
 	: c(std::move(__c), __a) { }
 
       template<typename _Alloc, typename _Requires = _Uses<_Alloc>>
+	_GLIBCXX_CEST_CONSTEXPR
 	stack(const stack& __q, const _Alloc& __a)
 	: c(__q.c, __a) { }
 
       template<typename _Alloc, typename _Requires = _Uses<_Alloc>>
+	_GLIBCXX_CEST_CONSTEXPR
 	stack(stack&& __q, const _Alloc& __a)
 	: c(std::move(__q.c), __a) { }
 
@@ -203,6 +212,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       template<typename _InputIterator, typename _Alloc,
 	       typename = _RequireInputIter<_InputIterator>,
 	       typename = _Uses<_Alloc>>
+	_GLIBCXX_CEST_CONSTEXPR
 	stack(_InputIterator __first, _InputIterator __last, const _Alloc& __a)
 	: c(__first, __last, __a) { }
 #endif
@@ -211,12 +221,15 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       /**
        *  Returns true if the %stack is empty.
        */
-      _GLIBCXX_NODISCARD bool
+      _GLIBCXX_NODISCARD
+      _GLIBCXX_CEST_CONSTEXPR
+      bool
       empty() const
       { return c.empty(); }
 
       /**  Returns the number of elements in the %stack.  */
       _GLIBCXX_NODISCARD
+      _GLIBCXX_CEST_CONSTEXPR
       size_type
       size() const
       { return c.size(); }
@@ -226,6 +239,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *  element of the %stack.
        */
       _GLIBCXX_NODISCARD
+      _GLIBCXX_CEST_CONSTEXPR
       reference
       top()
       {
@@ -238,6 +252,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *  element of the %stack.
        */
       _GLIBCXX_NODISCARD
+      _GLIBCXX_CEST_CONSTEXPR
       const_reference
       top() const
       {
@@ -254,17 +269,20 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *  to it.  The time complexity of the operation depends on the
        *  underlying sequence.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       void
       push(const value_type& __x)
       { c.push_back(__x); }
 
 #if __cplusplus >= 201103L
+      _GLIBCXX_CEST_CONSTEXPR
       void
       push(value_type&& __x)
       { c.push_back(std::move(__x)); }
 
 #if __cplusplus > 201402L
       template<typename... _Args>
+	_GLIBCXX_CEST_CONSTEXPR
 	decltype(auto)
 	emplace(_Args&&... __args)
 	{ return c.emplace_back(std::forward<_Args>(__args)...); }
@@ -287,6 +305,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *  data is needed, it should be retrieved before pop() is
        *  called.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       void
       pop()
       {
@@ -295,6 +314,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       }
 
 #if __cplusplus >= 201103L
+      _GLIBCXX_CEST_CONSTEXPR
       void
       swap(stack& __s)
 #if __cplusplus > 201402L || !defined(__STRICT_ANSI__) // c++1z or gnu++11
@@ -350,6 +370,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
   */
   template<typename _Tp, typename _Seq>
     _GLIBCXX_NODISCARD
+    _GLIBCXX_CEST_CONSTEXPR
     inline bool
     operator==(const stack<_Tp, _Seq>& __x, const stack<_Tp, _Seq>& __y)
     { return __x.c == __y.c; }
@@ -376,6 +397,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
   /// Based on operator==
   template<typename _Tp, typename _Seq>
     _GLIBCXX_NODISCARD
+    _GLIBCXX_CEST_CONSTEXPR
     inline bool
     operator!=(const stack<_Tp, _Seq>& __x, const stack<_Tp, _Seq>& __y)
     { return !(__x == __y); }
@@ -404,6 +426,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 #if __cpp_lib_three_way_comparison
   template<typename _Tp, three_way_comparable _Seq>
     [[nodiscard]]
+    _GLIBCXX_CEST_CONSTEXPR
     inline compare_three_way_result_t<_Seq>
     operator<=>(const stack<_Tp, _Seq>& __x, const stack<_Tp, _Seq>& __y)
     { return __x.c <=> __y.c; }
