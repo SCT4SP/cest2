@@ -170,6 +170,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  @param  __comp  Comparator to use.
        *  @param  __a  An allocator object.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       explicit
       multiset(const _Compare& __comp,
 	       const allocator_type& __a = allocator_type())
