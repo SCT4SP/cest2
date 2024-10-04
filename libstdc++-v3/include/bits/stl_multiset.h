@@ -186,6 +186,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  and NlogN otherwise (where N is distance(__first,__last)).
        */
       template<typename _InputIterator>
+	_GLIBCXX_CEST_CONSTEXPR
 	multiset(_InputIterator __first, _InputIterator __last)
 	: _M_t()
 	{ _M_t._M_insert_range_equal(__first, __last); }
@@ -238,6 +239,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  the list.  This is linear in N if the list is already sorted,
        *  and NlogN otherwise (where N is @a __l.size()).
        */
+      _GLIBCXX_CEST_CONSTEXPR
       multiset(initializer_list<value_type> __l,
 	       const _Compare& __comp = _Compare(),
 	       const allocator_type& __a = allocator_type())
@@ -339,6 +341,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  element in the %multiset.  Iteration is done in ascending order
        *  according to the keys.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       iterator
       begin() const _GLIBCXX_NOEXCEPT
       { return _M_t.begin(); }
@@ -348,6 +351,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  element in the %multiset.  Iteration is done in ascending order
        *  according to the keys.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       iterator
       end() const _GLIBCXX_NOEXCEPT
       { return _M_t.end(); }
@@ -357,6 +361,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  last element in the %multiset.  Iteration is done in descending order
        *  according to the keys.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       reverse_iterator
       rbegin() const _GLIBCXX_NOEXCEPT
       { return _M_t.rbegin(); }
@@ -366,6 +371,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  last element in the %multiset.  Iteration is done in descending order
        *  according to the keys.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       reverse_iterator
       rend() const _GLIBCXX_NOEXCEPT
       { return _M_t.rend(); }
@@ -376,6 +382,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  element in the %multiset.  Iteration is done in ascending order
        *  according to the keys.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       iterator
       cbegin() const noexcept
       { return _M_t.begin(); }
@@ -385,6 +392,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  element in the %multiset.  Iteration is done in ascending order
        *  according to the keys.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       iterator
       cend() const noexcept
       { return _M_t.end(); }
@@ -394,6 +402,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  last element in the %multiset.  Iteration is done in descending order
        *  according to the keys.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       reverse_iterator
       crbegin() const noexcept
       { return _M_t.rbegin(); }
@@ -403,22 +412,27 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  last element in the %multiset.  Iteration is done in descending order
        *  according to the keys.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       reverse_iterator
       crend() const noexcept
       { return _M_t.rend(); }
 #endif
 
       ///  Returns true if the %set is empty.
-      _GLIBCXX_NODISCARD bool
+      _GLIBCXX_NODISCARD
+      _GLIBCXX_CEST_CONSTEXPR
+      bool
       empty() const _GLIBCXX_NOEXCEPT
       { return _M_t.empty(); }
 
       ///  Returns the size of the %set.
+      _GLIBCXX_CEST_CONSTEXPR
       size_type
       size() const _GLIBCXX_NOEXCEPT
       { return _M_t.size(); }
 
       ///  Returns the maximum size of the %set.
+      _GLIBCXX_CEST_CONSTEXPR
       size_type
       max_size() const _GLIBCXX_NOEXCEPT
       { return _M_t.max_size(); }
@@ -436,6 +450,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *
        *  Whether the allocators are swapped depends on the allocator traits.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       void
       swap(multiset& __x)
       _GLIBCXX_NOEXCEPT_IF(__is_nothrow_swappable<_Compare>::value)
@@ -456,6 +471,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  Insertion requires logarithmic time.
        */
       template<typename... _Args>
+	_GLIBCXX_CEST_CONSTEXPR
 	iterator
 	emplace(_Args&&... __args)
 	{ return _M_t._M_emplace_equal(std::forward<_Args>(__args)...); }
@@ -482,6 +498,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  Insertion requires logarithmic time (if the hint is not taken).
        */
       template<typename... _Args>
+	_GLIBCXX_CEST_CONSTEXPR
 	iterator
 	emplace_hint(const_iterator __pos, _Args&&... __args)
 	{
@@ -506,6 +523,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
       { return _M_t._M_insert_equal(__x); }
 
 #if __cplusplus >= 201103L
+      _GLIBCXX_CEST_CONSTEXPR
       iterator
       insert(value_type&& __x)
       { return _M_t._M_insert_equal(std::move(__x)); }
@@ -569,6 +587,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 
 #if __cplusplus > 201402L
       /// Extract a node.
+      _GLIBCXX_CEST_CONSTEXPR
       node_type
       extract(const_iterator __pos)
       {
@@ -577,6 +596,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
       }
 
       /// Extract a node.
+      _GLIBCXX_CEST_CONSTEXPR
       node_type
       extract(const key_type& __x)
       { return _M_t.extract(__x); }
@@ -637,6 +657,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  not touched in any way.  Managing the pointer is the user's
        *  responsibility.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       _GLIBCXX_ABI_TAG_CXX11
       iterator
       erase(const_iterator __position)
@@ -717,6 +738,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  the pointed-to memory is not touched in any way.  Managing the pointer
        *  is the user's responsibility.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       void
       clear() _GLIBCXX_NOEXCEPT
       { _M_t.clear(); }
@@ -729,12 +751,14 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  @param  __x  Key of elements to be located.
        *  @return Number of elements with specified key.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       size_type
       count(const key_type& __x) const
       { return _M_t.count(__x); }
 
 #if __cplusplus > 201103L
       template<typename _Kt>
+	_GLIBCXX_CEST_CONSTEXPR
 	auto
 	count(const _Kt& __x) const -> decltype(_M_t._M_count_tr(__x))
 	{ return _M_t._M_count_tr(__x); }
@@ -774,22 +798,26 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  pointing to the sought after element.  If unsuccessful it returns the
        *  past-the-end ( @c end() ) iterator.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       iterator
       find(const key_type& __x)
       { return _M_t.find(__x); }
 
+      _GLIBCXX_CEST_CONSTEXPR
       const_iterator
       find(const key_type& __x) const
       { return _M_t.find(__x); }
 
 #if __cplusplus > 201103L
       template<typename _Kt>
+	_GLIBCXX_CEST_CONSTEXPR
 	auto
 	find(const _Kt& __x)
 	-> decltype(iterator{_M_t._M_find_tr(__x)})
 	{ return iterator{_M_t._M_find_tr(__x)}; }
 
       template<typename _Kt>
+	_GLIBCXX_CEST_CONSTEXPR
 	auto
 	find(const _Kt& __x) const
 	-> decltype(const_iterator{_M_t._M_find_tr(__x)})
@@ -902,6 +930,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
       ///@}
 
       template<typename _K1, typename _C1, typename _A1>
+	_GLIBCXX_CEST_CONSTEXPR
 	friend bool
 	operator==(const multiset<_K1, _C1, _A1>&,
 		   const multiset<_K1, _C1, _A1>&);
@@ -970,6 +999,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
    *  corresponding elements compare equal.
   */
   template<typename _Key, typename _Compare, typename _Alloc>
+    _GLIBCXX_CEST_CONSTEXPR
     inline bool
     operator==(const multiset<_Key, _Compare, _Alloc>& __x,
 	       const multiset<_Key, _Compare, _Alloc>& __y)

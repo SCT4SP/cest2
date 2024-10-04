@@ -78,18 +78,22 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
       explicit operator bool() const noexcept { return _M_ptr != nullptr; }
 
-      [[nodiscard]] bool empty() const noexcept { return _M_ptr == nullptr; }
+      [[nodiscard]]
+      _GLIBCXX_CEST_CONSTEXPR
+      bool empty() const noexcept { return _M_ptr == nullptr; }
 
     /// @cond undocumented
     protected:
       constexpr _Node_handle_common() noexcept : _M_ptr() { }
 
+      _GLIBCXX_CEST_CONSTEXPR
       ~_Node_handle_common()
       {
 	if (!empty())
 	  _M_reset();
       }
 
+      _GLIBCXX_CEST_CONSTEXPR
       _Node_handle_common(_Node_handle_common&& __nh) noexcept
       : _M_ptr(__nh._M_ptr)
       {
@@ -97,6 +101,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	  _M_move(std::move(__nh));
       }
 
+      _GLIBCXX_CEST_CONSTEXPR
       _Node_handle_common&
       operator=(_Node_handle_common&& __nh) noexcept
       {
@@ -120,6 +125,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	return *this;
       }
 
+      _GLIBCXX_CEST_CONSTEXPR
       _Node_handle_common(typename _AllocTraits::pointer __ptr,
 			  const _NodeAlloc& __alloc)
       : _M_ptr(__ptr), _M_alloc(__alloc)
@@ -149,10 +155,12 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       // Moves the pointer and allocator from __nh to *this.
       // Precondition: empty() && !__nh.empty()
       // Postcondition: !empty() && __nh.empty()
+      _GLIBCXX_CEST_CONSTEXPR
       void
       _M_move(_Node_handle_common&& __nh) noexcept
       {
 	::new (std::__addressof(_M_alloc)) _NodeAlloc(__nh._M_alloc.release());
+//cest2: std::construct_at(std::__addressof(_M_alloc), __nh._M_alloc.release());
 	_M_ptr = __nh._M_ptr;
 	__nh._M_ptr = nullptr;
       }
@@ -160,6 +168,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       // Deallocates the node, destroys the allocator.
       // Precondition: !empty()
       // Postcondition: empty()
+      _GLIBCXX_CEST_CONSTEXPR
       void
       _M_reset() noexcept
       {
@@ -187,12 +196,15 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       // Call release() before destruction iff the allocator member is active.
       union _Optional_alloc
       {
+	_GLIBCXX_CEST_CONSTEXPR
 	_Optional_alloc() { }
+	_GLIBCXX_CEST_CONSTEXPR
 	~_Optional_alloc() { }
 
 	_Optional_alloc(_Optional_alloc&&) = delete;
 	_Optional_alloc& operator=(_Optional_alloc&&) = delete;
 
+	_GLIBCXX_CEST_CONSTEXPR
 	_Optional_alloc(const _NodeAlloc& __alloc) noexcept
 	: _M_alloc(__alloc)
 	{ }
@@ -223,6 +235,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	_NodeAlloc& operator*() noexcept { return _M_alloc; }
 
 	// Precondition: _M_alloc is the active member of the union.
+	_GLIBCXX_CEST_CONSTEXPR
 	_NodeAlloc release() noexcept
 	{
 	  _NodeAlloc __tmp = std::move(_M_alloc);
@@ -353,6 +366,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
       using value_type = _Value;
 
+      _GLIBCXX_CEST_CONSTEXPR
       value_type&
       value() const noexcept
       {
@@ -372,6 +386,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     private:
       using _AllocTraits = allocator_traits<_NodeAlloc>;
 
+      _GLIBCXX_CEST_CONSTEXPR
       _Node_handle(typename _AllocTraits::pointer __ptr,
 		   const _NodeAlloc& __alloc)
       : _Node_handle_common<_Value, _NodeAlloc>(__ptr, __alloc) { }
