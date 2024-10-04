@@ -602,11 +602,13 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
       { return _M_t.extract(__x); }
 
       /// Re-insert an extracted node.
+      _GLIBCXX_CEST_CONSTEXPR
       iterator
       insert(node_type&& __nh)
       { return _M_t._M_reinsert_node_equal(std::move(__nh)); }
 
       /// Re-insert an extracted node.
+      _GLIBCXX_CEST_CONSTEXPR
       iterator
       insert(const_iterator __hint, node_type&& __nh)
       { return _M_t._M_reinsert_node_hint_equal(__hint, std::move(__nh)); }

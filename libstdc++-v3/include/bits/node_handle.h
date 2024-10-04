@@ -69,6 +69,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     public:
       using allocator_type = __alloc_rebind<_NodeAlloc, _Val>;
 
+      _GLIBCXX_CEST_CONSTEXPR
       allocator_type
       get_allocator() const noexcept
       {
@@ -76,6 +77,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	return allocator_type(_M_alloc._M_alloc);
       }
 
+      _GLIBCXX_CEST_CONSTEXPR
       explicit operator bool() const noexcept { return _M_ptr != nullptr; }
 
       [[nodiscard]]
@@ -159,8 +161,13 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       void
       _M_move(_Node_handle_common&& __nh) noexcept
       {
+#if _GLIBCXX_CEST_VERSION && defined(__clang__)
+// https://github.com/llvm/llvm-project/issues/107593
+	std::construct_at(std::__addressof(_M_alloc), __nh._M_alloc.release());
+#else
 	::new (std::__addressof(_M_alloc)) _NodeAlloc(__nh._M_alloc.release());
-//cest2: std::construct_at(std::__addressof(_M_alloc), __nh._M_alloc.release());
+#endif
+
 	_M_ptr = __nh._M_ptr;
 	__nh._M_ptr = nullptr;
       }
@@ -181,6 +188,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       // Destroys the allocator. Does not deallocate or destroy the node.
       // Precondition: !empty()
       // Postcondition: empty()
+      _GLIBCXX_CEST_CONSTEXPR
       void
       release() noexcept
       {
@@ -232,6 +240,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	}
 
 	// Precondition: _M_alloc is the active member of the union.
+	_GLIBCXX_CEST_CONSTEXPR
 	_NodeAlloc& operator*() noexcept { return _M_alloc; }
 
 	// Precondition: _M_alloc is the active member of the union.
@@ -391,6 +400,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 		   const _NodeAlloc& __alloc)
       : _Node_handle_common<_Value, _NodeAlloc>(__ptr, __alloc) { }
 
+      _GLIBCXX_CEST_CONSTEXPR
       const value_type&
       _M_key() const noexcept { return value(); }
 

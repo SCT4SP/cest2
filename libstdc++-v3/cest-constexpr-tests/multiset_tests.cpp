@@ -26,8 +26,9 @@ constexpr bool multiset_test1()
   b = b && m9.size() == 6 && m9.count(4) == 2;
   m8.swap(m9);
   b = b && m8.size() == 6;
-  //auto nh = m8.extract(4);
-  //nh.value() = 5;
+  auto nh = m8.extract(4);
+  nh.value() = 5;
+  m8.insert(std::move(nh)); // this shouldn't be needed
   return b;
 }
 

@@ -244,15 +244,26 @@ template <typename S> constexpr bool set_test10() {
   S s1;
   inserts(s1, 1, 2, 3);
   const S s2 = s1;
+  bool b = 3 == s1.size() && 3 == s2.size();
+
   S s3, s4;
   inserts(s3, 1, 2, 3, 4, 5);
   s4 = s3;
   s3 = s1;
   S s5 = s1;
   s5.clear();
+  b = b && 3 == s3.size() && 5 == s4.size() && s5.empty();
 
-  return 3 == s1.size() && 3 == s2.size() && 3 == s3.size() && 5 == s4.size() &&
-         s5.empty();
+  int arr[] = {1, 2, 3};
+  S s6{std::begin(arr), std::end(arr)};
+  auto nh = s6.extract(1);
+  nh.value() = 4;
+  nh.get_allocator();
+  decltype(nh) nh2{};
+  b = b && nh && !nh.empty() && !nh2 && nh2.empty();
+  nh2 = std::move(nh);
+  s6.insert(std::move(nh2)); // this shouldn't be needed
+  return b;
 }
 
 template <bool SA, class S1, class S2, class S3, class S4, class S5, class S6,
