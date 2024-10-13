@@ -181,6 +181,9 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       {
 	_NodeAlloc __alloc = _M_alloc.release();
 	_AllocTraits::destroy(__alloc, _M_ptr->_M_valptr());
+#if _GLIBCXX_CEST_VERSION
+	std::destroy_at(&_M_ptr->_M_storage); // call the __constexpr_buffer dtor
+#endif
 	_AllocTraits::deallocate(__alloc, _M_ptr, 1);
 	_M_ptr = nullptr;
       }
@@ -285,6 +288,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       using key_type = _Key;
       using mapped_type = typename _Value::second_type;
 
+      _GLIBCXX_CEST_CONSTEXPR
       key_type&
       key() const noexcept
       {
@@ -292,6 +296,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	return *_M_pkey;
       }
 
+      _GLIBCXX_CEST_CONSTEXPR
       mapped_type&
       mapped() const noexcept
       {
@@ -316,6 +321,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     private:
       using _AllocTraits = allocator_traits<_NodeAlloc>;
 
+      _GLIBCXX_CEST_CONSTEXPR
       _Node_handle(typename _AllocTraits::pointer __ptr,
 		   const _NodeAlloc& __alloc)
       : _Node_handle_common<_Value, _NodeAlloc>(__ptr, __alloc)
@@ -342,6 +348,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       __pointer<typename _Value::second_type>	_M_pmapped = nullptr;
 
       template<typename _Tp>
+	_GLIBCXX_CEST_CONSTEXPR
 	__pointer<_Tp>
 	_S_pointer_to(_Tp& __obj)
 	{ return pointer_traits<__pointer<_Tp>>::pointer_to(__obj); }

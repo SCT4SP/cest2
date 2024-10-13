@@ -255,14 +255,16 @@ template <typename S> constexpr bool set_test10() {
   b = b && 3 == s3.size() && 5 == s4.size() && s5.empty();
 
   int arr[] = {1, 2, 3};
-  S s6{std::begin(arr), std::end(arr)};
-  auto nh = s6.extract(1);
+  S s6{std::begin(arr), std::end(arr)};   // {1,2,3}
+  auto nh = s6.extract(1);                //   {2,3}
+  S s7{std::begin(arr)+1, std::end(arr)}; //   {2,3}
+  b = b && 1==nh.value() && 2==s6.size() && s6==s7;
   nh.value() = 4;
   nh.get_allocator();
   decltype(nh) nh2{};
   b = b && nh && !nh.empty() && !nh2 && nh2.empty();
   nh2 = std::move(nh);
-  s6.insert(std::move(nh2)); // this shouldn't be needed
+//  s6.insert(std::move(nh2)); // this shouldn't be needed
   return b;
 }
 

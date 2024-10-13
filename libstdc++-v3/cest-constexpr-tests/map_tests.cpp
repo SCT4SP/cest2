@@ -73,13 +73,19 @@ constexpr bool map_test3() {
   M<T, U> m2 = m1;
   bool b1 = 3 == m1.size() && 3 == m2.size();
 
+  auto nh = m1.extract('b');
+  bool b2 = 2 == m1.size() && 'b' == nh.key() && 2 == nh.mapped();
+  nh.mapped() = 42;
+  std::allocator<std::pair<const char, int>> alloc{};
+  b2 = b2 && 42 == nh.mapped() && nh.get_allocator()==alloc;
+
   M<T, U> m3;
   m3.insert({'d', 4});
   m1 = m3;
   m3.clear();
-  bool b2 = 1 == m1.size() && 'd' == m1.begin()->first && m3.empty();
+  bool b3 = 1 == m1.size() && 'd' == m1.begin()->first && m3.empty();
 
-  return b1 && b2;
+  return b1 && b2 && b3;
 }
 
 void map_tests() {

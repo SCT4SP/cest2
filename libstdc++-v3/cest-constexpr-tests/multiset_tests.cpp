@@ -20,15 +20,17 @@ constexpr bool multiset_test1()
   b = b && m3 == m5 && m5.size() == 2;
   std::multiset<int> m7{m6.cbegin(),  m6.cend()};
   std::multiset<int> m8{m6.rbegin(),  m6.rend()};
-  std::multiset<int> m9{m6.crbegin(), m6.crend()};
+  std::multiset<int> m9{m6.crbegin(), m6.crend()}; // {6, 4, 4, 2, 1, 2, 3}
   b = b && m6.size() == 7 && m7.size() == 7 && m8.size() == 7;
-  m9.erase(m9.find(2));
-  b = b && m9.size() == 6 && m9.count(4) == 2;
+  m9.erase(m9.find(2)); // {6, 4, 4, 2, 1, 2, 3} -> {6, 4, 4, 1, 2, 3}
+  b = b && m9.size() == 6 && m9.count(2) == 1 && m9.count(4) == 2;
   m8.swap(m9);
   b = b && m8.size() == 6;
-  auto nh = m8.extract(4);
+  auto nh = m8.extract(4); // {6, 4, 4, 1, 2, 3} -> {6, 4, 1, 2, 3}
+  b = b && 4==nh.value() && 1==m8.count(4) && 5==m8.size();
   nh.value() = 5;
-  m8.insert(std::move(nh)); // this shouldn't be needed
+  // m8.insert(std::move(nh)); // this shouldn't be needed
+  b = b && 5==nh.value();
   return b;
 }
 
