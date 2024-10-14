@@ -817,6 +817,34 @@ namespace esft_tests
   }
 }
 
+namespace bad_weak_ptr_tests
+{
+  constexpr bool run()
+  {
+    bool b = true;
+    std::bad_weak_ptr bwp1{};
+    bwp1.what();
+    std::bad_weak_ptr bwp2{bwp1};
+    bwp1 = bwp2;
+#if 0
+    // Enable after P3068 adoption
+    std::shared_ptr<int> p1(new int(42));
+    std::weak_ptr<int> wp(p1);
+    p1.reset();
+    try
+    {
+      std::shared_ptr<int> p2(wp);
+    }
+    catch (const std::bad_weak_ptr& e)
+    {
+      std::cout << e.what() << '\n';
+      b = b && true;
+    }
+#endif
+    return b;
+  }
+}
+
 void memory_tests() {
   static_assert(constexpr_mem_test<std::unique_ptr>(),
                 "unique_ptr: Tests failed!");
@@ -876,6 +904,9 @@ void memory_tests() {
 
   assert(esft_tests::run());
   static_assert(esft_tests::run());
+
+  assert(bad_weak_ptr_tests::run());
+  static_assert(bad_weak_ptr_tests::run());
 
   static_assert(__gnu_cxx::__is_single_threaded()); // in ext/atomicity.h
 }

@@ -93,6 +93,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
   };
 
   // Substitute for bad_weak_ptr object in the case of -fno-exceptions.
+  _GLIBCXX_CEST_CONSTEXPR
   inline void
   __throw_bad_weak_ptr()
   { _GLIBCXX_THROW_OR_ABORT(bad_weak_ptr()); }
@@ -2432,6 +2433,23 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	    __s.get());
       }
     };
+
+_GLIBCXX_END_NAMESPACE_VERSION
+} // namespace
+
+// From src/c++11/shared_ptr.cc with additional constexpr
+
+namespace std _GLIBCXX_VISIBILITY(default)
+{
+_GLIBCXX_BEGIN_NAMESPACE_VERSION
+
+  _GLIBCXX_CEST_CONSTEXPR
+  bad_weak_ptr::~bad_weak_ptr() noexcept = default;
+
+  _GLIBCXX_CEST_CONSTEXPR
+  char const*
+  bad_weak_ptr::what() const noexcept
+  { return "bad_weak_ptr"; }
 
 _GLIBCXX_END_NAMESPACE_VERSION
 } // namespace
