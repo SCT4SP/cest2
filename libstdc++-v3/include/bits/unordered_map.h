@@ -350,6 +350,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  Returns a read/write iterator that points one past the last element in
        *  the %unordered_map.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       iterator
       end() noexcept
       { return _M_h.end(); }
@@ -795,6 +796,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  elements themselves are pointers, the pointed-to memory is not touched
        *  in any way.  Managing the pointer is the user's responsibility.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       void
       clear() noexcept
       { _M_h.clear(); }
@@ -873,6 +875,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  pointing to the sought after element.  If unsuccessful it returns the
        *  past-the-end ( @c end() ) iterator.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       iterator
       find(const key_type& __x)
       { return _M_h.find(__x); }

@@ -647,6 +647,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       begin() const noexcept
       { return const_iterator(_M_begin()); }
 
+      _GLIBCXX_CEST_CONSTEXPR
       iterator
       end() noexcept
       { return iterator(nullptr); }
@@ -758,6 +759,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       { _M_rehash_policy = __pol; }
 
       // Lookup.
+      _GLIBCXX_CEST_CONSTEXPR
       iterator
       find(const key_type& __k);
 
@@ -822,6 +824,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
       // Find and insert helper functions and types
       // Find the node before the one matching the criteria.
+      _GLIBCXX_CEST_CONSTEXPR
       __node_base_ptr
       _M_find_before_node(size_type, const key_type&, __hash_code) const;
 
@@ -830,6 +833,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	__node_base_ptr
 	_M_find_before_node_tr(size_type, const _Kt&, __hash_code) const;
 
+      _GLIBCXX_CEST_CONSTEXPR
       __node_ptr
       _M_find_node(size_type __bkt, const key_type& __key,
 		   __hash_code __c) const
@@ -1048,6 +1052,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       iterator
       erase(const_iterator, const_iterator);
 
+      _GLIBCXX_CEST_CONSTEXPR
       void
       clear() noexcept;
 
@@ -1742,6 +1747,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	   typename _ExtractKey, typename _Equal,
 	   typename _Hash, typename _RangeHash, typename _Unused,
 	   typename _RehashPolicy, typename _Traits>
+    _GLIBCXX_CEST_CONSTEXPR
     auto
     _Hashtable<_Key, _Value, _Alloc, _ExtractKey, _Equal,
 	       _Hash, _RangeHash, _Unused, _RehashPolicy, _Traits>::
@@ -2080,6 +2086,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	   typename _ExtractKey, typename _Equal,
 	   typename _Hash, typename _RangeHash, typename _Unused,
 	   typename _RehashPolicy, typename _Traits>
+    _GLIBCXX_CEST_CONSTEXPR
     auto
     _Hashtable<_Key, _Value, _Alloc, _ExtractKey, _Equal,
 	       _Hash, _RangeHash, _Unused, _RehashPolicy, _Traits>::
@@ -2602,6 +2609,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	   typename _ExtractKey, typename _Equal,
 	   typename _Hash, typename _RangeHash, typename _Unused,
 	   typename _RehashPolicy, typename _Traits>
+    _GLIBCXX_CEST_CONSTEXPR
     void
     _Hashtable<_Key, _Value, _Alloc, _ExtractKey, _Equal,
 	       _Hash, _RangeHash, _Unused, _RehashPolicy, _Traits>::

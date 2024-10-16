@@ -351,6 +351,7 @@ namespace __detail
       { return _M_storage._M_ptr(); }
 
       [[__gnu__::__always_inline__]]
+      _GLIBCXX_CEST_CONSTEXPR
       _Value&
       _M_v() noexcept
       { return *_M_valptr(); }
@@ -413,6 +414,7 @@ namespace __detail
       _M_incr() noexcept
       { _M_cur = _M_cur->_M_next(); }
 
+      _GLIBCXX_CEST_CONSTEXPR
       friend bool
       operator==(const _Node_iterator_base& __x, const _Node_iterator_base& __y)
       noexcept
@@ -453,10 +455,12 @@ namespace __detail
       _Node_iterator(__node_type* __p) noexcept
       : __base_type(__p) { }
 
+      _GLIBCXX_CEST_CONSTEXPR
       reference
       operator*() const noexcept
       { return this->_M_cur->_M_v(); }
 
+      _GLIBCXX_CEST_CONSTEXPR
       pointer
       operator->() const noexcept
       { return this->_M_cur->_M_valptr(); }
@@ -477,6 +481,7 @@ namespace __detail
       }
 
 #if __cpp_impl_three_way_comparison >= 201907L
+      _GLIBCXX_CEST_CONSTEXPR
       friend bool
       operator==(const _Node_iterator&, const _Node_iterator&) = default;
 #else
@@ -1837,6 +1842,7 @@ namespace __detail
       : __hash_code_base(__hash), _EqualEBO(__eq)
       { }
 
+      _GLIBCXX_CEST_CONSTEXPR
       bool
       _M_key_equals(const _Key& __k,
 		    const _Hash_node_value<_Value,
@@ -1862,6 +1868,7 @@ namespace __detail
 	  return _M_eq()(__k, _ExtractKey{}(__n._M_v()));
 	}
 
+      _GLIBCXX_CEST_CONSTEXPR
       bool
       _M_equals(const _Key& __k, __hash_code __c,
 		const _Hash_node_value<_Value, __hash_cached::value>& __n) const
