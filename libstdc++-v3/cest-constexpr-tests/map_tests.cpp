@@ -1,22 +1,29 @@
 #include <cassert>
 #include <map>
+#include <unordered_map>
+#include <type_traits>
 
-constexpr bool common_static_map_tests() {
-  auto f = []<template <class...> class M>() {
+constexpr bool common_static_map_tests()
+{
+  using namespace std;
+  auto f = []<template <class...> class M>()
+  {
     static_assert(sizeof(M<float, int>) == sizeof(M<double, int>));
     static_assert(sizeof(M<int, float>) == sizeof(M<int, double>));
-    using iter_t = typename M<char, int>::iterator;
+    using       iter_t = typename M<char, int>::iterator;
     using const_iter_t = typename M<char, int>::const_iterator;
 #if !defined(_LIBCPP_VERSION) && !defined(__clang__)
-    static_assert(std::weakly_incrementable<iter_t>);
-    static_assert(std::weakly_incrementable<const_iter_t>);
+    static_assert(weakly_incrementable<iter_t>);
+    static_assert(weakly_incrementable<const_iter_t>);
 #endif
-    static_assert(std::is_same_v<typename iter_t::iterator_category,
-                                 std::bidirectional_iterator_tag>);
-    static_assert(!std::is_same_v<iter_t, const_iter_t>);
+    using tag_t = conditional_t<is_same_v<M<char,int>, map<char,int>>,
+                    bidirectional_iterator_tag, forward_iterator_tag>;
+    static_assert(is_same_v<typename iter_t::iterator_category, tag_t>);
+    static_assert(!is_same_v<iter_t, const_iter_t>);
   };
 
-  f.operator()<std::map>();
+  f.operator()<map>();
+  f.operator()<unordered_map>();
 
   return true;
 }
@@ -91,10 +98,12 @@ constexpr bool map_test3() {
 void map_tests() {
   static_assert(common_static_map_tests());
   static_assert(map_test1<std::map, char, int>());
+  static_assert(map_test1<std::unordered_map, char, int>());
   static_assert(map_test2<std::map, char, int>());
   static_assert(map_test3<std::map, char, int>());
 
   assert((map_test1<std::map, char, int>()));
+  assert((map_test1<std::unordered_map, char, int>()));
   assert((map_test2<std::map, char, int>()));
   assert((map_test3<std::map, char, int>()));
 }

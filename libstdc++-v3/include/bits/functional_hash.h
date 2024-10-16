@@ -116,6 +116,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
   template<>						\
     struct hash<_Tp> : public __hash_base<size_t, _Tp>  \
     {                                                   \
+      _GLIBCXX_CEST_CONSTEXPR                           \
       size_t                                            \
       operator()(_Tp __val) const noexcept              \
       { return static_cast<size_t>(__val); }            \

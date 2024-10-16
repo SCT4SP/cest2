@@ -2852,6 +2852,8 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 _GLIBCXX_END_NAMESPACE_VERSION
 } // namespace
 
+#if _GLIBCXX_CEST_VERSION
+
 // From src/c++98/tree.cc with additional constexpr
 #include <bits/stl_tree.h>
 
@@ -3280,5 +3282,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
 _GLIBCXX_END_NAMESPACE_VERSION
 } // namespace
+
+#endif // _GLIBCXX_CEST_VERSION
 
 #endif

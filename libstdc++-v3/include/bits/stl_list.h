@@ -2413,6 +2413,8 @@ _GLIBCXX_END_NAMESPACE_CONTAINER
 _GLIBCXX_END_NAMESPACE_VERSION
 } // namespace std
 
+#if _GLIBCXX_CEST_VERSION
+
 // From src/c++98/list.cc with additional constexpr
 #include <list>
 
@@ -2532,5 +2534,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
 _GLIBCXX_END_NAMESPACE_VERSION
 } // namespace std
+
+#endif // _GLIBCXX_CEST_VERSION
 
 #endif /* _STL_LIST_H */

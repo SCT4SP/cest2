@@ -555,6 +555,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *
        *  Insertion requires amortized constant time.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       std::pair<iterator, bool>
       insert(const value_type& __x)
       { return _M_h.insert(__x); }
@@ -1026,6 +1027,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        * @param  __n  A bucket index.
        * @return  The number of elements in the bucket.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       size_type
       bucket_size(size_type __n) const
       { return _M_h.bucket_size(__n); }

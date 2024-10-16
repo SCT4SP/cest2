@@ -2437,6 +2437,8 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 _GLIBCXX_END_NAMESPACE_VERSION
 } // namespace
 
+#if _GLIBCXX_CEST_VERSION
+
 // From src/c++11/shared_ptr.cc with additional constexpr
 
 namespace std _GLIBCXX_VISIBILITY(default)
@@ -2453,5 +2455,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
 _GLIBCXX_END_NAMESPACE_VERSION
 } // namespace
+
+#endif // _GLIBCXX_CEST_VERSION
 
 #endif // _SHARED_PTR_BASE_H

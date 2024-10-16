@@ -108,6 +108,7 @@ namespace __detail
       { using type = typename __1st_type<_Pair>::type&; };
 
     template<typename _Tp>
+      _GLIBCXX_CEST_CONSTEXPR
       typename __1st_type<_Tp>::type&&
       operator()(_Tp&& __x) const noexcept
       { return std::forward<_Tp>(__x).first; }
@@ -154,6 +155,7 @@ namespace __detail
     struct _NodeBuilder<_Select1st>
     {
       template<typename _Kt, typename _Arg, typename _NodeGenerator>
+	_GLIBCXX_CEST_CONSTEXPR
 	static auto
 	_S_build(_Kt&& __k, _Arg&& __arg, const _NodeGenerator& __node_gen)
 	-> typename _NodeGenerator::__node_ptr
@@ -245,10 +247,12 @@ namespace __detail
     public:
       using __node_ptr = typename __hashtable_alloc::__node_ptr;
 
+      _GLIBCXX_CEST_CONSTEXPR
       _AllocNode(__hashtable_alloc& __h)
       : _M_h(__h) { }
 
       template<typename... _Args>
+	_GLIBCXX_CEST_CONSTEXPR
 	__node_ptr
 	operator()(_Args&&... __args) const
 	{ return _M_h._M_allocate_node(std::forward<_Args>(__args)...); }
@@ -316,6 +320,7 @@ namespace __detail
   {
     _Hash_node_base* _M_nxt;
 
+    _GLIBCXX_CEST_CONSTEXPR
     _Hash_node_base() noexcept : _M_nxt() { }
 
     _Hash_node_base(_Hash_node_base* __next) noexcept : _M_nxt(__next) { }
@@ -334,11 +339,13 @@ namespace __detail
       __gnu_cxx::__aligned_buffer<_Value> _M_storage;
 
       [[__gnu__::__always_inline__]]
+      _GLIBCXX_CEST_CONSTEXPR
       _Value*
       _M_valptr() noexcept
       { return _M_storage._M_ptr(); }
 
       [[__gnu__::__always_inline__]]
+      _GLIBCXX_CEST_CONSTEXPR
       const _Value*
       _M_valptr() const noexcept
       { return _M_storage._M_ptr(); }
@@ -349,6 +356,7 @@ namespace __detail
       { return *_M_valptr(); }
 
       [[__gnu__::__always_inline__]]
+      _GLIBCXX_CEST_CONSTEXPR
       const _Value&
       _M_v() const noexcept
       { return *_M_valptr(); }
@@ -382,6 +390,7 @@ namespace __detail
     : _Hash_node_base
     , _Hash_node_value<_Value, _Cache_hash_code>
     {
+      _GLIBCXX_CEST_CONSTEXPR
       _Hash_node*
       _M_next() const noexcept
       { return static_cast<_Hash_node*>(this->_M_nxt); }
@@ -396,6 +405,7 @@ namespace __detail
       __node_type* _M_cur;
 
       _Node_iterator_base() : _M_cur(nullptr) { }
+      _GLIBCXX_CEST_CONSTEXPR
       _Node_iterator_base(__node_type* __p) noexcept
       : _M_cur(__p) { }
 
@@ -438,6 +448,7 @@ namespace __detail
 
       _Node_iterator() = default;
 
+      _GLIBCXX_CEST_CONSTEXPR
       explicit
       _Node_iterator(__node_type* __p) noexcept
       : __base_type(__p) { }
@@ -604,6 +615,7 @@ namespace __detail
     typedef std::size_t second_argument_type;
     typedef std::size_t result_type;
 
+    _GLIBCXX_CEST_CONSTEXPR
     result_type
     operator()(first_argument_type __num,
 	       second_argument_type __den) const noexcept
@@ -623,6 +635,7 @@ namespace __detail
   {
     using __has_load_factor = true_type;
 
+    _GLIBCXX_CEST_CONSTEXPR
     _Prime_rehash_policy(float __z = 1.0) noexcept
     : _M_max_load_factor(__z), _M_next_resize(0) { }
 
@@ -631,6 +644,7 @@ namespace __detail
     { return _M_max_load_factor; }
 
     // Return a bucket size no smaller than n.
+    _GLIBCXX_CEST_CONSTEXPR
     std::size_t
     _M_next_bkt(std::size_t __n) const;
 
@@ -643,12 +657,14 @@ namespace __detail
     // and __n_ins is number of elements to be inserted.  Do we need to
     // increase bucket count?  If so, return make_pair(true, n), where n
     // is the new bucket count.  If not, return make_pair(false, 0).
+    _GLIBCXX_CEST_CONSTEXPR
     std::pair<bool, std::size_t>
     _M_need_rehash(std::size_t __n_bkt, std::size_t __n_elt,
 		   std::size_t __n_ins) const;
 
     typedef std::size_t _State;
 
+    _GLIBCXX_CEST_CONSTEXPR
     _State
     _M_state() const
     { return _M_next_resize; }
@@ -710,6 +726,7 @@ namespace __detail
 
     // Return a bucket size no smaller than n (as long as n is not above the
     // highest power of 2).
+    _GLIBCXX_CEST_CONSTEXPR
     std::size_t
     _M_next_bkt(std::size_t __n) noexcept
     {
@@ -752,6 +769,7 @@ namespace __detail
     // and __n_ins is number of elements to be inserted.  Do we need to
     // increase bucket count?  If so, return make_pair(true, n), where n
     // is the new bucket count.  If not, return make_pair(false, 0).
+    _GLIBCXX_CEST_CONSTEXPR
     std::pair<bool, std::size_t>
     _M_need_rehash(std::size_t __n_bkt, std::size_t __n_elt,
 		   std::size_t __n_ins) noexcept
@@ -803,12 +821,14 @@ namespace __detail
       _RehashPolicy* _M_guarded_obj;
       typename _RehashPolicy::_State _M_prev_state;
 
+      _GLIBCXX_CEST_CONSTEXPR
       _RehashStateGuard(_RehashPolicy& __policy)
       : _M_guarded_obj(std::__addressof(__policy))
       , _M_prev_state(__policy._M_state())
       { }
       _RehashStateGuard(const _RehashStateGuard&) = delete;
 
+      _GLIBCXX_CEST_CONSTEXPR
       ~_RehashStateGuard()
       {
 	if (_M_guarded_obj)
@@ -1000,6 +1020,7 @@ namespace __detail
       using __node_alloc_type = typename __hashtable_alloc::__node_alloc_type;
       using __node_gen_type = _AllocNode<__node_alloc_type>;
 
+      _GLIBCXX_CEST_CONSTEXPR
       __hashtable&
       _M_conjure_hashtable()
       { return *(static_cast<__hashtable*>(this)); }
@@ -1026,6 +1047,7 @@ namespace __detail
 					     std::pair<iterator, bool>,
 					     iterator>;
 
+      _GLIBCXX_CEST_CONSTEXPR
       __ireturn_type
       insert(const value_type& __v)
       {
@@ -1316,6 +1338,7 @@ namespace __detail
     struct _Hashtable_ebo_helper<_Nm, _Tp, true>
     : private _Tp
     {
+      _GLIBCXX_CEST_CONSTEXPR
       _Hashtable_ebo_helper() noexcept(noexcept(_Tp())) : _Tp() { }
 
       template<typename _OtherTp>
@@ -1323,7 +1346,9 @@ namespace __detail
 	: _Tp(std::forward<_OtherTp>(__tp))
 	{ }
 
+      _GLIBCXX_CEST_CONSTEXPR
       const _Tp& _M_cget() const { return static_cast<const _Tp&>(*this); }
+      _GLIBCXX_CEST_CONSTEXPR
       _Tp& _M_get() { return static_cast<_Tp&>(*this); }
     };
 
@@ -1403,6 +1428,7 @@ namespace __detail
 
       _Hash_code_base(const _Hash& __hash) : __ebo_hash(__hash) { }
 
+      _GLIBCXX_CEST_CONSTEXPR
       __hash_code
       _M_hash_code(const _Key& __k) const
       {
@@ -1412,6 +1438,7 @@ namespace __detail
       }
 
       template<typename _Kt>
+	_GLIBCXX_CEST_CONSTEXPR
 	__hash_code
 	_M_hash_code_tr(const _Kt& __k) const
 	{
@@ -1428,10 +1455,12 @@ namespace __detail
       _M_hash_code(const _Hash_node_value<_Value, true>& __n) const
       { return __n._M_hash_code; }
 
+      _GLIBCXX_CEST_CONSTEXPR
       std::size_t
       _M_bucket_index(__hash_code __c, std::size_t __bkt_count) const
       { return _RangeHash{}(__c, __bkt_count); }
 
+      _GLIBCXX_CEST_CONSTEXPR
       std::size_t
       _M_bucket_index(const _Hash_node_value<_Value, false>& __n,
 		      std::size_t __bkt_count) const
@@ -1450,6 +1479,7 @@ namespace __detail
 							(std::size_t)0)) )
       { return _RangeHash{}(__n._M_hash_code, __bkt_count); }
 
+      _GLIBCXX_CEST_CONSTEXPR
       void
       _M_store_code(_Hash_node_code_cache<false>&, __hash_code) const
       { }
@@ -1472,6 +1502,7 @@ namespace __detail
       _M_swap(_Hash_code_base& __x)
       { std::swap(__ebo_hash::_M_get(), __x.__ebo_hash::_M_get()); }
 
+      _GLIBCXX_CEST_CONSTEXPR
       const _Hash&
       _M_hash() const { return __ebo_hash::_M_cget(); }
     };
@@ -1780,6 +1811,7 @@ namespace __detail
     private:
       using _EqualEBO = _Hashtable_ebo_helper<0, _Equal>;
 
+      _GLIBCXX_CEST_CONSTEXPR
       static bool
       _S_equals(__hash_code, const _Hash_node_code_cache<false>&)
       { return true; }
@@ -1817,6 +1849,7 @@ namespace __detail
       }
 
       template<typename _Kt>
+	_GLIBCXX_CEST_CONSTEXPR
 	bool
 	_M_key_equals_tr(const _Kt& __k,
 			 const _Hash_node_value<_Value,
@@ -1835,6 +1868,7 @@ namespace __detail
       { return _S_equals(__c, __n) && _M_key_equals(__k, __n); }
 
       template<typename _Kt>
+	_GLIBCXX_CEST_CONSTEXPR
 	bool
 	_M_equals_tr(const _Kt& __k, __hash_code __c,
 		     const _Hash_node_value<_Value,
@@ -1857,6 +1891,7 @@ namespace __detail
 	std::swap(_EqualEBO::_M_get(), __x._EqualEBO::_M_get());
       }
 
+      _GLIBCXX_CEST_CONSTEXPR
       const _Equal&
       _M_eq() const { return _EqualEBO::_M_cget(); }
     };
@@ -2050,6 +2085,7 @@ namespace __detail
 	: __ebo_node_alloc(std::forward<_Alloc>(__a))
 	{ }
 
+      _GLIBCXX_CEST_CONSTEXPR
       __node_alloc_type&
       _M_node_allocator()
       { return __ebo_node_alloc::_M_get(); }
@@ -2060,25 +2096,31 @@ namespace __detail
 
       // Allocate a node and construct an element within it.
       template<typename... _Args>
+	_GLIBCXX_CEST_CONSTEXPR
 	__node_ptr
 	_M_allocate_node(_Args&&... __args);
 
       // Destroy the element within a node and deallocate the node.
+      _GLIBCXX_CEST_CONSTEXPR
       void
       _M_deallocate_node(__node_ptr __n);
 
       // Deallocate a node.
+      _GLIBCXX_CEST_CONSTEXPR
       void
       _M_deallocate_node_ptr(__node_ptr __n);
 
       // Deallocate the linked list of nodes pointed to by __n.
       // The elements within the nodes are destroyed.
+      _GLIBCXX_CEST_CONSTEXPR
       void
       _M_deallocate_nodes(__node_ptr __n);
 
+      _GLIBCXX_CEST_CONSTEXPR
       __buckets_ptr
       _M_allocate_buckets(std::size_t __bkt_count);
 
+      _GLIBCXX_CEST_CONSTEXPR
       void
       _M_deallocate_buckets(__buckets_ptr, std::size_t __bkt_count);
     };
@@ -2087,6 +2129,7 @@ namespace __detail
   // functions.
   template<typename _NodeAlloc>
     template<typename... _Args>
+      _GLIBCXX_CEST_CONSTEXPR
       auto
       _Hashtable_alloc<_NodeAlloc>::_M_allocate_node(_Args&&... __args)
       -> __node_ptr
@@ -2110,6 +2153,7 @@ namespace __detail
       }
 
   template<typename _NodeAlloc>
+    _GLIBCXX_CEST_CONSTEXPR
     void
     _Hashtable_alloc<_NodeAlloc>::_M_deallocate_node(__node_ptr __n)
     {
@@ -2118,6 +2162,7 @@ namespace __detail
     }
 
   template<typename _NodeAlloc>
+    _GLIBCXX_CEST_CONSTEXPR
     void
     _Hashtable_alloc<_NodeAlloc>::_M_deallocate_node_ptr(__node_ptr __n)
     {
@@ -2128,6 +2173,7 @@ namespace __detail
     }
 
   template<typename _NodeAlloc>
+    _GLIBCXX_CEST_CONSTEXPR
     void
     _Hashtable_alloc<_NodeAlloc>::_M_deallocate_nodes(__node_ptr __n)
     {
@@ -2140,6 +2186,7 @@ namespace __detail
     }
 
   template<typename _NodeAlloc>
+    _GLIBCXX_CEST_CONSTEXPR
     auto
     _Hashtable_alloc<_NodeAlloc>::_M_allocate_buckets(std::size_t __bkt_count)
     -> __buckets_ptr
@@ -2148,11 +2195,23 @@ namespace __detail
 
       auto __ptr = __buckets_alloc_traits::allocate(__alloc, __bkt_count);
       __buckets_ptr __p = std::__to_address(__ptr);
+#if _GLIBCXX_CEST_VERSION
+      if (__builtin_is_constant_evaluated())
+      {
+        for (int i = 0; i < __bkt_count; ++i)
+        {
+          std::construct_at(&__p[i]);
+          __p[i] = 0;
+        }
+      }
+      else
+#endif
       __builtin_memset(__p, 0, __bkt_count * sizeof(__node_base_ptr));
       return __p;
     }
 
   template<typename _NodeAlloc>
+    _GLIBCXX_CEST_CONSTEXPR
     void
     _Hashtable_alloc<_NodeAlloc>::
     _M_deallocate_buckets(__buckets_ptr __bkts,
@@ -2167,6 +2226,185 @@ namespace __detail
  ///@} hashtable-detail
 } // namespace __detail
 /// @endcond
+_GLIBCXX_END_NAMESPACE_VERSION
+} // namespace std
+
+namespace std _GLIBCXX_VISIBILITY(default)
+{
+_GLIBCXX_BEGIN_NAMESPACE_VERSION
+
+// From src/c++11/hashtable_c++0x.c and src/shared/hashtable-aux.cc
+
+namespace __detail
+{
+  // The sentinel value is kept only for abi backward compatibility.
+  extern const unsigned long __prime_list[] = // 256 + 1 or 256 + 48 + 1
+  {
+    2ul, 3ul, 5ul, 7ul, 11ul, 13ul, 17ul, 19ul, 23ul, 29ul, 31ul,
+    37ul, 41ul, 43ul, 47ul, 53ul, 59ul, 61ul, 67ul, 71ul, 73ul, 79ul,
+    83ul, 89ul, 97ul, 103ul, 109ul, 113ul, 127ul, 137ul, 139ul, 149ul,
+    157ul, 167ul, 179ul, 193ul, 199ul, 211ul, 227ul, 241ul, 257ul,
+    277ul, 293ul, 313ul, 337ul, 359ul, 383ul, 409ul, 439ul, 467ul,
+    503ul, 541ul, 577ul, 619ul, 661ul, 709ul, 761ul, 823ul, 887ul,
+    953ul, 1031ul, 1109ul, 1193ul, 1289ul, 1381ul, 1493ul, 1613ul,
+    1741ul, 1879ul, 2029ul, 2179ul, 2357ul, 2549ul, 2753ul, 2971ul,
+    3209ul, 3469ul, 3739ul, 4027ul, 4349ul, 4703ul, 5087ul, 5503ul,
+    5953ul, 6427ul, 6949ul, 7517ul, 8123ul, 8783ul, 9497ul, 10273ul,
+    11113ul, 12011ul, 12983ul, 14033ul, 15173ul, 16411ul, 17749ul,
+    19183ul, 20753ul, 22447ul, 24281ul, 26267ul, 28411ul, 30727ul,
+    33223ul, 35933ul, 38873ul, 42043ul, 45481ul, 49201ul, 53201ul,
+    57557ul, 62233ul, 67307ul, 72817ul, 78779ul, 85229ul, 92203ul,
+    99733ul, 107897ul, 116731ul, 126271ul, 136607ul, 147793ul,
+    159871ul, 172933ul, 187091ul, 202409ul, 218971ul, 236897ul,
+    256279ul, 277261ul, 299951ul, 324503ul, 351061ul, 379787ul,
+    410857ul, 444487ul, 480881ul, 520241ul, 562841ul, 608903ul,
+    658753ul, 712697ul, 771049ul, 834181ul, 902483ul, 976369ul,
+    1056323ul, 1142821ul, 1236397ul, 1337629ul, 1447153ul, 1565659ul,
+    1693859ul, 1832561ul, 1982627ul, 2144977ul, 2320627ul, 2510653ul,
+    2716249ul, 2938679ul, 3179303ul, 3439651ul, 3721303ul, 4026031ul,
+    4355707ul, 4712381ul, 5098259ul, 5515729ul, 5967347ul, 6456007ul,
+    6984629ul, 7556579ul, 8175383ul, 8844859ul, 9569143ul, 10352717ul,
+    11200489ul, 12117689ul, 13109983ul, 14183539ul, 15345007ul,
+    16601593ul, 17961079ul, 19431899ul, 21023161ul, 22744717ul,
+    24607243ul, 26622317ul, 28802401ul, 31160981ul, 33712729ul,
+    36473443ul, 39460231ul, 42691603ul, 46187573ul, 49969847ul,
+    54061849ul, 58488943ul, 63278561ul, 68460391ul, 74066549ul,
+    80131819ul, 86693767ul, 93793069ul, 101473717ul, 109783337ul,
+    118773397ul, 128499677ul, 139022417ul, 150406843ul, 162723577ul,
+    176048909ul, 190465427ul, 206062531ul, 222936881ul, 241193053ul,
+    260944219ul, 282312799ul, 305431229ul, 330442829ul, 357502601ul,
+    386778277ul, 418451333ul, 452718089ul, 489790921ul, 529899637ul,
+    573292817ul, 620239453ul, 671030513ul, 725980837ul, 785430967ul,
+    849749479ul, 919334987ul, 994618837ul, 1076067617ul, 1164186217ul,
+    1259520799ul, 1362662261ul, 1474249943ul, 1594975441ul, 1725587117ul,
+    1866894511ul, 2019773507ul, 2185171673ul, 2364114217ul, 2557710269ul,
+    2767159799ul, 2993761039ul, 3238918481ul, 3504151727ul, 3791104843ul,
+    4101556399ul, 4294967291ul,
+    // Sentinel, so we don't have to test the result of lower_bound,
+    // or, on 64-bit machines, rest of the table.
+#if __SIZEOF_LONG__ != 8
+    4294967291ul
+#else
+    6442450933ul, 8589934583ul, 12884901857ul, 17179869143ul,
+    25769803693ul, 34359738337ul, 51539607367ul, 68719476731ul,
+    103079215087ul, 137438953447ul, 206158430123ul, 274877906899ul,
+    412316860387ul, 549755813881ul, 824633720731ul, 1099511627689ul,
+    1649267441579ul, 2199023255531ul, 3298534883309ul, 4398046511093ul,
+    6597069766607ul, 8796093022151ul, 13194139533241ul, 17592186044399ul,
+    26388279066581ul, 35184372088777ul, 52776558133177ul, 70368744177643ul,
+    105553116266399ul, 140737488355213ul, 211106232532861ul, 281474976710597ul,
+    562949953421231ul, 1125899906842597ul, 2251799813685119ul,
+    4503599627370449ul, 9007199254740881ul, 18014398509481951ul,
+    36028797018963913ul, 72057594037927931ul, 144115188075855859ul,
+    288230376151711717ul, 576460752303423433ul,
+    1152921504606846883ul, 2305843009213693951ul,
+    4611686018427387847ul, 9223372036854775783ul,
+    18446744073709551557ul, 18446744073709551557ul
+#endif
+  };
+} // namespace __detail
+
+namespace __detail
+{
+  // Return a prime no smaller than n.
+  _GLIBCXX_CEST_CONSTEXPR
+  std::size_t
+  _Prime_rehash_policy::_M_next_bkt(std::size_t __n) const
+  {
+    // Optimize lookups involving the first elements of __prime_list.
+    // (useful to speed-up, eg, constructors)
+#if _GLIBCXX_CEST_VERSION
+    static constexpr unsigned char __fast_bkt[]
+#else
+    static const unsigned char __fast_bkt[]
+#endif
+      = { 2, 2, 2, 3, 5, 5, 7, 7, 11, 11, 11, 11, 13, 13 };
+
+#if _GLIBCXX_CEST_VERSION && defined(__clang__)
+    auto __builtin_floor = [](std::floating_point auto f) -> decltype(f) {
+        return static_cast<int>(f >= 0 ? f : f - 1);
+    };
+#endif
+
+    if (__n < sizeof(__fast_bkt))
+      {
+	if (__n == 0)
+	  // Special case on container 1st initialization with 0 bucket count
+	  // hint. We keep _M_next_resize to 0 to make sure that next time we
+	  // want to add an element allocation will take place.
+	  return 1;
+
+	_M_next_resize =
+	  __builtin_floor(__fast_bkt[__n] * (double)_M_max_load_factor);
+	return __fast_bkt[__n];
+      }
+
+    // Number of primes (without sentinel).
+    constexpr auto __n_primes
+      = sizeof(__prime_list) / sizeof(unsigned long) - 1;
+
+    // Don't include the last prime in the search, so that anything
+    // higher than the second-to-last prime returns a past-the-end
+    // iterator that can be dereferenced to get the last prime.
+    constexpr auto __last_prime = __prime_list + __n_primes - 1;
+
+    const unsigned long* __next_bkt =
+      std::lower_bound(__prime_list + 6, __last_prime, __n);
+
+    if (__next_bkt == __last_prime)
+      // Set next resize to the max value so that we never try to rehash again
+      // as we already reach the biggest possible bucket number.
+      // Note that it might result in max_load_factor not being respected.
+      _M_next_resize = size_t(-1);
+    else
+      _M_next_resize =
+	__builtin_floor(*__next_bkt * (double)_M_max_load_factor);
+
+    return *__next_bkt;
+  }
+
+  // Finds the smallest prime p such that alpha p > __n_elt + __n_ins.
+  // If p > __n_bkt, return make_pair(true, p); otherwise return
+  // make_pair(false, 0).  In principle this isn't very different from
+  // _M_bkt_for_elements.
+
+  // The only tricky part is that we're caching the element count at
+  // which we need to rehash, so we don't have to do a floating-point
+  // multiply for every insertion.
+
+  _GLIBCXX_CEST_CONSTEXPR
+  std::pair<bool, std::size_t>
+  _Prime_rehash_policy::
+  _M_need_rehash(std::size_t __n_bkt, std::size_t __n_elt,
+		 std::size_t __n_ins) const
+  {
+    if (__n_elt + __n_ins > _M_next_resize)
+      {
+#if _GLIBCXX_CEST_VERSION && defined(__clang__)
+	auto __builtin_floor = [](std::floating_point auto f) -> decltype(f) {
+	  return static_cast<int>(f >= 0 ? f : f - 1);
+	};
+#endif
+	// If _M_next_resize is 0 it means that we have nothing allocated so
+	// far and that we start inserting elements. In this case we start
+	// with an initial bucket size of 11.
+	double __min_bkts
+	  = std::max<std::size_t>(__n_elt + __n_ins, _M_next_resize ? 0 : 11)
+	  / (double)_M_max_load_factor;
+	if (__min_bkts >= __n_bkt)
+	  return { true,
+	    _M_next_bkt(std::max<std::size_t>(__builtin_floor(__min_bkts) + 1,
+					      __n_bkt * _S_growth_factor)) };
+
+	_M_next_resize
+	  = __builtin_floor(__n_bkt * (double)_M_max_load_factor);
+	return { false, 0 };
+      }
+    else
+      return { false, 0 };
+  }
+} // namespace __detail
+
 _GLIBCXX_END_NAMESPACE_VERSION
 } // namespace std
 
