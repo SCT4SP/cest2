@@ -98,15 +98,18 @@ constexpr bool map_test3() {
 void map_tests() {
   static_assert(common_static_map_tests());
   static_assert(map_test1<std::map, char, int>());
-  static_assert(map_test1<std::unordered_map, char, int>());
   static_assert(map_test2<std::map, char, int>());
-  static_assert(map_test2<std::unordered_map, char, int>());
   static_assert(map_test3<std::map, char, int>());
+  static_assert(map_test1<std::unordered_map, char, int>());
+  static_assert(map_test2<std::unordered_map, char, int>());
+  static_assert(map_test3<std::unordered_map, char, int>());
 
   assert((map_test1<std::map, char, int>()));
-  assert((map_test1<std::unordered_map, char, int>()));
   assert((map_test2<std::map, char, int>()));
   assert((map_test3<std::map, char, int>()));
+  assert((map_test1<std::unordered_map, char, int>()));
+  assert((map_test2<std::unordered_map, char, int>()));
+  assert((map_test3<std::unordered_map, char, int>()));
 }
 
 int main(int argc, char *argv[])

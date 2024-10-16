@@ -308,11 +308,14 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
       // size and capacity:
 
       ///  Returns true if the %unordered_map is empty.
-      _GLIBCXX_NODISCARD bool
+      _GLIBCXX_NODISCARD
+      _GLIBCXX_CEST_CONSTEXPR
+      bool
       empty() const noexcept
       { return _M_h.empty(); }
 
       ///  Returns the size of the %unordered_map.
+      _GLIBCXX_CEST_CONSTEXPR
       size_type
       size() const noexcept
       { return _M_h.size(); }
@@ -328,6 +331,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  Returns a read/write iterator that points to the first element in the
        *  %unordered_map.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       iterator
       begin() noexcept
       { return _M_h.begin(); }
@@ -437,6 +441,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
       }
 
       /// Extract a node.
+      _GLIBCXX_CEST_CONSTEXPR
       node_type
       extract(const key_type& __key)
       { return _M_h.extract(__key); }
@@ -563,6 +568,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 
       // _GLIBCXX_RESOLVE_LIB_DEFECTS
       // 2354. Unnecessary copying when inserting into maps with braced-init
+      _GLIBCXX_CEST_CONSTEXPR
       std::pair<iterator, bool>
       insert(value_type&& __x)
       { return _M_h.insert(std::move(__x)); }

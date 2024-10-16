@@ -181,6 +181,7 @@ namespace __detail
       _HashtableAlloc& _M_h;
       _NodePtr _M_ptr;
 
+      _GLIBCXX_CEST_CONSTEXPR
       ~_NodePtrGuard()
       {
 	if (_M_ptr)
@@ -205,14 +206,17 @@ namespace __detail
     public:
       using __node_ptr = typename __hashtable_alloc::__node_ptr;
 
+      _GLIBCXX_CEST_CONSTEXPR
       _ReuseOrAllocNode(__node_ptr __nodes, __hashtable_alloc& __h)
       : _M_nodes(__nodes), _M_h(__h) { }
       _ReuseOrAllocNode(const _ReuseOrAllocNode&) = delete;
 
+      _GLIBCXX_CEST_CONSTEXPR
       ~_ReuseOrAllocNode()
       { _M_h._M_deallocate_nodes(_M_nodes); }
 
       template<typename... _Args>
+	_GLIBCXX_CEST_CONSTEXPR
 	__node_ptr
 	operator()(_Args&&... __args) const
 	{
@@ -1246,6 +1250,7 @@ namespace __detail
 	using _IFconsp = typename _IFcons<_Pair>::type;
 
       template<typename _Pair, typename = _IFconsp<_Pair>>
+	_GLIBCXX_CEST_CONSTEXPR
 	__ireturn_type
 	insert(_Pair&& __v)
 	{
@@ -1347,6 +1352,7 @@ namespace __detail
       _Hashtable_ebo_helper() noexcept(noexcept(_Tp())) : _Tp() { }
 
       template<typename _OtherTp>
+	_GLIBCXX_CEST_CONSTEXPR
 	_Hashtable_ebo_helper(_OtherTp&& __tp)
 	: _Tp(std::forward<_OtherTp>(__tp))
 	{ }
@@ -1489,6 +1495,7 @@ namespace __detail
       _M_store_code(_Hash_node_code_cache<false>&, __hash_code) const
       { }
 
+      _GLIBCXX_CEST_CONSTEXPR
       void
       _M_copy_code(_Hash_node_code_cache<false>&,
 		   const _Hash_node_code_cache<false>&) const
@@ -2088,6 +2095,7 @@ namespace __detail
       _Hashtable_alloc(_Hashtable_alloc&&) = default;
 
       template<typename _Alloc>
+	_GLIBCXX_CEST_CONSTEXPR
 	_Hashtable_alloc(_Alloc&& __a)
 	: __ebo_node_alloc(std::forward<_Alloc>(__a))
 	{ }
@@ -2097,6 +2105,7 @@ namespace __detail
       _M_node_allocator()
       { return __ebo_node_alloc::_M_get(); }
 
+      _GLIBCXX_CEST_CONSTEXPR
       const __node_alloc_type&
       _M_node_allocator() const
       { return __ebo_node_alloc::_M_cget(); }
