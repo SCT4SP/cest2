@@ -85,6 +85,7 @@ namespace __detail
   struct _Identity
   {
     template<typename _Tp>
+      _GLIBCXX_CEST_CONSTEXPR
       _Tp&&
       operator()(_Tp&& __x) const noexcept
       { return std::forward<_Tp>(__x); }
@@ -169,6 +170,7 @@ namespace __detail
     struct _NodeBuilder<_Identity>
     {
       template<typename _Kt, typename _Arg, typename _NodeGenerator>
+	_GLIBCXX_CEST_CONSTEXPR
 	static auto
 	_S_build(_Kt&& __k, _Arg&&, const _NodeGenerator& __node_gen)
 	-> typename _NodeGenerator::__node_ptr
@@ -1199,6 +1201,7 @@ namespace __detail
 
       using __base_type::insert;
 
+      _GLIBCXX_CEST_CONSTEXPR
       __ireturn_type
       insert(value_type&& __v)
       {

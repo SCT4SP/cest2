@@ -337,6 +337,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  Returns a read-only (constant) iterator that points one past the last
        *  element in the %unordered_set.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       iterator
       end() noexcept
       { return _M_h.end(); }
@@ -428,6 +429,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
       insert(const value_type& __x)
       { return _M_h.insert(__x); }
 
+      _GLIBCXX_CEST_CONSTEXPR
       std::pair<iterator, bool>
       insert(value_type&& __x)
       { return _M_h.insert(std::move(__x)); }

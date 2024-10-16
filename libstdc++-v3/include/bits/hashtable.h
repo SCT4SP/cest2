@@ -969,6 +969,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       _S_forward_key(const key_type& __k)
       { return __k; }
 
+      _GLIBCXX_CEST_CONSTEXPR
       static key_type&&
       _S_forward_key(key_type&& __k)
       { return std::move(__k); }

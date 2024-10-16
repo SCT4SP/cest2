@@ -2,6 +2,7 @@
 #include <cassert>
 #include <iostream>
 #include <set>
+#include <unordered_set>
 #include <tuple>
 #include <type_traits>
 #include <limits>
@@ -14,15 +15,22 @@ constexpr bool common_static_set_tests()
   auto f = []<template <class...> class S>()
   {
     static_assert(sizeof(S<float>) == sizeof(S<double>));
-    static_assert(std::weakly_incrementable<typename S<int>::iterator>);
-    using iter_t = typename S<int>::iterator;
+    static_assert(weakly_incrementable<typename S<int>::iterator>);
+    using       iter_t = typename S<int>::iterator;
     using const_iter_t = typename S<int>::const_iterator;
-    static_assert(std::is_same_v<typename iter_t::iterator_category,
-                                 std::bidirectional_iterator_tag>);
-    static_assert(std::is_same_v<iter_t, const_iter_t>);
+    if constexpr (is_same_v<S<float>, set<float>>) {
+      static_assert( is_same_v<iter_t, const_iter_t>);
+      static_assert(is_same_v<typename iter_t::iterator_category,
+                              bidirectional_iterator_tag>);
+    } else {
+      static_assert(!is_same_v<iter_t, const_iter_t>);
+      static_assert(is_same_v<typename iter_t::iterator_category,
+                              forward_iterator_tag>);
+    }
   };
 
-  f.operator()<std::set>();
+  f.operator()<set>();
+  f.operator()<unordered_set>();
 
   return true;
 }
@@ -331,8 +339,71 @@ constexpr void tests_helper() {
   doit<SA, S1, S2, S3, S4, S5, S6, S7, S8, S9, S10>();
 }
 
+template <bool SA, class S1, class S2, class S3, class S4, class S5, class S6,
+          class S7, class S8, class S9, class S10>
+constexpr void doit2() {
+  constexpr const auto tup3 = std::tuple{3, 3, 2, 1};
+  constexpr const auto tup4 = std::tuple{3, 1, 2, 3};
+  constexpr const auto tup5 = std::tuple{3, 1, 3, 2};
+  constexpr const auto tup6 = std::tuple{2, 1, 2, 2};
+
+#if 0
+  assert(set_test1<S1>());
+  assert(set_test2<S2>());
+  assert(set_test3<S3>(3, 2, 1) == tup3);
+  assert(set_test3<S3>(1, 2, 3) == tup4);
+  assert(set_test3<S3>(1, 3, 2) == tup5);
+  assert(set_test3<S3>(1, 2, 2) == tup6);
+  assert(set_test4<S4>(1, 2, 3, 4, 5));
+  assert(set_test5<S5>(42));
+  assert(set_test6<S6>(1, 6, 8, 11, 13, 15, 17, 22, 25, 27));
+  assert(set_test6<S6>(27, 25, 22, 17, 15, 13, 11, 8, 6, 1));
+  assert(set_test6<S6>(1, 27, 6, 25, 8, 22, 11, 17, 13, 15));
+  assert(set_test7<S7>());
+  assert(set_test8<S8>());
+  assert(set_test9<S9>());
+  assert(set_test10<S10>());
+#endif
+
+  if constexpr (SA) {
+    static_assert(set_test1<S1>());
+//    static_assert(set_test2<S2>());
+//    static_assert(set_test3<S3>(3, 2, 1) == tup3);
+//    static_assert(set_test3<S3>(1, 2, 3) == tup4);
+//    static_assert(set_test3<S3>(1, 3, 2) == tup5);
+//    static_assert(set_test3<S3>(1, 2, 2) == tup6);
+//    static_assert(set_test4<S4>(1, 2, 3, 4, 5));
+//    static_assert(set_test5<S5>(42));
+//    static_assert(set_test6<S6>(1, 6, 8, 11, 13, 15, 17, 22, 25, 27));
+//    static_assert(set_test6<S6>(27, 25, 22, 17, 15, 13, 11, 8, 6, 1));
+//    static_assert(set_test6<S6>(1, 27, 6, 25, 8, 22, 11, 17, 13, 15));
+//    static_assert(set_test7<S7>());
+//    static_assert(set_test8<S8>());
+//    static_assert(set_test9<S9>());
+//    static_assert(set_test10<S10>());
+  }
+}
+
+template <bool SA, template <class...> class St,
+          template <class> class Alloc = std::allocator>
+constexpr void tests_helper2() {
+  using S1 = St<int, std::hash<int>, std::equal_to<int>, Alloc<int>>;
+  using S2 = St<int, std::less<int>, Alloc<int>>;
+  using S3 = St<int, std::less<int>, Alloc<int>>;
+  using S4 = St<int, std::less<int>, Alloc<int>>;
+  using S5 = St<int, std::less<int>, Alloc<int>>;
+  using S6 = St<int, std::less<int>, Alloc<int>>;
+  using S7 = St<int, std::less<int>, Alloc<int>>;
+  using S8 = St<int, std::less<int>, Alloc<int>>;
+  using S9 = St<test9::FatKey, std::less<>>;
+  using S10 = St<int, std::less<int>, Alloc<int>>;
+
+  doit2<SA, S1, S2, S3, S4, S5, S6, S7, S8, S9, S10>();
+}
+
 void new_set_tests() {
   tests_helper<true, std::set>();
+  tests_helper2<true, std::unordered_set>();
 }
 
 } // namespace set_tests_ns
