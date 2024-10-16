@@ -8,8 +8,11 @@
 
 namespace set_tests_ns {
 
-constexpr bool common_static_set_tests() {
-  auto f = []<template <class...> class S>() {
+constexpr bool common_static_set_tests()
+{
+  using namespace std;
+  auto f = []<template <class...> class S>()
+  {
     static_assert(sizeof(S<float>) == sizeof(S<double>));
     static_assert(std::weakly_incrementable<typename S<int>::iterator>);
     using iter_t = typename S<int>::iterator;
