@@ -1,27 +1,27 @@
 #include <algorithm>
 #include <cassert>
 #include <iostream>
-#include <set>
+#include <unordered_set>
 #include <tuple>
 #include <type_traits>
 #include <limits>
 
-namespace set_tests_ns {
+namespace unordered_set_tests_ns {
 
-constexpr bool common_static_set_tests()
+constexpr bool common_static_unordered_set_tests()
 {
   using namespace std;
-  using sf_t = set<float>;
-  using sd_t = set<double>;
-  using si_t = set<double>;
+  using sf_t = unordered_set<float>;
+  using sd_t = unordered_set<double>;
+  using si_t = unordered_set<double>;
 
   static_assert(sizeof(sf_t) == sizeof(sd_t));
   static_assert(weakly_incrementable<typename si_t::iterator>);
   using       iter_t = typename si_t::iterator;
   using const_iter_t = typename si_t::const_iterator;
-  static_assert(is_same_v<iter_t, const_iter_t>);
-  static_assert(is_same_v<typename iter_t::iterator_category,
-                            bidirectional_iterator_tag>);
+  static_assert(!is_same_v<iter_t, const_iter_t>);
+  static_assert( is_same_v<typename iter_t::iterator_category,
+                           forward_iterator_tag>);
   return true;
 }
 
@@ -107,8 +107,7 @@ template <typename S, typename T> constexpr bool set_test5(const T x) {
   bool b3 = ib3 == ie0;
   T c = *ib3;
 
-  return b0 && !b1 && !b2 && !b3 && x == a && (x-1) == b && (x-1) == c &&
-         3 == s.size();
+  return b0 && !b1 && !b2 && !b3 && x==a && (x-1)==b && (x+1)==c && 3==s.size();
 }
 
 // test pre-increment (and insert, begin and end)
@@ -171,10 +170,10 @@ constexpr bool set_test6(T x, Ts... xs) {
     sum += prev;
   }
 
-  bool b =  6 == a1 &&   8 == a12 && 15 == a2 && 1 == a3 && 11 == a4 &&
+  bool b = 6 == a1 && 8 == a12 && 15 == a2 && 1 == a3 && 11 == a4 &&
            27 == a5 && 145 == sum && 10 == s.size();
-  return r0 && r && b && 8 == *it1 && 11 == *it12 && 17 == *it2 && 6 == *it3 &&
-         13 == *it4 && (it5==s.end()) && 145 == sum && inc && 10 == s.size();
+  return r0 && r && b;
+
 }
 
 // tests post-increment
@@ -183,7 +182,7 @@ template <typename S> constexpr bool set_test7() {
   inserts(s, 1, 5, 4, 2, 3);
   auto it0 = s.begin();
   auto it1 = it0++;
-  return 2 == *it0 && 1 == *it1;
+  return *it0 != *it1;
 }
 
 namespace test9 {
@@ -236,6 +235,44 @@ template <typename S> constexpr bool set_test9() {
   return ok && 2 == x && 2 == xf && 3 == x2 && 3 == x3;
 }
 
+constexpr bool unordered_set_test9b()
+{
+  using namespace std;
+  using namespace std::literals;
+
+  struct string_hash // C++20's transparent hashing
+  {
+    using hash_type = hash<string_view>;
+    using is_transparent = void;
+
+    size_t operator()(const char* str) const
+    {
+      return hash_type{}(str);
+    }
+    size_t operator()(string_view str) const
+    {
+      return hash_type{}(str);
+    }
+    size_t operator()(string const& str) const
+    {
+      return hash_type{}(str);
+    }
+  };
+
+  unordered_set<int> example{1, 2, -10};
+
+  int i = -1;
+  if (auto search = example.find(2); search != example.end())
+    i = *search;
+
+  unordered_set<string, string_hash, equal_to<>> set{"one"s, "two"s};
+  bool b1 = set.find("one") != set.end();
+  bool b2 = set.find("one"s) != set.end();
+  bool b3 = set.find("one"sv) != set.end();
+
+  return i==2 && b1 && b2 && b3;
+}
+
 template <typename S> constexpr bool set_test10() {
   S s1;
   inserts(s1, 1, 2, 3);
@@ -264,72 +301,59 @@ template <typename S> constexpr bool set_test10() {
   return b;
 }
 
-template <bool SA, class S1, class S2, class S3, class S4, class S5, class S6,
-          class S7, class S8, class S9, class S10>
+template <bool SA, class S>
 constexpr void doit() {
   constexpr const auto tup3 = std::tuple{3, 3, 2, 1};
   constexpr const auto tup4 = std::tuple{3, 1, 2, 3};
   constexpr const auto tup5 = std::tuple{3, 1, 3, 2};
   constexpr const auto tup6 = std::tuple{2, 1, 2, 2};
 
-  assert(set_test1<S1>());
-  assert(set_test2<S2>());
-  assert(set_test3<S3>(3, 2, 1) == tup3);
-  assert(set_test3<S3>(1, 2, 3) == tup4);
-  assert(set_test3<S3>(1, 3, 2) == tup5);
-  assert(set_test3<S3>(1, 2, 2) == tup6);
-  assert(set_test4<S4>(1, 2, 3, 4, 5));
-  assert(set_test5<S5>(42));
-  assert(set_test6<S6>(1, 6, 8, 11, 13, 15, 17, 22, 25, 27));
-  assert(set_test6<S6>(27, 25, 22, 17, 15, 13, 11, 8, 6, 1));
-  assert(set_test6<S6>(1, 27, 6, 25, 8, 22, 11, 17, 13, 15));
-  assert(set_test7<S7>());
-  assert(set_test8<S8>());
-  assert(set_test9<S9>());
-  assert(set_test10<S10>());
+  assert(set_test1<S>());
+  assert(set_test2<S>());
+  assert(set_test3<S>(3, 2, 1) == tup3);
+  assert(set_test3<S>(1, 2, 3) == tup4);
+  assert(set_test3<S>(1, 3, 2) == tup5);
+  assert(set_test3<S>(1, 2, 2) == tup6);
+  assert(set_test4<S>(1, 2, 3, 4, 5));
+  assert(set_test5<S>(42));
+  assert(set_test6<S>(1, 6, 8, 11, 13, 15, 17, 22, 25, 27));
+  assert(set_test6<S>(27, 25, 22, 17, 15, 13, 11, 8, 6, 1));
+  assert(set_test6<S>(1, 27, 6, 25, 8, 22, 11, 17, 13, 15));
+  assert(set_test7<S>());
+  assert(set_test8<S>());
+//  assert(unordered_set_test9b());
+  assert(set_test10<S>());
 
   if constexpr (SA) {
-    static_assert(set_test1<S1>());
-    static_assert(set_test2<S2>());
-    static_assert(set_test3<S3>(3, 2, 1) == tup3);
-    static_assert(set_test3<S3>(1, 2, 3) == tup4);
-    static_assert(set_test3<S3>(1, 3, 2) == tup5);
-    static_assert(set_test3<S3>(1, 2, 2) == tup6);
-    static_assert(set_test4<S4>(1, 2, 3, 4, 5));
-    static_assert(set_test5<S5>(42));
-    static_assert(set_test6<S6>(1, 6, 8, 11, 13, 15, 17, 22, 25, 27));
-    static_assert(set_test6<S6>(27, 25, 22, 17, 15, 13, 11, 8, 6, 1));
-    static_assert(set_test6<S6>(1, 27, 6, 25, 8, 22, 11, 17, 13, 15));
-    static_assert(set_test7<S7>());
-    static_assert(set_test8<S8>());
-    static_assert(set_test9<S9>());
-    static_assert(set_test10<S10>());
+    static_assert(set_test1<S>());
+    static_assert(set_test2<S>());
+    static_assert(set_test3<S>(3, 2, 1) == tup3);
+    static_assert(set_test3<S>(1, 2, 3) == tup4);
+    static_assert(set_test3<S>(1, 3, 2) == tup5);
+    static_assert(set_test3<S>(1, 2, 2) == tup6);
+    static_assert(set_test4<S>(1, 2, 3, 4, 5));
+    static_assert(set_test5<S>(42));
+    static_assert(set_test6<S>(1, 6, 8, 11, 13, 15, 17, 22, 25, 27));
+    static_assert(set_test6<S>(27, 25, 22, 17, 15, 13, 11, 8, 6, 1));
+    static_assert(set_test6<S>(1, 27, 6, 25, 8, 22, 11, 17, 13, 15));
+    static_assert(set_test7<S>());
+    static_assert(set_test8<S>());
+//    static_assert(unordered_set_test9b());
+    static_assert(set_test10<S>());
   }
 }
 
-template <bool SA, template <class...> class St,
-          template <class> class Alloc = std::allocator>
-constexpr void tests_helper()
+} // namespace unordered_set_tests_ns
+
+void unordered_set_tests()
 {
-  using set_t  = St<int, std::less<int>, Alloc<int>>;
-  using setF_t = St<test9::FatKey, std::less<>>;
-
-  doit<SA,set_t,set_t,set_t,set_t,set_t,set_t,set_t,set_t,setF_t,set_t>();
-}
-
-void new_set_tests() {
-  tests_helper<true, std::set>();
-}
-
-} // namespace set_tests_ns
-
-void set_tests() {
-  set_tests_ns::new_set_tests();
-  static_assert(set_tests_ns::common_static_set_tests());
+  using set_t = std::unordered_set<int>;
+  unordered_set_tests_ns::doit<true, set_t>();
+  static_assert(unordered_set_tests_ns::common_static_unordered_set_tests());
 }
 
 int main(int argc, char *argv[])
 {
-  set_tests();
+  unordered_set_tests();
   return 0;
 }

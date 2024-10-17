@@ -480,6 +480,7 @@ namespace __detail
 	return *this;
       }
 
+      _GLIBCXX_CEST_CONSTEXPR
       _Node_iterator
       operator++(int) noexcept
       {
@@ -1039,6 +1040,7 @@ namespace __detail
       { return *(static_cast<__hashtable*>(this)); }
 
       template<typename _InputIterator, typename _NodeGetter>
+	_GLIBCXX_CEST_CONSTEXPR
 	void
 	_M_insert_range(_InputIterator __first, _InputIterator __last,
 			const _NodeGetter&, true_type __uks);
@@ -1104,6 +1106,7 @@ namespace __detail
       { this->insert(__l.begin(), __l.end()); }
 
       template<typename _InputIterator>
+	_GLIBCXX_CEST_CONSTEXPR
 	void
 	insert(_InputIterator __first, _InputIterator __last)
 	{
@@ -1118,6 +1121,7 @@ namespace __detail
 	   typename _Hash, typename _RangeHash, typename _Unused,
 	   typename _RehashPolicy, typename _Traits>
     template<typename _InputIterator, typename _NodeGetter>
+      _GLIBCXX_CEST_CONSTEXPR
       void
       _Insert_base<_Key, _Value, _Alloc, _ExtractKey, _Equal,
 		   _Hash, _RangeHash, _Unused,
@@ -1442,6 +1446,7 @@ namespace __detail
       // default constructor.
       _Hash_code_base() = default;
 
+      _GLIBCXX_CEST_CONSTEXPR
       _Hash_code_base(const _Hash& __hash) : __ebo_hash(__hash) { }
 
       _GLIBCXX_CEST_CONSTEXPR
@@ -1850,6 +1855,7 @@ namespace __detail
     protected:
       _Hashtable_base() = default;
 
+      _GLIBCXX_CEST_CONSTEXPR
       _Hashtable_base(const _Hash& __hash, const _Equal& __eq)
       : __hash_code_base(__hash), _EqualEBO(__eq)
       { }
@@ -1942,6 +1948,7 @@ namespace __detail
 				     _Hash, _RangeHash, _Unused,
 				     _RehashPolicy, _Traits>;
 
+      _GLIBCXX_CEST_CONSTEXPR
       bool
       _M_equal(const __hashtable&) const;
     };
@@ -1950,6 +1957,7 @@ namespace __detail
 	   typename _ExtractKey, typename _Equal,
 	   typename _Hash, typename _RangeHash, typename _Unused,
 	   typename _RehashPolicy, typename _Traits>
+    _GLIBCXX_CEST_CONSTEXPR
     bool
     _Equality<_Key, _Value, _Alloc, _ExtractKey, _Equal,
 	      _Hash, _RangeHash, _Unused, _RehashPolicy, _Traits, true>::

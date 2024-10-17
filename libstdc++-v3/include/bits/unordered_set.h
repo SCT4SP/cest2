@@ -170,6 +170,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  distance(__first,__last)).
        */
       template<typename _InputIterator>
+	_GLIBCXX_CEST_CONSTEXPR
 	unordered_set(_InputIterator __first, _InputIterator __last,
 		      size_type __n = 0,
 		      const hasher& __hf = hasher(),
@@ -303,7 +304,9 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
       // size and capacity:
 
       ///  Returns true if the %unordered_set is empty.
-      _GLIBCXX_NODISCARD bool
+      _GLIBCXX_NODISCARD
+      _GLIBCXX_CEST_CONSTEXPR
+      bool
       empty() const noexcept
       { return _M_h.empty(); }
 
@@ -503,6 +506,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
       }
 
       /// Extract a node.
+      _GLIBCXX_CEST_CONSTEXPR
       node_type
       extract(const key_type& __key)
       { return _M_h.extract(__key); }
@@ -582,6 +586,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  the pointed-to memory is not touched in any way. Managing the pointer
        *  is the user's responsibility.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       void
       clear() noexcept
       { _M_h.clear(); }
@@ -877,6 +882,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 
       template<typename _Value1, typename _Hash1, typename _Pred1,
 	       typename _Alloc1>
+        _GLIBCXX_CEST_CONSTEXPR
         friend bool
         operator==(const unordered_set<_Value1, _Hash1, _Pred1, _Alloc1>&,
 		   const unordered_set<_Value1, _Hash1, _Pred1, _Alloc1>&);
@@ -1817,6 +1823,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
     { __x.swap(__y); }
 
   template<class _Value, class _Hash, class _Pred, class _Alloc>
+    _GLIBCXX_CEST_CONSTEXPR
     inline bool
     operator==(const unordered_set<_Value, _Hash, _Pred, _Alloc>& __x,
 	       const unordered_set<_Value, _Hash, _Pred, _Alloc>& __y)

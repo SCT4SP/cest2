@@ -507,6 +507,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       void
       _M_reset() noexcept;
 
+      _GLIBCXX_CEST_CONSTEXPR
       _Hashtable(const _Hash& __h, const _Equal& __eq,
 		 const allocator_type& __a)
       : __hashtable_base(__h, __eq),
@@ -538,6 +539,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 		 false_type /* alloc always equal */);
 
       template<typename _InputIterator>
+	_GLIBCXX_CEST_CONSTEXPR
 	_Hashtable(_InputIterator __first, _InputIterator __last,
 		   size_type __bkt_count_hint,
 		   const _Hash&, const _Equal&, const allocator_type&,
@@ -558,6 +560,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
       _Hashtable(const _Hashtable&, const allocator_type&);
 
+      _GLIBCXX_CEST_CONSTEXPR
       explicit
       _Hashtable(size_type __bkt_count_hint,
 		 const _Hash& __hf = _Hash(),
@@ -584,6 +587,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       { }
 
       template<typename _InputIterator>
+	_GLIBCXX_CEST_CONSTEXPR
 	_Hashtable(_InputIterator __f, _InputIterator __l,
 		   size_type __bkt_count_hint = 0,
 		   const _Hash& __hf = _Hash(),
@@ -593,6 +597,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 		     __unique_keys{})
 	{ }
 
+      _GLIBCXX_CEST_CONSTEXPR
       _Hashtable(initializer_list<value_type> __l,
 		 size_type __bkt_count_hint = 0,
 		 const _Hash& __hf = _Hash(),
@@ -961,6 +966,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	  __and_<__is_nothrow_invocable<_Hash&, const key_type&>,
 		 __not_<__is_nothrow_invocable<_Hash&, _Kt>>>::value,
 	  key_type, _Kt&&>
+	_GLIBCXX_CEST_CONSTEXPR
 	_S_forward_key(_Kt&& __k)
 	{ return std::forward<_Kt>(__k); }
 
@@ -1289,6 +1295,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	   typename _ExtractKey, typename _Equal,
 	   typename _Hash, typename _RangeHash, typename _Unused,
 	   typename _RehashPolicy, typename _Traits>
+    _GLIBCXX_CEST_CONSTEXPR
     _Hashtable<_Key, _Value, _Alloc, _ExtractKey, _Equal,
 	       _Hash, _RangeHash, _Unused, _RehashPolicy, _Traits>::
     _Hashtable(size_type __bkt_count_hint,
@@ -1308,6 +1315,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	   typename _Hash, typename _RangeHash, typename _Unused,
 	   typename _RehashPolicy, typename _Traits>
     template<typename _InputIterator>
+      _GLIBCXX_CEST_CONSTEXPR
       _Hashtable<_Key, _Value, _Alloc, _ExtractKey, _Equal,
 		 _Hash, _RangeHash, _Unused, _RehashPolicy, _Traits>::
       _Hashtable(_InputIterator __f, _InputIterator __l,
