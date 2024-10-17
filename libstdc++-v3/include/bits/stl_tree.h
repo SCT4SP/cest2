@@ -645,10 +645,11 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	  __try
 	    {
 #if _GLIBCXX_CEST_VERSION
+	    if (__builtin_is_constant_evaluated())
 	      _Alloc_traits::construct(_M_get_Node_allocator(), __node);
-#else
-	      ::new(__node) _Rb_tree_node<_Val>;
+	    else
 #endif
+	      ::new(__node) _Rb_tree_node<_Val>;
 	      _Alloc_traits::construct(_M_get_Node_allocator(),
 				       __node->_M_valptr(),
 				       std::forward<_Args>(__args)...);
