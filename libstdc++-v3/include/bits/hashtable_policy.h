@@ -416,6 +416,7 @@ namespace __detail
       _Node_iterator_base(__node_type* __p) noexcept
       : _M_cur(__p) { }
 
+      _GLIBCXX_CEST_CONSTEXPR
       void
       _M_incr() noexcept
       { _M_cur = _M_cur->_M_next(); }
@@ -471,6 +472,7 @@ namespace __detail
       operator->() const noexcept
       { return this->_M_cur->_M_valptr(); }
 
+      _GLIBCXX_CEST_CONSTEXPR
       _Node_iterator&
       operator++() noexcept
       {

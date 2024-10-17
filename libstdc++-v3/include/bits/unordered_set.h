@@ -225,6 +225,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  Create an %unordered_set consisting of copies of the elements in the
        *  list. This is linear in N (where N is @a __l.size()).
        */
+      _GLIBCXX_CEST_CONSTEXPR
       unordered_set(initializer_list<value_type> __l,
 		    size_type __n = 0,
 		    const hasher& __hf = hasher(),
@@ -324,6 +325,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  Returns a read-only (constant) iterator that points to the first
        *  element in the %unordered_set.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       iterator
       begin() noexcept
       { return _M_h.begin(); }
@@ -426,6 +428,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *
        *  Insertion requires amortized constant time.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       std::pair<iterator, bool>
       insert(const value_type& __x)
       { return _M_h.insert(__x); }
@@ -656,12 +659,14 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  pointing to the sought after element.  If unsuccessful it returns the
        *  past-the-end ( @c end() ) iterator.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       iterator
       find(const key_type& __x)
       { return _M_h.find(__x); }
 
 #if __cplusplus > 201703L
       template<typename _Kt>
+	_GLIBCXX_CEST_CONSTEXPR
 	auto
 	find(const _Kt& __k)
 	-> decltype(_M_h._M_find_tr(__k))

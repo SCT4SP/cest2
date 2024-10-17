@@ -97,7 +97,7 @@ constexpr bool set_test4(T x1, T x2, T x3, T x4, T x5) {
   return 5 == s1.size() && 5 == s2.size() && 5 == s3.size();
 }
 
-template <typename S, typename T> constexpr bool set_test5(T x) {
+template <typename S, typename T> constexpr bool set_test5(const T x) {
   S s;
 
   auto ib0 = s.begin();
@@ -108,17 +108,23 @@ template <typename S, typename T> constexpr bool set_test5(T x) {
   auto ib1 = s.begin();
   bool b1 = ib1 == ie0;
   T a = *ib1;
-  s.insert(x - 1);
+  s.insert(x-1);
   auto ib2 = s.begin();
   bool b2 = ib2 == ie0;
   T b = *ib2;
-  s.insert(x + 1);
+  s.insert(x+1);
   auto ib3 = s.begin();
   bool b3 = ib3 == ie0;
   T c = *ib3;
 
-  return b0 && !b1 && !b2 && !b3 && 42 == a && 41 == b && 41 == c &&
-         3 == s.size();
+  if constexpr (std::is_same_v<S, std::set<int>>) {
+    return b0 && !b1 && !b2 && !b3 && x == a && (x-1) == b && (x-1) == c &&
+           3 == s.size();
+  } else {
+    return b0 && !b1 && !b2 && !b3 && x == a && (x-1) == b && (x+1) == c &&
+           3 == s.size();
+  }
+
 }
 
 // test pre-increment (and insert, begin and end)
@@ -139,42 +145,36 @@ constexpr bool set_test6(T x, Ts... xs) {
   auto it1 = ip1.first;
   auto a1 = *it1;
   ++it1; // 6 -> 8
-  auto b1 = *it1;
 
   auto ip12 = s.insert(8);
   bool r12 = ip12.second;
   auto it12 = ip12.first;
   auto a12 = *it12;
   ++it12; // 8 -> 11
-  auto b12 = *it12;
 
   auto ip2 = s.insert(15);
   bool r2 = ip2.second;
   auto it2 = ip2.first;
   auto a2 = *it2;
   ++it2; // 15 -> 17
-  auto b2 = *it2;
 
   auto ip3 = s.insert(1);
   bool r3 = ip3.second;
   auto it3 = ip3.first;
   auto a3 = *it3;
   ++it3; // 1 -> 6
-  auto b3 = *it3;
 
   auto ip4 = s.insert(11);
   bool r4 = ip4.second;
   auto it4 = ip4.first;
   auto a4 = *it4;
   ++it4; // 11 -> 13
-  auto b4 = *it4;
 
   auto ip5 = s.insert(27);
   bool r5 = ip5.second;
   auto it5 = ip5.first;
   auto a5 = *it5;
   ++it5; // 27 -> end
-  auto r6 = it5 == s.end();
 
   bool r = !r1 && !r12 && !r2 && !r3 && !r4 && !r5; // no changes
 
@@ -187,9 +187,16 @@ constexpr bool set_test6(T x, Ts... xs) {
     sum += prev;
   }
 
-  return r0 && r && 6 == a1 && 8 == b1 && 8 == a12 && 11 == b12 && 15 == a2 &&
-         17 == b2 && 1 == a3 && 6 == b3 && 11 == a4 && 13 == b4 && 27 == a5 &&
-         r6 && 145 == sum && inc && 10 == s.size();
+  bool b =  6 == a1 &&   8 == a12 && 15 == a2 && 1 == a3 && 11 == a4 &&
+           27 == a5 && 145 == sum && 10 == s.size();
+  if constexpr (std::is_same_v<S, std::set<int>>) {
+    return r0 && r && b && 8 == *it1 && 11 == *it12 && 17 == *it2 &&
+           6 == *it3 && 13 == *it4 && (it5==s.end()) && 145 == sum &&
+           inc && 10 == s.size();
+  } else {
+    return r0 && r && b;
+  }
+
 }
 
 // tests post-increment
@@ -198,7 +205,10 @@ template <typename S> constexpr bool set_test7() {
   inserts(s, 1, 5, 4, 2, 3);
   auto it0 = s.begin();
   auto it1 = it0++;
-  return 2 == *it0 && 1 == *it1;
+  if constexpr (std::is_same_v<S, std::set<int>>)
+    return 2 == *it0 && 1 == *it1;
+  else
+    return *it0 != *it1;
 }
 
 namespace test9 {
@@ -249,6 +259,44 @@ template <typename S> constexpr bool set_test9() {
   auto x3 = it3->x;
 
   return ok && 2 == x && 2 == xf && 3 == x2 && 3 == x3;
+}
+
+constexpr bool unordered_set_test9b()
+{
+  using namespace std;
+  using namespace std::literals;
+
+  struct string_hash // C++20's transparent hashing
+  {
+    using hash_type = hash<string_view>;
+    using is_transparent = void;
+
+    size_t operator()(const char* str) const
+    {
+      return hash_type{}(str);
+    }
+    size_t operator()(string_view str) const
+    {
+      return hash_type{}(str);
+    }
+    size_t operator()(string const& str) const
+    {
+      return hash_type{}(str);
+    }
+  };
+
+  unordered_set<int> example{1, 2, -10};
+
+  int i = -1;
+  if (auto search = example.find(2); search != example.end())
+    i = *search;
+
+  unordered_set<string, string_hash, equal_to<>> set{"one"s, "two"s};
+  bool b1 = set.find("one") != set.end();
+  bool b2 = set.find("one"s) != set.end();
+  bool b3 = set.find("one"sv) != set.end();
+
+  return i==2 && b1 && b2 && b3;
 }
 
 template <typename S> constexpr bool set_test10() {
@@ -332,48 +380,53 @@ constexpr void tests_helper()
   doit<SA,set_t,set_t,set_t,set_t,set_t,set_t,set_t,set_t,setF_t,set_t>();
 }
 
-template <bool SA, class S1, class S2, class S3, class S4, class S5, class S6,
-          class S7, class S8, class S9, class S10>
+template <bool SA, class S>
 constexpr void doit2() {
   constexpr const auto tup3 = std::tuple{3, 3, 2, 1};
   constexpr const auto tup4 = std::tuple{3, 1, 2, 3};
   constexpr const auto tup5 = std::tuple{3, 1, 3, 2};
   constexpr const auto tup6 = std::tuple{2, 1, 2, 2};
 
-  assert(set_test1<S1>());
-#if 0
-  assert(set_test2<S2>());
-  assert(set_test3<S3>(3, 2, 1) == tup3);
-  assert(set_test3<S3>(1, 2, 3) == tup4);
-  assert(set_test3<S3>(1, 3, 2) == tup5);
-  assert(set_test3<S3>(1, 2, 2) == tup6);
-  assert(set_test4<S4>(1, 2, 3, 4, 5));
-  assert(set_test5<S5>(42));
-  assert(set_test6<S6>(1, 6, 8, 11, 13, 15, 17, 22, 25, 27));
-  assert(set_test6<S6>(27, 25, 22, 17, 15, 13, 11, 8, 6, 1));
-  assert(set_test6<S6>(1, 27, 6, 25, 8, 22, 11, 17, 13, 15));
-  assert(set_test7<S7>());
-  assert(set_test8<S8>());
-  assert(set_test9<S9>());
-  assert(set_test10<S10>());
-#endif
+  assert(set_test1<S>());
+  assert(set_test2<S>());
+  assert(set_test3<S>(3, 2, 1) == tup3);
+  assert(set_test3<S>(1, 2, 3) == tup4);
+  assert(set_test3<S>(1, 3, 2) == tup5);
+  assert(set_test3<S>(1, 2, 2) == tup6);
+  assert(set_test4<S>(1, 2, 3, 4, 5));
+  assert(set_test5<S>(42));
+  assert(set_test6<S>(1, 6, 8, 11, 13, 15, 17, 22, 25, 27));
+  assert(set_test6<S>(27, 25, 22, 17, 15, 13, 11, 8, 6, 1));
+  assert(set_test6<S>(1, 27, 6, 25, 8, 22, 11, 17, 13, 15));
+  assert(set_test7<S>());
+  assert(set_test8<S>());
+  if constexpr (std::is_same_v<S, std::set<int>>) {
+    assert(set_test9<S>());
+  } else {
+    unordered_set_test9b();
+  }
+  assert(set_test10<S>());
 
   if constexpr (SA) {
-    static_assert(set_test1<S1>());
-//    static_assert(set_test2<S2>());
-//    static_assert(set_test3<S3>(3, 2, 1) == tup3);
-//    static_assert(set_test3<S3>(1, 2, 3) == tup4);
-//    static_assert(set_test3<S3>(1, 3, 2) == tup5);
-//    static_assert(set_test3<S3>(1, 2, 2) == tup6);
-//    static_assert(set_test4<S4>(1, 2, 3, 4, 5));
-//    static_assert(set_test5<S5>(42));
-//    static_assert(set_test6<S6>(1, 6, 8, 11, 13, 15, 17, 22, 25, 27));
-//    static_assert(set_test6<S6>(27, 25, 22, 17, 15, 13, 11, 8, 6, 1));
-//    static_assert(set_test6<S6>(1, 27, 6, 25, 8, 22, 11, 17, 13, 15));
-//    static_assert(set_test7<S7>());
-//    static_assert(set_test8<S8>());
-//    static_assert(set_test9<S9>());
-//    static_assert(set_test10<S10>());
+    static_assert(set_test1<S>());
+    static_assert(set_test2<S>());
+    static_assert(set_test3<S>(3, 2, 1) == tup3);
+    static_assert(set_test3<S>(1, 2, 3) == tup4);
+    static_assert(set_test3<S>(1, 3, 2) == tup5);
+    static_assert(set_test3<S>(1, 2, 2) == tup6);
+    static_assert(set_test4<S>(1, 2, 3, 4, 5));
+    static_assert(set_test5<S>(42));
+    static_assert(set_test6<S>(1, 6, 8, 11, 13, 15, 17, 22, 25, 27));
+    static_assert(set_test6<S>(27, 25, 22, 17, 15, 13, 11, 8, 6, 1));
+    static_assert(set_test6<S>(1, 27, 6, 25, 8, 22, 11, 17, 13, 15));
+    static_assert(set_test7<S>());
+    static_assert(set_test8<S>());
+    if constexpr (std::is_same_v<S, std::set<int>>) {
+      static_assert(set_test9<S>());
+    } else {
+      unordered_set_test9b();
+    }
+    static_assert(set_test10<S>());
   }
 }
 
@@ -381,14 +434,13 @@ template <bool SA, template <class...> class St,
           template <class> class Alloc = std::allocator>
 constexpr void tests_helper2() {
   using set_t  = St<int, std::hash<int>, std::equal_to<int>, Alloc<int>>;
-  using setF_t = St<test9::FatKey, std::less<>>;
 
-  doit2<SA,set_t,set_t,set_t,set_t,set_t,set_t,set_t,set_t,setF_t,set_t>();
+  doit2<SA, set_t>();
 }
 
 void new_set_tests() {
   tests_helper<true, std::set>();
-  tests_helper2<true, std::unordered_set>();
+  tests_helper2<false, std::unordered_set>();
 }
 
 } // namespace set_tests_ns
