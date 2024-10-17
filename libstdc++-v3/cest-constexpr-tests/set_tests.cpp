@@ -324,19 +324,12 @@ constexpr void doit() {
 
 template <bool SA, template <class...> class St,
           template <class> class Alloc = std::allocator>
-constexpr void tests_helper() {
-  using S1 = St<int, std::less<int>, Alloc<int>>;
-  using S2 = St<int, std::less<int>, Alloc<int>>;
-  using S3 = St<int, std::less<int>, Alloc<int>>;
-  using S4 = St<int, std::less<int>, Alloc<int>>;
-  using S5 = St<int, std::less<int>, Alloc<int>>;
-  using S6 = St<int, std::less<int>, Alloc<int>>;
-  using S7 = St<int, std::less<int>, Alloc<int>>;
-  using S8 = St<int, std::less<int>, Alloc<int>>;
-  using S9 = St<test9::FatKey, std::less<>>;
-  using S10 = St<int, std::less<int>, Alloc<int>>;
+constexpr void tests_helper()
+{
+  using set_t  = St<int, std::less<int>, Alloc<int>>;
+  using setF_t = St<test9::FatKey, std::less<>>;
 
-  doit<SA, S1, S2, S3, S4, S5, S6, S7, S8, S9, S10>();
+  doit<SA,set_t,set_t,set_t,set_t,set_t,set_t,set_t,set_t,setF_t,set_t>();
 }
 
 template <bool SA, class S1, class S2, class S3, class S4, class S5, class S6,
@@ -347,8 +340,8 @@ constexpr void doit2() {
   constexpr const auto tup5 = std::tuple{3, 1, 3, 2};
   constexpr const auto tup6 = std::tuple{2, 1, 2, 2};
 
-#if 0
   assert(set_test1<S1>());
+#if 0
   assert(set_test2<S2>());
   assert(set_test3<S3>(3, 2, 1) == tup3);
   assert(set_test3<S3>(1, 2, 3) == tup4);
@@ -387,18 +380,10 @@ constexpr void doit2() {
 template <bool SA, template <class...> class St,
           template <class> class Alloc = std::allocator>
 constexpr void tests_helper2() {
-  using S1 = St<int, std::hash<int>, std::equal_to<int>, Alloc<int>>;
-  using S2 = St<int, std::less<int>, Alloc<int>>;
-  using S3 = St<int, std::less<int>, Alloc<int>>;
-  using S4 = St<int, std::less<int>, Alloc<int>>;
-  using S5 = St<int, std::less<int>, Alloc<int>>;
-  using S6 = St<int, std::less<int>, Alloc<int>>;
-  using S7 = St<int, std::less<int>, Alloc<int>>;
-  using S8 = St<int, std::less<int>, Alloc<int>>;
-  using S9 = St<test9::FatKey, std::less<>>;
-  using S10 = St<int, std::less<int>, Alloc<int>>;
+  using set_t  = St<int, std::hash<int>, std::equal_to<int>, Alloc<int>>;
+  using setF_t = St<test9::FatKey, std::less<>>;
 
-  doit2<SA, S1, S2, S3, S4, S5, S6, S7, S8, S9, S10>();
+  doit2<SA,set_t,set_t,set_t,set_t,set_t,set_t,set_t,set_t,setF_t,set_t>();
 }
 
 void new_set_tests() {
