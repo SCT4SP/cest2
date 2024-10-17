@@ -40,8 +40,6 @@
 # include <bits/c++0x_warning.h>
 #endif
 
-#include <iostream>
-
 namespace __gnu_cxx
 {
   // A utility type containing a POD object that can hold an object of type
@@ -96,15 +94,11 @@ namespace __gnu_cxx
 
       _GLIBCXX_CEST_CONSTEXPR
       __constexpr_buffer()
-        : _M_storage_ptr{ std::allocator<_Tp>().allocate(1) } {
-std::cerr << "CEB ctor1 ";
-}
+        : _M_storage_ptr{ std::allocator<_Tp>().allocate(1) } { }
 
       // Can be used to avoid value-initialization
       _GLIBCXX_CEST_CONSTEXPR
-      __constexpr_buffer(std::nullptr_t) : __constexpr_buffer() {
-std::cerr << "CEB ctor2 ";
-}
+      __constexpr_buffer(std::nullptr_t) : __constexpr_buffer() { }
 
       _GLIBCXX_CEST_CONSTEXPR
       ~__constexpr_buffer()

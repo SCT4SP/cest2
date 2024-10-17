@@ -307,6 +307,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
       { return _M_h.empty(); }
 
       ///  Returns the size of the %unordered_set.
+      _GLIBCXX_CEST_CONSTEXPR
       size_type
       size() const noexcept
       { return _M_h.size(); }
