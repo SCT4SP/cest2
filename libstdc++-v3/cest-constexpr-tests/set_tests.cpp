@@ -53,19 +53,6 @@ constexpr auto set_test3(int x, int y, int z)
   return std::tuple{s.size(), *r1.first, *r2.first, *r3.first};
 }
 
-template <class T, class U> constexpr T &inserts(T &s, U x)
-{
-  s.insert(x);
-  return s;
-}
-
-template <class T, class U, class... Us>
-constexpr T &inserts(T &s, U x, Us... xs)
-{
-  s.insert(x);
-  return inserts(s, xs...);
-}
-
 constexpr bool set_test4(int x1, int x2, int x3, int x4, int x5)
 {
   std::set<int> s1, s2, s3;
@@ -124,8 +111,7 @@ constexpr bool set_test6(T x, Ts... xs)
   ++it;
   bool r0 = it == s.end();
 
-  // wikipedia - a different structure, but still fine (a valid rb tree)
-  inserts(s, x, xs...);
+  s.insert({x, xs...});
 
   auto ip1 = s.insert(6);
   bool r1 = ip1.second;
@@ -184,7 +170,7 @@ constexpr bool set_test6(T x, Ts... xs)
 constexpr bool set_test7()
 {
   std::set<int> s;
-  inserts(s, 1, 5, 4, 2, 3);
+  s.insert({1, 5, 4, 2, 3});
   auto it0 = s.begin();
   auto it1 = it0++;
   return 2 == *it0 && 1 == *it1;
@@ -194,7 +180,7 @@ constexpr bool set_test7()
 constexpr bool set_test8()
 {
   std::set<int> s;
-  inserts(s, 1, 2, 3, 4);
+  s.insert({1, 2, 3, 4});
   auto it = s.find(2);
   bool ok = it != s.end();
   return ok;
@@ -228,7 +214,7 @@ constexpr bool set_test9()
 
   setF_t s;
   FatKey fk{2, {}};
-  inserts(s, FatKey{1, {}}, FatKey{2, {}}, FatKey{3, {}}, FatKey{4, {}});
+  s.insert({FatKey{1, {}}, FatKey{2, {}}, FatKey{3, {}}, FatKey{4, {}}});
   auto it = s.find(lk);  // The C++14 template version of find
   auto itf = s.find(fk); // ""
   int x = it->x;
@@ -246,12 +232,12 @@ constexpr bool set_test9()
 constexpr bool set_test10()
 {
   std::set<int> s1;
-  inserts(s1, 1, 2, 3);
+  s1.insert({1, 2, 3});
   const std::set<int> s2 = s1;
   bool b = 3 == s1.size() && 3 == s2.size();
 
   std::set<int> s3, s4;
-  inserts(s3, 1, 2, 3, 4, 5);
+  s3.insert({1, 2, 3, 4, 5});
   s4 = s3;
   s3 = s1;
   std::set<int> s5 = s1;

@@ -1101,6 +1101,7 @@ namespace __detail
 	  return { __it, true };
 	}
 
+      _GLIBCXX_CEST_CONSTEXPR
       void
       insert(initializer_list<value_type> __l)
       { this->insert(__l.begin(), __l.end()); }

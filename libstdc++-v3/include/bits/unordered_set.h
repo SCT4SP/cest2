@@ -492,6 +492,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *
        *  Complexity similar to that of the range constructor.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       void
       insert(initializer_list<value_type> __l)
       { _M_h.insert(__l); }
