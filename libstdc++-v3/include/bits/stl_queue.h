@@ -582,6 +582,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       template<typename _Seq = _Sequence, typename _Requires = typename
 	       enable_if<__and_<is_default_constructible<_Compare>,
 				is_default_constructible<_Seq>>::value>::type>
+	_GLIBCXX_CEST_CONSTEXPR
 	priority_queue()
 	: c(), comp() { }
 
@@ -733,12 +734,15 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       /**
        *  Returns true if the %queue is empty.
        */
-      _GLIBCXX_NODISCARD bool
+      _GLIBCXX_NODISCARD
+      _GLIBCXX_CEST_CONSTEXPR
+      bool
       empty() const
       { return c.empty(); }
 
       /**  Returns the number of elements in the %queue.  */
       _GLIBCXX_NODISCARD
+      _GLIBCXX_CEST_CONSTEXPR
       size_type
       size() const
       { return c.size(); }
@@ -748,6 +752,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *  element of the %queue.
        */
       _GLIBCXX_NODISCARD
+      _GLIBCXX_CEST_CONSTEXPR
       const_reference
       top() const
       {
@@ -763,6 +768,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *  The time complexity of the operation depends on the underlying
        *  sequence.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       void
       push(const value_type& __x)
       {
@@ -771,6 +777,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       }
 
 #if __cplusplus >= 201103L
+      _GLIBCXX_CEST_CONSTEXPR
       void
       push(value_type&& __x)
       {
@@ -779,6 +786,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       }
 
       template<typename... _Args>
+	_GLIBCXX_CEST_CONSTEXPR
 	void
 	emplace(_Args&&... __args)
 	{
@@ -798,6 +806,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *  data is needed, it should be retrieved before pop() is
        *  called.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       void
       pop()
       {

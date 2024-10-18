@@ -13,24 +13,27 @@ constexpr bool comparable(const T &x, const T &y, const T tolerance = 0.01) {
 }
 
 template <bool TestAssert = true> struct Bar {
-  constexpr Bar() : m_p(new int(42)) {}
-  constexpr Bar(int x) : m_p(new int(x)) {}
-  constexpr Bar(const Bar &f) noexcept : m_p(new int(*f.m_p)) {}
-  constexpr Bar(Bar &&other) : m_p(other.m_p) {
+  constexpr Bar() : p_(new int(42)) {}
+  constexpr Bar(int x) : p_(new int(x)) {}
+  constexpr Bar(const Bar &f) noexcept : p_(new int(*f.p_)) {}
+  constexpr Bar(Bar &&other) : p_(other.p_) {
     assert(TestAssert);
-    other.m_p = nullptr;
+    other.p_ = nullptr;
   }
-  constexpr ~Bar() { delete m_p; }
+  constexpr ~Bar() { delete p_; }
   constexpr Bar &operator=(const Bar &other) {
-    delete m_p;
-    m_p = new int(*other.m_p);
+    delete p_;
+    p_ = new int(*other.p_);
     return *this;
   }
   constexpr Bar &operator=(Bar &&other) {
-    std::swap(m_p, other.m_p);
+    std::swap(p_, other.p_);
     return *this;
   }
-  int *m_p;
+  constexpr friend bool operator<(const Bar& x, const Bar& y) {
+    return *x.p_ < *y.p_;
+  }
+  int *p_;
 };
 
 template <typename C> constexpr bool push_back_dtor_test() {
@@ -38,7 +41,7 @@ template <typename C> constexpr bool push_back_dtor_test() {
   typename C::value_type f(42);
   c.push_back(f);
   c.push_back(f); // ~Bar() (Bar destructor) called here (by reserve w' vector)
-  bool b1 = 42 == *c.begin()->m_p && 2 == std::distance(c.begin(), c.end());
+  bool b1 = 42 == *c.begin()->p_ && 2 == std::distance(c.begin(), c.end());
   c.pop_back(); // ~Bar() (Bar destructor) called here
   bool b2 = 1 == std::distance(c.begin(), c.end());
   return b1 && b2;
@@ -49,18 +52,31 @@ template <typename C> constexpr bool push_front_dtor_test() {
   typename C::value_type f(42);
   c.push_front(f);
   c.push_front(f); // ~Bar() (Bar destructor) called here
-  bool b1 = 42 == *c.begin()->m_p && 2 == std::distance(c.begin(), c.end());
+  bool b1 = 42 == *c.begin()->p_ && 2 == std::distance(c.begin(), c.end());
   c.pop_front(); // ~Bar() (Bar destructor) called here
   bool b2 = 1 == std::distance(c.begin(), c.end());
   return b1 && b2;
 }
 
-template <typename C> constexpr bool push_dtor_test() {
+template <typename C>
+constexpr bool push_dtor_test() {
   C c;
   typename C::value_type f(42);
   c.push(f);
   c.push(f); // ~Bar() (Bar destructor) called here
-  bool b1 = 42 == *c.front().m_p && 2 == c.size();
+  bool b1 = 42 == *c.front().p_ && 2 == c.size();
+  c.pop(); // ~Bar() (Bar destructor) called here
+  bool b2 = 1 == c.size();
+  return b1 && b2;
+}
+
+template <typename C>
+constexpr bool push_dtor_test_pq() {
+  C c;
+  typename C::value_type f(42);
+  c.push(f);
+  c.push(f); // ~Bar() (Bar destructor) called here
+  bool b1 = 42 == *c.top().p_ && 2 == c.size();
   c.pop(); // ~Bar() (Bar destructor) called here
   bool b2 = 1 == c.size();
   return b1 && b2;
