@@ -3,7 +3,9 @@
 #include <list>
 #include <queue>
 
-template <typename Q> constexpr bool queue_test1() {
+template <typename Q>
+constexpr bool queue_test1()
+{
   Q q;
   bool b0 = q.empty();
   auto sz0 = q.size();
@@ -30,7 +32,9 @@ template <typename Q> constexpr bool queue_test1() {
 }
 
 // tests copy ctor and operator=
-template <typename Q> constexpr bool queue_test2() {
+template <typename Q>
+constexpr bool queue_test2()
+{
   Q q1;
   q1.push(42);
   Q q2 = q1;
@@ -39,26 +43,26 @@ template <typename Q> constexpr bool queue_test2() {
   return q1.size() == q2.size() && 42 == q3.front();
 }
 
-void queue_tests() {
+constexpr bool doit()
+{
   using namespace tests_util;
 
-  static_assert(queue_test1<std::queue<int>>());
-  static_assert(queue_test1<std::queue<int, std::list<int>>>());
+  bool b = queue_test1<std::queue<int>>();
+  b = b && queue_test1<std::queue<int, std::list<int>>>();
 
-  static_assert(queue_test2<std::queue<int>>());
-  static_assert(queue_test2<std::queue<int, std::list<int>>>());
+  b = b && queue_test2<std::queue<int>>();
+  b = b && queue_test2<std::queue<int, std::list<int>>>();
 
-  static_assert(push_dtor_test<std::queue<Bar<>>>());
-  static_assert(push_dtor_test<std::queue<Bar<>, std::list<Bar<>>>>());
+  b = b && push_dtor_test<std::queue<Bar<>>>();
+  b = b && push_dtor_test<std::queue<Bar<>, std::list<Bar<>>>>();
 
-  assert((queue_test1<std::queue<int>>()));
-  assert((queue_test1<std::queue<int, std::list<int>>>()));
+  return b;
+}
 
-  assert((queue_test2<std::queue<int>>()));
-  assert((queue_test2<std::queue<int, std::list<int>>>()));
-
-  assert((push_dtor_test<std::queue<Bar<>>>()));
-  assert((push_dtor_test<std::queue<Bar<>, std::list<Bar<>>>>()));
+void queue_tests()
+{
+  assert(doit());
+  static_assert(doit());
 }
 
 int main(int argc, char *argv[])
