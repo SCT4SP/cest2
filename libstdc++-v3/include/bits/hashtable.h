@@ -794,6 +794,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       template<typename _Kt,
 	       typename = __has_is_transparent_t<_Hash, _Kt>,
 	       typename = __has_is_transparent_t<_Equal, _Kt>>
+	_GLIBCXX_CEST_CONSTEXPR
 	iterator
 	_M_find_tr(const _Kt& __k);
 
@@ -1823,6 +1824,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	   typename _Hash, typename _RangeHash, typename _Unused,
 	   typename _RehashPolicy, typename _Traits>
     template<typename _Kt, typename, typename>
+      _GLIBCXX_CEST_CONSTEXPR
       auto
       _Hashtable<_Key, _Value, _Alloc, _ExtractKey, _Equal,
 		 _Hash, _RangeHash, _Unused, _RehashPolicy, _Traits>::

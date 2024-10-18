@@ -201,6 +201,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
   struct _Hash_impl
   {
+    _GLIBCXX_CEST_CONSTEXPR
     static size_t
     hash(const void* __ptr, size_t __clength,
 	 size_t __seed = static_cast<size_t>(0xc70f6907UL))

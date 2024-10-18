@@ -1493,6 +1493,7 @@ namespace __detail
 			    __bkt_count);
       }
 
+      _GLIBCXX_CEST_CONSTEXPR
       std::size_t
       _M_bucket_index(const _Hash_node_value<_Value, true>& __n,
 		      std::size_t __bkt_count) const
@@ -1511,6 +1512,7 @@ namespace __detail
 		   const _Hash_node_code_cache<false>&) const
       { }
 
+      _GLIBCXX_CEST_CONSTEXPR
       void
       _M_store_code(_Hash_node_code_cache<true>& __n, __hash_code __c) const
       { __n._M_hash_code = __c; }
@@ -1843,6 +1845,7 @@ namespace __detail
 		     const _Hash_node_code_cache<false>&)
       { return true; }
 
+      _GLIBCXX_CEST_CONSTEXPR
       static bool
       _S_equals(__hash_code __c, const _Hash_node_code_cache<true>& __n)
       { return __c == __n._M_hash_code; }

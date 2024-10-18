@@ -3,10 +3,7 @@
 #include <iostream>
 #include <set>
 #include <tuple>
-#include <type_traits>
 #include <limits>
-
-namespace set_tests_ns {
 
 constexpr bool common_static_set_tests()
 {
@@ -264,68 +261,51 @@ template <typename S> constexpr bool set_test10() {
   return b;
 }
 
-template <bool SA, class S1, class S2, class S3, class S4, class S5, class S6,
-          class S7, class S8, class S9, class S10>
-constexpr void doit() {
-  constexpr const auto tup3 = std::tuple{3, 3, 2, 1};
-  constexpr const auto tup4 = std::tuple{3, 1, 2, 3};
-  constexpr const auto tup5 = std::tuple{3, 1, 3, 2};
-  constexpr const auto tup6 = std::tuple{2, 1, 2, 2};
-
-  assert(set_test1<S1>());
-  assert(set_test2<S2>());
-  assert(set_test3<S3>(3, 2, 1) == tup3);
-  assert(set_test3<S3>(1, 2, 3) == tup4);
-  assert(set_test3<S3>(1, 3, 2) == tup5);
-  assert(set_test3<S3>(1, 2, 2) == tup6);
-  assert(set_test4<S4>(1, 2, 3, 4, 5));
-  assert(set_test5<S5>(42));
-  assert(set_test6<S6>(1, 6, 8, 11, 13, 15, 17, 22, 25, 27));
-  assert(set_test6<S6>(27, 25, 22, 17, 15, 13, 11, 8, 6, 1));
-  assert(set_test6<S6>(1, 27, 6, 25, 8, 22, 11, 17, 13, 15));
-  assert(set_test7<S7>());
-  assert(set_test8<S8>());
-  assert(set_test9<S9>());
-  assert(set_test10<S10>());
-
-  if constexpr (SA) {
-    static_assert(set_test1<S1>());
-    static_assert(set_test2<S2>());
-    static_assert(set_test3<S3>(3, 2, 1) == tup3);
-    static_assert(set_test3<S3>(1, 2, 3) == tup4);
-    static_assert(set_test3<S3>(1, 3, 2) == tup5);
-    static_assert(set_test3<S3>(1, 2, 2) == tup6);
-    static_assert(set_test4<S4>(1, 2, 3, 4, 5));
-    static_assert(set_test5<S5>(42));
-    static_assert(set_test6<S6>(1, 6, 8, 11, 13, 15, 17, 22, 25, 27));
-    static_assert(set_test6<S6>(27, 25, 22, 17, 15, 13, 11, 8, 6, 1));
-    static_assert(set_test6<S6>(1, 27, 6, 25, 8, 22, 11, 17, 13, 15));
-    static_assert(set_test7<S7>());
-    static_assert(set_test8<S8>());
-    static_assert(set_test9<S9>());
-    static_assert(set_test10<S10>());
-  }
-}
-
-template <bool SA, template <class...> class St,
-          template <class> class Alloc = std::allocator>
-constexpr void tests_helper()
+constexpr void doit()
 {
-  using set_t  = St<int, std::less<int>, Alloc<int>>;
-  using setF_t = St<test9::FatKey, std::less<>>;
+  using set_t  = std::set<int>;
+  using setF_t = std::set<test9::FatKey, std::less<>>;
+  constexpr const auto tup1 = std::tuple{3, 3, 2, 1};
+  constexpr const auto tup2 = std::tuple{3, 1, 2, 3};
+  constexpr const auto tup3 = std::tuple{3, 1, 3, 2};
+  constexpr const auto tup4 = std::tuple{2, 1, 2, 2};
 
-  doit<SA,set_t,set_t,set_t,set_t,set_t,set_t,set_t,set_t,setF_t,set_t>();
+  assert(set_test1<set_t>());
+  assert(set_test2<set_t>());
+  assert(set_test3<set_t>(3, 2, 1) == tup1);
+  assert(set_test3<set_t>(1, 2, 3) == tup2);
+  assert(set_test3<set_t>(1, 3, 2) == tup3);
+  assert(set_test3<set_t>(1, 2, 2) == tup4);
+  assert(set_test4<set_t>(1, 2, 3, 4, 5));
+  assert(set_test5<set_t>(42));
+  assert(set_test6<set_t>(1, 6, 8, 11, 13, 15, 17, 22, 25, 27));
+  assert(set_test6<set_t>(27, 25, 22, 17, 15, 13, 11, 8, 6, 1));
+  assert(set_test6<set_t>(1, 27, 6, 25, 8, 22, 11, 17, 13, 15));
+  assert(set_test7<set_t>());
+  assert(set_test8<set_t>());
+  assert(set_test9<setF_t>());
+  assert(set_test10<set_t>());
+
+  static_assert(set_test1<set_t>());
+  static_assert(set_test2<set_t>());
+  static_assert(set_test3<set_t>(3, 2, 1) == tup1);
+  static_assert(set_test3<set_t>(1, 2, 3) == tup2);
+  static_assert(set_test3<set_t>(1, 3, 2) == tup3);
+  static_assert(set_test3<set_t>(1, 2, 2) == tup4);
+  static_assert(set_test4<set_t>(1, 2, 3, 4, 5));
+  static_assert(set_test5<set_t>(42));
+  static_assert(set_test6<set_t>(1, 6, 8, 11, 13, 15, 17, 22, 25, 27));
+  static_assert(set_test6<set_t>(27, 25, 22, 17, 15, 13, 11, 8, 6, 1));
+  static_assert(set_test6<set_t>(1, 27, 6, 25, 8, 22, 11, 17, 13, 15));
+  static_assert(set_test7<set_t>());
+  static_assert(set_test8<set_t>());
+  static_assert(set_test9<setF_t>());
+  static_assert(set_test10<set_t>());
 }
-
-void new_set_tests() {
-  tests_helper<true, std::set>();
-}
-
-} // namespace set_tests_ns
 
 void set_tests() {
-  set_tests_ns::new_set_tests();
-  static_assert(set_tests_ns::common_static_set_tests());
+  doit();
+  static_assert(common_static_set_tests());
 }
 
 int main(int argc, char *argv[])

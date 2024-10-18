@@ -5,6 +5,7 @@
 #include <tuple>
 #include <type_traits>
 #include <limits>
+#include <string>
 
 namespace unordered_set_tests_ns {
 
@@ -245,15 +246,15 @@ constexpr bool unordered_set_test9b()
     using hash_type = hash<string_view>;
     using is_transparent = void;
 
-    size_t operator()(const char* str) const
+    constexpr size_t operator()(const char* str) const
     {
       return hash_type{}(str);
     }
-    size_t operator()(string_view str) const
+    constexpr size_t operator()(string_view str) const
     {
       return hash_type{}(str);
     }
-    size_t operator()(string const& str) const
+    constexpr size_t operator()(string const& str) const
     {
       return hash_type{}(str);
     }
@@ -265,10 +266,18 @@ constexpr bool unordered_set_test9b()
   if (auto search = example.find(2); search != example.end())
     i = *search;
 
-  unordered_set<string, string_hash, equal_to<>> set{"one"s, "two"s};
-  bool b1 = set.find("one") != set.end();
-  bool b2 = set.find("one"s) != set.end();
-  bool b3 = set.find("one"sv) != set.end();
+  using uset_t = unordered_set<string, string_hash, equal_to<>>;
+#if __clang__
+  // So avoiding https://github.com/llvm/llvm-project/issues/112894
+  uset_t set{string{"one"}, string{"two"}};
+  bool b1 = set.find(string{"one"}) != set.end();
+  bool b2 = set.find(string_view{"one"}) != set.end();
+#else
+  uset_t set{"one"s, "two"s};
+  bool b1 = set.find("one"s) != set.end();
+  bool b2 = set.find("one"sv) != set.end();
+#endif
+  bool b3 = set.find("one") != set.end();
 
   return i==2 && b1 && b2 && b3;
 }
@@ -321,7 +330,7 @@ constexpr void doit() {
   assert(set_test6<S>(1, 27, 6, 25, 8, 22, 11, 17, 13, 15));
   assert(set_test7<S>());
   assert(set_test8<S>());
-//  assert(unordered_set_test9b());
+  assert(unordered_set_test9b());
   assert(set_test10<S>());
 
   if constexpr (SA) {
@@ -338,7 +347,7 @@ constexpr void doit() {
     static_assert(set_test6<S>(1, 27, 6, 25, 8, 22, 11, 17, 13, 15));
     static_assert(set_test7<S>());
     static_assert(set_test8<S>());
-//    static_assert(unordered_set_test9b());
+    static_assert(unordered_set_test9b());
     static_assert(set_test10<S>());
   }
 }
