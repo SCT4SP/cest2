@@ -1,9 +1,8 @@
 #include <algorithm>
 #include <cassert>
-#include <iostream>
 #include <set>
 #include <tuple>
-#include <limits>
+#include <limits> // std::numeric_limits
 
 constexpr bool common_static_set_tests()
 {
@@ -22,26 +21,29 @@ constexpr bool common_static_set_tests()
   return true;
 }
 
-template <typename S> constexpr bool set_test1() {
-  S set;
+constexpr bool set_test1()
+{
+  std::set<int> s;
 
-  auto r1 = set.insert(3); // set size increased: insert done
-  auto r2 = set.insert(3); // set size unchanged: insert not done
-  return r1.first != set.end() && 3 == *r1.first && r1.second &&
+  auto r1 = s.insert(3); // set size increased: insert done
+  auto r2 = s.insert(3); // set size unchanged: insert not done
+  return r1.first != s.end() && 3 == *r1.first && r1.second &&
          r2.first == r1.first && 3 == *r2.first && !r2.second;
 }
 
-template <typename S> constexpr bool set_test2() {
-  S set;
+constexpr bool set_test2()
+{
+  std::set<int> s;
 
-  auto r1 = set.insert(1);
-  auto r2 = set.insert(2);
-  return 2 == set.size() && 1 == *r1.first && r1.second && 2 == *r2.first &&
+  auto r1 = s.insert(1);
+  auto r2 = s.insert(2);
+  return 2 == s.size() && 1 == *r1.first && r1.second && 2 == *r2.first &&
          r2.second;
 }
 
-template <typename S, typename T> constexpr auto set_test3(T x, T y, T z) {
-  S s;
+constexpr auto set_test3(int x, int y, int z)
+{
+  std::set<int> s;
 
   auto r1 = s.insert(x);
   auto r2 = s.insert(y);
@@ -51,20 +53,22 @@ template <typename S, typename T> constexpr auto set_test3(T x, T y, T z) {
   return std::tuple{s.size(), *r1.first, *r2.first, *r3.first};
 }
 
-template <class T, class U> constexpr T &inserts(T &s, U x) {
+template <class T, class U> constexpr T &inserts(T &s, U x)
+{
   s.insert(x);
   return s;
 }
 
 template <class T, class U, class... Us>
-constexpr T &inserts(T &s, U x, Us... xs) {
+constexpr T &inserts(T &s, U x, Us... xs)
+{
   s.insert(x);
   return inserts(s, xs...);
 }
 
-template <typename S, typename T>
-constexpr bool set_test4(T x1, T x2, T x3, T x4, T x5) {
-  S s1, s2, s3;
+constexpr bool set_test4(int x1, int x2, int x3, int x4, int x5)
+{
+  std::set<int> s1, s2, s3;
   s1.insert(x1);
   s1.insert(x2);
   s1.insert(x3);
@@ -84,8 +88,9 @@ constexpr bool set_test4(T x1, T x2, T x3, T x4, T x5) {
   return 5 == s1.size() && 5 == s2.size() && 5 == s3.size();
 }
 
-template <typename S, typename T> constexpr bool set_test5(const T x) {
-  S s;
+constexpr bool set_test5(const int x)
+{
+  std::set<int> s;
 
   auto ib0 = s.begin();
   auto ie0 = s.end();
@@ -94,24 +99,25 @@ template <typename S, typename T> constexpr bool set_test5(const T x) {
   s.insert(x);
   auto ib1 = s.begin();
   bool b1 = ib1 == ie0;
-  T a = *ib1;
+  int a = *ib1;
   s.insert(x-1);
   auto ib2 = s.begin();
   bool b2 = ib2 == ie0;
-  T b = *ib2;
+  int b = *ib2;
   s.insert(x+1);
   auto ib3 = s.begin();
   bool b3 = ib3 == ie0;
-  T c = *ib3;
+  int c = *ib3;
 
   return b0 && !b1 && !b2 && !b3 && x == a && (x-1) == b && (x-1) == c &&
          3 == s.size();
 }
 
 // test pre-increment (and insert, begin and end)
-template <typename S, typename T, typename... Ts>
-constexpr bool set_test6(T x, Ts... xs) {
-  S s;
+template <typename T, typename... Ts>
+constexpr bool set_test6(T x, Ts... xs)
+{
+  std::set<int> s;
 
   s.insert(x);
   auto it = s.begin();
@@ -175,12 +181,23 @@ constexpr bool set_test6(T x, Ts... xs) {
 }
 
 // tests post-increment
-template <typename S> constexpr bool set_test7() {
-  S s;
+constexpr bool set_test7()
+{
+  std::set<int> s;
   inserts(s, 1, 5, 4, 2, 3);
   auto it0 = s.begin();
   auto it1 = it0++;
   return 2 == *it0 && 1 == *it1;
+}
+
+// tests find
+constexpr bool set_test8()
+{
+  std::set<int> s;
+  inserts(s, 1, 2, 3, 4);
+  auto it = s.find(2);
+  bool ok = it != s.end();
+  return ok;
 }
 
 namespace test9 {
@@ -202,21 +219,14 @@ constexpr bool operator<(const FatKey &fk1, const FatKey &fk2) {
 }
 } // namespace test9
 
-// tests find
-template <typename S> constexpr bool set_test8() {
-  S s;
-  inserts(s, 1, 2, 3, 4);
-  auto it = s.find(2);
-  bool ok = it != s.end();
-  return ok;
-}
-
-template <typename S> constexpr bool set_test9() {
+constexpr bool set_test9()
+{
   using namespace test9;
+  using setF_t = std::set<test9::FatKey, std::less<>>;
 
   LightKey lk = {2};
 
-  S s;
+  setF_t s;
   FatKey fk{2, {}};
   inserts(s, FatKey{1, {}}, FatKey{2, {}}, FatKey{3, {}}, FatKey{4, {}});
   auto it = s.find(lk);  // The C++14 template version of find
@@ -233,24 +243,25 @@ template <typename S> constexpr bool set_test9() {
   return ok && 2 == x && 2 == xf && 3 == x2 && 3 == x3;
 }
 
-template <typename S> constexpr bool set_test10() {
-  S s1;
+constexpr bool set_test10()
+{
+  std::set<int> s1;
   inserts(s1, 1, 2, 3);
-  const S s2 = s1;
+  const std::set<int> s2 = s1;
   bool b = 3 == s1.size() && 3 == s2.size();
 
-  S s3, s4;
+  std::set<int> s3, s4;
   inserts(s3, 1, 2, 3, 4, 5);
   s4 = s3;
   s3 = s1;
-  S s5 = s1;
+  std::set<int> s5 = s1;
   s5.clear();
   b = b && 3 == s3.size() && 5 == s4.size() && s5.empty();
 
   int arr[] = {1, 2, 3};
-  S s6{std::begin(arr), std::end(arr)};   // {1,2,3}
+  std::set<int> s6{std::begin(arr), std::end(arr)};   // {1,2,3}
   auto nh = s6.extract(1);                //   {2,3}
-  S s7{std::begin(arr)+1, std::end(arr)}; //   {2,3}
+  std::set<int> s7{std::begin(arr)+1, std::end(arr)}; //   {2,3}
   b = b && 1==nh.value() && 2==s6.size() && s6==s7;
   nh.value() = 4;
   nh.get_allocator();
@@ -261,50 +272,33 @@ template <typename S> constexpr bool set_test10() {
   return b;
 }
 
-constexpr void doit()
+constexpr bool doit()
 {
-  using set_t  = std::set<int>;
-  using setF_t = std::set<test9::FatKey, std::less<>>;
-  constexpr const auto tup1 = std::tuple{3, 3, 2, 1};
-  constexpr const auto tup2 = std::tuple{3, 1, 2, 3};
-  constexpr const auto tup3 = std::tuple{3, 1, 3, 2};
-  constexpr const auto tup4 = std::tuple{2, 1, 2, 2};
+  constexpr const std::tuple<int,int,int,int> t[] =
+    {{3, 3, 2, 1}, {3, 1, 2, 3}, {3, 1, 3, 2}, {2, 1, 2, 2}};
 
-  assert(set_test1<set_t>());
-  assert(set_test2<set_t>());
-  assert(set_test3<set_t>(3, 2, 1) == tup1);
-  assert(set_test3<set_t>(1, 2, 3) == tup2);
-  assert(set_test3<set_t>(1, 3, 2) == tup3);
-  assert(set_test3<set_t>(1, 2, 2) == tup4);
-  assert(set_test4<set_t>(1, 2, 3, 4, 5));
-  assert(set_test5<set_t>(42));
-  assert(set_test6<set_t>(1, 6, 8, 11, 13, 15, 17, 22, 25, 27));
-  assert(set_test6<set_t>(27, 25, 22, 17, 15, 13, 11, 8, 6, 1));
-  assert(set_test6<set_t>(1, 27, 6, 25, 8, 22, 11, 17, 13, 15));
-  assert(set_test7<set_t>());
-  assert(set_test8<set_t>());
-  assert(set_test9<setF_t>());
-  assert(set_test10<set_t>());
+  bool b = set_test1();
+  b = b && set_test2();
+  b = b && set_test3(3, 2, 1) == t[0];
+  b = b && set_test3(1, 2, 3) == t[1];
+  b = b && set_test3(1, 3, 2) == t[2];
+  b = b && set_test3(1, 2, 2) == t[3];
+  b = b && set_test4(1, 2, 3, 4, 5);
+  b = b && set_test5(42);
+  b = b && set_test6(1, 6, 8, 11, 13, 15, 17, 22, 25, 27);
+  b = b && set_test6(27, 25, 22, 17, 15, 13, 11, 8, 6, 1);
+  b = b && set_test6(1, 27, 6, 25, 8, 22, 11, 17, 13, 15);
+  b = b && set_test7();
+  b = b && set_test8();
+  b = b && set_test9();
+  b = b && set_test10();
 
-  static_assert(set_test1<set_t>());
-  static_assert(set_test2<set_t>());
-  static_assert(set_test3<set_t>(3, 2, 1) == tup1);
-  static_assert(set_test3<set_t>(1, 2, 3) == tup2);
-  static_assert(set_test3<set_t>(1, 3, 2) == tup3);
-  static_assert(set_test3<set_t>(1, 2, 2) == tup4);
-  static_assert(set_test4<set_t>(1, 2, 3, 4, 5));
-  static_assert(set_test5<set_t>(42));
-  static_assert(set_test6<set_t>(1, 6, 8, 11, 13, 15, 17, 22, 25, 27));
-  static_assert(set_test6<set_t>(27, 25, 22, 17, 15, 13, 11, 8, 6, 1));
-  static_assert(set_test6<set_t>(1, 27, 6, 25, 8, 22, 11, 17, 13, 15));
-  static_assert(set_test7<set_t>());
-  static_assert(set_test8<set_t>());
-  static_assert(set_test9<setF_t>());
-  static_assert(set_test10<set_t>());
+  return b;
 }
 
 void set_tests() {
-  doit();
+  assert(doit());
+  static_assert(doit());
   static_assert(common_static_set_tests());
 }
 
