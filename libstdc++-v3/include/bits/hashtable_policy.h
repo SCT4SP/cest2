@@ -71,12 +71,14 @@ namespace __detail
     { return __first != __last ? 1 : 0; }
 
   template<typename _Iterator>
+    _GLIBCXX_CEST_CONSTEXPR
     inline typename std::iterator_traits<_Iterator>::difference_type
     __distance_fw(_Iterator __first, _Iterator __last,
 		  std::forward_iterator_tag)
     { return std::distance(__first, __last); }
 
   template<typename _Iterator>
+    _GLIBCXX_CEST_CONSTEXPR
     inline typename std::iterator_traits<_Iterator>::difference_type
     __distance_fw(_Iterator __first, _Iterator __last)
     { return __distance_fw(__first, __last,
@@ -531,10 +533,12 @@ namespace __detail
 
       _Node_const_iterator() = default;
 
+      _GLIBCXX_CEST_CONSTEXPR
       explicit
       _Node_const_iterator(__node_type* __p) noexcept
       : __base_type(__p) { }
 
+      _GLIBCXX_CEST_CONSTEXPR
       _Node_const_iterator(const __iterator& __x) noexcept
       : __base_type(__x._M_cur) { }
 
@@ -663,6 +667,7 @@ namespace __detail
     _M_next_bkt(std::size_t __n) const;
 
     // Return a bucket count appropriate for n elements
+    _GLIBCXX_CEST_CONSTEXPR
     std::size_t
     _M_bkt_for_elements(std::size_t __n) const
     { return __builtin_ceil(__n / (double)_M_max_load_factor); }
@@ -2271,7 +2276,11 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 namespace __detail
 {
   // The sentinel value is kept only for abi backward compatibility.
+#if _GLIBCXX_CEST_VERSION
+  extern constexpr unsigned long __prime_list[] = // 256 + 1 or 256 + 48 + 1
+#else
   extern const unsigned long __prime_list[] = // 256 + 1 or 256 + 48 + 1
+#endif
   {
     2ul, 3ul, 5ul, 7ul, 11ul, 13ul, 17ul, 19ul, 23ul, 29ul, 31ul,
     37ul, 41ul, 43ul, 47ul, 53ul, 59ul, 61ul, 67ul, 71ul, 73ul, 79ul,

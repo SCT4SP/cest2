@@ -1030,6 +1030,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  @param __eql  A key equality functor.
        *  @param __a  An allocator object.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       explicit
       unordered_multiset(size_type __n,
 			 const hasher& __hf = hasher(),
@@ -1052,6 +1053,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  distance(__first,__last)).
        */
       template<typename _InputIterator>
+	_GLIBCXX_CEST_CONSTEXPR
 	unordered_multiset(_InputIterator __first, _InputIterator __last,
 			   size_type __n = 0,
 			   const hasher& __hf = hasher(),
@@ -1077,6 +1079,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  Create an %unordered_multiset consisting of copies of the elements in
        *  the list. This is linear in N (where N is @a __l.size()).
        */
+      _GLIBCXX_CEST_CONSTEXPR
       unordered_multiset(initializer_list<value_type> __l,
 			 size_type __n = 0,
 			 const hasher& __hf = hasher(),
@@ -1184,16 +1187,20 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
       // size and capacity:
 
       ///  Returns true if the %unordered_multiset is empty.
-      _GLIBCXX_NODISCARD bool
+      _GLIBCXX_NODISCARD
+      _GLIBCXX_CEST_CONSTEXPR
+      bool
       empty() const noexcept
       { return _M_h.empty(); }
 
       ///  Returns the size of the %unordered_multiset.
+      _GLIBCXX_CEST_CONSTEXPR
       size_type
       size() const noexcept
       { return _M_h.size(); }
 
       ///  Returns the maximum size of the %unordered_multiset.
+      _GLIBCXX_CEST_CONSTEXPR
       size_type
       max_size() const noexcept
       { return _M_h.max_size(); }
@@ -1205,6 +1212,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  Returns a read-only (constant) iterator that points to the first
        *  element in the %unordered_multiset.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       iterator
       begin() noexcept
       { return _M_h.begin(); }
@@ -1232,6 +1240,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  Returns a read-only (constant) iterator that points to the first
        *  element in the %unordered_multiset.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       const_iterator
       cbegin() const noexcept
       { return _M_h.begin(); }
@@ -1240,6 +1249,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  Returns a read-only (constant) iterator that points one past the last
        *  element in the %unordered_multiset.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       const_iterator
       cend() const noexcept
       { return _M_h.end(); }
@@ -1254,6 +1264,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  Insertion requires amortized constant time.
        */
       template<typename... _Args>
+	_GLIBCXX_CEST_CONSTEXPR
 	iterator
 	emplace(_Args&&... __args)
 	{ return _M_h.emplace(std::forward<_Args>(__args)...); }
@@ -1276,6 +1287,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  Insertion requires amortized constant time.
        */
       template<typename... _Args>
+	_GLIBCXX_CEST_CONSTEXPR
 	iterator
 	emplace_hint(const_iterator __pos, _Args&&... __args)
 	{ return _M_h.emplace_hint(__pos, std::forward<_Args>(__args)...); }
@@ -1292,6 +1304,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
       insert(const value_type& __x)
       { return _M_h.insert(__x); }
 
+      _GLIBCXX_CEST_CONSTEXPR
       iterator
       insert(value_type&& __x)
       { return _M_h.insert(std::move(__x)); }
@@ -1357,6 +1370,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
       }
 
       /// Extract a node.
+      _GLIBCXX_CEST_CONSTEXPR
       node_type
       extract(const key_type& __key)
       { return _M_h.extract(__key); }
@@ -1392,6 +1406,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
       { return _M_h.erase(__position); }
 
       // LWG 2059.
+      _GLIBCXX_CEST_CONSTEXPR
       iterator
       erase(iterator __position)
       { return _M_h.erase(__position); }
@@ -1441,6 +1456,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  elements themselves are pointers, the pointed-to memory is not touched
        *  in any way. Managing the pointer is the user's responsibility.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       void
       clear() noexcept
       { _M_h.clear(); }
@@ -1454,6 +1470,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  Note that the global std::swap() function is specialized such that
        *  std::swap(s1,s2) will feed to this function.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       void
       swap(unordered_multiset& __x)
       noexcept( noexcept(_M_h.swap(__x._M_h)) )
@@ -1520,6 +1537,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  pointing to the sought after element.  If unsuccessful it returns the
        *  past-the-end ( @c end() ) iterator.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       iterator
       find(const key_type& __x)
       { return _M_h.find(__x); }

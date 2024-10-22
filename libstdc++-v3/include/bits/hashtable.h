@@ -546,6 +546,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 		   true_type __uks);
 
       template<typename _InputIterator>
+	_GLIBCXX_CEST_CONSTEXPR
 	_Hashtable(_InputIterator __first, _InputIterator __last,
 		   size_type __bkt_count_hint,
 		   const _Hash&, const _Equal&, const allocator_type&,
@@ -568,6 +569,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 		 const allocator_type& __a = allocator_type());
 
       // Use delegating constructors.
+      _GLIBCXX_CEST_CONSTEXPR
       _Hashtable(_Hashtable&& __ht)
 	noexcept(_S_nothrow_move())
       : _Hashtable(std::move(__ht), std::move(__ht._M_node_allocator()),
@@ -673,6 +675,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       cbegin() const noexcept
       { return const_iterator(_M_begin()); }
 
+      _GLIBCXX_CEST_CONSTEXPR
       const_iterator
       cend() const noexcept
       { return const_iterator(nullptr); }
@@ -692,6 +695,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       get_allocator() const noexcept
       { return allocator_type(this->_M_node_allocator()); }
 
+      _GLIBCXX_CEST_CONSTEXPR
       size_type
       max_size() const noexcept
       { return __node_alloc_traits::max_size(this->_M_node_allocator()); }
@@ -920,6 +924,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       __node_base_ptr
       _M_get_previous_node(size_type __bkt, __node_ptr __n);
 
+      _GLIBCXX_CEST_CONSTEXPR
       pair<__node_ptr, __hash_code>
       _M_compute_hash_code(__node_ptr __hint, const key_type& __k) const;
 
@@ -933,6 +938,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
       // Insert node __n with key __k and hash code __code.
       // Takes ownership of __n if insertion succeeds, throws otherwise.
+      _GLIBCXX_CEST_CONSTEXPR
       iterator
       _M_insert_multi_node(__node_ptr __hint,
 			   __hash_code __code, __node_ptr __n);
@@ -943,6 +949,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	_M_emplace(true_type __uks, _Args&&... __args);
 
       template<typename... _Args>
+	_GLIBCXX_CEST_CONSTEXPR
 	iterator
 	_M_emplace(false_type __uks, _Args&&... __args)
 	{ return _M_emplace(cend(), __uks, std::forward<_Args>(__args)...); }
@@ -954,6 +961,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	{ return _M_emplace(__uks, std::forward<_Args>(__args)...).first; }
 
       template<typename... _Args>
+	_GLIBCXX_CEST_CONSTEXPR
 	iterator
 	_M_emplace(const_iterator, false_type __uks, _Args&&... __args);
 
@@ -1004,6 +1012,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	}
 
       template<typename _Arg, typename _NodeGenerator>
+	_GLIBCXX_CEST_CONSTEXPR
 	iterator
 	_M_insert(_Arg&& __arg, const _NodeGenerator& __node_gen,
 		  false_type __uks)
@@ -1026,6 +1035,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
       // Insert with hint when keys are not unique.
       template<typename _Arg, typename _NodeGenerator>
+	_GLIBCXX_CEST_CONSTEXPR
 	iterator
 	_M_insert(const_iterator, _Arg&&,
 		  const _NodeGenerator&, false_type __uks);
@@ -1042,11 +1052,13 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     public:
       // Emplace
       template<typename... _Args>
+	_GLIBCXX_CEST_CONSTEXPR
 	__ireturn_type
 	emplace(_Args&&... __args)
 	{ return _M_emplace(__unique_keys{}, std::forward<_Args>(__args)...); }
 
       template<typename... _Args>
+	_GLIBCXX_CEST_CONSTEXPR
 	iterator
 	emplace_hint(const_iterator __hint, _Args&&... __args)
 	{
@@ -1331,6 +1343,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	   typename _Hash, typename _RangeHash, typename _Unused,
 	   typename _RehashPolicy, typename _Traits>
     template<typename _InputIterator>
+      _GLIBCXX_CEST_CONSTEXPR
       _Hashtable<_Key, _Value, _Alloc, _ExtractKey, _Equal,
 		 _Hash, _RangeHash, _Unused, _RehashPolicy, _Traits>::
       _Hashtable(_InputIterator __f, _InputIterator __l,
@@ -2230,6 +2243,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	   typename _Hash, typename _RangeHash, typename _Unused,
 	   typename _RehashPolicy, typename _Traits>
     template<typename... _Args>
+      _GLIBCXX_CEST_CONSTEXPR
       auto
       _Hashtable<_Key, _Value, _Alloc, _ExtractKey, _Equal,
 		 _Hash, _RangeHash, _Unused, _RehashPolicy, _Traits>::
@@ -2252,6 +2266,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	   typename _ExtractKey, typename _Equal,
 	   typename _Hash, typename _RangeHash, typename _Unused,
 	   typename _RehashPolicy, typename _Traits>
+    _GLIBCXX_CEST_CONSTEXPR
     auto
     _Hashtable<_Key, _Value, _Alloc, _ExtractKey, _Equal,
 	       _Hash, _RangeHash, _Unused, _RehashPolicy, _Traits>::
@@ -2313,6 +2328,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	   typename _ExtractKey, typename _Equal,
 	   typename _Hash, typename _RangeHash, typename _Unused,
 	   typename _RehashPolicy, typename _Traits>
+    _GLIBCXX_CEST_CONSTEXPR
     auto
     _Hashtable<_Key, _Value, _Alloc, _ExtractKey, _Equal,
 	       _Hash, _RangeHash, _Unused, _RehashPolicy, _Traits>::
@@ -2410,6 +2426,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	   typename _Hash, typename _RangeHash, typename _Unused,
 	   typename _RehashPolicy, typename _Traits>
     template<typename _Arg, typename _NodeGenerator>
+      _GLIBCXX_CEST_CONSTEXPR
       auto
       _Hashtable<_Key, _Value, _Alloc, _ExtractKey, _Equal,
 		 _Hash, _RangeHash, _Unused, _RehashPolicy, _Traits>::
