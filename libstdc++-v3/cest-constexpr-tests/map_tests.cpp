@@ -3,27 +3,22 @@
 #include <unordered_map>
 #include <type_traits>
 
-constexpr bool common_static_map_tests()
+template <template <class...> class M>
+constexpr bool static_tests()
 {
   using namespace std;
-  auto f = []<template <class...> class M>()
-  {
-    static_assert(sizeof(M<float, int>) == sizeof(M<double, int>));
-    static_assert(sizeof(M<int, float>) == sizeof(M<int, double>));
-    using       iter_t = typename M<char, int>::iterator;
-    using const_iter_t = typename M<char, int>::const_iterator;
-    static_assert(weakly_incrementable<iter_t>);
-    static_assert(weakly_incrementable<const_iter_t>);
-    using tag_t = conditional_t<is_same_v<M<char,int>, map<char,int>>,
-                    bidirectional_iterator_tag, forward_iterator_tag>;
-    static_assert(is_same_v<typename iter_t::iterator_category, tag_t>);
-    static_assert(!is_same_v<iter_t, const_iter_t>);
-  };
+  bool b = sizeof(M<float, int>) == sizeof(M<double, int>);
+  b = b && sizeof(M<int, float>) == sizeof(M<int, double>);
+  using       iter_t = typename M<char, int>::iterator;
+  using const_iter_t = typename M<char, int>::const_iterator;
+  b = b && weakly_incrementable<iter_t>;
+  b = b && weakly_incrementable<const_iter_t>;
+  using tag_t = conditional_t<is_same_v<M<char,int>, map<char,int>>,
+                  bidirectional_iterator_tag, forward_iterator_tag>;
+  b = b &&  is_same_v<typename iter_t::iterator_category, tag_t>;
+  b = b && !is_same_v<iter_t, const_iter_t>;
 
-  f.operator()<map>();
-  f.operator()<unordered_map>();
-
-  return true;
+  return b;
 }
 
 template <template <class...> class M, class T, class U>
@@ -93,18 +88,27 @@ constexpr bool map_test3() {
   return b1 && b2 && b3;
 }
 
-void map_tests() {
-  static_assert(common_static_map_tests());
+void map_tests()
+{
+  static_assert(static_tests<std::map>());
   static_assert(map_test1<std::map, char, int>());
   static_assert(map_test2<std::map, char, int>());
   static_assert(map_test3<std::map, char, int>());
+
+  assert(static_tests<std::map>());
+  assert((map_test1<std::map, char, int>()));
+  assert((map_test2<std::map, char, int>()));
+  assert((map_test3<std::map, char, int>()));
+}
+
+void unordered_map_tests()
+{
+  static_assert(static_tests<std::unordered_map>());
   static_assert(map_test1<std::unordered_map, char, int>());
   static_assert(map_test2<std::unordered_map, char, int>());
   static_assert(map_test3<std::unordered_map, char, int>());
 
-  assert((map_test1<std::map, char, int>()));
-  assert((map_test2<std::map, char, int>()));
-  assert((map_test3<std::map, char, int>()));
+  assert(static_tests<std::unordered_map>());
   assert((map_test1<std::unordered_map, char, int>()));
   assert((map_test2<std::unordered_map, char, int>()));
   assert((map_test3<std::unordered_map, char, int>()));
@@ -113,5 +117,6 @@ void map_tests() {
 int main(int argc, char *argv[])
 {
   map_tests();
+  unordered_map_tests();
   return 0;
 }
