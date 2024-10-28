@@ -16,7 +16,7 @@ template <std::floating_point T> [[nodiscard]]
 constexpr bool is_float_equal(T x, T y) { return y == std::nextafter(x, y); }
 
 template <std::floating_point T>
-constexpr bool cmath_tests()
+constexpr bool basic_cmath_tests()
 {
   const T one = 1, two = 2, four = 4;
   T pi = std::atan(one) * 4;
@@ -34,26 +34,48 @@ constexpr bool cmath_tests()
 }
 
 template <std::floating_point T>
+constexpr bool infinite_math_tests()
+{
+  auto inf = std::numeric_limits<T>::infinity();
+  T zero = 0;
+  bool b = std::isinf(inf) && std::isinf(-inf) && !std::isinf(zero);
+  auto qnan = std::numeric_limits<T>::quiet_NaN();
+  auto snan = std::numeric_limits<T>::signaling_NaN();
+  b = b && std::isnan(qnan) && std::isnan(snan);
+
+  b = b && std::fpclassify( inf)==FP_INFINITE;
+  b = b && std::fpclassify(-inf)==FP_INFINITE;
+  b = b && std::fpclassify(qnan)==FP_NAN;
+  b = b && std::fpclassify(snan)==FP_NAN;
+  b = b && std::fpclassify(zero)==FP_ZERO;
+  b = b && std::fpclassify(zero)==FP_ZERO;
+
+  return b;
+}
+
+template <std::floating_point T>
 constexpr void run_cmath_tests()
 {
+  assert(basic_cmath_tests<T>());
 #ifndef __clang__
-  assert(cmath_tests<T>());
-  static_assert(cmath_tests<T>());
+  static_assert(basic_cmath_tests<T>());
 #endif
+
+  assert(infinite_math_tests<T>());
+  static_assert(infinite_math_tests<T>());
 }
 
 int main(int argc, char *argv[])
 {
 #ifndef __clang__
-  static_assert(!std::is_same_v<std::float128_t, long double>);
+  static_assert(!std::is_same_v<std::float128_t, long double>); // just saying
 #endif
   run_cmath_tests<float>();
   run_cmath_tests<double>();
   run_cmath_tests<long double>();
-  // https://sourceware.org/bugzilla/show_bug.cgi?id=32312
-  // GCC: undefined reference to `nextafterf16'
-  run_cmath_tests<std::float16_t>();
 #ifndef __clang__
+  run_cmath_tests<std::float16_t>();
+  run_cmath_tests<std::bfloat16_t>();
   run_cmath_tests<std::float128_t>();
 #endif
 
