@@ -52,7 +52,7 @@ int main(int argc, char *argv[])
   run_cmath_tests<long double>();
   // https://sourceware.org/bugzilla/show_bug.cgi?id=32312
   // GCC: undefined reference to `nextafterf16'
-  //run_cmath_tests<std::float16_t>();
+  run_cmath_tests<std::float16_t>();
 #ifndef __clang__
   run_cmath_tests<std::float128_t>();
 #endif
