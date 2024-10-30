@@ -171,6 +171,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       }
 
     private:
+      _GLIBCXX_CEST_CONSTEXPR
       _List_node_base* _M_base() { return this; }
     };
 
