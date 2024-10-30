@@ -2,6 +2,7 @@
 #include <numbers>
 #include <concepts>
 #include <cassert>
+#include <climits> // INT_MAX
 #ifndef __clang__
 #include <stdfloat>
 #endif
@@ -37,11 +38,11 @@ template <std::floating_point T>
 constexpr bool infinite_math_tests()
 {
   auto inf = std::numeric_limits<T>::infinity();
-  T zero = 0;
-  bool b = std::isinf(inf) && std::isinf(-inf) && !std::isinf(zero);
   auto qnan = std::numeric_limits<T>::quiet_NaN();
   auto snan = std::numeric_limits<T>::signaling_NaN();
-  b = b && std::isnan(qnan) && std::isnan(snan);
+  T zero = 0;
+  bool b = std::isinf( inf) && std::isinf(-inf) && !std::isinf(zero);
+  b = b && std::isnan(qnan) && std::isnan(snan) && !std::isnan(zero);
 
   b = b && std::fpclassify( inf)==FP_INFINITE;
   b = b && std::fpclassify(-inf)==FP_INFINITE;
@@ -49,6 +50,25 @@ constexpr bool infinite_math_tests()
   b = b && std::fpclassify(snan)==FP_NAN;
   b = b && std::fpclassify(zero)==FP_ZERO;
   b = b && std::fpclassify(zero)==FP_ZERO;
+
+  return b;
+}
+
+template <std::floating_point T>
+constexpr bool floor_ceil_logb_tests()
+{
+  auto inf = std::numeric_limits<T>::infinity();
+  auto qnan = std::numeric_limits<T>::quiet_NaN();
+  auto snan = std::numeric_limits<T>::signaling_NaN();
+  T zero = 0, one = 1;
+
+  bool b = true;
+
+  b = b && -1 == std::ilogb(static_cast<T>(0.8));
+  b = b &&  0 == std::ilogb(one);
+  b = b && FP_ILOGB0==std::ilogb(zero);
+  b = b && INT_MAX==std::ilogb(inf);
+  b = b && FP_ILOGBNAN==std::ilogb(qnan) && FP_ILOGBNAN==std::ilogb(snan);
 
   return b;
 }
@@ -63,6 +83,8 @@ constexpr void run_cmath_tests()
 
   assert(infinite_math_tests<T>());
   static_assert(infinite_math_tests<T>());
+
+  assert(floor_ceil_logb_tests<T>());
 }
 
 int main(int argc, char *argv[])
