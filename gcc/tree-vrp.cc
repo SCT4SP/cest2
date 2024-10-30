@@ -18,6 +18,7 @@ You should have received a copy of the GNU General Public License
 along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
+#define INCLUDE_MEMORY
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
@@ -1258,6 +1259,7 @@ execute_fast_vrp (struct function *fun, bool final_p)
   fvrp_folder folder (&dr, final_p);
 
   gcc_checking_assert (!fun->x_range_query);
+  set_all_edges_as_executable (fun);
   fun->x_range_query = &dr;
   // Create a relation oracle without transitives.
   get_range_query (fun)->create_relation_oracle (false);
@@ -1337,7 +1339,7 @@ public:
 	{
 	  use_fvrp = true;
 	  warning (OPT_Wdisabled_optimization,
-		   "Using fast VRP algorithm. %d basic blocks"
+		   "using fast VRP algorithm; %d basic blocks"
 		   " exceeds %<--param=vrp-block-limit=%d%> limit",
 		   n_basic_blocks_for_fn (fun),
 		   param_vrp_block_limit);

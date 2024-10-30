@@ -282,7 +282,7 @@
    (match_operand:<VM> 2 "vector_mask_operand")
    (match_operand 3 "autovec_length_operand")
    (match_operand 4 "const_0_operand")]
-  "TARGET_VECTOR"
+  "TARGET_VECTOR_AUTOVEC_SEGMENT"
   {
     riscv_vector::expand_lanes_load_store (operands, true);
     DONE;
@@ -295,7 +295,7 @@
    (match_operand:<VM> 2 "vector_mask_operand")
    (match_operand 3 "autovec_length_operand")
    (match_operand 4 "const_0_operand")]
-  "TARGET_VECTOR"
+  "TARGET_VECTOR_AUTOVEC_SEGMENT"
   {
     riscv_vector::expand_lanes_load_store (operands, false);
     DONE;
@@ -1485,6 +1485,34 @@
     }
 
   emit_move_insn (operands[0], gen_lowpart (<VLS_HALF>mode, tmp));
+  DONE;
+})
+
+(define_expand "vec_extract<mode><vls_quarter>"
+  [(set (match_operand:<VLS_QUARTER>	 0 "nonimmediate_operand")
+     (vec_select:<VLS_QUARTER>
+       (match_operand:VLS_HAS_QUARTER	 1 "register_operand")
+       (parallel
+	 [(match_operand		 2 "immediate_operand")])))]
+  "TARGET_VECTOR"
+{
+  int sz = GET_MODE_NUNITS (<VLS_QUARTER>mode).to_constant ();
+  int part = INTVAL (operands[2]);
+
+  rtx start = GEN_INT (part * sz);
+  rtx tmp = operands[1];
+
+  if (part != 0)
+    {
+      tmp = gen_reg_rtx (<MODE>mode);
+
+      rtx ops[] = {tmp, operands[1], start};
+      riscv_vector::emit_vlmax_insn
+	(code_for_pred_slide (UNSPEC_VSLIDEDOWN, <MODE>mode),
+	 riscv_vector::BINARY_OP, ops);
+    }
+
+  emit_move_insn (operands[0], gen_lowpart (<VLS_QUARTER>mode, tmp));
   DONE;
 })
 
@@ -2684,6 +2712,17 @@
   }
 )
 
+(define_expand "ssadd<mode>3"
+  [(match_operand:V_VLSI 0 "register_operand")
+   (match_operand:V_VLSI 1 "register_operand")
+   (match_operand:V_VLSI 2 "register_operand")]
+  "TARGET_VECTOR"
+  {
+    riscv_vector::expand_vec_ssadd (operands[0], operands[1], operands[2], <MODE>mode);
+    DONE;
+  }
+)
+
 (define_expand "ussub<mode>3"
   [(match_operand:V_VLSI 0 "register_operand")
    (match_operand:V_VLSI 1 "register_operand")
@@ -2691,6 +2730,17 @@
   "TARGET_VECTOR"
   {
     riscv_vector::expand_vec_ussub (operands[0], operands[1], operands[2], <MODE>mode);
+    DONE;
+  }
+)
+
+(define_expand "sssub<mode>3"
+  [(match_operand:V_VLSI 0 "register_operand")
+   (match_operand:V_VLSI 1 "register_operand")
+   (match_operand:V_VLSI 2 "register_operand")]
+  "TARGET_VECTOR"
+  {
+    riscv_vector::expand_vec_sssub (operands[0], operands[1], operands[2], <MODE>mode);
     DONE;
   }
 )
@@ -2723,6 +2773,40 @@
   "TARGET_VECTOR"
   {
     riscv_vector::expand_vec_oct_ustrunc (operands[0], operands[1], <MODE>mode,
+					  <V_DOUBLE_TRUNC>mode,
+					  <V_QUAD_TRUNC>mode);
+    DONE;
+  }
+)
+
+(define_expand "sstrunc<mode><v_double_trunc>2"
+  [(match_operand:<V_DOUBLE_TRUNC> 0 "register_operand")
+   (match_operand:VWEXTI           1 "register_operand")]
+  "TARGET_VECTOR"
+  {
+    riscv_vector::expand_vec_double_sstrunc (operands[0], operands[1],
+					  <MODE>mode);
+    DONE;
+  }
+)
+
+(define_expand "sstrunc<mode><v_quad_trunc>2"
+  [(match_operand:<V_QUAD_TRUNC> 0 "register_operand")
+   (match_operand:VQEXTI         1 "register_operand")]
+  "TARGET_VECTOR"
+  {
+    riscv_vector::expand_vec_quad_sstrunc (operands[0], operands[1], <MODE>mode,
+					   <V_DOUBLE_TRUNC>mode);
+    DONE;
+  }
+)
+
+(define_expand "sstrunc<mode><v_oct_trunc>2"
+  [(match_operand:<V_OCT_TRUNC> 0 "register_operand")
+   (match_operand:VOEXTI        1 "register_operand")]
+  "TARGET_VECTOR"
+  {
+    riscv_vector::expand_vec_oct_sstrunc (operands[0], operands[1], <MODE>mode,
 					  <V_DOUBLE_TRUNC>mode,
 					  <V_QUAD_TRUNC>mode);
     DONE;
@@ -2805,3 +2889,32 @@
     DONE;
   }
 )
+
+;; =========================================================================
+;; == Strided Load/Store
+;; =========================================================================
+(define_expand "mask_len_strided_load_<mode>"
+  [(match_operand:V     0 "register_operand")
+   (match_operand       1 "pmode_reg_or_0_operand")
+   (match_operand       2 "pmode_reg_or_0_operand")
+   (match_operand:<VM>  3 "vector_mask_operand")
+   (match_operand       4 "autovec_length_operand")
+   (match_operand       5 "const_0_operand")]
+  "TARGET_VECTOR"
+  {
+    riscv_vector::expand_strided_load (<MODE>mode, operands);
+    DONE;
+  })
+
+(define_expand "mask_len_strided_store_<mode>"
+  [(match_operand       0 "pmode_reg_or_0_operand")
+   (match_operand       1 "pmode_reg_or_0_operand")
+   (match_operand:V     2 "register_operand")
+   (match_operand:<VM>  3 "vector_mask_operand")
+   (match_operand       4 "autovec_length_operand")
+   (match_operand       5 "const_0_operand")]
+  "TARGET_VECTOR"
+  {
+    riscv_vector::expand_strided_store (<MODE>mode, operands);
+    DONE;
+  })

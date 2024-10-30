@@ -5049,23 +5049,17 @@ package body Exp_Util is
    ---------------------------------
 
    function Duplicate_Subexpr_No_Checks
-     (Exp           : Node_Id;
-      Name_Req      : Boolean   := False;
-      Renaming_Req  : Boolean   := False;
-      Related_Id    : Entity_Id := Empty;
-      Is_Low_Bound  : Boolean   := False;
-      Is_High_Bound : Boolean   := False) return Node_Id
+     (Exp          : Node_Id;
+      Name_Req     : Boolean := False;
+      Renaming_Req : Boolean := False) return Node_Id
    is
       New_Exp : Node_Id;
 
    begin
       Remove_Side_Effects
-        (Exp           => Exp,
-         Name_Req      => Name_Req,
-         Renaming_Req  => Renaming_Req,
-         Related_Id    => Related_Id,
-         Is_Low_Bound  => Is_Low_Bound,
-         Is_High_Bound => Is_High_Bound);
+        (Exp          => Exp,
+         Name_Req     => Name_Req,
+         Renaming_Req => Renaming_Req);
 
       New_Exp := New_Copy_Tree (Exp);
       Remove_Checks (New_Exp);
@@ -6748,6 +6742,7 @@ package body Exp_Util is
                                         | N_Aggregate
                                         | N_Delta_Aggregate
                                         | N_Extension_Aggregate
+                                        | N_Elsif_Part
               and then Nkind (Parent (Par)) not in N_Function_Call
                                                  | N_Procedure_Call_Statement
                                                  | N_Entry_Call_Statement
@@ -8266,6 +8261,7 @@ package body Exp_Util is
                | N_Expanded_Name
                | N_Explicit_Dereference
                | N_Extension_Aggregate
+               | N_External_Initializer
                | N_Floating_Point_Definition
                | N_Formal_Decimal_Fixed_Point_Definition
                | N_Formal_Derived_Type_Definition
@@ -11578,7 +11574,7 @@ package body Exp_Util is
       --  The aspect Finalizable may change the name of the primitives when
       --  present, but it's a GNAT extension.
 
-      if All_Extensions_Allowed then
+      if Core_Extensions_Allowed then
          declare
             Rep : constant Node_Id :=
               Get_Rep_Item (Typ, Name_Finalizable, Check_Parents => True);

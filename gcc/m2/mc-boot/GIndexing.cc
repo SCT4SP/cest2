@@ -18,6 +18,7 @@ You should have received a copy of the GNU General Public License
 along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
+#define INCLUDE_MEMORY
 #include "config.h"
 #include "system.h"
 #include <stdbool.h>
@@ -426,7 +427,7 @@ extern "C" void Indexing_DeleteIndice (Indexing_Index i, unsigned int j)
       b += sizeof (void *)*(j-static_cast<Indexing_Index__opaque> (i)->Low);
       p = (Indexing_PtrToAddress) (b);
       b += sizeof (void *);
-      p = static_cast<Indexing_PtrToAddress> (libc_memmove (reinterpret_cast<void *> (p), reinterpret_cast<void *> (b), static_cast<size_t> ((static_cast<Indexing_Index__opaque> (i)->High-j)*sizeof (void *))));
+      p = static_cast<Indexing_PtrToAddress> (libc_memmove (reinterpret_cast <void *> (p), reinterpret_cast <void *> (b), static_cast<size_t> ((static_cast<Indexing_Index__opaque> (i)->High-j)*sizeof (void *))));
       static_cast<Indexing_Index__opaque> (i)->High -= 1;
       static_cast<Indexing_Index__opaque> (i)->Used -= 1;
     }

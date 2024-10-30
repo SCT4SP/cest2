@@ -18,6 +18,7 @@ You should have received a copy of the GNU General Public License
 along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
+#define INCLUDE_MEMORY
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
@@ -1107,14 +1108,14 @@ build_cplus_array_type (tree elt_type, tree index_type, int dependent)
 
       if (cplus_array_htab == NULL)
 	cplus_array_htab = hash_table<cplus_array_hasher>::create_ggc (61);
-      
+
       hash = TYPE_UID (elt_type);
       if (index_type)
 	hash ^= TYPE_UID (index_type);
       cai.type = elt_type;
       cai.domain = index_type;
 
-      tree *e = cplus_array_htab->find_slot_with_hash (&cai, hash, INSERT); 
+      tree *e = cplus_array_htab->find_slot_with_hash (&cai, hash, INSERT);
       if (*e)
 	/* We have found the type: we're done.  */
 	return (tree) *e;
@@ -1304,7 +1305,7 @@ cp_build_reference_type_for_mode (tree to_type, machine_mode mode, bool rval)
   if (TYPE_STRUCTURAL_EQUALITY_P (to_type))
     SET_TYPE_STRUCTURAL_EQUALITY (t);
   else if (TYPE_CANONICAL (to_type) != to_type)
-    TYPE_CANONICAL (t) 
+    TYPE_CANONICAL (t)
       = cp_build_reference_type_for_mode (TYPE_CANONICAL (to_type), mode, rval);
   else
     TYPE_CANONICAL (t) = t;
@@ -2009,11 +2010,8 @@ strip_typedefs_expr (tree t, bool *remove_attributes, unsigned int flags)
       }
 
     case LAMBDA_EXPR:
+    case STMT_EXPR:
       return t;
-
-    case STATEMENT_LIST:
-      error ("statement-expression in a constant expression");
-      return error_mark_node;
 
     default:
       break;
@@ -2447,7 +2445,7 @@ ovl_iterator::reveal_node (tree overload, tree node)
   return overload;
 }
 
-/* NODE is on the overloads of OVL.  Remove it.  
+/* NODE is on the overloads of OVL.  Remove it.
    The removed node is unaltered and may continue to be iterated
    from (i.e. it is safe to remove a node from an overload one is
    currently iterating over).  */
@@ -2563,7 +2561,7 @@ lookup_maybe_add (tree fns, tree lookup, bool deduping)
    overloaded functions.  Returns 2 if the function is actually
    overloaded, i.e., if it is impossible to know the type of the
    function without performing overload resolution.  */
- 
+
 int
 is_overloaded_fn (tree x)
 {
@@ -3080,19 +3078,6 @@ cxx_print_statistics (void)
 }
 
 /* Return, as an INTEGER_CST node, the number of elements for TYPE
-   (which is an ARRAY_TYPE).  This counts only elements of the top
-   array.  */
-
-tree
-array_type_nelts_top (tree type)
-{
-  return fold_build2_loc (input_location,
-		      PLUS_EXPR, sizetype,
-		      array_type_nelts (type),
-		      size_one_node);
-}
-
-/* Return, as an INTEGER_CST node, the number of elements for TYPE
    (which is an ARRAY_TYPE).  This one is a recursive count of all
    ARRAY_TYPEs that are clumped together.  */
 
@@ -3141,17 +3126,17 @@ bot_manip (tree* tp, int* walk_subtrees, void* data_)
     {
       tree u;
 
-      if (TREE_CODE (TREE_OPERAND (t, 1)) == AGGR_INIT_EXPR)
+      if (TREE_CODE (TARGET_EXPR_INITIAL (t)) == AGGR_INIT_EXPR)
 	{
-	  u = build_cplus_new (TREE_TYPE (t), TREE_OPERAND (t, 1),
+	  u = build_cplus_new (TREE_TYPE (t), TARGET_EXPR_INITIAL (t),
 			       tf_warning_or_error);
 	  if (u == error_mark_node)
 	    return u;
-	  if (AGGR_INIT_ZERO_FIRST (TREE_OPERAND (t, 1)))
-	    AGGR_INIT_ZERO_FIRST (TREE_OPERAND (u, 1)) = true;
+	  if (AGGR_INIT_ZERO_FIRST (TARGET_EXPR_INITIAL (t)))
+	    AGGR_INIT_ZERO_FIRST (TARGET_EXPR_INITIAL (u)) = true;
 	}
       else
-	u = force_target_expr (TREE_TYPE (t), TREE_OPERAND (t, 1),
+	u = force_target_expr (TREE_TYPE (t), TARGET_EXPR_INITIAL (t),
 			       tf_warning_or_error);
 
       TARGET_EXPR_IMPLICIT_P (u) = TARGET_EXPR_IMPLICIT_P (t);
@@ -3161,12 +3146,12 @@ bot_manip (tree* tp, int* walk_subtrees, void* data_)
 
       /* Map the old variable to the new one.  */
       splay_tree_insert (target_remap,
-			 (splay_tree_key) TREE_OPERAND (t, 0),
-			 (splay_tree_value) TREE_OPERAND (u, 0));
+			 (splay_tree_key) TARGET_EXPR_SLOT (t),
+			 (splay_tree_value) TARGET_EXPR_SLOT (u));
 
-      TREE_OPERAND (u, 1) = break_out_target_exprs (TREE_OPERAND (u, 1),
-						    data.clear_location);
-      if (TREE_OPERAND (u, 1) == error_mark_node)
+      TARGET_EXPR_INITIAL (u) = break_out_target_exprs (TARGET_EXPR_INITIAL (u),
+							data.clear_location);
+      if (TARGET_EXPR_INITIAL (u) == error_mark_node)
 	return error_mark_node;
 
       if (data.clear_location)
@@ -4037,8 +4022,8 @@ cp_tree_equal (tree t1, tree t2)
 
     case TARGET_EXPR:
       {
-	tree o1 = TREE_OPERAND (t1, 0);
-	tree o2 = TREE_OPERAND (t2, 0);
+	tree o1 = TARGET_EXPR_SLOT (t1);
+	tree o2 = TARGET_EXPR_SLOT (t2);
 
 	/* Special case: if either target is an unallocated VAR_DECL,
 	   it means that it's going to be unified with whatever the
@@ -4053,7 +4038,8 @@ cp_tree_equal (tree t1, tree t2)
 	else if (!cp_tree_equal (o1, o2))
 	  return false;
 
-	return cp_tree_equal (TREE_OPERAND (t1, 1), TREE_OPERAND (t2, 1));
+	return cp_tree_equal (TARGET_EXPR_INITIAL (t1),
+			      TARGET_EXPR_INITIAL (t2));
       }
 
     case PARM_DECL:
@@ -5199,7 +5185,8 @@ handle_init_priority_attribute (tree* node,
 
   /* Check for init_priorities that are reserved for
      language and runtime support implementations.*/
-  if (pri <= MAX_RESERVED_INIT_PRIORITY)
+  if (pri <= MAX_RESERVED_INIT_PRIORITY
+      && !in_system_header_at (input_location))
     {
       warning
 	(0, "requested %<init_priority%> %i is reserved for internal use",
@@ -5223,6 +5210,7 @@ check_abi_tag_redeclaration (const_tree decl, const_tree old, const_tree new_)
   if (new_ && TREE_CODE (TREE_VALUE (new_)) == TREE_LIST)
     new_ = TREE_VALUE (new_);
   bool err = false;
+  auto_diagnostic_group d;
   for (const_tree t = new_; t; t = TREE_CHAIN (t))
     {
       tree str = TREE_VALUE (t);
@@ -5276,6 +5264,7 @@ check_abi_tag_args (tree args, tree name)
 	    {
 	      if (!ISALPHA (c) && c != '_')
 		{
+		  auto_diagnostic_group d;
 		  error ("arguments to the %qE attribute must contain valid "
 			 "identifiers", name);
 		  inform (input_location, "%<%c%> is not a valid first "
@@ -5289,6 +5278,7 @@ check_abi_tag_args (tree args, tree name)
 	    {
 	      if (!ISALNUM (c) && c != '_')
 		{
+		  auto_diagnostic_group d;
 		  error ("arguments to the %qE attribute must contain valid "
 			 "identifiers", name);
 		  inform (input_location, "%<%c%> is not a valid character "
@@ -5437,7 +5427,7 @@ cp_build_type_attribute_variant (tree type, tree attributes)
 
   /* Making a new main variant of a class type is broken.  */
   gcc_assert (!CLASS_TYPE_P (type) || new_type == type);
-    
+
   return new_type;
 }
 
@@ -5588,7 +5578,7 @@ cp_walk_subtrees (tree *tp, int *walk_subtrees_p, walk_tree_fn func,
       WALK_SUBTREE (PACK_EXPANSION_EXTRA_ARGS (t));
       *walk_subtrees_p = 0;
       break;
-      
+
     case EXPR_PACK_EXPANSION:
       WALK_SUBTREE (TREE_OPERAND (t, 0));
       WALK_SUBTREE (PACK_EXPANSION_EXTRA_ARGS (t));
@@ -5839,7 +5829,7 @@ char_type_p (tree type)
 	  || same_type_p (type, wchar_type_node));
 }
 
-/* Returns the kind of linkage associated with the indicated DECL.  Th
+/* Returns the kind of linkage associated with the indicated DECL.  The
    value returned is as specified by the language standard; it is
    independent of implementation details regarding template
    instantiation, etc.  For example, it is possible that a declaration
@@ -5856,53 +5846,75 @@ decl_linkage (tree decl)
      linkage first, and then transform that into a concrete
      implementation.  */
 
-  /* Things that don't have names have no linkage.  */
-  if (!DECL_NAME (decl))
+  /* An explicit type alias has no linkage.  */
+  if (TREE_CODE (decl) == TYPE_DECL
+      && !DECL_IMPLICIT_TYPEDEF_P (decl)
+      && !DECL_SELF_REFERENCE_P (decl))
+    {
+      /* But this could be a typedef name for linkage purposes, in which
+	 case we're interested in the linkage of the main decl.  */
+      if (decl == TYPE_NAME (TYPE_MAIN_VARIANT (TREE_TYPE (decl))))
+	decl = TYPE_MAIN_DECL (TREE_TYPE (decl));
+      else
+	return lk_none;
+    }
+
+  /* Namespace-scope entities with no name usually have no linkage.  */
+  if (NAMESPACE_SCOPE_P (decl)
+      && (!DECL_NAME (decl) || IDENTIFIER_ANON_P (DECL_NAME (decl))))
+    {
+      if (TREE_CODE (decl) == TYPE_DECL && !TYPE_ANON_P (TREE_TYPE (decl)))
+	/* This entity has a typedef name for linkage purposes.  */;
+      else if (TREE_CODE (decl) == NAMESPACE_DECL && cxx_dialect >= cxx11)
+	/* An anonymous namespace has internal linkage since C++11.  */
+	return lk_internal;
+      else
+	return lk_none;
+    }
+
+  /* Fields and parameters have no linkage.  */
+  if (TREE_CODE (decl) == FIELD_DECL || TREE_CODE (decl) == PARM_DECL)
     return lk_none;
 
-  /* Fields have no linkage.  */
-  if (TREE_CODE (decl) == FIELD_DECL)
-    return lk_none;
-
-  /* Things in local scope do not have linkage.  */
+  /* Things in block scope do not have linkage.  */
   if (decl_function_context (decl))
     return lk_none;
+
+  /* Things in class scope have the linkage of their owning class.  */
+  if (tree ctype = DECL_CLASS_CONTEXT (decl))
+    return decl_linkage (TYPE_NAME (ctype));
+
+  /* Anonymous namespaces don't provide internal linkage in C++98,
+     but otherwise consider such declarations to be internal.  */
+  if (cxx_dialect >= cxx11 && decl_internal_context_p (decl))
+    return lk_internal;
+
+  /* Templates don't properly propagate TREE_PUBLIC, consider the
+     template result instead.  Any template that isn't a variable
+     or function must be external linkage by this point.  */
+  if (TREE_CODE (decl) == TEMPLATE_DECL)
+    {
+      decl = DECL_TEMPLATE_RESULT (decl);
+      if (!decl || !VAR_OR_FUNCTION_DECL_P (decl))
+	return lk_external;
+    }
 
   /* Things that are TREE_PUBLIC have external linkage.  */
   if (TREE_PUBLIC (decl))
     return lk_external;
 
-  /* maybe_thunk_body clears TREE_PUBLIC on the maybe-in-charge 'tor variants,
-     check one of the "clones" for the real linkage.  */
-  if (DECL_MAYBE_IN_CHARGE_CDTOR_P (decl)
-      && DECL_CHAIN (decl)
-      && DECL_CLONED_FUNCTION_P (DECL_CHAIN (decl)))
-    return decl_linkage (DECL_CHAIN (decl));
-
-  if (TREE_CODE (decl) == NAMESPACE_DECL)
+  /* All types have external linkage in C++98, since anonymous namespaces
+     didn't explicitly confer internal linkage.  */
+  if (TREE_CODE (decl) == TYPE_DECL && cxx_dialect < cxx11)
     return lk_external;
 
-  /* Linkage of a CONST_DECL depends on the linkage of the enumeration
-     type.  */
-  if (TREE_CODE (decl) == CONST_DECL)
-    return decl_linkage (TYPE_NAME (DECL_CONTEXT (decl)));
-
-  /* Members of the anonymous namespace also have TREE_PUBLIC unset, but
-     are considered to have external linkage for language purposes, as do
-     template instantiations on targets without weak symbols.  DECLs really
-     meant to have internal linkage have DECL_THIS_STATIC set.  */
-  if (TREE_CODE (decl) == TYPE_DECL)
+  /* Variables or function decls not marked as TREE_PUBLIC might still
+     be external linkage, such as for template instantiations on targets
+     without weak symbols, decls referring to internal-linkage entities,
+     or compiler-generated entities; in such cases, decls really meant to
+     have internal linkage will have DECL_THIS_STATIC set.  */
+  if (VAR_OR_FUNCTION_DECL_P (decl) && !DECL_THIS_STATIC (decl))
     return lk_external;
-  if (VAR_OR_FUNCTION_DECL_P (decl))
-    {
-      if (!DECL_THIS_STATIC (decl))
-	return lk_external;
-
-      /* Static data members and static member functions from classes
-	 in anonymous namespace also don't have TREE_PUBLIC set.  */
-      if (DECL_CLASS_CONTEXT (decl))
-	return lk_external;
-    }
 
   /* Everything else has internal linkage.  */
   return lk_internal;
@@ -6050,7 +6062,7 @@ stabilize_aggr_init (tree call, tree *initp)
   *initp = inits;
 }
 
-/* Like stabilize_expr, but for an initialization.  
+/* Like stabilize_expr, but for an initialization.
 
    If the initialization is for an object of class type, this function
    takes care not to introduce additional temporaries.

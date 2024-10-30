@@ -277,8 +277,10 @@ function_point::print_source_line (pretty_printer *pp) const
   // TODO: monospace font
   debug_diagnostic_context tmp_dc;
   gcc_rich_location richloc (stmt->location);
-  diagnostic_show_locus (&tmp_dc, &richloc, DK_ERROR);
-  pp_string (pp, pp_formatted_text (tmp_dc.printer));
+  diagnostic_source_print_policy source_policy (tmp_dc);
+  gcc_assert (pp);
+  source_policy.print (*pp, richloc, DK_ERROR, nullptr);
+  pp_string (pp, pp_formatted_text (tmp_dc.get_reference_printer ()));
 }
 
 /* class program_point.  */
@@ -300,11 +302,8 @@ program_point::print (pretty_printer *pp, const format &f) const
 DEBUG_FUNCTION void
 program_point::dump () const
 {
-  pretty_printer pp;
-  pp_show_color (&pp) = pp_show_color (global_dc->printer);
-  pp.set_output_stream (stderr);
+  tree_dump_pretty_printer pp (stderr);
   print (&pp, format (true));
-  pp_flush (&pp);
 }
 
 /* Return a new json::object of the form
@@ -343,7 +342,7 @@ program_point::to_json () const
 
 /* Update the callstack to represent a call from caller to callee.
 
-   Generally used to push a custom call to a perticular program point 
+   Generally used to push a custom call to a perticular program point
    where we don't have a superedge representing the call.  */
 void
 program_point::push_to_call_stack (const supernode *caller,

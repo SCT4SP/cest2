@@ -61,6 +61,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "builtins.h"
 #include "tree-vector-builder.h"
 #include "opts.h"
+#include "dwarf2out.h"
 
 /* This file should be included last.  */
 #include "target-def.h"
@@ -681,6 +682,9 @@ static rtx sparc_libcall_value (machine_mode, const_rtx);
 static bool sparc_function_value_regno_p (const unsigned int);
 static unsigned HOST_WIDE_INT sparc_asan_shadow_offset (void);
 static void sparc_output_dwarf_dtprel (FILE *, int, rtx) ATTRIBUTE_UNUSED;
+static bool sparc_output_cfi_directive (FILE *, dw_cfi_ref);
+static bool sparc_dw_cfi_oprnd1_desc (dwarf_call_frame_info,
+				      dw_cfi_oprnd_type &);
 static void sparc_file_end (void);
 static bool sparc_frame_pointer_required (void);
 static bool sparc_can_eliminate (const int, const int);
@@ -693,7 +697,6 @@ static const char *sparc_mangle_type (const_tree);
 static void sparc_trampoline_init (rtx, tree, rtx);
 static machine_mode sparc_preferred_simd_mode (scalar_mode);
 static reg_class_t sparc_preferred_reload_class (rtx x, reg_class_t rclass);
-static bool sparc_lra_p (void);
 static bool sparc_print_operand_punct_valid_p (unsigned char);
 static void sparc_print_operand (FILE *, rtx, int);
 static void sparc_print_operand_address (FILE *, machine_mode, rtx);
@@ -878,6 +881,12 @@ char sparc_hard_reg_printed[8];
 #define TARGET_ASM_OUTPUT_DWARF_DTPREL sparc_output_dwarf_dtprel
 #endif
 
+#undef TARGET_OUTPUT_CFI_DIRECTIVE
+#define TARGET_OUTPUT_CFI_DIRECTIVE sparc_output_cfi_directive
+
+#undef TARGET_DW_CFI_OPRND1_DESC
+#define TARGET_DW_CFI_OPRND1_DESC sparc_dw_cfi_oprnd1_desc
+
 #undef TARGET_ASM_FILE_END
 #define TARGET_ASM_FILE_END sparc_file_end
 
@@ -910,9 +919,6 @@ char sparc_hard_reg_printed[8];
 #undef TARGET_MANGLE_TYPE
 #define TARGET_MANGLE_TYPE sparc_mangle_type
 #endif
-
-#undef TARGET_LRA_P
-#define TARGET_LRA_P sparc_lra_p
 
 #undef TARGET_LEGITIMATE_ADDRESS_P
 #define TARGET_LEGITIMATE_ADDRESS_P sparc_legitimate_address_p
@@ -1947,10 +1953,6 @@ sparc_option_override (void)
   if (TARGET_ARCH32)
     target_flags &= ~MASK_STACK_BIAS;
 
-  /* Use LRA instead of reload, unless otherwise instructed.  */
-  if (!(target_flags_explicit & MASK_LRA))
-    target_flags |= MASK_LRA;
-
   /* Enable applicable errata workarounds for LEON3FT.  */
   if (sparc_fix_ut699 || sparc_fix_ut700 || sparc_fix_gr712rc)
     {
@@ -2168,7 +2170,7 @@ sparc_option_override (void)
 			 || sparc_cpu == PROCESSOR_M8)
 			? 128 : (sparc_cpu == PROCESSOR_NIAGARA7
 				 ? 256 : 512)));
-  
+
 
   /* Disable save slot sharing for call-clobbered registers by default.
      The IRA sharing algorithm works on single registers only and this
@@ -10142,7 +10144,7 @@ supersparc_adjust_cost (rtx_insn *insn, int dep_type, rtx_insn *dep_insn,
       if (insn_type == TYPE_IALU || insn_type == TYPE_SHIFT)
 	return 0;
     }
-	
+
   return cost;
 }
 
@@ -10384,7 +10386,7 @@ sparc_branch_cost (bool speed_p, bool predictable_p)
       return cost;
     }
 }
-      
+
 static int
 set_extends (rtx_insn *insn)
 {
@@ -11006,7 +11008,7 @@ enum sparc_builtins
   SPARC_BUILTIN_FPCMPUR16SHL,
   SPARC_BUILTIN_FPCMPUR32SHL,
   SPARC_BUILTIN_LAST_FPCMPSHL = SPARC_BUILTIN_FPCMPUR32SHL,
-  
+
   SPARC_BUILTIN_MAX
 };
 
@@ -11553,7 +11555,7 @@ sparc_vis_init_builtins (void)
 	  def_builtin_const ("__builtin_vis_fpcmpugt32", CODE_FOR_fpcmpugt32si_vis,
 			     SPARC_BUILTIN_FPCMPUGT32, di_ftype_v2si_v2si);
 	}
-      
+
       def_builtin_const ("__builtin_vis_fpmax8", CODE_FOR_maxv8qi3,
 			 SPARC_BUILTIN_FPMAX8, v8qi_ftype_v8qi_v8qi);
       def_builtin_const ("__builtin_vis_fpmax16", CODE_FOR_maxv4hi3,
@@ -11608,7 +11610,7 @@ sparc_vis_init_builtins (void)
 	  tree di_ftype_v2si_v2si_si = build_function_type_list (intDI_type_node,
 								 v2si, v2si,
 								 intSI_type_node, 0);
-	  
+
 	  def_builtin_const ("__builtin_vis_fpcmple8shl", CODE_FOR_fpcmple8dishl,
 			     SPARC_BUILTIN_FPCMPLE8SHL, di_ftype_v8qi_v8qi_si);
 	  def_builtin_const ("__builtin_vis_fpcmpgt8shl", CODE_FOR_fpcmpgt8dishl,
@@ -11678,7 +11680,7 @@ sparc_vis_init_builtins (void)
 	  tree si_ftype_v2si_v2si_si = build_function_type_list (intSI_type_node,
 								 v2si, v2si,
 								 intSI_type_node, 0);
-	  
+
 	  def_builtin_const ("__builtin_vis_fpcmple8shl", CODE_FOR_fpcmple8sishl,
 			     SPARC_BUILTIN_FPCMPLE8SHL, si_ftype_v8qi_v8qi_si);
 	  def_builtin_const ("__builtin_vis_fpcmpgt8shl", CODE_FOR_fpcmpgt8sishl,
@@ -12621,6 +12623,31 @@ sparc_output_dwarf_dtprel (FILE *file, int size, rtx x)
   fputs (")", file);
 }
 
+/* Implement TARGET_OUTPUT_CFI_DIRECTIVE.  */
+static bool
+sparc_output_cfi_directive (FILE *f, dw_cfi_ref cfi)
+{
+  if (cfi->dw_cfi_opc == DW_CFA_GNU_window_save)
+    {
+      fprintf (f, "\t.cfi_window_save\n");
+      return true;
+    }
+  return false;
+}
+
+/* Implement TARGET_DW_CFI_OPRND1_DESC.  */
+static bool
+sparc_dw_cfi_oprnd1_desc (dwarf_call_frame_info cfi_opc,
+			  dw_cfi_oprnd_type &oprnd_type)
+{
+  if (cfi_opc == DW_CFA_GNU_window_save)
+    {
+      oprnd_type = dw_cfi_oprnd_unused;
+      return true;
+    }
+  return false;
+}
+
 /* Do whatever processing is required at the end of a file.  */
 
 static void
@@ -12995,7 +13022,7 @@ sparc_expand_vec_perm_bmask (machine_mode vmode, rtx sel)
       t_1 = force_reg (SImode, GEN_INT (0x01010101));
       /* sel = { A*2, A*2+1, B*2, B*2+1, ... } */
       break;
-  
+
     case E_V8QImode:
       /* input = xAxBxCxDxExFxGxH */
       sel = expand_simple_binop (DImode, AND, sel,
@@ -13249,14 +13276,6 @@ sparc_preferred_reload_class (rtx x, reg_class_t rclass)
     }
 
   return rclass;
-}
-
-/* Return true if we use LRA instead of reload pass.  */
-
-static bool
-sparc_lra_p (void)
-{
-  return TARGET_LRA;
 }
 
 /* Output a wide multiply instruction in V8+ mode.  INSN is the instruction,

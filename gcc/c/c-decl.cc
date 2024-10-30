@@ -162,6 +162,14 @@ vec<c_omp_declare_target_attr, va_gc> *current_omp_declare_target_attribute;
    #pragma omp begin assumes ... #pragma omp end assumes regions
    we are in.  */
 vec<c_omp_begin_assumes_data, va_gc> *current_omp_begin_assumes;
+
+/* Vector of loop names with C_DECL_LOOP_NAME or C_DECL_SWITCH_NAME marked
+   LABEL_DECL as the last and canonical for each loop or switch.  */
+static vec<tree> loop_names;
+
+/* Hash table mapping LABEL_DECLs to the canonical LABEL_DECLs if LOOP_NAMES
+   vector becomes too long.  */
+static decl_tree_map *loop_names_hash;
 
 /* Each c_binding structure describes one binding of an identifier to
    a decl.  All the decls in a scope - irrespective of namespace - are
@@ -632,6 +640,8 @@ public:
   /* If warn_cxx_compat, a list of typedef names used when defining
      fields in this struct.  */
   auto_vec<tree> typedefs_seen;
+  /* The location of a previous definition of this struct.  */
+  location_t refloc;
 };
 
 
@@ -694,13 +704,14 @@ add_stmt (tree t)
 	SET_EXPR_LOCATION (t, input_location);
     }
 
-  if (code == LABEL_EXPR || code == CASE_LABEL_EXPR)
-    STATEMENT_LIST_HAS_LABEL (cur_stmt_list) = 1;
-
   /* Add T to the statement-tree.  Non-side-effect statements need to be
      recorded during statement expressions.  */
   if (!building_stmt_list_p ())
     push_stmt_list ();
+
+  if (code == LABEL_EXPR || code == CASE_LABEL_EXPR)
+    STATEMENT_LIST_HAS_LABEL (cur_stmt_list) = 1;
+
   append_to_statement_list_force (t, &cur_stmt_list);
 
   return t;
@@ -2780,7 +2791,7 @@ merge_decls (tree newdecl, tree olddecl, tree newtype, tree oldtype)
 			= TYPE_NEXT_VARIANT (TYPE_NEXT_VARIANT (t));
 		      break;
 		    }
-	    }	    
+	    }
 	  else
 	    for (tree t = TYPE_MAIN_VARIANT (remove); ;
 		 t = TYPE_NEXT_VARIANT (t))
@@ -5358,7 +5369,7 @@ one_element_array_type_p (const_tree type)
 {
   if (TREE_CODE (type) != ARRAY_TYPE)
     return false;
-  return integer_zerop (array_type_nelts (type));
+  return integer_zerop (array_type_nelts_minus_one (type));
 }
 
 /* Determine whether TYPE is a zero-length array type "[0]".  */
@@ -6306,15 +6317,15 @@ get_parm_array_spec (const struct c_parm *parm, tree attrs)
 	  for (tree type = parm->specs->type; TREE_CODE (type) == ARRAY_TYPE;
 	       type = TREE_TYPE (type))
 	    {
-	      tree nelts = array_type_nelts (type);
-	      if (error_operand_p (nelts))
+	      tree nelts_minus_one = array_type_nelts_minus_one (type);
+	      if (error_operand_p (nelts_minus_one))
 		return attrs;
-	      if (TREE_CODE (nelts) != INTEGER_CST)
+	      if (TREE_CODE (nelts_minus_one) != INTEGER_CST)
 		{
 		  /* Each variable VLA bound is represented by the dollar
 		     sign.  */
 		  spec += "$";
-		  tpbnds = tree_cons (NULL_TREE, nelts, tpbnds);
+		  tpbnds = tree_cons (NULL_TREE, nelts_minus_one, tpbnds);
 		}
 	    }
 	  tpbnds = nreverse (tpbnds);
@@ -8510,7 +8521,10 @@ grokparms (struct c_arg_info *arg_info, bool funcdef_flag)
 	  && !arg_types
 	  && !arg_info->parms
 	  && !arg_info->no_named_args_stdarg_p)
-	arg_types = arg_info->types = void_list_node;
+	{
+	  arg_types = arg_info->types = void_list_node;
+	  arg_info->c23_empty_parens = 1;
+	}
 
       /* If there is a parameter of incomplete type in a definition,
 	 this is an error.  In a declaration this is valid, and a
@@ -8580,6 +8594,7 @@ build_arg_info (void)
   ret->pending_sizes = NULL;
   ret->had_vla_unspec = 0;
   ret->no_named_args_stdarg_p = 0;
+  ret->c23_empty_parens = 0;
   return ret;
 }
 
@@ -8987,6 +9002,7 @@ start_struct (location_t loc, enum tree_code code, tree name,
 
   *enclosing_struct_parse_info = struct_parse_info;
   struct_parse_info = new c_struct_parse_info ();
+  struct_parse_info->refloc = refloc;
 
   /* FIXME: This will issue a warning for a use of a type defined
      within a statement expr used within sizeof, et. al.  This is not
@@ -9502,14 +9518,17 @@ verify_counted_by_attribute (tree struct_type, tree field_decl)
 
   tree counted_by_field = lookup_field (struct_type, fieldname);
 
-  /* Error when the field is not found in the containing structure.  */
+  /* Error when the field is not found in the containing structure and
+     remove the corresponding counted_by attribute from the field_decl.  */
   if (!counted_by_field)
-    error_at (DECL_SOURCE_LOCATION (field_decl),
-	      "argument %qE to the %qE attribute is not a field declaration"
-	      " in the same structure as %qD", fieldname,
-	      (get_attribute_name (attr_counted_by)),
-	      field_decl);
-
+    {
+      error_at (DECL_SOURCE_LOCATION (field_decl),
+		"argument %qE to the %<counted_by%> attribute"
+		" is not a field declaration in the same structure"
+		" as %qD", fieldname, field_decl);
+      DECL_ATTRIBUTES (field_decl)
+	= remove_attribute ("counted_by", DECL_ATTRIBUTES (field_decl));
+    }
   else
   /* Error when the field is not with an integer type.  */
     {
@@ -9518,14 +9537,15 @@ verify_counted_by_attribute (tree struct_type, tree field_decl)
       tree real_field = TREE_VALUE (counted_by_field);
 
       if (!INTEGRAL_TYPE_P (TREE_TYPE (real_field)))
-	error_at (DECL_SOURCE_LOCATION (field_decl),
-		  "argument %qE to the %qE attribute is not a field declaration"
-		  " with an integer type", fieldname,
-		  (get_attribute_name (attr_counted_by)));
-
+	{
+	  error_at (DECL_SOURCE_LOCATION (field_decl),
+		    "argument %qE to the %<counted_by%> attribute"
+		    " is not a field declaration with an integer type",
+		    fieldname);
+	  DECL_ATTRIBUTES (field_decl)
+	    = remove_attribute ("counted_by", DECL_ATTRIBUTES (field_decl));
+	}
     }
-
-  return;
 }
 
 /* TYPE is a struct or union that we're applying may_alias to after the body is
@@ -9879,10 +9899,18 @@ finish_struct (location_t loc, tree t, tree fieldlist, tree attributes,
 	{
 	  TYPE_STUB_DECL (vistype) = TYPE_STUB_DECL (t);
 	  if (c_type_variably_modified_p (t))
-	    error ("redefinition of struct or union %qT with variably "
-		   "modified type", t);
+	    {
+	      error ("redefinition of struct or union %qT with variably "
+		     "modified type", t);
+	      if (struct_parse_info->refloc != UNKNOWN_LOCATION)
+		inform (struct_parse_info->refloc, "originally defined here");
+	    }
 	  else if (!comptypes_same_p (t, vistype))
-	    error ("redefinition of struct or union %qT", t);
+	    {
+	      error ("redefinition of struct or union %qT", t);
+	      if (struct_parse_info->refloc != UNKNOWN_LOCATION)
+		inform (struct_parse_info->refloc, "originally defined here");
+	    }
 	}
     }
 
@@ -10910,7 +10938,8 @@ store_parm_decls_newstyle (tree fndecl, const struct c_arg_info *arg_info)
      its parameter list).  */
   else if (!in_system_header_at (input_location)
 	   && !current_function_scope
-	   && arg_info->types != error_mark_node)
+	   && arg_info->types != error_mark_node
+	   && !arg_info->c23_empty_parens)
     warning_at (DECL_SOURCE_LOCATION (fndecl), OPT_Wtraditional,
 		"traditional C rejects ISO C style function definitions");
 
@@ -11403,7 +11432,7 @@ void
 finish_function (location_t end_loc)
 {
   tree fndecl = current_function_decl;
-  
+
   if (c_dialect_objc ())
     objc_finish_function ();
 
@@ -11679,6 +11708,10 @@ c_push_function_context (void)
   c_stmt_tree.x_cur_stmt_list = vec_safe_copy (c_stmt_tree.x_cur_stmt_list);
   p->x_in_statement = in_statement;
   p->x_switch_stack = c_switch_stack;
+  p->loop_names = loop_names;
+  loop_names = vNULL;
+  p->loop_names_hash = loop_names_hash;
+  loop_names_hash = NULL;
   p->arg_info = current_function_arg_info;
   p->returns_value = current_function_returns_value;
   p->returns_null = current_function_returns_null;
@@ -11718,6 +11751,12 @@ c_pop_function_context (void)
   p->base.x_stmt_tree.x_cur_stmt_list = NULL;
   in_statement = p->x_in_statement;
   c_switch_stack = p->x_switch_stack;
+  loop_names.release ();
+  loop_names = p->loop_names;
+  p->loop_names = vNULL;
+  delete loop_names_hash;
+  loop_names_hash = p->loop_names_hash;
+  p->loop_names_hash = NULL;
   current_function_arg_info = p->arg_info;
   current_function_returns_value = p->returns_value;
   current_function_returns_null = p->returns_null;
@@ -11788,6 +11827,7 @@ names_builtin_p (const char *name)
     case RID_BUILTIN_SHUFFLE:
     case RID_BUILTIN_SHUFFLEVECTOR:
     case RID_BUILTIN_STDC:
+    case RID_BUILTIN_COUNTED_BY_REF:
     case RID_CHOOSE_EXPR:
     case RID_OFFSETOF:
     case RID_TYPES_COMPATIBLE_P:
@@ -13581,7 +13621,7 @@ collect_source_refs (void)
   unsigned i;
 
   FOR_EACH_VEC_ELT (*all_translation_units, i, t)
-    { 
+    {
       decls = DECL_INITIAL (t);
       for (decl = BLOCK_VARS (decls); decl; decl = TREE_CHAIN (decl))
 	if (!DECL_IS_UNDECLARED_BUILTIN (decl))
@@ -13798,6 +13838,217 @@ c_check_in_current_scope (tree decl)
 {
   struct c_binding *b = I_SYMBOL_BINDING (DECL_NAME (decl));
   return b != NULL && B_IN_CURRENT_SCOPE (b);
+}
+
+/* Search for loop or switch names.  BEFORE_LABELS is last statement before
+   possible labels and SWITCH_P true for a switch, false for loops.
+   Searches through last statements in cur_stmt_list, stops when seeing
+   BEFORE_LABELs, or statement other than LABEL_EXPR or CASE_LABEL_EXPR.
+   Returns number of loop/switch names found and if any are found, sets
+   *LAST_P to the canonical loop/switch name LABEL_DECL.  */
+
+int
+c_get_loop_names (tree before_labels, bool switch_p, tree *last_p)
+{
+  *last_p = NULL_TREE;
+  if (!building_stmt_list_p ()
+      || !STATEMENT_LIST_HAS_LABEL (cur_stmt_list)
+      || before_labels == void_list_node)
+    return 0;
+
+  int ret = 0;
+  tree last = NULL_TREE;
+  for (tree_stmt_iterator tsi = tsi_last (cur_stmt_list);
+       !tsi_end_p (tsi); tsi_prev (&tsi))
+    {
+      tree stmt = tsi_stmt (tsi);
+      if (stmt == before_labels)
+	break;
+      else if (TREE_CODE (stmt) == LABEL_EXPR)
+	{
+	  if (last == NULL_TREE)
+	    last = LABEL_EXPR_LABEL (stmt);
+	  else
+	    {
+	      loop_names.safe_push (LABEL_EXPR_LABEL (stmt));
+	      ++ret;
+	    }
+	}
+      else if (TREE_CODE (stmt) != CASE_LABEL_EXPR)
+	break;
+    }
+  if (last)
+    {
+      if (switch_p)
+	C_DECL_SWITCH_NAME (last) = 1;
+      else
+	C_DECL_LOOP_NAME (last) = 1;
+      loop_names.safe_push (last);
+      ++ret;
+      if (loop_names.length () > 16)
+	{
+	  unsigned int first = 0, i;
+	  tree l, c = NULL_TREE;
+	  if (loop_names_hash == NULL)
+	    loop_names_hash = new decl_tree_map (ret);
+	  else
+	    first = loop_names.length () - ret;
+	  FOR_EACH_VEC_ELT_REVERSE (loop_names, i, l)
+	    {
+	      if (C_DECL_LOOP_NAME (l) || C_DECL_SWITCH_NAME (l))
+		c = l;
+	      gcc_checking_assert (c);
+	      loop_names_hash->put (l, c);
+	      if (i == first)
+		break;
+	    }
+	}
+      *last_p = last;
+    }
+  return ret;
+}
+
+/* Undoes what get_loop_names did when it returned NUM_NAMES.  */
+
+void
+c_release_loop_names (int num_names)
+{
+  unsigned len = loop_names.length () - num_names;
+  if (loop_names_hash)
+    {
+      if (len <= 16)
+	{
+	  delete loop_names_hash;
+	  loop_names_hash = NULL;
+	}
+      else
+	{
+	  unsigned int i;
+	  tree l;
+	  FOR_EACH_VEC_ELT_REVERSE (loop_names, i, l)
+	    {
+	      loop_names_hash->remove (l);
+	      if (i == len)
+		break;
+	    }
+	}
+    }
+  loop_names.truncate (len);
+}
+
+/* Finish processing of break or continue identifier operand.
+   NAME is the identifier operand of break or continue and
+   IS_BREAK is true iff it is break stmt.  Returns the operand
+   to use for BREAK_STMT or CONTINUE_STMT, either NULL_TREE or
+   canonical loop/switch name LABEL_DECL.  */
+
+tree
+c_finish_bc_name (location_t loc, tree name, bool is_break)
+{
+  tree label = NULL_TREE, lab;
+  pedwarn_c23 (loc, OPT_Wpedantic,
+	       "ISO C does not support %qs statement with an identifier "
+	       "operand before C2Y", is_break ? "break" : "continue");
+
+  /* If I_LABEL_DECL is NULL or not from current function, don't waste time
+     trying to find it among loop_names, it can't be there.  */
+  if (!loop_names.is_empty ()
+      && current_function_scope
+      && (lab = I_LABEL_DECL (name))
+      && DECL_CONTEXT (lab) == current_function_decl)
+    {
+      unsigned int i;
+      tree l, c = NULL_TREE;
+      if (loop_names_hash)
+	{
+	  if (tree *val = loop_names_hash->get (lab))
+	    label = *val;
+	}
+      else
+	FOR_EACH_VEC_ELT_REVERSE (loop_names, i, l)
+	  {
+	    if (C_DECL_LOOP_NAME (l) || C_DECL_SWITCH_NAME (l))
+	      c = l;
+	    gcc_checking_assert (c);
+	    if (l == lab)
+	      {
+		label = c;
+		break;
+	      }
+	  }
+      if (label)
+	TREE_USED (lab) = 1;
+    }
+  if (label == NULL_TREE)
+    {
+      auto_vec<const char *> candidates;
+      unsigned int i;
+      tree l, c = NULL_TREE;
+      FOR_EACH_VEC_ELT_REVERSE (loop_names, i, l)
+	{
+	  if (C_DECL_LOOP_NAME (l) || C_DECL_SWITCH_NAME (l))
+	    c = l;
+	  gcc_checking_assert (c);
+	  if (is_break || C_DECL_LOOP_NAME (c))
+	    candidates.safe_push (IDENTIFIER_POINTER (DECL_NAME (l)));
+	}
+      const char *hint = find_closest_string (IDENTIFIER_POINTER (name),
+					      &candidates);
+      if (hint)
+	{
+	  gcc_rich_location richloc (loc);
+	  richloc.add_fixit_replace (hint);
+	  if (is_break)
+	    error_at (&richloc, "%<break%> statement operand %qE does not "
+				"refer to a named loop or %<switch%>; "
+				"did you mean %qs?", name, hint);
+	  else
+	    error_at (&richloc, "%<continue%> statement operand %qE does not "
+				"refer to a named loop; did you mean %qs?",
+		      name, hint);
+	}
+      else if (is_break)
+	error_at (loc, "%<break%> statement operand %qE does not refer to a "
+		       "named loop or %<switch%>", name);
+      else
+	error_at (loc, "%<continue%> statement operand %qE does not refer to "
+		       "a named loop", name);
+    }
+  else if (!C_DECL_LOOP_NAME (label) && !is_break)
+    {
+      auto_diagnostic_group d;
+      error_at (loc, "%<continue%> statement operand %qE refers to a named "
+		     "%<switch%>", name);
+      inform (DECL_SOURCE_LOCATION (label), "%<switch%> name defined here");
+      label = NULL_TREE;
+    }
+  else if (!C_DECL_LOOP_SWITCH_NAME_VALID (label))
+    {
+      auto_diagnostic_group d;
+      if (C_DECL_LOOP_NAME (label))
+	{
+	  error_at (loc, "%qs statement operand %qE refers to a loop outside "
+			 "of its body", is_break ? "break" : "continue", name);
+	  inform (DECL_SOURCE_LOCATION (label), "loop name defined here");
+	}
+      else
+	{
+	  error_at (loc, "%<break%> statement operand %qE refers to a "
+			 "%<switch%> outside of its body", name);
+	  inform (DECL_SOURCE_LOCATION (label),
+		  "%<switch%> name defined here");
+	}
+      label = NULL_TREE;
+    }
+  else if (label == loop_names.last () && (in_statement & IN_NAMED_STMT) != 0)
+    /* If it is just a fancy reference to the innermost construct, handle it
+       just like break; or continue; though tracking cheaply what is the
+       innermost loop for continue when nested in switches would require
+       another global variable and updating it.  */
+    label = NULL_TREE;
+  else
+    C_DECL_LOOP_SWITCH_NAME_USED (label) = 1;
+  return label;
 }
 
 #include "gt-c-c-decl.h"

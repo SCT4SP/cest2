@@ -18,6 +18,7 @@ You should have received a copy of the GNU General Public License
 along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
+#define INCLUDE_MEMORY
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
@@ -69,6 +70,9 @@ gfc_basic_typename (bt type)
     {
     case BT_INTEGER:
       p = "INTEGER";
+      break;
+    case BT_UNSIGNED:
+      p = "UNSIGNED";
       break;
     case BT_REAL:
       p = "REAL";
@@ -144,6 +148,9 @@ gfc_typename (gfc_typespec *ts, bool for_hash)
 	sprintf (buffer, "TYPE(%s)", ts->u.derived->name);
       else
 	sprintf (buffer, "INTEGER(%d)", ts->kind);
+      break;
+    case BT_UNSIGNED:
+      sprintf (buffer, "UNSIGNED(%d)", ts->kind);
       break;
     case BT_REAL:
       sprintf (buffer, "REAL(%d)", ts->kind);

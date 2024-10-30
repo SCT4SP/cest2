@@ -201,14 +201,14 @@ supergraph::supergraph (logger *logger)
 	          // maybe call is via a function pointer
 	          if (gcall *call = dyn_cast<gcall *> (stmt))
 	          {
-	            cgraph_edge *edge 
+	            cgraph_edge *edge
 		      = cgraph_node::get (fun->decl)->get_edge (stmt);
 	            if (!edge || !edge->callee)
 	            {
 	              supernode *old_node_for_stmts = node_for_stmts;
 	              node_for_stmts = add_node (fun, bb, call, NULL);
 
-	              superedge *sedge 
+	              superedge *sedge
 	                = new callgraph_superedge (old_node_for_stmts,
 	                  			   node_for_stmts,
 	                  			   SUPEREDGE_INTRAPROCEDURAL_CALL,
@@ -437,16 +437,15 @@ supergraph::dump_dot_to_pp (pretty_printer *pp,
 void
 supergraph::dump_dot_to_file (FILE *fp, const dump_args_t &dump_args) const
 {
-  pretty_printer *pp = global_dc->printer->clone ();
-  pp_show_color (pp) = 0;
+  std::unique_ptr<pretty_printer> pp (global_dc->clone_printer ());
+  pp_show_color (pp.get ()) = 0;
   /* %qE in logs for SSA_NAMEs should show the ssa names, rather than
      trying to prettify things by showing the underlying var.  */
-  pp_format_decoder (pp) = default_tree_printer;
+  pp_format_decoder (pp.get ()) = default_tree_printer;
 
   pp->set_output_stream (fp);
-  dump_dot_to_pp (pp, dump_args);
-  pp_flush (pp);
-  delete pp;
+  dump_dot_to_pp (pp.get (), dump_args);
+  pp_flush (pp.get ());
 }
 
 /* Dump this graph in .dot format to PATH, using DUMP_ARGS.  */
@@ -898,13 +897,9 @@ superedge::dump (pretty_printer *pp) const
 DEBUG_FUNCTION void
 superedge::dump () const
 {
-  pretty_printer pp;
-  pp_format_decoder (&pp) = default_tree_printer;
-  pp_show_color (&pp) = pp_show_color (global_dc->printer);
-  pp.set_output_stream (stderr);
+  tree_dump_pretty_printer pp (stderr);
   dump (&pp);
   pp_newline (&pp);
-  pp_flush (&pp);
 }
 
 /* Implementation of dedge::dump_dot for superedges.
@@ -1271,7 +1266,7 @@ callgraph_superedge::get_call_stmt () const
 {
   if (m_cedge)
     return m_cedge->call_stmt;
-  
+
   return m_src->get_final_call ();
 }
 

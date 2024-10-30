@@ -26,10 +26,10 @@
  *  This is a Standard C++ Library header.
  */
 
-#include <cwchar>
-
 #ifndef _GLIBCXX_WCHAR_H
 #define _GLIBCXX_WCHAR_H 1
+
+#include <cwchar>
 
 #ifdef _GLIBCXX_NAMESPACE_C
 using std::mbstate_t;
@@ -111,6 +111,6 @@ using std::wcstoull;
 
 #endif  //_GLIBCXX_USE_WCHAR_T
 
-#endif 
+#endif
 
 #endif

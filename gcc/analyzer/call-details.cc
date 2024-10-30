@@ -363,12 +363,8 @@ call_details::dump_to_pp (pretty_printer *pp, bool simple) const
 DEBUG_FUNCTION void
 call_details::dump (bool simple) const
 {
-  pretty_printer pp;
-  pp_format_decoder (&pp) = default_tree_printer;
-  pp_show_color (&pp) = pp_show_color (global_dc->printer);
-  pp.set_output_stream (stderr);
+  tree_dump_pretty_printer pp (stderr);
   dump_to_pp (&pp, simple);
-  pp_flush (&pp);
 }
 
 /* Get a conjured_svalue for this call for REG,
@@ -470,11 +466,14 @@ public:
     return warned;
   }
 
-  label_text describe_final_event (const evdesc::final_event &ev) final override
+  bool
+  describe_final_event (pretty_printer &pp,
+			const evdesc::final_event &) final override
   {
-    return ev.formatted_print
-      ("overlapping buffers passed as arguments to %qD",
-       m_fndecl);
+    pp_printf (&pp,
+	       "overlapping buffers passed as arguments to %qD",
+	       m_fndecl);
+    return true;
   }
 
   void maybe_add_sarif_properties (sarif_object &result_obj)

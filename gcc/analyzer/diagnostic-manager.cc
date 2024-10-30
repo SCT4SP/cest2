@@ -1561,8 +1561,6 @@ diagnostic_manager::emit_saved_diagnostic (const exploded_graph &eg,
        sd.get_index (), sd.m_d->get_kind (), sd.m_snode->m_index);
   log ("num dupes: %i", sd.get_num_dupes ());
 
-  pretty_printer *pp = global_dc->printer->clone ();
-
   const exploded_path *epath = sd.get_best_epath ();
   gcc_assert (epath);
 
@@ -1645,7 +1643,6 @@ diagnostic_manager::emit_saved_diagnostic (const exploded_graph &eg,
 	  free (filename);
 	}
     }
-  delete pp;
 }
 
 /* Emit a "path" of events to EMISSION_PATH describing the exploded path
@@ -2836,7 +2833,7 @@ diagnostic_manager::prune_interproc_events (checker_path *path) const
 	      if (get_logger ())
 		{
 		  label_text desc
-		    (path->get_checker_event (idx)->get_desc (false));
+		    (path->get_checker_event (idx)->get_desc ());
 		  log ("filtering events %i-%i:"
 		       " irrelevant call/entry/return: %s",
 		       idx, idx + 2, desc.get ());
@@ -2858,7 +2855,7 @@ diagnostic_manager::prune_interproc_events (checker_path *path) const
 	      if (get_logger ())
 		{
 		  label_text desc
-		    (path->get_checker_event (idx)->get_desc (false));
+		    (path->get_checker_event (idx)->get_desc ());
 		  log ("filtering events %i-%i:"
 		       " irrelevant call/return: %s",
 		       idx, idx + 1, desc.get ());
@@ -2955,7 +2952,7 @@ diagnostic_manager::prune_system_headers (checker_path *path) const
 	      {
 		if (get_logger ())
 		  {
-		    label_text desc (event->get_desc (false));
+		    label_text desc (event->get_desc ());
 		    log ("filtering event %i:"
 			 "system header entry event: %s",
 			 idx, desc.get ());

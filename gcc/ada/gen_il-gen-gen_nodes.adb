@@ -408,11 +408,13 @@ begin -- Gen_IL.Gen.Gen_Nodes
    Cc (N_Function_Call, N_Subprogram_Call,
        (Sy (Name, Node_Id, Default_Empty),
         Sy (Parameter_Associations, List_Id, Default_No_List),
-        Sm (Is_Expanded_Build_In_Place_Call, Flag)));
+        Sm (Is_Expanded_Build_In_Place_Call, Flag),
+        Sm (Is_Expanded_Prefixed_Call, Flag)));
 
    Cc (N_Procedure_Call_Statement, N_Subprogram_Call,
        (Sy (Name, Node_Id, Default_Empty),
-        Sy (Parameter_Associations, List_Id, Default_No_List)));
+        Sy (Parameter_Associations, List_Id, Default_No_List),
+        Sm (Is_Expanded_Prefixed_Call, Flag)));
 
    Ab (N_Raise_xxx_Error, N_Subexpr);
 
@@ -460,6 +462,9 @@ begin -- Gen_IL.Gen.Gen_Nodes
    Cc (N_Expression_With_Actions, N_Subexpr,
        (Sy (Actions, List_Id, Default_No_List),
         Sy (Expression, Node_Id, Default_Empty)));
+
+   Cc (N_External_Initializer, N_Subexpr,
+       (Sy (File_Index, Source_File_Index)));
 
    Cc (N_If_Expression, N_Subexpr,
        (Sy (Expressions, List_Id, Default_No_List),
@@ -1673,7 +1678,7 @@ begin -- Gen_IL.Gen.Gen_Nodes
         Sm (Elaborate_All_Present, Flag),
         Sm (Elaborate_Desirable, Flag),
         Sm (Elaborate_Present, Flag),
-        Sm (Implicit_With, Flag),
+        Sm (Is_Implicit_With, Flag),
         Sm (Library_Unit, Node_Id),
         Sm (Limited_View_Installed, Flag),
         Sm (Next_Implicit_With, Node_Id),

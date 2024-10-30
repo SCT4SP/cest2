@@ -22,6 +22,7 @@ along with GCC; see the file COPYING3.  If not see
 
 /* High-level class interface.  */
 
+#define INCLUDE_MEMORY
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
@@ -456,7 +457,7 @@ struct conversion_info {
   /* The location of the argument.  */
   location_t loc;
 };
-  
+
 struct rejection_reason {
   enum rejection_reason_code code;
   union {
@@ -1871,7 +1872,7 @@ reference_binding (tree rto, tree rfrom, tree expr, bool c_cast_p, int flags,
 	conv->rvaluedness_matches_p
 	  = (TYPE_REF_IS_RVALUE (rto) == TYPE_REF_IS_RVALUE (rfrom));
       else
-	conv->rvaluedness_matches_p 
+	conv->rvaluedness_matches_p
           = (TYPE_REF_IS_RVALUE (rto) == !is_lvalue);
 
       if ((gl_kind & clk_bitfield) != 0
@@ -3045,16 +3046,16 @@ add_builtin_candidate (struct z_candidate **candidates, enum tree_code code,
 	break;
       if (TYPE_PTR_P (type1) && TYPE_PTR_P (type2))
 	break;
-      if (TREE_CODE (type1) == ENUMERAL_TYPE 
+      if (TREE_CODE (type1) == ENUMERAL_TYPE
 	  && TREE_CODE (type2) == ENUMERAL_TYPE)
 	break;
-      if (TYPE_PTR_P (type1) 
+      if (TYPE_PTR_P (type1)
 	  && null_ptr_cst_p (args[1]))
 	{
 	  type2 = type1;
 	  break;
 	}
-      if (null_ptr_cst_p (args[0]) 
+      if (null_ptr_cst_p (args[0])
 	  && TYPE_PTR_P (type2))
 	{
 	  type1 = type2;
@@ -3219,7 +3220,7 @@ add_builtin_candidate (struct z_candidate **candidates, enum tree_code code,
       if (ARITHMETIC_TYPE_P (type1))
 	break;
       return;
- 
+
     default:
       gcc_unreachable ();
     }
@@ -5418,7 +5419,7 @@ build_op_call (tree obj, vec<tree, va_gc> **args, tsubst_flags_t complain)
           if (complain & tf_error)
             {
               auto_diagnostic_group d;
-              error ("call of %<(%T) (%A)%> is ambiguous", 
+              error ("call of %<(%T) (%A)%> is ambiguous",
                      TREE_TYPE (obj), build_tree_list_vec (*args));
               print_z_candidates (location_of (TREE_TYPE (obj)), candidates);
             }
@@ -7232,7 +7233,7 @@ build_new_op (const op_location_t &loc, enum tree_code code, int flags,
 	  else
 	    {
 	      tree fnname = ovl_op_identifier (ismodop, ismodop ? code2 : code);
-	      const char *msg = (flag_permissive) 
+	      const char *msg = (flag_permissive)
 		? G_("no %<%D(int)%> declared for postfix %qs,"
 		     " trying prefix operator instead")
 		: G_("no %<%D(int)%> declared for postfix %qs");
@@ -8669,6 +8670,10 @@ convert_like_internal (conversion *convs, tree expr, tree fn, int argnum,
 	   rvalue, but we know it's read.  */
 	mark_exp_read (expr);
 
+	/* Give the conversion call the location of EXPR rather than the
+	   location of the context that caused the conversion.  */
+	iloc_sentinel ils (loc);
+
 	/* Pass LOOKUP_NO_CONVERSION so rvalue/base handling knows not to allow
 	   any more UDCs.  */
 	expr = build_over_call (cand, LOOKUP_NORMAL|LOOKUP_NO_CONVERSION,
@@ -8958,7 +8963,7 @@ convert_like_internal (conversion *convs, tree expr, tree fn, int argnum,
 	else if (complain & tf_warning)
 	  maybe_warn_array_conv (loc, convs, expr);
 
-	/* If necessary, create a temporary. 
+	/* If necessary, create a temporary.
 
            VA_ARG_EXPR and CONSTRUCTOR expressions are special cases
            that need temporaries, even when their types are reference
@@ -9448,7 +9453,7 @@ convert_for_arg_passing (tree type, tree val, tsubst_flags_t complain)
   tree bitfield_type;
 
   /* If VAL is a bitfield, then -- since it has already been converted
-     to TYPE -- it cannot have a precision greater than TYPE.  
+     to TYPE -- it cannot have a precision greater than TYPE.
 
      If it has a smaller precision, we must widen it here.  For
      example, passing "int f:3;" to a function expecting an "int" will
@@ -9462,7 +9467,7 @@ convert_for_arg_passing (tree type, tree val, tsubst_flags_t complain)
      if we call convert_bitfield_to_declared_type, the bitfield will
      be converted to "long long".  */
   bitfield_type = is_bitfield_expr_with_lowered_type (val);
-  if (bitfield_type 
+  if (bitfield_type
       && TYPE_PRECISION (TREE_TYPE (val)) < TYPE_PRECISION (type))
     val = convert_to_integer_nofold (TYPE_MAIN_VARIANT (bitfield_type), val);
 
@@ -9584,7 +9589,7 @@ get_function_version_dispatcher (tree fn)
   return dispatcher_decl;
 }
 
-/* fn is a function version dispatcher that is marked used. Mark all the 
+/* fn is a function version dispatcher that is marked used. Mark all the
    semantically identical function versions it will dispatch as used.  */
 
 void
@@ -12804,27 +12809,6 @@ class_of_implicit_object (z_candidate *cand)
   return BINFO_TYPE (cand->conversion_path);
 }
 
-/* True if candidates C1 and C2 have corresponding object parameters per
-   [basic.scope.scope].  */
-
-static bool
-object_parms_correspond (z_candidate *c1, tree fn1, z_candidate *c2, tree fn2)
-{
-  tree context = class_of_implicit_object (c1);
-  tree ctx2 = class_of_implicit_object (c2);
-  if (!ctx2)
-    /* Leave context as is. */;
-  else if (!context)
-    context = ctx2;
-  else if (context != ctx2)
-    /* This can't happen for normal function calls, since it means finding
-       functions in multiple bases which would fail with an ambiguous lookup,
-       but it can occur with reversed operators.  */
-    return false;
-
-  return object_parms_correspond (fn1, fn2, context);
-}
-
 /* Return whether the first parameter of C1 matches the second parameter
    of C2.  */
 
@@ -12882,23 +12866,26 @@ cand_parms_match (z_candidate *c1, z_candidate *c2, pmatch match_kind)
 	}
     }
 
-  else if (reversed)
-    return (reversed_match (c1, c2)
-	    && reversed_match (c2, c1));
-
   tree parms1 = TYPE_ARG_TYPES (TREE_TYPE (fn1));
   tree parms2 = TYPE_ARG_TYPES (TREE_TYPE (fn2));
 
-  if (!(DECL_FUNCTION_MEMBER_P (fn1)
-	&& DECL_FUNCTION_MEMBER_P (fn2)))
-    /* Early escape.  */;
-
-  /* CWG2789 is not adequate, it should specify corresponding object
-     parameters, not same typed object parameters.  */
-  else if (!object_parms_correspond (c1, fn1, c2, fn2))
-    return false;
-  else
+  if (DECL_FUNCTION_MEMBER_P (fn1)
+      && DECL_FUNCTION_MEMBER_P (fn2))
     {
+      tree base1 = DECL_CONTEXT (strip_inheriting_ctors (fn1));
+      tree base2 = DECL_CONTEXT (strip_inheriting_ctors (fn2));
+      if (base1 != base2)
+	return false;
+
+      if (reversed)
+	return (reversed_match (c1, c2)
+		&& reversed_match (c2, c1));
+
+      /* Use object_parms_correspond to simplify comparing iobj/xobj/static
+	 member functions.  */
+      if (!object_parms_correspond (fn1, fn2, base1))
+	return false;
+
       /* We just compared the object parameters, if they don't correspond
 	 we already returned false.  */
       auto skip_parms = [] (tree fn, tree parms)
@@ -12911,6 +12898,9 @@ cand_parms_match (z_candidate *c1, z_candidate *c2, pmatch match_kind)
       parms1 = skip_parms (fn1, parms1);
       parms2 = skip_parms (fn2, parms2);
     }
+  else if (reversed)
+    return (reversed_match (c1, c2)
+	    && reversed_match (c2, c1));
   return compparms (parms1, parms2);
 }
 
@@ -13169,7 +13159,7 @@ joust (struct z_candidate *cand1, struct z_candidate *cand2, bool warn,
 	  auto_diagnostic_group d;
 	  if (warning (OPT_Wconversion, "choosing %qD over %qD", w->fn, l->fn)
 	      && warning (OPT_Wconversion, "  for conversion from %qH to %qI",
-			  source, w->second_conv->type)) 
+			  source, w->second_conv->type))
 	    {
 	      inform (input_location, "  because conversion sequence "
 		      "for the argument is better");
@@ -13265,10 +13255,14 @@ joust (struct z_candidate *cand1, struct z_candidate *cand2, bool warn,
 	return winner;
     }
 
-  /* Concepts: F1 and F2 are non-template functions with the same
-     parameter-type-lists, and F1 is more constrained than F2 according to the
-     partial ordering of constraints described in 13.5.4.  */
-
+  /* F1 and F2 are non-template functions and
+     - they have the same non-object-parameter-type-lists ([dcl.fct]), and
+     - if they are member functions, both are direct members of the same
+       class, and
+     - if both are non-static member functions, they have the same types for
+       their object parameters, and
+     - F1 is more constrained than F2 according to the partial ordering of
+       constraints described in [temp.constr.order].  */
   if (flag_concepts && DECL_P (cand1->fn) && DECL_P (cand2->fn)
       && !cand1->template_decl && !cand2->template_decl
       && cand_parms_match (cand1, cand2, pmatch::current))
@@ -13346,13 +13340,10 @@ joust (struct z_candidate *cand1, struct z_candidate *cand2, bool warn,
 	}
     }
 
-  /* F1 is a member of a class D, F2 is a member of a base class B of D, and
-     for all arguments the corresponding parameters of F1 and F2 have the same
-     type (CWG 2273/2277). */
-  if (DECL_P (cand1->fn) && DECL_CLASS_SCOPE_P (cand1->fn)
-      && !DECL_CONV_FN_P (cand1->fn)
-      && DECL_P (cand2->fn) && DECL_CLASS_SCOPE_P (cand2->fn)
-      && !DECL_CONV_FN_P (cand2->fn))
+  /* F1 is a constructor for a class D, F2 is a constructor for a base class B
+     of D, and for all arguments the corresponding parameters of F1 and F2 have
+     the same type (CWG 2273/2277).  */
+  if (DECL_INHERITED_CTOR (cand1->fn) || DECL_INHERITED_CTOR (cand2->fn))
     {
       tree base1 = DECL_CONTEXT (strip_inheriting_ctors (cand1->fn));
       tree base2 = DECL_CONTEXT (strip_inheriting_ctors (cand2->fn));
@@ -13425,7 +13416,7 @@ joust (struct z_candidate *cand1, struct z_candidate *cand2, bool warn,
       tree f2 = TREE_TYPE (cand2->fn);
       tree p1 = TYPE_ARG_TYPES (f1);
       tree p2 = TYPE_ARG_TYPES (f2);
-     
+
       /* Check if cand1->fn and cand2->fn are versions of the same function.  It
          is possible that cand1->fn and cand2->fn are function versions but of
          different functions.  Check types to see if they are versions of the same
@@ -13964,7 +13955,9 @@ set_up_extended_ref_temp (tree decl, tree expr, vec<tree, va_gc> **cleanups,
   init = cp_fully_fold (init);
   if (TREE_CONSTANT (init))
     {
-      if (literal_type_p (type) && CP_TYPE_CONST_NON_VOLATILE_P (type))
+      if (literal_type_p (type)
+	  && CP_TYPE_CONST_NON_VOLATILE_P (type)
+	  && !TYPE_HAS_MUTABLE_P (type))
 	{
 	  /* 5.19 says that a constant expression can include an
 	     lvalue-rvalue conversion applied to "a glvalue of literal type
@@ -14247,19 +14240,18 @@ reference_like_class_p (tree ctype)
   return false;
 }
 
-/* Helper for maybe_warn_dangling_reference to find a problematic CALL_EXPR
-   that initializes the LHS (and at least one of its arguments represents
-   a temporary, as outlined in maybe_warn_dangling_reference), or NULL_TREE
+/* Helper for maybe_warn_dangling_reference to find a problematic temporary
+   in EXPR (as outlined in maybe_warn_dangling_reference), or NULL_TREE
    if none found.  For instance:
 
-     const S& s = S().self(); // S::self (&TARGET_EXPR <...>)
-     const int& r = (42, f(1)); // f(1)
-     const int& t = b ? f(1) : f(2); // f(1)
-     const int& u = b ? f(1) : f(g); // f(1)
-     const int& v = b ? f(g) : f(2); // f(2)
+     const S& s = S().self(); // S()
+     const int& r = (42, f(1)); // temporary for passing 1 to f
+     const int& t = b ? f(1) : f(2); // temporary for 1
+     const int& u = b ? f(1) : f(g); // temporary for 1
+     const int& v = b ? f(g) : f(2); // temporary for 2
      const int& w = b ? f(g) : f(g); // NULL_TREE
      const int& y = (f(1), 42); // NULL_TREE
-     const int& z = f(f(1)); // f(f(1))
+     const int& z = f(f(1)); // temporary for 1
 
    EXPR is the initializer.  If ARG_P is true, we're processing an argument
    to a function; the point is to distinguish between, for example,
@@ -14350,14 +14342,16 @@ do_warn_dangling_reference (tree expr, bool arg_p)
 	    if ((arg = do_warn_dangling_reference (arg, /*arg_p=*/true)))
 	      {
 		/* If we know the temporary could not bind to the return type,
-		   don't warn.  This is for scalars only because for classes
-		   we can't be sure we are not returning its sub-object.  */
-		if (SCALAR_TYPE_P (TREE_TYPE (arg))
+		   don't warn.  This is for scalars and empty classes only
+		   because for other classes we can't be sure we are not
+		   returning its sub-object.  */
+		if ((SCALAR_TYPE_P (TREE_TYPE (arg))
+		     || is_empty_class (TREE_TYPE (arg)))
 		    && TYPE_REF_P (rettype)
-		    && !reference_related_p (TREE_TYPE (arg),
-					     TREE_TYPE (rettype)))
+		    && !reference_related_p (TREE_TYPE (rettype),
+					     TREE_TYPE (arg)))
 		  continue;
-		return expr;
+		return arg;
 	      }
 	  /* Don't warn about member functions like:
 	      std::any a(...);
@@ -14430,8 +14424,8 @@ maybe_warn_dangling_reference (const_tree decl, tree init)
       auto_diagnostic_group d;
       if (warning_at (DECL_SOURCE_LOCATION (decl), OPT_Wdangling_reference,
 		      "possibly dangling reference to a temporary"))
-	inform (EXPR_LOCATION (call), "the temporary was destroyed at "
-		"the end of the full expression %qE", call);
+	inform (EXPR_LOCATION (call), "%qT temporary created here",
+		TREE_TYPE (call));
     }
 }
 
@@ -14569,6 +14563,12 @@ extend_ref_init_temps (tree decl, tree init, vec<tree, va_gc> **cleanups,
 {
   tree type = TREE_TYPE (init);
   if (processing_template_decl)
+    return init;
+
+  /* P2718R0 - ignore temporaries in C++23 for-range-initializer, those
+     have all extended lifetime.  */
+  if (DECL_NAME (decl) == for_range__identifier
+      && flag_range_for_ext_temps)
     return init;
 
   maybe_warn_dangling_reference (decl, init);

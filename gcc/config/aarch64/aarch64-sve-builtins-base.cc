@@ -758,30 +758,59 @@ public:
     if (auto *res = f.fold_const_binary (TRUNC_DIV_EXPR))
       return res;
 
+    /* If the divisor is all ones, fold to dividend.  */
+    tree op1 = gimple_call_arg (f.call, 1);
+    tree op2 = gimple_call_arg (f.call, 2);
+    if (integer_onep (op2))
+      return f.fold_active_lanes_to (op1);
+
+    /* If one of the operands is all zeros, fold to zero vector.  */
+    if (integer_zerop (op1) || integer_zerop (op2))
+      return f.fold_active_lanes_to (build_zero_cst (TREE_TYPE (f.lhs)));
+
+    /* If the divisor is all integer -1, fold to svneg.  */
+    tree pg = gimple_call_arg (f.call, 0);
+    if (!f.type_suffix (0).unsigned_p && integer_minus_onep (op2))
+      {
+	function_instance instance ("svneg", functions::svneg,
+				    shapes::unary, MODE_none,
+				    f.type_suffix_ids, GROUP_none, f.pred);
+	gcall *call = f.redirect_call (instance);
+	unsigned offset_index = 0;
+	if (f.pred == PRED_m)
+	  {
+	    offset_index = 1;
+	    gimple_call_set_arg (call, 0, op1);
+	  }
+	else
+	  gimple_set_num_ops (call, 5);
+	gimple_call_set_arg (call, offset_index, pg);
+	gimple_call_set_arg (call, offset_index + 1, op1);
+	return call;
+      }
+
     /* If the divisor is a uniform power of 2, fold to a shift
        instruction.  */
-    tree op2 = gimple_call_arg (f.call, 2);
-    tree divisor_cst = uniform_integer_cst_p (op2);
-
-    if (!divisor_cst || !integer_pow2p (divisor_cst))
+    tree op2_cst = uniform_integer_cst_p (op2);
+    if (!op2_cst || !integer_pow2p (op2_cst))
       return NULL;
 
     tree new_divisor;
     gcall *call;
 
-    if (f.type_suffix (0).unsigned_p && tree_to_uhwi (divisor_cst) != 1)
+    if (f.type_suffix (0).unsigned_p && tree_to_uhwi (op2_cst) != 1)
       {
 	function_instance instance ("svlsr", functions::svlsr,
 				    shapes::binary_uint_opt_n, MODE_n,
 				    f.type_suffix_ids, GROUP_none, f.pred);
 	call = f.redirect_call (instance);
-	tree d = INTEGRAL_TYPE_P (TREE_TYPE (op2)) ? op2 : divisor_cst;
+	tree d = INTEGRAL_TYPE_P (TREE_TYPE (op2)) ? op2 : op2_cst;
 	new_divisor = wide_int_to_tree (TREE_TYPE (d), tree_log2 (d));
       }
     else
       {
-	if (tree_int_cst_sign_bit (divisor_cst)
-	    || tree_to_shwi (divisor_cst) == 1)
+	if (tree_int_cst_sign_bit (op2_cst)
+	    || tree_to_shwi (op2_cst) == 1)
 	  return NULL;
 
 	function_instance instance ("svasrd", functions::svasrd,
@@ -789,7 +818,7 @@ public:
 				    f.type_suffix_ids, GROUP_none, f.pred);
 	call = f.redirect_call (instance);
 	new_divisor = wide_int_to_tree (scalar_types[VECTOR_TYPE_svuint64_t],
-					tree_log2 (divisor_cst));
+					tree_log2 (op2_cst));
       }
 
     gimple_call_set_arg (call, 2, new_divisor);
@@ -809,15 +838,16 @@ public:
     e.rotate_inputs_left (0, 3);
     insn_code icode;
     if (e.type_suffix_ids[1] == NUM_TYPE_SUFFIXES)
-      icode = e.direct_optab_handler_for_sign (sdot_prod_optab,
-					       udot_prod_optab,
-					       0, GET_MODE (e.args[0]));
+      icode = e.convert_optab_handler_for_sign (sdot_prod_optab,
+						udot_prod_optab,
+						0, e.result_mode (),
+						GET_MODE (e.args[0]));
     else
       icode = (e.type_suffix (0).float_p
 	       ? CODE_FOR_aarch64_sve_fdotvnx4sfvnx8hf
 	       : e.type_suffix (0).unsigned_p
-	       ? CODE_FOR_aarch64_sve_udotvnx4sivnx8hi
-	       : CODE_FOR_aarch64_sve_sdotvnx4sivnx8hi);
+	       ? CODE_FOR_udot_prodvnx4sivnx8hi
+	       : CODE_FOR_sdot_prodvnx4sivnx8hi);
     return e.use_unpred_insn (icode);
   }
 };
@@ -1292,6 +1322,20 @@ public:
 
 class svindex_impl : public function_base
 {
+public:
+  gimple *
+  fold (gimple_folder &f) const override
+  {
+    /* Apply constant folding if base and step are integer constants.  */
+    tree vec_type = TREE_TYPE (f.lhs);
+    tree base = gimple_call_arg (f.call, 0);
+    tree step = gimple_call_arg (f.call, 1);
+    if (TREE_CODE (base) != INTEGER_CST || TREE_CODE (step) != INTEGER_CST)
+      return NULL;
+    return gimple_build_assign (f.lhs,
+				build_vec_series (vec_type, base, step));
+  }
+
 public:
   rtx
   expand (function_expander &e) const override
@@ -1882,6 +1926,19 @@ public:
   }
 };
 
+class svlsl_impl : public rtx_code_function
+{
+public:
+  CONSTEXPR svlsl_impl ()
+    : rtx_code_function (ASHIFT, ASHIFT) {}
+
+  gimple *
+  fold (gimple_folder &f) const override
+  {
+    return f.fold_const_binary (LSHIFT_EXPR);
+  }
+};
+
 class svmad_impl : public function_base
 {
 public:
@@ -2009,7 +2066,81 @@ public:
   gimple *
   fold (gimple_folder &f) const override
   {
-    return f.fold_const_binary (MULT_EXPR);
+    if (auto *res = f.fold_const_binary (MULT_EXPR))
+      return res;
+
+    /* If one of the operands is all ones, fold to other operand.  */
+    tree op1 = gimple_call_arg (f.call, 1);
+    tree op2 = gimple_call_arg (f.call, 2);
+    if (integer_onep (op1))
+      return f.fold_active_lanes_to (op2);
+    if (integer_onep (op2))
+      return f.fold_active_lanes_to (op1);
+
+    /* If one of the operands is all zeros, fold to zero vector.  */
+    if (integer_zerop (op1) || integer_zerop (op2))
+      return f.fold_active_lanes_to (build_zero_cst (TREE_TYPE (f.lhs)));
+
+    /* If one of the operands is all integer -1, fold to svneg.  */
+    tree pg = gimple_call_arg (f.call, 0);
+    tree negated_op = NULL;
+    if (integer_minus_onep (op2))
+      negated_op = op1;
+    else if (integer_minus_onep (op1))
+      negated_op = op2;
+    if (!f.type_suffix (0).unsigned_p && negated_op)
+      {
+	function_instance instance ("svneg", functions::svneg,
+				    shapes::unary, MODE_none,
+				    f.type_suffix_ids, GROUP_none, f.pred);
+	gcall *call = f.redirect_call (instance);
+	unsigned offset_index = 0;
+	if (f.pred == PRED_m)
+	  {
+	    offset_index = 1;
+	    gimple_call_set_arg (call, 0, op1);
+	  }
+	else
+	  gimple_set_num_ops (call, 5);
+	gimple_call_set_arg (call, offset_index, pg);
+	gimple_call_set_arg (call, offset_index + 1, negated_op);
+	return call;
+      }
+
+    /* If one of the operands is a uniform power of 2, fold to a left shift
+       by immediate.  */
+    tree op1_cst = uniform_integer_cst_p (op1);
+    tree op2_cst = uniform_integer_cst_p (op2);
+    tree shift_op1, shift_op2 = NULL;
+    if (op1_cst && integer_pow2p (op1_cst)
+	&& (f.pred != PRED_m
+	    || is_ptrue (pg, f.type_suffix (0).element_bytes)))
+      {
+	shift_op1 = op2;
+	shift_op2 = op1_cst;
+      }
+    else if (op2_cst && integer_pow2p (op2_cst))
+      {
+	shift_op1 = op1;
+	shift_op2 = op2_cst;
+      }
+    else
+      return NULL;
+
+    if (shift_op2)
+      {
+	shift_op2 = wide_int_to_tree (unsigned_type_for (TREE_TYPE (shift_op2)),
+				      tree_log2 (shift_op2));
+	function_instance instance ("svlsl", functions::svlsl,
+				    shapes::binary_uint_opt_n, MODE_n,
+				    f.type_suffix_ids, GROUP_none, f.pred);
+	gcall *call = f.redirect_call (instance);
+	gimple_call_set_arg (call, 1, shift_op1);
+	gimple_call_set_arg (call, 2, shift_op2);
+	return call;
+      }
+
+    return NULL;
   }
 };
 
@@ -2879,7 +3010,7 @@ public:
        Hence we do the same rotation on arguments as svdot_impl does.  */
     e.rotate_inputs_left (0, 3);
     machine_mode mode = e.vector_mode (0);
-    insn_code icode = code_for_dot_prod (UNSPEC_USDOT, mode);
+    insn_code icode = code_for_dot_prod (UNSPEC_USDOT, e.result_mode (), mode);
     return e.use_exact_insn (icode);
   }
 
@@ -2918,7 +3049,9 @@ public:
     : while_comparison (unspec_for_sint, unspec_for_uint), m_eq_p (eq_p)
   {}
 
-  /* Try to fold a call by treating its arguments as constants of type T.  */
+  /* Try to fold a call by treating its arguments as constants of type T.
+     We have already filtered out the degenerate cases of X .LT. MIN
+     and X .LE. MAX.  */
   template<typename T>
   gimple *
   fold_type (gimple_folder &f) const
@@ -2973,6 +3106,13 @@ public:
   {
     if (f.vectors_per_tuple () > 1)
       return nullptr;
+
+    /* Filter out cases where the condition is always true or always false.  */
+    tree arg1 = gimple_call_arg (f.call, 1);
+    if (!m_eq_p && operand_equal_p (arg1, TYPE_MIN_VALUE (TREE_TYPE (arg1))))
+      return f.fold_to_pfalse ();
+    if (m_eq_p && operand_equal_p (arg1, TYPE_MAX_VALUE (TREE_TYPE (arg1))))
+      return f.fold_to_ptrue ();
 
     if (f.type_suffix (1).unsigned_p)
       return fold_type<poly_uint64> (f);
@@ -3044,6 +3184,10 @@ FUNCTION (svadrb, svadr_bhwd_impl, (0))
 FUNCTION (svadrd, svadr_bhwd_impl, (3))
 FUNCTION (svadrh, svadr_bhwd_impl, (1))
 FUNCTION (svadrw, svadr_bhwd_impl, (2))
+FUNCTION (svamax, cond_or_uncond_unspec_function,
+	  (UNSPEC_COND_FAMAX, UNSPEC_FAMAX))
+FUNCTION (svamin, cond_or_uncond_unspec_function,
+	  (UNSPEC_COND_FAMIN, UNSPEC_FAMIN))
 FUNCTION (svand, rtx_code_function, (AND, AND))
 FUNCTION (svandv, reduction, (UNSPEC_ANDV))
 FUNCTION (svasr, rtx_code_function, (ASHIFTRT, ASHIFTRT))
@@ -3173,7 +3317,7 @@ FUNCTION (svldnf1uh, svldxf1_extend_impl, (TYPE_SUFFIX_u16, UNSPEC_LDNF1))
 FUNCTION (svldnf1uw, svldxf1_extend_impl, (TYPE_SUFFIX_u32, UNSPEC_LDNF1))
 FUNCTION (svldnt1, svldnt1_impl,)
 FUNCTION (svlen, svlen_impl,)
-FUNCTION (svlsl, rtx_code_function, (ASHIFT, ASHIFT))
+FUNCTION (svlsl, svlsl_impl,)
 FUNCTION (svlsl_wide, shift_wide, (ASHIFT, UNSPEC_ASHIFT_WIDE))
 FUNCTION (svlsr, rtx_code_function, (LSHIFTRT, LSHIFTRT))
 FUNCTION (svlsr_wide, shift_wide, (LSHIFTRT, UNSPEC_LSHIFTRT_WIDE))

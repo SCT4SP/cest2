@@ -466,7 +466,8 @@ vec_info::vec_info (vec_info::vec_kind kind_in, vec_info_shared *shared_)
     shared (shared_),
     stmt_vec_info_ro (false),
     bbs (NULL),
-    nbbs (0)
+    nbbs (0),
+    inv_pattern_def_seq (NULL)
 {
   stmt_vec_infos.create (50);
 }
@@ -535,6 +536,7 @@ stmt_vec_info
 vec_info::add_pattern_stmt (gimple *stmt, stmt_vec_info stmt_info)
 {
   stmt_vec_info res = new_stmt_vec_info (stmt);
+  res->pattern_stmt_p = true;
   set_vinfo_for_stmt (stmt, res, false);
   STMT_VINFO_RELATED_STMT (res) = stmt_info;
   return res;
@@ -608,6 +610,8 @@ vec_info::move_dr (stmt_vec_info new_stmt_info, stmt_vec_info old_stmt_info)
     = STMT_VINFO_DR_WRT_VEC_LOOP (old_stmt_info);
   STMT_VINFO_GATHER_SCATTER_P (new_stmt_info)
     = STMT_VINFO_GATHER_SCATTER_P (old_stmt_info);
+  STMT_VINFO_STRIDED_P (new_stmt_info)
+    = STMT_VINFO_STRIDED_P (old_stmt_info);
 }
 
 /* Permanently remove the statement described by STMT_INFO from the
@@ -1065,7 +1069,8 @@ try_vectorize_loop_1 (hash_table<simduid_to_vf> *&simduid_to_vf_htab,
 		 LOCATION_LINE (vect_location.get_location_t ()));
 
   /* Try to analyze the loop, retaining an opt_problem if dump_enabled_p.  */
-  opt_loop_vec_info loop_vinfo = vect_analyze_loop (loop, &shared);
+  opt_loop_vec_info loop_vinfo = vect_analyze_loop (loop, loop_vectorized_call,
+						    &shared);
   loop->aux = loop_vinfo;
 
   if (!loop_vinfo)
@@ -1567,7 +1572,7 @@ static hash_map<tree, unsigned> *type_align_map;
 /* Return alignment of array's vector type corresponding to scalar type.
    0 if no vector type exists.  */
 static unsigned
-get_vec_alignment_for_array_type (tree type) 
+get_vec_alignment_for_array_type (tree type)
 {
   gcc_assert (TREE_CODE (type) == ARRAY_TYPE);
   poly_uint64 array_size, vector_size;
@@ -1588,7 +1593,7 @@ get_vec_alignment_for_array_type (tree type)
    offset is a multiple of it's vector alignment.
    0 if no suitable field is found.  */
 static unsigned
-get_vec_alignment_for_record_type (tree type) 
+get_vec_alignment_for_record_type (tree type)
 {
   gcc_assert (TREE_CODE (type) == RECORD_TYPE);
 
@@ -1607,7 +1612,7 @@ get_vec_alignment_for_record_type (tree type)
        field != NULL_TREE;
        field = DECL_CHAIN (field))
     {
-      /* Skip if not FIELD_DECL or if alignment is set by user.  */ 
+      /* Skip if not FIELD_DECL or if alignment is set by user.  */
       if (TREE_CODE (field) != FIELD_DECL
 	  || DECL_USER_ALIGN (field)
 	  || DECL_ARTIFICIAL (field))
@@ -1625,11 +1630,11 @@ get_vec_alignment_for_record_type (tree type)
       if (!tree_fits_uhwi_p (offset_tree))
 	break;
 
-      offset = tree_to_uhwi (offset_tree); 
+      offset = tree_to_uhwi (offset_tree);
       alignment = get_vec_alignment_for_type (TREE_TYPE (field));
 
       /* Get maximum alignment of vectorized field/array among those members
-	 whose offset is multiple of the vector alignment.  */ 
+	 whose offset is multiple of the vector alignment.  */
       if (alignment
 	  && (offset % alignment == 0)
 	  && (alignment > max_align))

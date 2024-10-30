@@ -18,6 +18,7 @@ You should have received a copy of the GNU General Public License
 along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
+#define INCLUDE_MEMORY
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
@@ -38,6 +39,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "builtins.h"
 #include "gimplify-me.h"
 #include "gimplify.h"
+#include "tree-ssa-dce.h"
 
 struct object_size_info
 {
@@ -1500,8 +1502,7 @@ plus_stmt_object_size (struct object_size_info *osi, tree var, gimple *stmt)
     return false;
 
   /* Handle PTR + OFFSET here.  */
-  if (size_valid_p (op1, object_size_type)
-      && (TREE_CODE (op0) == SSA_NAME || TREE_CODE (op0) == ADDR_EXPR))
+  if ((TREE_CODE (op0) == SSA_NAME || TREE_CODE (op0) == ADDR_EXPR))
     {
       if (TREE_CODE (op0) == SSA_NAME)
 	{
@@ -1526,7 +1527,9 @@ plus_stmt_object_size (struct object_size_info *osi, tree var, gimple *stmt)
       if (size_unknown_p (bytes, 0))
 	;
       else if ((object_size_type & OST_DYNAMIC)
-	       || compare_tree_int (op1, offset_limit) <= 0)
+	       || bytes != wholesize
+	       || (size_valid_p (op1, object_size_type)
+		   && compare_tree_int (op1, offset_limit) <= 0))
 	bytes = size_for_offset (bytes, op1, wholesize);
       /* In the static case, with a negative offset, the best estimate for
 	 minimum size is size_unknown but for maximum size, the wholesize is a
@@ -2187,6 +2190,7 @@ static unsigned int
 object_sizes_execute (function *fun, bool early)
 {
   todo = 0;
+  auto_bitmap sdce_worklist;
 
   basic_block bb;
   FOR_EACH_BB_FN (bb, fun)
@@ -2277,13 +2281,18 @@ object_sizes_execute (function *fun, bool early)
 
 	  /* Propagate into all uses and fold those stmts.  */
 	  if (!SSA_NAME_OCCURS_IN_ABNORMAL_PHI (lhs))
-	    replace_uses_by (lhs, result);
+	    {
+	      replace_uses_by (lhs, result);
+	      /* Mark lhs as being possiblely DCEd. */
+	      bitmap_set_bit (sdce_worklist, SSA_NAME_VERSION (lhs));
+	    }
 	  else
 	    replace_call_with_value (&i, result);
 	}
     }
 
   fini_object_sizes ();
+  simple_dce_from_worklist (sdce_worklist);
   return todo;
 }
 

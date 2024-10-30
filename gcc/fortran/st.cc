@@ -23,6 +23,7 @@ along with GCC; see the file COPYING3.  If not see
    GENERIC tree structures and from there to executable code for a
    target.  */
 
+#define INCLUDE_MEMORY
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
@@ -229,6 +230,7 @@ gfc_free_statement (gfc_code *p)
     case EXEC_OMP_DO:
     case EXEC_OMP_DO_SIMD:
     case EXEC_OMP_ERROR:
+    case EXEC_OMP_INTEROP:
     case EXEC_OMP_LOOP:
     case EXEC_OMP_END_SINGLE:
     case EXEC_OMP_MASKED_TASKLOOP:
@@ -290,7 +292,7 @@ gfc_free_statement (gfc_code *p)
       break;
 
     case EXEC_OMP_FLUSH:
-      gfc_free_omp_namelist (p->ext.omp_namelist, false, false, false);
+      gfc_free_omp_namelist (p->ext.omp_namelist, false, false, false, false);
       break;
 
     case EXEC_OMP_BARRIER:
@@ -333,6 +335,22 @@ gfc_free_association_list (gfc_association_list* assoc)
 {
   if (!assoc)
     return;
+
+  if (assoc->ar)
+    {
+      for (int i = 0; i < assoc->ar->dimen; i++)
+	{
+	  if (assoc->ar->start[i]
+	      && assoc->ar->start[i]->ts.type == BT_INTEGER)
+	    gfc_free_expr (assoc->ar->start[i]);
+	  if (assoc->ar->end[i]
+	      && assoc->ar->end[i]->ts.type == BT_INTEGER)
+	    gfc_free_expr (assoc->ar->end[i]);
+	  if (assoc->ar->stride[i]
+	      && assoc->ar->stride[i]->ts.type == BT_INTEGER)
+	    gfc_free_expr (assoc->ar->stride[i]);
+	}
+    }
 
   gfc_free_association_list (assoc->next);
   free (assoc);

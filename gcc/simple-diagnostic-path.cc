@@ -191,6 +191,12 @@ simple_diagnostic_event::~simple_diagnostic_event ()
   free (m_desc);
 }
 
+void
+simple_diagnostic_event::print_desc (pretty_printer &pp) const
+{
+  pp_string (&pp, m_desc);
+}
+
 #if CHECKING_P
 
 namespace selftest {
@@ -209,8 +215,8 @@ test_intraprocedural_path (pretty_printer *event_pp)
   ASSERT_EQ (path.num_events (), 2);
   ASSERT_EQ (path.num_threads (), 1);
   ASSERT_FALSE (path.interprocedural_p ());
-  ASSERT_STREQ (path.get_event (0).get_desc (false).get (), "first `free'");
-  ASSERT_STREQ (path.get_event (1).get_desc (false).get (), "double `free'");
+  ASSERT_STREQ (path.get_event (0).get_desc ().get (), "first `free'");
+  ASSERT_STREQ (path.get_event (1).get_desc ().get (), "double `free'");
 }
 
 /* Run all of the selftests within this file.  */
@@ -220,16 +226,17 @@ simple_diagnostic_path_cc_tests ()
 {
   /* In a few places we use the global dc's printer to determine
      colorization so ensure this off during the tests.  */
-  const bool saved_show_color = pp_show_color (global_dc->printer);
-  pp_show_color (global_dc->printer) = false;
+  pretty_printer *global_pp = global_dc->get_reference_printer ();
+  const bool saved_show_color = pp_show_color (global_pp);
+  pp_show_color (global_pp) = false;
 
   auto_fix_quotes fix_quotes;
   std::unique_ptr<pretty_printer> event_pp
-    = std::unique_ptr<pretty_printer> (global_dc->printer->clone ());
+    = std::unique_ptr<pretty_printer> (global_pp->clone ());
 
   test_intraprocedural_path (event_pp.get ());
 
-  pp_show_color (global_dc->printer) = saved_show_color;
+  pp_show_color (global_pp) = saved_show_color;
 }
 
 } // namespace selftest

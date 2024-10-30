@@ -20,6 +20,7 @@ You should have received a copy of the GNU General Public License
 along with GNU Modula-2; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
+#define INCLUDE_MEMORY
 #include "config.h"
 #include "system.h"
 #include <stdbool.h>
@@ -123,7 +124,7 @@ static void copy (mcStream_ptrToFile p);
 
 static DynamicStrings_String removeLater (DynamicStrings_String filename)
 {
-  alists_includeItemIntoList (listOfFiles, reinterpret_cast<void *> (filename));
+  alists_includeItemIntoList (listOfFiles, reinterpret_cast <void *> (filename));
   return filename;
   /* static analysis guarentees a RETURN statement will be used before here.  */
   __builtin_unreachable ();
@@ -213,7 +214,7 @@ extern "C" FIO_File mcStream_openFrag (unsigned int id)
   f = createTemporaryFile (id);
   Storage_ALLOCATE ((void **) &p, sizeof (FIO_File));
   (*p) = f;
-  Indexing_PutIndice (frag, id, reinterpret_cast<void *> (p));
+  Indexing_PutIndice (frag, id, reinterpret_cast <void *> (p));
   return f;
   /* static analysis guarentees a RETURN statement will be used before here.  */
   __builtin_unreachable ();

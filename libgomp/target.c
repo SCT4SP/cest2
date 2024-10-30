@@ -51,6 +51,9 @@
 #define splay_tree_c
 #include "splay-tree.h"
 
+/* Used by omp_get_device_from_uid / omp_get_uid_from_device for the host.  */
+static char *str_omp_initial_device = "OMP_INITIAL_DEVICE";
+#define STR_OMP_DEV_PREFIX "OMP_DEV_"
 
 typedef uintptr_t *hash_entry_type;
 static inline void * htab_alloc (size_t size) { return gomp_malloc (size); }
@@ -2451,6 +2454,12 @@ gomp_load_image_to_device (struct gomp_device_descr *devicep, unsigned version,
       array->right = NULL;
       splay_tree_insert (&devicep->mem_map, array);
       array++;
+
+      if (is_link_var
+	  && (omp_requires_mask
+	      & (GOMP_REQUIRES_UNIFIED_SHARED_MEMORY | GOMP_REQUIRES_SELF_MAPS)))
+	gomp_copy_host2dev (devicep, NULL, (void *) target_var->start,
+			    &k->host_start, sizeof (void *), false, NULL);
     }
 
   /* Last entry is for the ICV struct variable; if absent, start = end = 0.  */
@@ -2584,6 +2593,9 @@ gomp_requires_to_name (char *buf, size_t size, int requires_mask)
   if (requires_mask & GOMP_REQUIRES_UNIFIED_SHARED_MEMORY)
     p += snprintf (p, end - p, "%sunified_shared_memory",
 		   (p == buf ? "" : ", "));
+  if (requires_mask & GOMP_REQUIRES_SELF_MAPS)
+    p += snprintf (p, end - p, "%sself_maps",
+		   (p == buf ? "" : ", "));
   if (requires_mask & GOMP_REQUIRES_REVERSE_OFFLOAD)
     p += snprintf (p, end - p, "%sreverse_offload",
 		   (p == buf ? "" : ", "));
@@ -2621,9 +2633,9 @@ GOMP_offload_register_ver (unsigned version, const void *host_table,
   if (omp_req && omp_requires_mask && omp_requires_mask != omp_req)
     {
       char buf1[sizeof ("unified_address, unified_shared_memory, "
-			"reverse_offload")];
+			"self_maps, reverse_offload")];
       char buf2[sizeof ("unified_address, unified_shared_memory, "
-			"reverse_offload")];
+			"self_maps, reverse_offload")];
       gomp_requires_to_name (buf2, sizeof (buf2),
 			     omp_req != GOMP_REQUIRES_TARGET_USED
 			     ? omp_req : omp_requires_mask);
@@ -5223,6 +5235,59 @@ ialias (omp_get_interop_name)
 ialias (omp_get_interop_type_desc)
 ialias (omp_get_interop_rc_desc)
 
+static const char *
+gomp_get_uid_for_device (struct gomp_device_descr *devicep, int device_num)
+{
+  if (devicep->uid)
+    return devicep->uid;
+
+  if (devicep->get_uid_func)
+    devicep->uid = devicep->get_uid_func (devicep->target_id);
+  if (!devicep->uid)
+    {
+      size_t ln = strlen (STR_OMP_DEV_PREFIX) + 10 + 1;
+      char *uid;
+      uid = gomp_malloc (ln);
+      snprintf (uid, ln, "%s%d", STR_OMP_DEV_PREFIX, device_num);
+      devicep->uid = uid;
+    }
+  return devicep->uid;
+}
+
+const char *
+omp_get_uid_from_device (int device_num)
+{
+  if (device_num < omp_initial_device || device_num > gomp_get_num_devices ())
+    return NULL;
+
+  if (device_num == omp_initial_device || device_num == gomp_get_num_devices ())
+    return str_omp_initial_device;
+
+  struct gomp_device_descr *devicep = resolve_device (device_num, false);
+  if (devicep == NULL)
+    return NULL;
+  return gomp_get_uid_for_device (devicep, device_num);
+}
+
+int
+omp_get_device_from_uid (const char *uid)
+{
+  if (uid == NULL)
+    return omp_invalid_device;
+  if (strcmp (uid, str_omp_initial_device) == 0)
+    return omp_initial_device;
+  for (int dev = 0; dev < gomp_get_num_devices (); dev++)
+    {
+      struct gomp_device_descr *devicep = resolve_device (dev, false);
+      if (strcmp (uid, gomp_get_uid_for_device (devicep, dev)) == 0)
+	return dev;
+    }
+  return omp_invalid_device;
+}
+
+ialias (omp_get_uid_from_device)
+ialias (omp_get_device_from_uid)
+
 #ifdef PLUGIN_SUPPORT
 
 /* This function tries to load a plugin for DEVICE.  Name of plugin is passed
@@ -5264,6 +5329,7 @@ gomp_load_plugin_for_device (struct gomp_device_descr *device,
     }
 
   DLSYM (get_name);
+  DLSYM_OPT (get_uid, get_uid);
   DLSYM (get_caps);
   DLSYM (get_type);
   DLSYM (get_num_devices);
@@ -5436,7 +5502,8 @@ gomp_target_init (void)
 
 		/* If USM has been requested and is supported by all devices
 		   of this type, set the capability accordingly.  */
-		if (omp_requires_mask & GOMP_REQUIRES_UNIFIED_SHARED_MEMORY)
+		if (omp_requires_mask
+		    & (GOMP_REQUIRES_UNIFIED_SHARED_MEMORY | GOMP_REQUIRES_SELF_MAPS))
 		  current_device.capabilities |= GOMP_OFFLOAD_CAP_SHARED_MEM;
 
 		devs = realloc (devs, (num_devs + new_num_devs)
@@ -5449,6 +5516,8 @@ gomp_target_init (void)
 		  }
 
 		current_device.name = current_device.get_name_func ();
+		/* Defer UID setting until needed + after gomp_init_device.  */
+		current_device.uid = NULL;
 		/* current_device.capabilities has already been set.  */
 		current_device.type = current_device.get_type_func ();
 		current_device.mem_map.root = NULL;

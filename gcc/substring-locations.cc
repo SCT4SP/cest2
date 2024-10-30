@@ -17,6 +17,7 @@ You should have received a copy of the GNU General Public License
 along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
+#define INCLUDE_MEMORY
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
@@ -143,7 +144,7 @@ format_string_diagnostic_t (const substring_loc &fmt_loc,
 {
 }
 
-/* Emit a warning governed by option OPT, using SINGULAR_GMSGID as the
+/* Emit a warning governed by option OPTION_ID, using SINGULAR_GMSGID as the
    format string (or if PLURAL_GMSGID is different from SINGULAR_GMSGID,
    using SINGULAR_GMSGID, PLURAL_GMSGID and N as arguments to ngettext)
    and AP as its arguments.
@@ -151,7 +152,7 @@ format_string_diagnostic_t (const substring_loc &fmt_loc,
    Return true if a warning was emitted, false otherwise.  */
 
 bool
-format_string_diagnostic_t::emit_warning_n_va (int opt,
+format_string_diagnostic_t::emit_warning_n_va (diagnostic_option_id option_id,
 					       unsigned HOST_WIDE_INT n,
 					       const char *singular_gmsgid,
 					       const char *plural_gmsgid,
@@ -223,7 +224,7 @@ format_string_diagnostic_t::emit_warning_n_va (int opt,
   else
     diagnostic_set_info (&diagnostic, singular_gmsgid, ap, &richloc,
 			 DK_WARNING);
-  diagnostic.option_index = opt;
+  diagnostic.option_id = option_id;
   bool warned = diagnostic_report_diagnostic (global_dc, &diagnostic);
 
   if (!err && fmt_substring_loc && !substring_within_range)
@@ -248,21 +249,23 @@ format_string_diagnostic_t::emit_warning_n_va (int opt,
 /* Singular-only version of the above.  */
 
 bool
-format_string_diagnostic_t::emit_warning_va (int opt, const char *gmsgid,
+format_string_diagnostic_t::emit_warning_va (diagnostic_option_id option_id,
+					     const char *gmsgid,
 					     va_list *ap) const
 {
-  return emit_warning_n_va (opt, 0, gmsgid, gmsgid, ap);
+  return emit_warning_n_va (option_id, 0, gmsgid, gmsgid, ap);
 }
 
 /* Variadic version of the above (singular only).  */
 
 bool
-format_string_diagnostic_t::emit_warning (int opt, const char *gmsgid,
+format_string_diagnostic_t::emit_warning (diagnostic_option_id option_id,
+					  const char *gmsgid,
 					  ...) const
 {
   va_list ap;
   va_start (ap, gmsgid);
-  bool warned = emit_warning_va (opt, gmsgid, &ap);
+  bool warned = emit_warning_va (option_id, gmsgid, &ap);
   va_end (ap);
 
   return warned;
@@ -271,14 +274,15 @@ format_string_diagnostic_t::emit_warning (int opt, const char *gmsgid,
 /* Variadic version of the above (singular vs plural).  */
 
 bool
-format_string_diagnostic_t::emit_warning_n (int opt, unsigned HOST_WIDE_INT n,
+format_string_diagnostic_t::emit_warning_n (diagnostic_option_id option_id,
+					    unsigned HOST_WIDE_INT n,
 					    const char *singular_gmsgid,
 					    const char *plural_gmsgid,
 					    ...) const
 {
   va_list ap;
   va_start (ap, plural_gmsgid);
-  bool warned = emit_warning_n_va (opt, n, singular_gmsgid, plural_gmsgid,
+  bool warned = emit_warning_n_va (option_id, n, singular_gmsgid, plural_gmsgid,
 				   &ap);
   va_end (ap);
 

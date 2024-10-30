@@ -1,3 +1,49 @@
+2024-10-29  David Malcolm  <dmalcolm@redhat.com>
+
+	PR other/116613
+	* dummy-frontend.cc: Include "make-unique.h".
+	(class jit_diagnostic_listener): New.
+	(jit_begin_diagnostic): Update comment.
+	(jit_end_diagnostic): Drop call to add_diagnostic.
+	(jit_langhook_init): Set the output format to a new
+	jit_diagnostic_listener.
+	* jit-playback.cc (playback::context::add_diagnostic): Add "text"
+	param and use that rather than trying to get the text from a
+	pretty_printer.
+	* jit-playback.h (playback::context::add_diagnostic): Add "text"
+	param.
+
+2024-10-25  Jakub Jelinek  <jakub@redhat.com>
+
+	* docs/examples/tut04-toyvm/toyvm.cc: Remove trailing whitespace.
+
+2024-10-24  David Malcolm  <dmalcolm@redhat.com>
+	    Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR other/116613
+	* dummy-frontend.cc: Add #define INCLUDE_MEMORY.
+	* jit-playback.cc: Likewise.
+	* jit-recording.cc: Likewise.
+
+2024-09-20  David Malcolm  <dmalcolm@redhat.com>
+
+	PR other/116613
+	* dummy-frontend.cc: Include "diagnostic-format-text.h".
+	(jit_begin_diagnostic): Convert first param from
+	diagnostic_context * to diagnostic_text_output_format &
+	(jit_end_diagnostic): Likewise.  Update accordingly.
+	(jit_langhook_init): Update for renamings.
+
+2024-09-18  Francois-Xavier Coudert  <fxcoudert@gcc.gnu.org>
+
+	* libgccjit.h: Include <sys/types.h>
+
+2024-09-09  David Malcolm  <dmalcolm@redhat.com>
+
+	PR other/116613
+	* jit-playback.cc (add_diagnostic): Rename diagnostic_context's
+	"printer" field to "m_printer".
+
 2024-09-02  Richard Sandiford  <richard.sandiford@arm.com>
 
 	* jit-playback.cc (playback::block::add_extended_asm):  Rename

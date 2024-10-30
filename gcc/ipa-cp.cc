@@ -101,6 +101,7 @@ along with GCC; see the file COPYING3.  If not see
    the second stage.  */
 
 #define INCLUDE_ALGORITHM
+#define INCLUDE_MEMORY
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
@@ -1649,7 +1650,8 @@ ipa_vr_operation_and_type_effects (vrange &dst_vr,
 				   enum tree_code operation,
 				   tree dst_type, tree src_type)
 {
-  if (!ipa_supports_p (dst_type) || !ipa_supports_p (src_type))
+  if (!ipa_vr_supported_type_p (dst_type)
+      || !ipa_vr_supported_type_p (src_type))
     return false;
 
   range_op_handler handler (operation);
@@ -2518,8 +2520,7 @@ propagate_vr_across_jump_function (cgraph_edge *cs, ipa_jump_func *jfunc,
     return false;
 
   if (!param_type
-      || (!INTEGRAL_TYPE_P (param_type)
-	  && !POINTER_TYPE_P (param_type)))
+      || !ipa_vr_supported_type_p (param_type))
     return dest_lat->set_to_bottom ();
 
   if (jfunc->type == IPA_JF_PASS_THROUGH)
@@ -2553,7 +2554,7 @@ propagate_vr_across_jump_function (cgraph_edge *cs, ipa_jump_func *jfunc,
 	  ipa_range_set_and_normalize (op_vr, op);
 
 	  if (!handler
-	      || !ipa_supports_p (operand_type)
+	      || !ipa_vr_supported_type_p (operand_type)
 	      /* Sometimes we try to fold comparison operators using a
 		 pointer type to hold the result instead of a boolean
 		 type.  Avoid trapping in the sanity check in

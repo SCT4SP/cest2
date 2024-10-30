@@ -19,6 +19,7 @@ You should have received a copy of the GNU General Public License
 along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
+#define INCLUDE_MEMORY
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
@@ -1960,7 +1961,7 @@ operator_minus::update_bitmask (irange &r, const irange &lh,
   update_known_bitmask (r, MINUS_EXPR, lh, rh);
 }
 
-void 
+void
 operator_minus::wi_fold (irange &r, tree type,
 			 const wide_int &lh_lb, const wide_int &lh_ub,
 			 const wide_int &rh_lb, const wide_int &rh_ub) const
@@ -2251,7 +2252,7 @@ operator_mult::wi_op_overflows (wide_int &res, tree type,
    return overflow;
 }
 
-void 
+void
 operator_mult::wi_fold (irange &r, tree type,
 			const wide_int &lh_lb, const wide_int &lh_ub,
 			const wide_int &rh_lb, const wide_int &rh_ub) const
@@ -2863,7 +2864,7 @@ operator_rshift::op1_range (irange &r,
       // OP1 is anything from 0011 1000 to 0011 1111.  That is, a
       // range from LHS<<3 plus a mask of the 3 bits we shifted on the
       // right hand side (0x07).
-      wide_int mask = wi::bit_not (wi::lshift (wi::minus_one (prec), shift));
+      wide_int mask = wi::mask (shift.to_uhwi (), false, prec);
       int_range_max mask_range (type,
 				wi::zero (TYPE_PRECISION (type)),
 				mask);

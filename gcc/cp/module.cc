@@ -585,7 +585,7 @@ class bytes_out : public data {
 
 public:
   allocator *memory;	/* Obtainer of memory.  */
-  
+
 public:
   bytes_out (allocator *memory)
     : parent (), memory (memory)
@@ -616,7 +616,7 @@ public:
     if (unsigned pad = pos & (boundary - 1))
       write (boundary - pad);
   }
-  
+
 public:
   char *write (unsigned count, bool exact = false)
   {
@@ -1235,7 +1235,7 @@ protected:
     uint32_t entry;	/* 0 */
     uint32_t phoff;	/* 0 */
     uint32_t shoff;	/* Section Header Offset in file */
-    uint32_t flags; 
+    uint32_t flags;
     uint16_t ehsize;	/* ELROND Header SIZE -- sizeof (header) */
     uint16_t phentsize; /* 0 */
     uint16_t phnum;	/* 0 */
@@ -1709,7 +1709,7 @@ elf_in::read (data *data, unsigned pos, unsigned length)
     }
 #endif
   grow (*data, length);
-#if MAPPED_READING  
+#if MAPPED_READING
   data->buffer = hdr.buffer + pos;
 #else
   if (::read (fd, data->buffer, data->size) != ssize_t (length))
@@ -2310,7 +2310,7 @@ public:
     EK_USING,		/* A using declaration (at namespace scope).  */
     EK_NAMESPACE,	/* A namespace.  */
     EK_REDIRECT,	/* Redirect to a template_decl.  */
-    EK_EXPLICIT_HWM,  
+    EK_EXPLICIT_HWM,
     EK_BINDING = EK_EXPLICIT_HWM, /* Implicitly encoded.  */
     EK_FOR_BINDING,	/* A decl being inserted for a binding.  */
     EK_INNER_DECL,	/* A decl defined outside of its imported
@@ -2322,14 +2322,14 @@ public:
 
 private:
   /* Placement of bit fields in discriminator.  */
-  enum disc_bits 
+  enum disc_bits
   {
     DB_ZERO_BIT, /* Set to disambiguate identifier from flags  */
     DB_SPECIAL_BIT, /* First dep slot is special.  */
     DB_KIND_BIT, /* Kind of the entity.  */
     DB_KIND_BITS = EK_BITS,
     DB_DEFN_BIT = DB_KIND_BIT + DB_KIND_BITS,
-    DB_IS_MEMBER_BIT,		/* Is an out-of-class member.  */
+    DB_IS_PENDING_BIT,		/* Is a maybe-pending entity.  */
     DB_IS_INTERNAL_BIT,		/* It is an (erroneous)
 				   internal-linkage entity.  */
     DB_REFS_INTERNAL_BIT,	/* Refers to an internal-linkage
@@ -2386,7 +2386,7 @@ private:
     gcc_checking_assert (I < 2 || !is_binding ());
     return bool ((discriminator >> I) & 1);
   }
-  
+
 public:
   bool is_binding () const
   {
@@ -2407,11 +2407,14 @@ public:
   }
 
 public:
-  /* This class-member is defined here, but the class was imported.  */
-  bool is_member () const
+  /* This entity might be found other than by namespace-scope lookup;
+     see module_state::write_pendings for more details.  */
+  bool is_pending_entity () const
   {
-    gcc_checking_assert (get_entity_kind () == EK_DECL);
-    return get_flag_bit<DB_IS_MEMBER_BIT> ();
+    return (get_entity_kind () == EK_SPECIALIZATION
+	    || get_entity_kind () == EK_PARTIAL
+	    || (get_entity_kind () == EK_DECL
+		&& get_flag_bit<DB_IS_PENDING_BIT> ()));
   }
 public:
   bool is_internal () const
@@ -2592,7 +2595,7 @@ public:
   private:
     void add_deduction_guides (tree decl);
 
-  public:    
+  public:
     void find_dependencies (module_state *);
     bool finalize_dependencies ();
     vec<depset *> connect ();
@@ -2610,7 +2613,7 @@ public:
       result.create (size);
       stack.create (50);
     }
-    ~tarjan () 
+    ~tarjan ()
     {
       gcc_assert (!stack.length ());
       stack.release ();
@@ -2638,7 +2641,7 @@ const char *
 depset::entity_kind_name () const
 {
   /* Same order as entity_kind.  */
-  static const char *const names[] = 
+  static const char *const names[] =
     {"decl", "specialization", "partial", "using",
      "namespace", "redirect", "binding"};
   entity_kind kind = get_entity_kind ();
@@ -2807,7 +2810,7 @@ enum merge_kind
   MK_local_friend, /* Found by CTX, index.  */
 
   MK_indirect_lwm = MK_enum,
-  
+
   /* Template specialization kinds below. These are all found via
      primary template and specialization args.  */
   MK_template_mask = 0x10,  /* A template specialization.  */
@@ -2946,7 +2949,7 @@ public:
 public:
   /* Serialize various definitions. */
   bool read_definition (tree decl);
-  
+
 private:
   bool is_matching_decl (tree existing, tree decl, bool is_typedef);
   static bool install_implicit_member (tree decl);
@@ -3050,7 +3053,7 @@ public:
   void end ();
 
 public:
-  enum tags 
+  enum tags
   {
     tag_backref = -1,	/* Upper bound on the backrefs.  */
     tag_value = 0,	/* Write by value.  */
@@ -3338,7 +3341,7 @@ struct ord_loc_traits
 
   static bool is_deleted (value_type &) { return false; }
   static void mark_deleted (value_type &) { gcc_unreachable (); }
-  
+
   static void remove (value_type &) {}
 };
 /* Table keyed by ord_loc_info, used for noting.  */
@@ -3396,7 +3399,7 @@ struct macro_loc_traits
 
   static bool is_deleted (value_type &) { return false; }
   static void mark_deleted (value_type &) { gcc_unreachable (); }
-  
+
   static void remove (value_type &) {}
 };
 /* Table keyed by line_map_macro, used for noting.  */
@@ -4032,7 +4035,7 @@ get_clone_target (tree decl)
   if (TREE_CODE (decl) == TEMPLATE_DECL)
     {
       tree res_orig = DECL_CLONED_FUNCTION (DECL_TEMPLATE_RESULT (decl));
-      
+
       target = DECL_TI_TEMPLATE (res_orig);
     }
   else
@@ -4695,7 +4698,7 @@ noisy_p ()
   if (quiet_flag)
     return false;
 
-  pp_needs_newline (global_dc->printer) = true;
+  pp_needs_newline (global_dc->get_reference_printer ()) = true;
   diagnostic_set_last_function (global_dc, (diagnostic_info *) NULL);
 
   return true;
@@ -4719,7 +4722,7 @@ set_cmi_repo (const char *r)
   size_t len = strlen (r);
   cmi_repo = XNEWVEC (char, len + 1);
   memcpy (cmi_repo, r, len + 1);
-  
+
   if (len > 1 && IS_DIR_SEPARATOR (cmi_repo[len-1]))
     len--;
   if (len == 1 && cmi_repo[0] == '.')
@@ -5680,7 +5683,7 @@ trees_in::core_bools (tree t, bits_in& bits)
       RB (t->function_decl.disregard_inline_limits);
       RB (t->function_decl.pure_flag);
       RB (t->function_decl.looping_const_or_pure_flag);
-      
+
       RB (t->function_decl.has_debug_args_flag);
       RB (t->function_decl.versioned_function);
 
@@ -6422,7 +6425,7 @@ trees_out::core_vals (tree t)
       WT (((lang_tree_node *)t)->overload.function);
       WT (t->common.chain);
       break;
-      
+
     case PTRMEM_CST:
       WT (((lang_tree_node *)t)->ptrmem.member);
       break;
@@ -6482,7 +6485,7 @@ trees_out::core_vals (tree t)
       /* TEMPLATE_PARM_DESCENDANTS (AKA TREE_CHAIN) is an internal
 	 cache, do not stream.  */
       break;
-      
+
     case TRAIT_EXPR:
       WT (((lang_tree_node *)t)->trait_expression.type1);
       WT (((lang_tree_node *)t)->trait_expression.type2);
@@ -6768,7 +6771,7 @@ trees_in::core_vals (tree t)
       RU (t->label_decl.label_decl_uid);
       RU (t->label_decl.eh_landing_pad_nr);
       break;
-  
+
     case FUNCTION_DECL:
       {
 	unsigned bltin = u ();
@@ -7534,7 +7537,7 @@ bool
 trees_in::add_indirects (tree decl)
 {
   unsigned count = 0;
-	    
+
   tree inner = decl;
   if (TREE_CODE (inner) == TEMPLATE_DECL)
     {
@@ -7722,7 +7725,7 @@ void
 trees_out::install_entity (tree decl, depset *dep)
 {
   gcc_checking_assert (streaming_p ());
-  
+
   /* Write the entity index, so we can insert it as soon as we
      know this is new.  */
   u (dep ? dep->cluster + 1 : 0);
@@ -8120,7 +8123,7 @@ trees_in::decl_value ()
 
   unsigned saved_unused = unused;
   unused = 0;
-  
+
   merge_kind mk = merge_kind (mk_u);
 
   tree decl = start ();
@@ -8141,7 +8144,7 @@ trees_in::decl_value ()
       if (!tree_node_bools (decl))
 	decl = NULL_TREE;
     }
-  
+
   /* Insert into map.  */
   tag = insert (decl);
   if (decl)
@@ -8433,11 +8436,6 @@ trees_in::decl_value ()
 	  spec.spec = is_type ? type : mk & MK_tmpl_tmpl_mask ? inner : decl;
 	  add_mergeable_specialization (!is_type, &spec, decl, spec_flags);
 	}
-
-      /* When making a CMI from a partition we're going to need to walk partial
-	 specializations again, so make sure they're tracked.  */
-      if (state->is_partition () && (spec_flags & 2))
-	set_defining_module_for_partial_spec (inner);
 
       if (NAMESPACE_SCOPE_P (decl)
 	  && (mk == MK_named || mk == MK_unique
@@ -9405,7 +9403,7 @@ trees_out::tree_node (tree t)
       if (streaming_p ())
 	{
 	  /* We know the ordering of the 4 id tags.  */
-	  static const char *const kinds[] = 
+	  static const char *const kinds[] =
 	    {"", "conv_op ", "anon ", "lambda "};
 	  dump (dumper::TREE)
 	    && dump ("Written:%d %sidentifier:%N", tag,
@@ -11394,7 +11392,7 @@ trees_in::key_mergeable (int tag, merge_kind mk, tree decl, tree inner,
 
 			    existing = check_mergeable_decl
 			      (mk, inner, existing, key);
-			    
+
 			    if (!existing && DECL_ALIAS_TEMPLATE_P (decl))
 			      {} // FIXME: Insert into specialization
 			    // tables, we'll need the arguments for that!
@@ -11627,6 +11625,7 @@ trees_in::is_matching_decl (tree existing, tree decl, bool is_typedef)
 	{
 	  // FIXME:QOI Might be template specialization from a module,
 	  // not necessarily global module
+	  auto_diagnostic_group d;
 	  error_at (DECL_SOURCE_LOCATION (decl),
 		    "conflicting global module declaration %#qD", decl);
 	  inform (DECL_SOURCE_LOCATION (existing),
@@ -11833,7 +11832,7 @@ has_definition (tree decl)
 	       since there's no TU to emit them in otherwise.  */
 	    return true;
 
-	  if (!TREE_CONSTANT (decl))
+	  if (!decl_maybe_constant_var_p (decl))
 	    return false;
 
 	  return true;
@@ -12012,7 +12011,7 @@ trees_in::read_function_def (tree decl, tree maybe_template)
     {
       // FIXME:QOI Check matching defn
     }
-  
+
   return true;
 }
 
@@ -12380,8 +12379,12 @@ trees_in::read_class_def (tree defn, tree maybe_template)
 
 	  /* Core pieces.  */
 	  TYPE_MODE_RAW (type) = TYPE_MODE_RAW (type_dup);
+	  TYPE_ALIGN_RAW (type) = TYPE_ALIGN_RAW (type_dup);
+	  TYPE_WARN_IF_NOT_ALIGN_RAW (type)
+	    = TYPE_WARN_IF_NOT_ALIGN_RAW (type_dup);
+	  TYPE_USER_ALIGN (type) = TYPE_USER_ALIGN (type_dup);
+
 	  SET_DECL_MODE (defn, DECL_MODE (maybe_dup));
-	  TREE_ADDRESSABLE (type) = TREE_ADDRESSABLE (type_dup);
 	  DECL_SIZE (defn) = DECL_SIZE (maybe_dup);
 	  DECL_SIZE_UNIT (defn) = DECL_SIZE_UNIT (maybe_dup);
 	  DECL_ALIGN_RAW (defn) = DECL_ALIGN_RAW (maybe_dup);
@@ -12389,12 +12392,26 @@ trees_in::read_class_def (tree defn, tree maybe_template)
 	    = DECL_WARN_IF_NOT_ALIGN_RAW (maybe_dup);
 	  DECL_USER_ALIGN (defn) = DECL_USER_ALIGN (maybe_dup);
 
+	  TYPE_TYPELESS_STORAGE (type) = TYPE_TYPELESS_STORAGE (type_dup);
+	  TYPE_CXX_ODR_P (type) = TYPE_CXX_ODR_P (type_dup);
+	  TYPE_NO_FORCE_BLK (type) = TYPE_NO_FORCE_BLK (type_dup);
+	  TYPE_TRANSPARENT_AGGR (type) = TYPE_TRANSPARENT_AGGR (type_dup);
+	  TYPE_CONTAINS_PLACEHOLDER_INTERNAL (type)
+	    = TYPE_CONTAINS_PLACEHOLDER_INTERNAL (type_dup);
+
+	  TYPE_EMPTY_P (type) = TYPE_EMPTY_P (type_dup);
+	  TREE_ADDRESSABLE (type) = TREE_ADDRESSABLE (type_dup);
+
 	  /* C++ pieces.  */
 	  TYPE_POLYMORPHIC_P (type) = TYPE_POLYMORPHIC_P (type_dup);
+	  CLASSTYPE_FINAL (type) = CLASSTYPE_FINAL (type_dup);
+
 	  TYPE_HAS_USER_CONSTRUCTOR (type)
 	    = TYPE_HAS_USER_CONSTRUCTOR (type_dup);
 	  TYPE_HAS_NONTRIVIAL_DESTRUCTOR (type)
 	    = TYPE_HAS_NONTRIVIAL_DESTRUCTOR (type_dup);
+	  TYPE_NEEDS_CONSTRUCTING (type)
+	    = TYPE_NEEDS_CONSTRUCTING (type_dup);
 
 	  if (auto ls = TYPE_LANG_SPECIFIC (type_dup))
 	    {
@@ -12575,7 +12592,7 @@ trees_in::read_class_def (tree defn, tree maybe_template)
 		 friend_decls; friend_decls = TREE_CHAIN (friend_decls))
 	      {
 		tree f = TREE_VALUE (friend_decls);
-		
+
 		DECL_BEFRIENDING_CLASSES (f)
 		  = tree_cons (NULL_TREE, type, DECL_BEFRIENDING_CLASSES (f));
 		dump () && dump ("Class %N befriending %C:%N",
@@ -12672,7 +12689,7 @@ trees_in::read_enum_def (tree defn, tree maybe_template)
 
 	  if (DECL_NAME (known_decl) != DECL_NAME (new_decl))
 	    break;
-	      
+
 	  new_decl = maybe_duplicate (new_decl);
 
 	  if (!cp_tree_equal (DECL_INITIAL (known_decl),
@@ -12682,6 +12699,7 @@ trees_in::read_enum_def (tree defn, tree maybe_template)
 
       if (known || values)
 	{
+	  auto_diagnostic_group d;
 	  error_at (DECL_SOURCE_LOCATION (maybe_dup),
 		    "definition of %qD does not match", maybe_dup);
 	  inform (DECL_SOURCE_LOCATION (defn),
@@ -13034,6 +13052,18 @@ depset::hash::make_dependency (tree decl, entity_kind ek)
 		    dep->set_flag_bit<DB_IS_INTERNAL_BIT> ();
 		}
 	    }
+
+	  /* A namespace-scope type may be declared in one module unit
+	     and defined in another; make sure that we're found when
+	     completing the class.  */
+	  if (ek == EK_DECL
+	      && !dep->is_import ()
+	      && dep->has_defn ()
+	      && DECL_NAMESPACE_SCOPE_P (not_tmpl)
+	      && DECL_IMPLICIT_TYPEDEF_P (not_tmpl)
+	      /* Anonymous types can't be forward-declared.  */
+	      && !IDENTIFIER_ANON_P (DECL_NAME (not_tmpl)))
+	    dep->set_flag_bit<DB_IS_PENDING_BIT> ();
 	}
 
       if (!dep->is_import ())
@@ -13354,16 +13384,20 @@ depset::hash::add_partial_entities (vec<tree, va_gc> *partial_classes)
 	     specialization.  */
 	  gcc_checking_assert (dep->get_entity_kind ()
 			       == depset::EK_PARTIAL);
+
+	  /* Only emit GM entities if reached.  */
+	  if (!DECL_LANG_SPECIFIC (inner)
+	      || !DECL_MODULE_PURVIEW_P (inner))
+	    dep->set_flag_bit<DB_UNREACHED_BIT> ();
 	}
       else
-	/* It was an explicit specialization, not a partial one.  */
-	gcc_checking_assert (dep->get_entity_kind ()
-			     == depset::EK_SPECIALIZATION);
-
-      /* Only emit GM entities if reached.  */
-      if (!DECL_LANG_SPECIFIC (inner)
-	  || !DECL_MODULE_PURVIEW_P (inner))
-	dep->set_flag_bit<DB_UNREACHED_BIT> ();
+	{
+	  /* It was an explicit specialization, not a partial one.
+	     We should have already added this.  */
+	  gcc_checking_assert (dep->get_entity_kind ()
+			       == depset::EK_SPECIALIZATION);
+	  gcc_checking_assert (dep->is_special ());
+	}
     }
 }
 
@@ -13382,9 +13416,9 @@ depset::hash::add_class_entities (vec<tree, va_gc> *class_members)
       if (dep->get_entity_kind () == EK_REDIRECT)
 	dep = dep->deps[0];
 
-      /* Only non-instantiations need marking as members.  */
+      /* Only non-instantiations need marking as pendings.  */
       if (dep->get_entity_kind () == EK_DECL)
-	dep->set_flag_bit <DB_IS_MEMBER_BIT> ();
+	dep->set_flag_bit <DB_IS_PENDING_BIT> ();
     }
 }
 
@@ -13710,10 +13744,7 @@ depset::hash::find_dependencies (module_state *module)
 		  walker.mark_declaration (decl, current->has_defn ());
 
 		  if (!walker.is_key_order ()
-		      && (item->get_entity_kind () == EK_SPECIALIZATION
-			  || item->get_entity_kind () == EK_PARTIAL
-			  || (item->get_entity_kind () == EK_DECL
-			      && item->is_member ())))
+		      && item->is_pending_entity ())
 		    {
 		      tree ns = find_pending_key (decl, nullptr);
 		      add_namespace_context (item, ns);
@@ -13832,7 +13863,7 @@ binding_cmp (const void *a_, const void *b_)
     a_export = DECL_MODULE_EXPORT_P (TREE_CODE (a_ent) == CONST_DECL
 				     ? TYPE_NAME (TREE_TYPE (a_ent))
 				     : STRIP_TEMPLATE (a_ent));
-  
+
   bool b_using = b->get_entity_kind () == depset::EK_USING;
   bool b_export;
   if (b_using)
@@ -13981,7 +14012,7 @@ depset_cmp (const void *a_, const void *b_)
   if  (a_kind != b_kind)
     /* Different entity kinds, order by that.  */
     return a_kind < b_kind ? -1 : +1;
-  
+
   tree a_decl = a->get_entity ();
   tree b_decl = b->get_entity ();
   if (a_kind == depset::EK_USING)
@@ -14213,7 +14244,7 @@ loc_spans::init (const line_maps *lmaps, const line_map_ordinary *map)
 	     interval.ordinary.first, interval.ordinary.second,
 	     interval.macro.first, interval.macro.second);
   spans->quick_push (interval);
-  
+
   /* Start an interval for the main file.  */
   interval.ordinary.first = interval.ordinary.second;
   interval.macro.second = interval.macro.first;
@@ -14497,6 +14528,7 @@ module_state::check_not_purview (location_t from)
   if (imp == this)
     {
       /* Cannot import the current module.  */
+      auto_diagnostic_group d;
       error_at (from, "cannot import module in its own purview");
       inform (loc, "module %qs declared here", get_flatname ());
       return false;
@@ -14516,7 +14548,7 @@ module_state::mangle (bool include_partition)
     {
       if (parent)
 	parent->mangle (include_partition);
-      if (include_partition || !is_partition ()) 
+      if (include_partition || !is_partition ())
 	{
 	  // Partitions are significant for global initializer
 	  // functions
@@ -15525,7 +15557,7 @@ module_state::read_cluster (unsigned snum)
 
       if (abstract)
 	;
-      else if (DECL_ABSTRACT_P (decl))
+      else if (DECL_MAYBE_IN_CHARGE_CDTOR_P (decl))
 	vec_safe_push (post_load_decls, decl);
       else
 	{
@@ -15643,7 +15675,7 @@ module_state::write_namespaces (elf_out *to, vec<depset *> spaces,
 
       dump () && dump ("Writing namespace:%u %N%s%s%s%s",
 		       b->cluster, ns,
-		       flags & 1 ? ", public" : "", 
+		       flags & 1 ? ", public" : "",
 		       flags & 2 ? ", inline" : "",
 		       flags & 4 ? ", purview" : "",
 		       flags & 8 ? ", export" : "");
@@ -15719,7 +15751,7 @@ module_state::read_namespaces (unsigned num)
 
       dump () && dump ("Read namespace:%u %P%s%s%s%s",
 		       entity_index, parent, id,
-		       flags & 1 ? ", public" : "", 
+		       flags & 1 ? ", public" : "",
 		       flags & 2 ? ", inline" : "",
 		       flags & 4 ? ", purview" : "",
 		       flags & 8 ? ", export" : "");
@@ -15937,15 +15969,13 @@ module_state::read_entities (unsigned count, unsigned lwm, unsigned hwm)
    'instantiated' in one module, and it'd be nice to not have to
    reinstantiate it in another.
 
-   (c) A member classes completed elsewhere.  A member class could be
-   declared in one header and defined in another.  We need to know to
-   load the class definition before looking in it.  This turns out to
-   be a specific case of #b, so we can treat these the same.  But it
-   does highlight an issue -- there could be an intermediate import
-   between the outermost containing namespace-scope class and the
-   innermost being-defined member class.  This is actually possible
-   with all of these cases, so be aware -- we're not just talking of
-   one level of import to get to the innermost namespace.
+   (c) Classes completed elsewhere.  A class could be declared in one
+   header and defined in another.  We need to know to load the class
+   definition before looking in it.  It does highlight an issue --
+   there could be an intermediate import between the outermost containing
+   namespace-scope class and the innermost being-defined class.  This is
+   actually possible with all of these cases, so be aware -- we're not
+   just talking of one level of import to get to the innermost namespace.
 
    This gets complicated fast, it took me multiple attempts to even
    get something remotely working.  Partially because I focussed on
@@ -16065,9 +16095,7 @@ module_state::write_pendings (elf_out *to, vec<depset *> depsets,
       if (d->is_import ())
 	continue;
 
-      if (!(d->get_entity_kind () == depset::EK_SPECIALIZATION
-	    || d->get_entity_kind () == depset::EK_PARTIAL
-	    || (d->get_entity_kind () == depset::EK_DECL && d->is_member ())))
+      if (!d->is_pending_entity ())
 	continue;
 
       tree key_decl = nullptr;
@@ -16280,7 +16308,7 @@ module_state::note_location (location_t loc)
 		  }
 	      added = true;
 	    }
-	}				       
+	}
     }
   else if (IS_ORDINARY_LOC (loc))
     {
@@ -16635,7 +16663,7 @@ module_state::write_prepare_maps (module_state_config *cfg, bool has_partitions)
   unsigned offset = 0, range_bits = 0;
   ord_loc_info *base = nullptr;
   for (auto iter = begin; iter != end; ++iter)
-    {    
+    {
       if (base && iter->src == base->src)
 	{
 	  if (base->offset + base->span +
@@ -16989,7 +17017,7 @@ module_state::read_ordinary_maps (unsigned num_ord_locs, unsigned range_bits)
     spans.close ();
 
   filenames.release ();
-  
+
   dump.outdent ();
   if (!sec.end (from ()))
     return false;
@@ -17859,6 +17887,7 @@ module_state::deferred_macro (cpp_reader *reader, location_t loc,
     {
       /* If LOC is the first loc, this is the end of file check, which
 	 is a warning.  */
+      auto_diagnostic_group d;
       if (loc == MAP_START_LOCATION (LINEMAPS_ORDINARY_MAP_AT (line_table, 0)))
 	warning_at (loc, OPT_Winvalid_imported_macros,
 		    "inconsistent imported macro definition %qE",
@@ -17919,7 +17948,7 @@ module_state::write_inits (elf_out *to, depset::hash &table, unsigned *crc_ptr)
 
       list = tls_aggregates;
     }
-  
+
   sec.end (to, to->name (MOD_SNAME_PFX ".ini"), crc_ptr);
   dump.outdent ();
 
@@ -17947,10 +17976,23 @@ post_load_processing ()
 
       dump () && dump ("Post-load processing of %N", decl);
 
-      gcc_checking_assert (DECL_ABSTRACT_P (decl));
-      /* Cloning can cause loading -- specifically operator delete for
-	 the deleting dtor.  */
-      maybe_clone_body (decl);
+      gcc_checking_assert (DECL_MAYBE_IN_CHARGE_CDTOR_P (decl));
+
+      if (DECL_COMDAT (decl))
+	comdat_linkage (decl);
+      if (!TREE_ASM_WRITTEN (decl))
+	{
+	  /* Cloning can cause loading -- specifically operator delete for
+	     the deleting dtor.  */
+	  if (maybe_clone_body (decl))
+	    TREE_ASM_WRITTEN (decl) = 1;
+	  else
+	    {
+	      /* We didn't clone the cdtor, make sure we emit it.  */
+	      note_vague_linkage_fn (decl);
+	      cgraph_node::finalize_function (decl, true);
+	    }
+	}
     }
 
   cfun = old_cfun;
@@ -17982,7 +18024,7 @@ module_state::read_inits (unsigned count)
   post_load_processing ();
   dump.outdent ();
   if (!sec.end (from ()))
-    return false;  
+    return false;
   return true;
 }
 
@@ -18133,6 +18175,7 @@ module_state::read_config (module_state_config &config)
 
       /* Reject when either is non-experimental or when experimental
 	 major versions differ.  */
+      auto_diagnostic_group d;
       bool reject_p = ((!IS_EXPERIMENTAL (my_ver)
 			|| !IS_EXPERIMENTAL (their_ver)
 			|| MODULE_MAJOR (my_ver) != MODULE_MAJOR (their_ver))
@@ -18596,7 +18639,7 @@ module_state::write_begin (elf_out *to, cpp_reader *reader,
   return true;
 }
 
-// Finish module writing after we've emitted all dynamic initializers. 
+// Finish module writing after we've emitted all dynamic initializers.
 
 void
 module_state::write_end (elf_out *to, cpp_reader *reader,
@@ -18846,7 +18889,7 @@ module_state::read_language (bool outermost)
     ok = false;
 
   function_depth--;
-  
+
   announce (flag_module_lazy ? "lazy" : "imported");
   loadedness = ML_LANGUAGE;
 
@@ -18896,7 +18939,7 @@ module_state::load_section (unsigned snum, binding_slot *mslot)
       slurp->lru = ++lazy_lru;
       slurp->current = old_current;
     }
-  
+
   if (mslot && mslot->is_lazy ())
     {
       /* Oops, the section didn't set this slot.  */
@@ -18945,6 +18988,7 @@ module_state::check_read (bool outermost, bool ok)
 
   if (int e = from ()->get_error ())
     {
+      auto_diagnostic_group d;
       error_at (loc, "failed to read compiled module: %s",
 		from ()->get_error (filename));
       note_cmi_name ();
@@ -19679,7 +19723,7 @@ module_state::lazy_load (unsigned index, binding_slot *mslot)
   dump () && dump ("Loading entity %M[%u] section:%u", this, index, snum);
 
   bool ok = load_section (snum, mslot);
- 
+
   dump.pop (n);
 
   return ok;
@@ -19878,6 +19922,7 @@ declare_module (module_state *module, location_t from_loc, bool exporting_p,
   module_state *current = (*modules)[0];
   if (module_purview_p () || module->loadedness > ML_CONFIG)
     {
+      auto_diagnostic_group d;
       error_at (from_loc, module_purview_p ()
 		? G_("module already declared")
 		: G_("module already imported"));
@@ -20171,7 +20216,7 @@ maybe_translate_include (cpp_reader *reader, line_maps *lmaps, location_t loc,
 
   if (translate != xlate_kind::import)
     return nullptr;
-  
+
   /* Create the translation text.  */
   loc = ordinary_loc_of (lmaps, loc);
   const line_map_ordinary *map
@@ -20527,22 +20572,6 @@ init_modules (cpp_reader *reader)
   if (cpp_get_options (reader)->traditional)
     fatal_error (input_location,
 		 "C++ modules are incompatible with traditional preprocessing");
-
-  if (flag_preprocess_only)
-    {
-      cpp_options *cpp_opts = cpp_get_options (reader);
-      if (flag_no_output
-	  || (cpp_opts->deps.style != DEPS_NONE
-	      && !cpp_opts->deps.need_preprocessor_output))
-	{
-	  warning (0, flag_dump_macros == 'M'
-		   ? G_("macro debug output may be incomplete with modules")
-		   : G_("module dependencies require preprocessing"));
-	  if (cpp_opts->deps.style != DEPS_NONE)
-	    inform (input_location, "you should use the %<-%s%> option",
-		    cpp_opts->deps.style == DEPS_SYSTEM ? "MD" : "MMD");
-	}
-    }
 
   /* :: is always exported.  */
   DECL_MODULE_EXPORT_P (global_namespace) = true;
@@ -21065,7 +21094,7 @@ module_preprocess_options (cpp_reader *reader)
   if (modules_p ())
     {
       auto *cb = cpp_get_callbacks (reader);
-      
+
       cb->translate_include = maybe_translate_include;
       cb->user_deferred_macro = module_state::deferred_macro;
       if (flag_header_unit)

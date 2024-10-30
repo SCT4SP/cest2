@@ -18,6 +18,7 @@ You should have received a copy of the GNU General Public License
 along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
+#define INCLUDE_MEMORY
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
@@ -1165,6 +1166,9 @@ decode_omp_directive (void)
     case 'f':
       matcho ("flush", gfc_match_omp_flush, ST_OMP_FLUSH);
       break;
+    case 'i':
+      matcho ("interop", gfc_match_omp_interop, ST_OMP_INTEROP);
+      break;
     case 'm':
       matcho ("masked taskloop simd", gfc_match_omp_masked_taskloop_simd,
 	      ST_OMP_MASKED_TASKLOOP_SIMD);
@@ -1342,8 +1346,12 @@ decode_omp_directive (void)
 
   switch (ret)
     {
-    /* Set omp_target_seen; exclude ST_OMP_DECLARE_TARGET.
-       FIXME: Get clarification, cf. OpenMP Spec Issue #3240.  */
+    /* For the constraints on clauses with the global requirement property,
+       we set omp_target_seen. This included all clauses that take the
+       DEVICE clause, (BEGIN) DECLARE_TARGET and procedures run the device
+       (which effectively is implied by the former).  */
+    case ST_OMP_DECLARE_TARGET:
+    case ST_OMP_INTEROP:
     case ST_OMP_TARGET:
     case ST_OMP_TARGET_DATA:
     case ST_OMP_TARGET_ENTER_DATA:
@@ -1792,7 +1800,7 @@ blank_line:
   if (digit_flag)
     gfc_error_now ("Statement label without statement at %L", &label_locus);
 
-  gfc_current_locus.lb->truncated = 0;
+  gfc_current_locus.u.lb->truncated = 0;
   gfc_advance_line ();
   return ST_NONE;
 }
@@ -1881,6 +1889,7 @@ next_statement (void)
   case ST_OMP_CANCEL: case ST_OMP_CANCELLATION_POINT: case ST_OMP_DEPOBJ: \
   case ST_OMP_TARGET_UPDATE: case ST_OMP_TARGET_ENTER_DATA: \
   case ST_OMP_TARGET_EXIT_DATA: case ST_OMP_ORDERED_DEPEND: case ST_OMP_ERROR: \
+  case ST_OMP_INTEROP: \
   case ST_ERROR_STOP: case ST_OMP_SCAN: case ST_SYNC_ALL: \
   case ST_SYNC_IMAGES: case ST_SYNC_MEMORY: case ST_LOCK: case ST_UNLOCK: \
   case ST_FORM_TEAM: case ST_CHANGE_TEAM: \
@@ -2809,6 +2818,9 @@ gfc_ascii_statement (gfc_statement st, bool strip_sentinel)
       break;
     case ST_OMP_FLUSH:
       p = "!$OMP FLUSH";
+      break;
+    case ST_OMP_INTEROP:
+      p = "!$OMP INTEROP";
       break;
     case ST_OMP_LOOP:
       p = "!$OMP LOOP";
@@ -5274,15 +5286,25 @@ parse_associate (void)
 	  if ((!CLASS_DATA (sym)->as && (rank != 0 || corank != 0))
 	      || (CLASS_DATA (sym)->as
 		  && (CLASS_DATA (sym)->as->rank != rank
-		      || CLASS_DATA (sym)->as->corank != corank)))
+		      || CLASS_DATA (sym)->as->corank != corank))
+	      || rank == -1)
 	    {
 	      /* Don't just (re-)set the attr and as in the sym.ts,
 	      because this modifies the target's attr and as.  Copy the
 	      data and do a build_class_symbol.  */
 	      symbol_attribute attr = CLASS_DATA (target)->attr;
 	      gfc_typespec type;
-
-	      if (rank || corank)
+	      if (rank == -1 && a->ar)
+		{
+		  as = gfc_get_array_spec ();
+		  as->rank = a->ar->dimen;
+		  as->corank = 0;
+		  as->type = AS_DEFERRED;
+		  attr.dimension = rank ? 1 : 0;
+		  attr.codimension = as->corank ? 1 : 0;
+		  sym->assoc->variable = true;
+		}
+	       else if (rank || corank)
 		{
 		  as = gfc_get_array_spec ();
 		  as->type = AS_DEFERRED;
@@ -5308,6 +5330,16 @@ parse_associate (void)
 	  else
 	    sym->attr.class_ok = 1;
 	}
+      else if (rank == -1 && a->ar)
+	{
+	  sym->as = gfc_get_array_spec ();
+	  sym->as->rank = a->ar->dimen;
+	  sym->as->corank = a->ar->codimen;
+	  sym->as->type = AS_DEFERRED;
+	  sym->attr.dimension = 1;
+	  sym->attr.codimension = sym->as->corank ? 1 : 0;
+	  sym->attr.pointer = 1;
+	}
       else if ((!sym->as && (rank != 0 || corank != 0))
 	       || (sym->as
 		   && (sym->as->rank != rank || sym->as->corank != corank)))
@@ -5325,6 +5357,7 @@ parse_associate (void)
 	      sym->attr.codimension = 1;
 	    }
 	}
+      gfc_commit_symbols ();
     }
 
   accept_statement (ST_ASSOCIATE);
@@ -7408,6 +7441,9 @@ done:
     omp_requires_mask
 	  = (enum omp_requires) (omp_requires_mask
 				 | OMP_REQUIRES_UNIFIED_SHARED_MEMORY);
+  if (omp_requires & OMP_REQ_SELF_MAPS)
+    omp_requires_mask
+	  = (enum omp_requires) (omp_requires_mask | OMP_REQUIRES_SELF_MAPS);
   if (omp_requires & OMP_REQ_DYNAMIC_ALLOCATORS)
     omp_requires_mask = (enum omp_requires) (omp_requires_mask
 					     | OMP_REQUIRES_DYNAMIC_ALLOCATORS);
