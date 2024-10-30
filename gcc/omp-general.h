@@ -35,7 +35,7 @@ enum oacc_loop_flags {
   OLF_GANG_STATIC = 1u << 3,	/* Gang partitioning is static (has op). */
   OLF_TILE	= 1u << 4,	/* Tiled loop. */
   OLF_REDUCTION = 1u << 5,	/* Reduction loop.  */
-  
+
   /* Explicitly specified loop axes.  */
   OLF_DIM_BASE = 6,
   OLF_DIM_GANG   = 1u << (OLF_DIM_BASE + GOMP_DIM_GANG),
@@ -195,6 +195,7 @@ enum omp_requires {
   OMP_REQUIRES_REVERSE_OFFLOAD = GOMP_REQUIRES_REVERSE_OFFLOAD,
   OMP_REQUIRES_ATOMIC_DEFAULT_MEM_ORDER_USED = 0x100,
   OMP_REQUIRES_TARGET_USED = GOMP_REQUIRES_TARGET_USED,
+  OMP_REQUIRES_SELF_MAPS = GOMP_REQUIRES_SELF_MAPS
 };
 
 extern GTY(()) enum omp_requires omp_requires_mask;

@@ -16,6 +16,7 @@ You should have received a copy of the GNU General Public License
 along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
+#define INCLUDE_MEMORY
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
@@ -1057,7 +1058,7 @@ cb_used_define (cpp_reader *pfile, location_t line ATTRIBUTE_UNUSED,
 /* Return the gcc option code associated with the reason for a cpp
    message, or 0 if none.  */
 
-static int
+static diagnostic_option_id
 cb_cpp_diagnostic_cpp_option (enum cpp_warning_reason reason)
 {
   const struct cpp_reason_option_codes_t *entry;
@@ -1115,8 +1116,8 @@ cb_cpp_diagnostic (cpp_reader *pfile ATTRIBUTE_UNUSED,
     }
   diagnostic_set_info_translated (&diagnostic, msg, ap,
 				  richloc, dlevel);
-  diagnostic_override_option_index (&diagnostic,
-				    cb_cpp_diagnostic_cpp_option (reason));
+  diagnostic_set_option_id (&diagnostic,
+			    cb_cpp_diagnostic_cpp_option (reason));
   ret = diagnostic_report_diagnostic (global_dc, &diagnostic);
   if (level == CPP_DL_WARNING_SYSHDR)
     global_dc->m_warn_system_headers = save_warn_system_headers;

@@ -24,6 +24,7 @@ along with GNU Modula-2; see the file COPYING3.  If not see
 #if !defined (_keyc_H)
 #   define _keyc_H
 
+#define INCLUDE_MEMORY
 #include "config.h"
 #include "system.h"
 #   ifdef __cplusplus
@@ -47,6 +48,18 @@ extern "C" {
 #      define EXTERN extern
 #   endif
 
+
+/*
+   useGccTree - indicate we have imported tree from gcctypes.
+*/
+
+EXTERN void keyc_useGccTree (void);
+
+/*
+   useGccLocation - indicate we have imported tree from gcctypes.
+*/
+
+EXTERN void keyc_useGccLocation (void);
 
 /*
    useUnistd - need to use unistd.h call using open/close/read/write require this header.

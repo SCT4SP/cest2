@@ -19,6 +19,7 @@ You should have received a copy of the GNU General Public License
 along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
+#define INCLUDE_MEMORY
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
@@ -537,7 +538,7 @@ dump_ternary_rhs (pretty_printer *pp, const gassign *gs, int spc,
       dump_generic_node (pp, gimple_assign_rhs3 (gs), spc, flags, false);
       pp_greater (pp);
       break;
-    
+
     case VEC_PERM_EXPR:
       if (flags & TDF_GIMPLE)
 	pp_string (pp, "__VEC_PERM (");
@@ -740,10 +741,10 @@ dump_gimple_call_args (pretty_printer *pp, const gcall *gs,
 	  static const char *const unique_args[] = {IFN_UNIQUE_CODES};
 #undef DEF
 	  enums = unique_args;
-	  
+
 	  limit = ARRAY_SIZE (unique_args);
 	  break;
-	  
+
 	case IFN_GOACC_LOOP:
 #define DEF(X) #X
 	  static const char *const loop_args[] = {IFN_GOACC_LOOP_CODES};
@@ -3076,7 +3077,7 @@ gimple_dump_bb_buff (pretty_printer *pp, basic_block bb, int indent,
       pp_newline_and_flush (pp);
       gcc_checking_assert (DECL_STRUCT_FUNCTION (current_function_decl));
       dump_histograms_for_stmt (DECL_STRUCT_FUNCTION (current_function_decl),
-				pp_buffer (pp)->stream, stmt);
+				pp_buffer (pp)->m_stream, stmt);
     }
 
   dump_implicit_edges (pp, bb, indent, flags);

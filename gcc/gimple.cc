@@ -19,6 +19,7 @@ You should have received a copy of the GNU General Public License
 along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
+#define INCLUDE_MEMORY
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
@@ -3033,7 +3034,7 @@ nonbarrier_call_p (gimple *call)
 }
 
 /* Callback for walk_stmt_load_store_ops.
- 
+
    Return TRUE if OP will dereference the tree stored in DATA, FALSE
    otherwise.
 

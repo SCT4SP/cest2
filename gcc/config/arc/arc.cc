@@ -30,6 +30,7 @@ along with GCC; see the file COPYING3.  If not see
 
 #define IN_TARGET_CODE 1
 
+#define INCLUDE_MEMORY
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
@@ -721,7 +722,7 @@ static rtx arc_legitimize_address_0 (rtx, rtx, machine_mode mode);
   arc_no_speculation_in_delay_slots_p
 
 #undef TARGET_LRA_P
-#define TARGET_LRA_P arc_lra_p
+#define TARGET_LRA_P hook_bool_void_true
 #define TARGET_REGISTER_PRIORITY arc_register_priority
 /* Stores with scaled offsets have different displacement ranges.  */
 #define TARGET_DIFFERENT_ADDR_DISPLACEMENT_P hook_bool_void_true
@@ -4228,7 +4229,7 @@ enum arc_shift_alg
 {
   SHIFT_MOVE,		/* Register-to-register move.  */
   SHIFT_LOOP,		/* Zero-overhead loop implementation.  */
-  SHIFT_INLINE,		/* Mmultiple LSHIFTs and LSHIFT-PLUSs.  */ 
+  SHIFT_INLINE,		/* Mmultiple LSHIFTs and LSHIFT-PLUSs.  */
   SHIFT_AND_ROT,        /* Bitwise AND, then ROTATERTs.  */
   SHIFT_SWAP,		/* SWAP then multiple LSHIFTs/LSHIFT-PLUSs.  */
   SHIFT_AND_SWAP_ROT	/* Bitwise AND, then SWAP, then ROTATERTs.  */
@@ -9674,7 +9675,7 @@ arc_delegitimize_address (rtx orig_x)
 rtx
 gen_acc1 (void)
 {
-  return gen_rtx_REG (SImode, TARGET_BIG_ENDIAN ? 56: 57);
+  return gen_rtx_REG (SImode, TARGET_BIG_ENDIAN ? 56 : 57);
 }
 
 /* Return a REG rtx for acc2.  N.B. the gcc-internal representation may
@@ -9684,7 +9685,7 @@ gen_acc1 (void)
 rtx
 gen_acc2 (void)
 {
-  return gen_rtx_REG (SImode, TARGET_BIG_ENDIAN ? 57: 56);
+  return gen_rtx_REG (SImode, TARGET_BIG_ENDIAN ? 57 : 56);
 }
 
 /* When estimating sizes during arc_reorg, when optimizing for speed, there
@@ -10154,14 +10155,6 @@ arc_eh_uses (int regno)
   if (regno == arc_tp_regno)
     return true;
   return false;
-}
-
-/* Return true if we use LRA instead of reload pass.  */
-
-bool
-arc_lra_p (void)
-{
-  return arc_lra_flag;
 }
 
 /* ??? Should we define TARGET_REGISTER_PRIORITY?  We might perfer to

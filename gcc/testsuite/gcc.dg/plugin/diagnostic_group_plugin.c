@@ -29,6 +29,7 @@
 #include "diagnostic.h"
 #include "diagnostic-format-text.h"
 #include "context.h"
+#include "make-unique.h"
 
 int plugin_is_GPL_compatible;
 
@@ -165,21 +166,22 @@ pass_test_groups::execute (function *fun)
    expected output.  */
 
 void
-test_diagnostic_starter (diagnostic_context *context,
-			 const diagnostic_info *diagnostic)
+test_diagnostic_text_starter (diagnostic_text_output_format &text_output,
+			      const diagnostic_info *diagnostic)
 {
-  pp_set_prefix (context->printer, xstrdup ("PREFIX: "));
+  pp_set_prefix (text_output.get_printer (), xstrdup ("PREFIX: "));
 }
 
 /* Custom diagnostic callback, to avoid having the path in the
    expected output.  */
 
 void
-test_diagnostic_start_span_fn (diagnostic_context *context,
-			       expanded_location exploc)
+test_diagnostic_start_span_fn (const diagnostic_location_print_policy &,
+			       pretty_printer *pp,
+			       expanded_location)
 {
-  pp_string (context->printer, "START_SPAN_FN: ");
-  pp_newline (context->printer);
+  pp_string (pp, "START_SPAN_FN: ");
+  pp_newline (pp);
 }
 
 /* Custom output format subclass.  */
@@ -194,17 +196,19 @@ class test_output_format : public diagnostic_text_output_format
   void on_begin_group () final override
   {
     /* Loudly announce a new diagnostic group.  */
-    pp_string (m_context.printer,
+    pretty_printer *const pp = get_printer ();
+    pp_string (pp,
 	       "================================= BEGIN GROUP ==============================");
-    pp_newline (m_context.printer);
+    pp_newline (pp);
   }
   void on_end_group () final override
   {
     /* Loudly announce the end of a diagnostic group.  */
-    pp_set_prefix (m_context.printer, NULL);
-    pp_string (m_context.printer,
+    pretty_printer *const pp = get_printer ();
+    pp_set_prefix (pp, NULL);
+    pp_string (pp,
 	       "---------------------------------- END GROUP -------------------------------");
-    pp_newline_and_flush (m_context.printer);
+    pp_newline_and_flush (pp);
   }
 };
 
@@ -224,9 +228,9 @@ plugin_init (struct plugin_name_args *plugin_info,
   if (!plugin_default_version_check (version, &gcc_version))
     return 1;
 
-  diagnostic_starter (global_dc) = test_diagnostic_starter;
+  diagnostic_text_starter (global_dc) = test_diagnostic_text_starter;
   diagnostic_start_span (global_dc) = test_diagnostic_start_span_fn;
-  global_dc->set_output_format (new test_output_format (*global_dc));
+  global_dc->set_output_format (::make_unique<test_output_format> (*global_dc));
 
   pass_info.pass = new pass_test_groups (g);
   pass_info.reference_pass_name = "*warn_function_noreturn";

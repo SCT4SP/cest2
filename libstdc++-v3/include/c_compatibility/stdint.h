@@ -29,7 +29,12 @@
 #ifndef _GLIBCXX_STDINT_H
 #define _GLIBCXX_STDINT_H 1
 
+#ifdef _GLIBCXX_SYSHDR
 #pragma GCC system_header
+#endif
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpedantic" // include_next
 
 #include <bits/c++config.h>
 
@@ -77,7 +82,7 @@ namespace std
 
   using ::intmax_t;
   using ::intptr_t;
-  
+
   using ::uint8_t;
   using ::uint16_t;
   using ::uint32_t;
@@ -106,5 +111,7 @@ namespace std
 # endif
 
 #endif // C++11
+
+#pragma GCC diagnostic pop
 
 #endif // _GLIBCXX_STDINT_H

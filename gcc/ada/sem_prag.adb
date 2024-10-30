@@ -5228,17 +5228,17 @@ package body Sem_Prag is
            Find_Related_Declaration_Or_Body
              (N, Do_Checks => not Duplicates_OK);
 
-         --  When a pre/postcondition pragma applies to an abstract subprogram,
-         --  its original form must be an aspect with 'Class.
+         --  Abstract subprogram
 
          if Nkind (Subp_Decl) = N_Abstract_Subprogram_Declaration then
-            if not From_Aspect_Specification (N) then
-               Error_Pragma
-                 ("pragma % cannot be applied to abstract subprogram");
-
-            elsif not Class_Present (N) then
-               Error_Pragma
-                 ("aspect % requires ''Class for abstract subprogram");
+            if not Class_Present (N) then
+               if From_Aspect_Specification (N) then
+                  Error_Pragma
+                    ("aspect % requires ''Class for abstract subprogram");
+               else
+                  Error_Pragma
+                    ("pragma % cannot be applied to abstract subprogram");
+               end if;
             end if;
 
          --  Entry declaration
@@ -5346,10 +5346,14 @@ package body Sem_Prag is
          --  Chain the pragma on the contract for further processing by
          --  Analyze_Pre_Post_Condition_In_Decl_Part.
 
-         if Ekind (Subp_Id) in Access_Subprogram_Kind then
-            Add_Contract_Item (N, Directly_Designated_Type (Subp_Id));
-         else
-            Add_Contract_Item (N, Subp_Id);
+         if Chars (Prag_Iden) not in Name_Post_Class
+                                   | Name_Pre_Class
+         then
+            if Ekind (Subp_Id) in Access_Subprogram_Kind then
+               Add_Contract_Item (N, Directly_Designated_Type (Subp_Id));
+            else
+               Add_Contract_Item (N, Subp_Id);
+            end if;
          end if;
 
          --  Fully analyze the pragma when it appears inside an entry or
@@ -5366,6 +5370,38 @@ package body Sem_Prag is
             Analyze_If_Present (Pragma_SPARK_Mode);
             Analyze_If_Present (Pragma_Volatile_Function);
             Analyze_Pre_Post_Condition_In_Decl_Part (N);
+         end if;
+
+         --  Complete the decoration of Subp_Id saving in the tree copy of
+         --  class-wide pre/postcondition expression (for aspects this is
+         --  done when the aspect is analyzed). This is required to merge
+         --  the expression with inherited conditions.
+
+         if Comes_From_Source (N)
+           and then Class_Present (N)
+           and then Is_Subprogram (Subp_Id)
+         then
+            declare
+               Expr : constant Node_Id := Expression (Get_Argument (N));
+
+            begin
+               if Pname = Name_Pre_Class then
+                  if Is_Ignored (N) then
+                     Set_Ignored_Class_Preconditions (Subp_Id,
+                       New_Copy_Tree (Expr));
+                  else
+                     Set_Class_Preconditions (Subp_Id, New_Copy_Tree (Expr));
+                  end if;
+
+               else
+                  if Is_Ignored (N) then
+                     Set_Ignored_Class_Postconditions (Subp_Id,
+                       New_Copy_Tree (Expr));
+                  else
+                     Set_Class_Postconditions (Subp_Id, New_Copy_Tree (Expr));
+                  end if;
+               end if;
+            end;
          end if;
       end Analyze_Pre_Post_Condition;
 
@@ -8147,6 +8183,11 @@ package body Sem_Prag is
          Check_No_Identifiers;
          Check_Arg_Is_OK_Static_Expression (Arg2, Standard_String);
          Analyze_And_Resolve (Arg1x, Standard_Boolean);
+
+         if CodePeer_Mode then
+            Rewrite (N, Make_Null_Statement (Loc));
+            return;
+         end if;
 
          --  In GNATprove mode, pragma Compile_Time_Error is translated as
          --  a Check pragma in GNATprove mode, handled as an assumption in
@@ -16508,15 +16549,15 @@ package body Sem_Prag is
 
             --  In Ada 83 mode, there can be no items following it in the
             --  context list except other pragmas and implicit with clauses
-            --  (e.g. those added by use of Rtsfind). In Ada 95 mode, this
-            --  placement rule does not apply.
+            --  (e.g. those added by Rtsfind). In Ada 95 mode, this placement
+            --  rule does not apply.
 
             if Ada_Version = Ada_83 and then Comes_From_Source (N) then
                Citem := Next (N);
                while Present (Citem) loop
                   if Nkind (Citem) = N_Pragma
                     or else (Nkind (Citem) = N_With_Clause
-                              and then Implicit_With (Citem))
+                              and then Is_Implicit_With (Citem))
                   then
                      null;
                   else
@@ -17761,22 +17802,55 @@ package body Sem_Prag is
          ----------------------------------------
 
          when Pragma_First_Controlling_Parameter => First_Ctrl_Param : declare
-            Arg : Node_Id;
-            E   : Entity_Id := Empty;
+            Arg  : Node_Id;
+            E    : Entity_Id := Empty;
+            Expr : Node_Id := Empty;
 
          begin
-            if not Core_Extensions_Allowed then
-               return;
-            end if;
-
             GNAT_Pragma;
-            Check_Arg_Count (1);
+            Check_At_Least_N_Arguments (1);
+            Check_At_Most_N_Arguments  (2);
 
             Arg := Get_Pragma_Arg (Arg1);
+            Check_Arg_Is_Identifier (Arg);
 
-            if Nkind (Arg) = N_Identifier then
-               Analyze (Arg);
-               E := Entity (Arg);
+            Analyze (Arg);
+            E := Entity (Arg);
+
+            if Present (Arg2) then
+               Check_Arg_Is_OK_Static_Expression (Arg2, Standard_Boolean);
+               Expr := Get_Pragma_Arg (Arg2);
+               Analyze_And_Resolve (Expr, Standard_Boolean);
+            end if;
+
+            if not Core_Extensions_Allowed then
+               if No (Expr)
+                 or else
+                   (Present (Expr)
+                      and then Is_Entity_Name (Expr)
+                      and then Entity (Expr) = Standard_True)
+               then
+                  Error_Msg_GNAT_Extension
+                    ("'First_'Controlling_'Parameter", Sloc (N),
+                     Is_Core_Extension => True);
+               end if;
+
+               return;
+
+            elsif Present (Expr)
+              and then Is_Entity_Name (Expr)
+              and then Entity (Expr) = Standard_False
+            then
+               if Is_Derived_Type (E)
+                 and then Has_First_Controlling_Parameter_Aspect (Etype (E))
+               then
+                  Error_Msg_Name_1 := Name_First_Controlling_Parameter;
+                  Error_Msg_N
+                    ("specification of inherited True value for aspect% can "
+                      & "only confirm parent value", Pragma_Identifier (N));
+               end if;
+
+               return;
             end if;
 
             if No (E)
@@ -24237,6 +24311,27 @@ package body Sem_Prag is
                Check_Static_Boolean_Expression (Get_Pragma_Arg (Arg1));
             end if;
          end Side_Effects;
+
+         ------------------------------------
+         -- Pragma_Simulate_Internal_Error --
+         ------------------------------------
+
+         --  pragma Simulate_Internal_Error;
+
+         --  Since the only purpose of this pragma is to write tests for the
+         --  compiler, it is not documented in the GNAT reference manual. The
+         --  effect of the pragma is to cause the compiler to raise an
+         --  exception when it analyzes the pragma.
+
+         when Pragma_Simulate_Internal_Error =>
+         Simulate_Internal_Error : declare
+            Simulated_Internal_Error : exception;
+         begin
+            GNAT_Pragma;
+            Check_Arg_Count (0);
+
+            raise Simulated_Internal_Error;
+         end Simulate_Internal_Error;
 
          ------------------------------
          -- Simple_Storage_Pool_Type --
@@ -32992,6 +33087,7 @@ package body Sem_Prag is
       Pragma_Shared_Passive                 =>  0,
       Pragma_Short_Circuit_And_Or           =>  0,
       Pragma_Short_Descriptors              =>  0,
+      Pragma_Simulate_Internal_Error        =>  0,
       Pragma_Simple_Storage_Pool_Type       =>  0,
       Pragma_Source_File_Name               =>  0,
       Pragma_Source_File_Name_Project       =>  0,
@@ -33242,7 +33338,9 @@ package body Sem_Prag is
             | Name_Loop_Invariant
             | Name_Loop_Variant
             | Name_Postcondition
+            | Name_Post_Class
             | Name_Precondition
+            | Name_Pre_Class
             | Name_Predicate
             | Name_Refined_Post
             | Name_Statement_Assertions

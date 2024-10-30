@@ -24,6 +24,7 @@ along with GNU Modula-2; see the file COPYING3.  If not see
 #if !defined (_decl_H)
 #   define _decl_H
 
+#define INCLUDE_MEMORY
 #include "config.h"
 #include "system.h"
 #   ifdef __cplusplus
@@ -189,6 +190,18 @@ EXTERN decl_node decl_lookupModule (nameKey_Name n);
 */
 
 EXTERN void decl_putDefForC (decl_node n);
+
+/*
+   putDefUnqualified - the definition module uses export unqualified.
+*/
+
+EXTERN void decl_putDefUnqualified (decl_node n);
+
+/*
+   isDefUnqualified - returns TRUE if the definition module uses unqualified.
+*/
+
+EXTERN bool decl_isDefUnqualified (decl_node n);
 
 /*
    lookupInScope - looks up a symbol named, n, from, scope.

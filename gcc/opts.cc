@@ -18,6 +18,7 @@ You should have received a copy of the GNU General Public License
 along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
+#define INCLUDE_MEMORY
 #include "config.h"
 #include "system.h"
 #include "intl.h"
@@ -385,7 +386,7 @@ add_comma_separated_to_vector (void **pvec, const char *arg)
   char *w;
   char *token_start;
   vec<char_p> *v = (vec<char_p> *) *pvec;
-  
+
   vec_check_alloc (v, 1);
 
   /* We never free this string.  */
@@ -610,6 +611,7 @@ static const struct default_options default_options_table[] =
     { OPT_LEVELS_1_PLUS, OPT_fvar_tracking, NULL, 1 },
 
     /* -O1 (and not -Og) optimizations.  */
+    { OPT_LEVELS_1_PLUS_NOT_DEBUG, OPT_fbit_tests, NULL, 1 },
     { OPT_LEVELS_1_PLUS_NOT_DEBUG, OPT_fbranch_count_reg, NULL, 1 },
 #if DELAY_SLOTS
     { OPT_LEVELS_1_PLUS_NOT_DEBUG, OPT_fdelayed_branch, NULL, 1 },
@@ -618,6 +620,7 @@ static const struct default_options default_options_table[] =
     { OPT_LEVELS_1_PLUS_NOT_DEBUG, OPT_fif_conversion, NULL, 1 },
     { OPT_LEVELS_1_PLUS_NOT_DEBUG, OPT_fif_conversion2, NULL, 1 },
     { OPT_LEVELS_1_PLUS_NOT_DEBUG, OPT_finline_functions_called_once, NULL, 1 },
+    { OPT_LEVELS_1_PLUS_NOT_DEBUG, OPT_fjump_tables, NULL, 1 },
     { OPT_LEVELS_1_PLUS_NOT_DEBUG, OPT_fmove_loop_invariants, NULL, 1 },
     { OPT_LEVELS_1_PLUS_NOT_DEBUG, OPT_fmove_loop_stores, NULL, 1 },
     { OPT_LEVELS_1_PLUS_NOT_DEBUG, OPT_fssa_phiopt, NULL, 1 },
@@ -2933,9 +2936,9 @@ common_handle_option (struct gcc_options *opts,
       break;
 
     case OPT_fdiagnostics_show_location_:
-      diagnostic_prefixing_rule (dc) = (diagnostic_prefixing_rule_t) value;
+      dc->set_prefixing_rule ((diagnostic_prefixing_rule_t) value);
       break;
- 
+
     case OPT_fdiagnostics_show_caret:
       dc->m_source_printing.enabled = value;
       break;
@@ -2971,6 +2974,14 @@ common_handle_option (struct gcc_options *opts,
 					 opts->x_flag_diagnostics_json_formatting);
 	  break;
 	}
+
+    case OPT_fdiagnostics_add_output_:
+      handle_OPT_fdiagnostics_add_output_ (*opts, *dc, arg, loc);
+      break;
+
+    case OPT_fdiagnostics_set_output_:
+      handle_OPT_fdiagnostics_set_output_ (*opts, *dc, arg, loc);
+      break;
 
     case OPT_fdiagnostics_text_art_charset_:
       dc->set_text_art_charset ((enum diagnostic_text_art_charset)value);
@@ -3056,7 +3067,7 @@ common_handle_option (struct gcc_options *opts,
       break;
 
     case OPT_fmessage_length_:
-      pp_set_line_maximum_length (dc->printer, value);
+      pp_set_line_maximum_length (dc->get_reference_printer (), value);
       diagnostic_set_caret_max_width (dc, value);
       break;
 
@@ -3070,11 +3081,14 @@ common_handle_option (struct gcc_options *opts,
       break;
 
     case OPT_foffload_abi_:
+    case OPT_foffload_abi_host_opts_:
 #ifdef ACCEL_COMPILER
       /* Handled in the 'mkoffload's.  */
 #else
-      error_at (loc, "%<-foffload-abi%> option can be specified only for "
-		"offload compiler");
+      error_at (loc,
+		"%qs option can be specified only for offload compiler",
+		(code == OPT_foffload_abi_) ? "-foffload-abi"
+					    : "-foffload-abi-host-opts");
 #endif
       break;
 
@@ -3261,7 +3275,7 @@ common_handle_option (struct gcc_options *opts,
         }
       else
         value = opts->x_dwarf_version;
-      
+
       /* FALLTHRU */
     case OPT_gdwarf_:
       if (value < 2 || value > 5)
@@ -3699,31 +3713,33 @@ enable_warning_as_error (const char *arg, int value, unsigned int lang_mask,
 }
 
 /* Return malloced memory for the name of the option OPTION_INDEX
-   which enabled a diagnostic (context CONTEXT), originally of type
+   which enabled a diagnostic, originally of type
    ORIG_DIAG_KIND but possibly converted to DIAG_KIND by options such
    as -Werror.  */
 
 char *
-option_name (const diagnostic_context *context, int option_index,
-	     diagnostic_t orig_diag_kind, diagnostic_t diag_kind)
+compiler_diagnostic_option_manager::
+make_option_name (diagnostic_option_id option_id,
+		  diagnostic_t orig_diag_kind,
+		  diagnostic_t diag_kind) const
 {
-  if (option_index)
+  if (option_id.m_idx)
     {
       /* A warning classified as an error.  */
       if ((orig_diag_kind == DK_WARNING || orig_diag_kind == DK_PEDWARN)
 	  && diag_kind == DK_ERROR)
 	return concat (cl_options[OPT_Werror_].opt_text,
 		       /* Skip over "-W".  */
-		       cl_options[option_index].opt_text + 2,
+		       cl_options[option_id.m_idx].opt_text + 2,
 		       NULL);
       /* A warning with option.  */
       else
-	return xstrdup (cl_options[option_index].opt_text);
+	return xstrdup (cl_options[option_id.m_idx].opt_text);
     }
   /* A warning without option classified as an error.  */
   else if ((orig_diag_kind == DK_WARNING || orig_diag_kind == DK_PEDWARN
 	    || diag_kind == DK_WARNING)
-	   && context->warning_as_error_requested_p ())
+	   && m_context.warning_as_error_requested_p ())
     return xstrdup (cl_options[OPT_Werror].opt_text);
   else
     return NULL;
@@ -3776,16 +3792,16 @@ get_option_url_suffix (int option_index, unsigned lang_mask)
 }
 
 /* Return malloced memory for a URL describing the option OPTION_INDEX
-   which enabled a diagnostic (context CONTEXT).  */
+   which enabled a diagnostic.  */
 
 char *
-get_option_url (const diagnostic_context *,
-		int option_index,
-		unsigned lang_mask)
+gcc_diagnostic_option_manager::
+make_option_url (diagnostic_option_id option_id) const
 {
-  if (option_index)
+  if (option_id.m_idx)
     {
-      label_text url_suffix = get_option_url_suffix (option_index, lang_mask);
+      label_text url_suffix = get_option_url_suffix (option_id.m_idx,
+						     m_lang_mask);
       if (url_suffix.get ())
 	return concat (DOCUMENTATION_ROOT_URL, url_suffix.get (), nullptr);
     }

@@ -81,6 +81,24 @@ unspec_sqrdcmlah (int rot)
 class svaba_impl : public function_base
 {
 public:
+  gimple *
+  fold (gimple_folder &f) const override
+  {
+    /* Fold to svabd if op1 is all zeros.  */
+    tree op1 = gimple_call_arg (f.call, 0);
+    if (!integer_zerop (op1))
+      return NULL;
+    function_instance instance ("svabd", functions::svabd,
+				shapes::binary_opt_n, f.mode_suffix_id,
+				f.type_suffix_ids, GROUP_none, PRED_x);
+    gcall *call = f.redirect_call (instance);
+    /* Add a ptrue as predicate, because unlike svaba, svabd is
+       predicated.  */
+    gimple_call_set_arg (call, 0, build_all_ones_cst (f.gp_type ()));
+    return call;
+  }
+
+public:
   rtx
   expand (function_expander &e) const override
   {
@@ -234,7 +252,7 @@ public:
   }
 };
 
-class svpsel_impl : public function_base
+class svpsel_lane_impl : public function_base
 {
 public:
   rtx
@@ -417,6 +435,34 @@ public:
 
 class svsra_impl : public function_base
 {
+public:
+  gimple *
+  fold (gimple_folder &f) const override
+  {
+    /* Fold to svlsr/svasr if op1 is all zeros.  */
+    tree op1 = gimple_call_arg (f.call, 0);
+    if (!integer_zerop (op1))
+      return NULL;
+    function_instance instance ("svlsr", functions::svlsr,
+				shapes::binary_uint_opt_n, MODE_n,
+				f.type_suffix_ids, GROUP_none, PRED_x);
+    if (!f.type_suffix (0).unsigned_p)
+      {
+	instance.base_name = "svasr";
+	instance.base = functions::svasr;
+      }
+    gcall *call = f.redirect_call (instance);
+    /* Add a ptrue as predicate, because unlike svsra, svlsr/svasr are
+       predicated intrinsics.  */
+    gimple_call_set_arg (call, 0, build_all_ones_cst (f.gp_type ()));
+    /* For svsra, the shift amount (imm3) is uint64_t for all function types,
+       but for svlsr/svasr, imm3 has the same width as the function type.  */
+    tree imm3 = gimple_call_arg (f.call, 2);
+    tree imm3_prec = wide_int_to_tree (f.scalar_type (0),
+				       wi::to_widest (imm3));
+    gimple_call_set_arg (call, 2, imm3_prec);
+    return call;
+  }
 public:
   rtx
   expand (function_expander &e) const override
@@ -625,7 +671,7 @@ FUNCTION (svpmullb, unspec_based_function, (-1, UNSPEC_PMULLB, -1))
 FUNCTION (svpmullb_pair, unspec_based_function, (-1, UNSPEC_PMULLB_PAIR, -1))
 FUNCTION (svpmullt, unspec_based_function, (-1, UNSPEC_PMULLT, -1))
 FUNCTION (svpmullt_pair, unspec_based_function, (-1, UNSPEC_PMULLT_PAIR, -1))
-FUNCTION (svpsel, svpsel_impl,)
+FUNCTION (svpsel_lane, svpsel_lane_impl,)
 FUNCTION (svqabs, rtx_code_function, (SS_ABS, UNKNOWN, UNKNOWN))
 FUNCTION (svqcadd, svqcadd_impl,)
 FUNCTION (svqcvt, integer_conversion, (UNSPEC_SQCVT, UNSPEC_SQCVTU,

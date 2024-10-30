@@ -522,6 +522,11 @@ maybe_push_res_to_seq (gimple_match_op *res_op, gimple_seq *seq, tree res)
 	{
 	  /* Generate the given function if we can.  */
 	  internal_fn ifn = as_internal_fn (fn);
+
+	  /* We can't and should not emit calls to non-const functions.  */
+	  if (!(internal_fn_flags (ifn) & ECF_CONST))
+	    return NULL_TREE;
+
 	  new_stmt = build_call_internal (ifn, res_op);
 	  if (!new_stmt)
 	    return NULL_TREE;
@@ -1400,6 +1405,29 @@ directly_supported_p (code_helper code, tree type, optab_subtype query_type)
   return (direct_internal_fn_p (ifn)
 	  && direct_internal_fn_supported_p (ifn, type, OPTIMIZE_FOR_SPEED));
 }
+
+/* As above, overloading the function for conversion-type optabs.  */
+bool
+directly_supported_p (code_helper code, tree otype, tree itype,
+		      optab_subtype query_type)
+{
+  if (code.is_tree_code ())
+    {
+      convert_optab optab = optab_for_tree_code (tree_code (code), itype,
+						query_type);
+      return (optab != unknown_optab
+	      && convert_optab_handler (optab, TYPE_MODE (otype),
+					TYPE_MODE (itype)) != CODE_FOR_nothing);
+    }
+  gcc_assert (query_type == optab_default
+	      || (query_type == optab_vector && VECTOR_TYPE_P (itype))
+	      || (query_type == optab_scalar && !VECTOR_TYPE_P (itype)));
+  internal_fn ifn = associated_internal_fn (combined_fn (code), itype);
+  return (direct_internal_fn_p (ifn)
+	  && direct_internal_fn_supported_p (ifn, tree_pair (otype, itype),
+					     OPTIMIZE_FOR_SPEED));
+}
+
 
 /* A wrapper around the internal-fn.cc versions of get_conditional_internal_fn
    for a code_helper CODE operating on type TYPE.  */

@@ -25,6 +25,7 @@ a copy of the GCC Runtime Library Exception along with this program;
 see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 <http://www.gnu.org/licenses/>.  */
 
+#define INCLUDE_MEMORY
 #include "config.h"
 #include "system.h"
 #include <stdbool.h>
@@ -1772,11 +1773,11 @@ extern "C" DynamicStrings_String StringConvert_LongrealToString (long double x, 
   if (TotalWidth == 0)
     {
       maxprecision = true;
-      r = ldtoa_ldtoa (x, ldtoa_decimaldigits, 100, &point, &sign);
+      r = ldtoa_ldtoa (x, static_cast<int> (ldtoa_decimaldigits), 100, &point, &sign);
     }
   else
     {
-      r = ldtoa_ldtoa (x, ldtoa_decimaldigits, 100, &point, &sign);
+      r = ldtoa_ldtoa (x, static_cast<int> (ldtoa_decimaldigits), 100, &point, &sign);
     }
   s = DynamicStrings_InitStringCharStar (r);
   libc_free (r);

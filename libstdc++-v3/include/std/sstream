@@ -33,7 +33,9 @@
 #ifndef _GLIBCXX_SSTREAM
 #define _GLIBCXX_SSTREAM 1
 
+#ifdef _GLIBCXX_SYSHDR
 #pragma GCC system_header
+#endif
 
 #include <bits/requires_hosted.h> // iostream
 
@@ -249,6 +251,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        *  character sequence is equal to the input sequence; otherwise, it
        *  is equal to the output sequence.</em> [27.7.1.2]/1
       */
+      _GLIBCXX_NODISCARD
       _GLIBCXX_CEST_CONSTEXPR
       __string_type
       str() const _GLIBCXX_LVAL_REF_QUAL
@@ -265,6 +268,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
 #if _GLIBCXX_USE_CXX11_ABI
 #if __cpp_concepts
       template<__allocator_like _SAlloc>
+	_GLIBCXX_NODISCARD
 	basic_string<_CharT, _Traits, _SAlloc>
 	str(const _SAlloc& __sa) const
 	{
@@ -273,6 +277,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
 	}
 #endif
 
+      _GLIBCXX_NODISCARD
       __string_type
       str() &&
       {
@@ -711,6 +716,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        *
        *  This hides both signatures of std::basic_ios::rdbuf().
       */
+      _GLIBCXX_NODISCARD
       __stringbuf_type*
       rdbuf() const
       { return const_cast<__stringbuf_type*>(&_M_stringbuf); }
@@ -719,6 +725,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        *  @brief  Copying out the string buffer.
        *  @return  @c rdbuf()->str()
       */
+      _GLIBCXX_NODISCARD
       _GLIBCXX_CEST_CONSTEXPR
       __string_type
       str() const _GLIBCXX_LVAL_REF_QUAL
@@ -728,11 +735,13 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
 #if _GLIBCXX_USE_CXX11_ABI
 #if __cpp_concepts
       template<__allocator_like _SAlloc>
+	_GLIBCXX_NODISCARD
 	basic_string<_CharT, _Traits, _SAlloc>
 	str(const _SAlloc& __sa) const
 	{ return _M_stringbuf.str(__sa); }
 #endif
 
+      _GLIBCXX_NODISCARD
       __string_type
       str() &&
       { return std::move(_M_stringbuf).str(); }
@@ -940,6 +949,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        *
        *  This hides both signatures of std::basic_ios::rdbuf().
       */
+      _GLIBCXX_NODISCARD
       __stringbuf_type*
       rdbuf() const
       { return const_cast<__stringbuf_type*>(&_M_stringbuf); }
@@ -948,6 +958,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        *  @brief  Copying out the string buffer.
        *  @return  @c rdbuf()->str()
       */
+      _GLIBCXX_NODISCARD
       __string_type
       str() const _GLIBCXX_LVAL_REF_QUAL
       { return _M_stringbuf.str(); }
@@ -956,11 +967,13 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
 #if _GLIBCXX_USE_CXX11_ABI
 #if __cpp_concepts
       template<__allocator_like _SAlloc>
+	_GLIBCXX_NODISCARD
 	basic_string<_CharT, _Traits, _SAlloc>
 	str(const _SAlloc& __sa) const
 	{ return _M_stringbuf.str(__sa); }
 #endif
 
+      _GLIBCXX_NODISCARD
       __string_type
       str() &&
       { return std::move(_M_stringbuf).str(); }
@@ -1162,6 +1175,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        *
        *  This hides both signatures of std::basic_ios::rdbuf().
       */
+      _GLIBCXX_NODISCARD
       __stringbuf_type*
       rdbuf() const
       { return const_cast<__stringbuf_type*>(&_M_stringbuf); }
@@ -1170,6 +1184,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        *  @brief  Copying out the string buffer.
        *  @return  @c rdbuf()->str()
       */
+      _GLIBCXX_NODISCARD
       __string_type
       str() const _GLIBCXX_LVAL_REF_QUAL
       { return _M_stringbuf.str(); }
@@ -1178,11 +1193,13 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
 #if _GLIBCXX_USE_CXX11_ABI
 #if __cpp_concepts
       template<__allocator_like _SAlloc>
+	_GLIBCXX_NODISCARD
 	basic_string<_CharT, _Traits, _SAlloc>
 	str(const _SAlloc& __sa) const
 	{ return _M_stringbuf.str(__sa); }
 #endif
 
+      _GLIBCXX_NODISCARD
       __string_type
       str() &&
       { return std::move(_M_stringbuf).str(); }

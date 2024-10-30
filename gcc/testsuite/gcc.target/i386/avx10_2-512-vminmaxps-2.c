@@ -1,15 +1,16 @@
 /* { dg-do run } */
-/* { dg-options "-fsignaling-nans -mfpmath=sse -O2 -mavx10.2-512" } */
+/* { dg-options "-fsignaling-nans -mfpmath=sse -O2 -march=x86-64-v3 -mavx10.2-512" } */
 /* { dg-require-effective-target avx10_2 } */
 
 #ifndef AVX10_2
 #define AVX10_2
 #define AVX10_512BIT
 #endif
-#define SIZE (AVX512F_LEN / 32)
 #include "avx10-helper.h"
+#define SIZE (AVX512F_LEN / 32)
 #include <stdbool.h>
 #include "avx10-minmax-helper.h"
+#include "avx512f-mask-type.h"
 
 void static
 CALC (float *r, float *s1, float *s2, int R)

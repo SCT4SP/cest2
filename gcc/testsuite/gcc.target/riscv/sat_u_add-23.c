@@ -1,4 +1,5 @@
 /* { dg-do compile } */
+/* { dg-skip-if  "" { *-*-* } { "-flto" } } */
 /* { dg-options "-march=rv64gc -mabi=lp64d -O3 -fdump-rtl-expand-details -fno-schedule-insns -fno-schedule-insns2" } */
 /* { dg-final { check-function-bodies "**" "" } } */
 
@@ -8,7 +9,7 @@
 ** sat_u_add_uint32_t_fmt_6:
 ** slli\s+[atx][0-9]+,\s*a0,\s*32
 ** srli\s+[atx][0-9]+,\s*[atx][0-9]+,\s*32
-** add\s+[atx][0-9]+,\s*a0,\s*a1
+** add\s+[atx][0-9]+,\s*a[01],\s*a[01]
 ** slli\s+[atx][0-9]+,\s*[atx][0-9],\s*32
 ** srli\s+[atx][0-9]+,\s*[atx][0-9]+,\s*32
 ** sltu\s+[atx][0-9]+,\s*[atx][0-9]+,\s*[atx][0-9]+

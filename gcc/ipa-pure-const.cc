@@ -31,6 +31,7 @@ along with GCC; see the file COPYING3.  If not see
    should be one of the later passes since it's information is used by
    the rest of the compilation. */
 
+#define INCLUDE_MEMORY
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
@@ -199,11 +200,12 @@ function_always_visible_to_compiler_p (tree decl)
    by the function.  */
 
 static hash_set<tree> *
-suggest_attribute (int option, tree decl, bool known_finite,
+suggest_attribute (diagnostic_option_id option, tree decl, bool known_finite,
 		   hash_set<tree> *warned_about,
 		   const char * attrib_name)
 {
-  if (!option_enabled (option, lang_hooks.option_lang_mask (), &global_options))
+  if (!option_enabled (option.m_idx, lang_hooks.option_lang_mask (),
+		       &global_options))
     return warned_about;
   if (TREE_THIS_VOLATILE (decl)
       || (known_finite && function_always_visible_to_compiler_p (decl)))
@@ -2375,7 +2377,7 @@ pass_nothrow::execute (function *)
 						  callee_t))
 		  continue;
 	      }
-	
+
 	    if (dump_file)
 	      {
 		fprintf (dump_file, "Statement can throw: ");

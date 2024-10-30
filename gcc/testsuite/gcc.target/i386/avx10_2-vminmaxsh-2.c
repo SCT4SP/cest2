@@ -1,5 +1,5 @@
 /* { dg-do run } */
-/* { dg-options "-fsignaling-nans -mfpmath=sse -O2 -mavx10.2" } */
+/* { dg-options "-fsignaling-nans -mfpmath=sse -O2 -march=x86-64-v3 -mavx10.2" } */
 /* { dg-require-effective-target avx10_2 } */
 
 #define AVX10_2
@@ -8,6 +8,7 @@
 #include "avx10-helper.h"
 #include <stdbool.h>
 #include "avx10-minmax-helper.h"
+#include "avx512f-mask-type.h"
 
 void static
 CALC (_Float16 *r, _Float16 *s1, _Float16 *s2, int R)

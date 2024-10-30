@@ -18,6 +18,7 @@ You should have received a copy of the GNU General Public License
 along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
+#define INCLUDE_MEMORY
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
@@ -159,6 +160,7 @@ gfc_get_constant_expr (bt type, int kind, locus *where)
   switch (type)
     {
     case BT_INTEGER:
+    case BT_UNSIGNED:
       mpz_init (e->value.integer);
       break;
 
@@ -223,6 +225,19 @@ gfc_get_int_expr (int kind, locus *where, HOST_WIDE_INT value)
   return p;
 }
 
+/* Get a new expression node that is an unsigned constant.  */
+
+gfc_expr *
+gfc_get_unsigned_expr (int kind, locus *where, HOST_WIDE_INT value)
+{
+  gfc_expr *p;
+  p = gfc_get_constant_expr (BT_UNSIGNED, kind,
+			     where ? where : &gfc_current_locus);
+  const wide_int w = wi::shwi (value, kind * BITS_PER_UNIT);
+  wi::to_mpz (w, p->value.integer, UNSIGNED);
+
+  return p;
+}
 
 /* Get a new expression node that is a logical constant.  */
 
@@ -296,6 +311,7 @@ gfc_copy_expr (gfc_expr *p)
       switch (q->ts.type)
 	{
 	case BT_INTEGER:
+	case BT_UNSIGNED:
 	  mpz_init_set (q->value.integer, p->value.integer);
 	  break;
 
@@ -696,7 +712,6 @@ gfc_extract_int (gfc_expr *expr, int *result, int report_error)
   return false;
 }
 
-
 /* Same as gfc_extract_int, but use a HWI.  */
 
 bool
@@ -899,7 +914,8 @@ gfc_kind_max (gfc_expr *e1, gfc_expr *e2)
 static bool
 numeric_type (bt type)
 {
-  return type == BT_COMPLEX || type == BT_REAL || type == BT_INTEGER;
+  return type == BT_COMPLEX || type == BT_REAL || type == BT_INTEGER
+    || type == BT_UNSIGNED;
 }
 
 
@@ -3897,7 +3913,8 @@ gfc_check_assign (gfc_expr *lvalue, gfc_expr *rvalue, int conform,
       if (lvalue->ts.type == BT_LOGICAL && rvalue->ts.type == BT_LOGICAL)
 	return true;
 
-      where = lvalue->where.lb ? &lvalue->where : &rvalue->where;
+      where = (GFC_LOCUS_IS_SET (lvalue->where)
+	       ? &lvalue->where : &rvalue->where);
       gfc_error ("Incompatible types in DATA statement at %L; attempted "
 		 "conversion of %s to %s", where,
 		 gfc_typename (rvalue), gfc_typename (lvalue));
@@ -4355,9 +4372,18 @@ gfc_check_pointer_assign (gfc_expr *lvalue, gfc_expr *rvalue,
 	  return false;
 	}
 
+      /* An assumed rank target is an experimental F202y feature.  */
+      if (rvalue->rank == -1 && !(gfc_option.allow_std & GFC_STD_F202Y))
+	{
+	  gfc_error ("The assumed rank target at %L is an experimental F202y "
+		     "feature. Use option -std=f202y to enable",
+		     &rvalue->where);
+	  return false;
+	}
+
       /* The target must be either rank one or it must be simply contiguous
 	 and F2008 must be allowed.  */
-      if (rvalue->rank != 1)
+      if (rvalue->rank != 1 && rvalue->rank != -1)
 	{
 	  if (!gfc_is_simply_contiguous (rvalue, true, false))
 	    {
@@ -4369,6 +4395,21 @@ gfc_check_pointer_assign (gfc_expr *lvalue, gfc_expr *rvalue,
 			       "rank 1 at %L", &rvalue->where))
 	    return false;
 	}
+    }
+  else if (rvalue->rank == -1)
+    {
+      gfc_error ("The data-target at %L is an assumed rank object and so the "
+		 "data-pointer-object %s must have a bounds remapping list "
+		 "(list of lbound:ubound for each dimension)",
+		  &rvalue->where, lvalue->symtree->name);
+      return false;
+    }
+
+  if (rvalue->rank == -1 && !gfc_is_simply_contiguous (rvalue, true, false))
+    {
+      gfc_error ("The assumed rank data-target at %L must be contiguous",
+		 &rvalue->where);
+      return false;
     }
 
   /* Now punt if we are dealing with a NULLIFY(X) or X = NULL(X).  */

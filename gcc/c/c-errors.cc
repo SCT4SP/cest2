@@ -18,6 +18,7 @@ You should have received a copy of the GNU General Public License
 along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
+#define INCLUDE_MEMORY
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
@@ -32,7 +33,9 @@ along with GCC; see the file COPYING3.  If not see
    when C2Y is specified.  */
 
 bool
-pedwarn_c23 (location_t location, int opt, const char *gmsgid, ...)
+pedwarn_c23 (location_t location,
+	     diagnostic_option_id option_id,
+	     const char *gmsgid, ...)
 {
   diagnostic_info diagnostic;
   va_list ap;
@@ -47,7 +50,7 @@ pedwarn_c23 (location_t location, int opt, const char *gmsgid, ...)
       diagnostic_set_info (&diagnostic, gmsgid, &ap, &richloc,
 			   (pedantic && !flag_isoc2y)
 			   ? DK_PEDWARN : DK_WARNING);
-      diagnostic.option_index = OPT_Wc23_c2y_compat;
+      diagnostic.option_id = OPT_Wc23_c2y_compat;
       warned = diagnostic_report_diagnostic (global_dc, &diagnostic);
     }
   /* -Wno-c23-c2y-compat suppresses even the pedwarns.  */
@@ -57,7 +60,7 @@ pedwarn_c23 (location_t location, int opt, const char *gmsgid, ...)
   else if (pedantic && !flag_isoc2y)
     {
       diagnostic_set_info (&diagnostic, gmsgid, &ap, &richloc, DK_PEDWARN);
-      diagnostic.option_index = opt;
+      diagnostic.option_id = option_id;
       warned = diagnostic_report_diagnostic (global_dc, &diagnostic);
     }
   va_end (ap);
@@ -71,7 +74,9 @@ pedwarn_c23 (location_t location, int opt, const char *gmsgid, ...)
    when C23 is specified.  */
 
 bool
-pedwarn_c11 (location_t location, int opt, const char *gmsgid, ...)
+pedwarn_c11 (location_t location,
+	     diagnostic_option_id option_id,
+	     const char *gmsgid, ...)
 {
   diagnostic_info diagnostic;
   va_list ap;
@@ -86,7 +91,7 @@ pedwarn_c11 (location_t location, int opt, const char *gmsgid, ...)
       diagnostic_set_info (&diagnostic, gmsgid, &ap, &richloc,
 			   (pedantic && !flag_isoc23)
 			   ? DK_PEDWARN : DK_WARNING);
-      diagnostic.option_index = OPT_Wc11_c23_compat;
+      diagnostic.option_id = OPT_Wc11_c23_compat;
       warned = diagnostic_report_diagnostic (global_dc, &diagnostic);
     }
   /* -Wno-c11-c23-compat suppresses even the pedwarns.  */
@@ -96,7 +101,7 @@ pedwarn_c11 (location_t location, int opt, const char *gmsgid, ...)
   else if (pedantic && !flag_isoc23)
     {
       diagnostic_set_info (&diagnostic, gmsgid, &ap, &richloc, DK_PEDWARN);
-      diagnostic.option_index = opt;
+      diagnostic.option_id = option_id;
       warned = diagnostic_report_diagnostic (global_dc, &diagnostic);
     }
   va_end (ap);
@@ -110,7 +115,9 @@ pedwarn_c11 (location_t location, int opt, const char *gmsgid, ...)
    when C11 is specified.  */
 
 bool
-pedwarn_c99 (location_t location, int opt, const char *gmsgid, ...)
+pedwarn_c99 (location_t location,
+	     diagnostic_option_id option_id,
+	     const char *gmsgid, ...)
 {
   diagnostic_info diagnostic;
   va_list ap;
@@ -125,7 +132,7 @@ pedwarn_c99 (location_t location, int opt, const char *gmsgid, ...)
       diagnostic_set_info (&diagnostic, gmsgid, &ap, &richloc,
 			   (pedantic && !flag_isoc11)
 			   ? DK_PEDWARN : DK_WARNING);
-      diagnostic.option_index = OPT_Wc99_c11_compat;
+      diagnostic.option_id = OPT_Wc99_c11_compat;
       warned = diagnostic_report_diagnostic (global_dc, &diagnostic);
     }
   /* -Wno-c99-c11-compat suppresses even the pedwarns.  */
@@ -135,7 +142,7 @@ pedwarn_c99 (location_t location, int opt, const char *gmsgid, ...)
   else if (pedantic && !flag_isoc11)
     {
       diagnostic_set_info (&diagnostic, gmsgid, &ap, &richloc, DK_PEDWARN);
-      diagnostic.option_index = opt;
+      diagnostic.option_id = option_id;
       warned = diagnostic_report_diagnostic (global_dc, &diagnostic);
     }
   va_end (ap);
@@ -150,7 +157,9 @@ pedwarn_c99 (location_t location, int opt, const char *gmsgid, ...)
    when C99 is specified.  (There is no flag_c90.)  */
 
 bool
-pedwarn_c90 (location_t location, int opt, const char *gmsgid, ...)
+pedwarn_c90 (location_t location,
+	     diagnostic_option_id option_id,
+	     const char *gmsgid, ...)
 {
   diagnostic_info diagnostic;
   va_list ap;
@@ -159,9 +168,9 @@ pedwarn_c90 (location_t location, int opt, const char *gmsgid, ...)
 
   va_start (ap, gmsgid);
   /* Warnings such as -Wvla are the most specific ones.  */
-  if (opt != OPT_Wpedantic)
+  if (option_id.m_idx != OPT_Wpedantic)
     {
-      int opt_var = *(int *) option_flag_var (opt, &global_options);
+      int opt_var = *(int *) option_flag_var (option_id.m_idx, &global_options);
       if (opt_var == 0)
         goto out;
       else if (opt_var > 0)
@@ -169,7 +178,7 @@ pedwarn_c90 (location_t location, int opt, const char *gmsgid, ...)
 	  diagnostic_set_info (&diagnostic, gmsgid, &ap, &richloc,
 			       (pedantic && !flag_isoc99)
 			       ? DK_PEDWARN : DK_WARNING);
-	  diagnostic.option_index = opt;
+	  diagnostic.option_id = option_id;
 	  diagnostic_report_diagnostic (global_dc, &diagnostic);
 	  warned = true;
 	  goto out;
@@ -182,7 +191,7 @@ pedwarn_c90 (location_t location, int opt, const char *gmsgid, ...)
       diagnostic_set_info (&diagnostic, gmsgid, &ap, &richloc,
 			   (pedantic && !flag_isoc99)
 			   ? DK_PEDWARN : DK_WARNING);
-      diagnostic.option_index = OPT_Wc90_c99_compat;
+      diagnostic.option_id = OPT_Wc90_c99_compat;
       diagnostic_report_diagnostic (global_dc, &diagnostic);
     }
   /* -Wno-c90-c99-compat suppresses the pedwarns.  */
@@ -192,7 +201,7 @@ pedwarn_c90 (location_t location, int opt, const char *gmsgid, ...)
   else if (pedantic && !flag_isoc99)
     {
       diagnostic_set_info (&diagnostic, gmsgid, &ap, &richloc, DK_PEDWARN);
-      diagnostic.option_index = opt;
+      diagnostic.option_id = option_id;
       diagnostic_report_diagnostic (global_dc, &diagnostic);
       warned = true;
     }

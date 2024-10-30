@@ -1,3 +1,1024 @@
+2024-10-25  Jakub Jelinek  <jakub@redhat.com>
+
+	* mc-boot/GFpuIO.cc: Remove trailing whitespace.
+	* mc-boot/GFIO.cc: Likewise.
+	* mc-boot/GFormatStrings.cc: Likewise.
+	* mc-boot/GCmdArgs.cc: Likewise.
+	* mc-boot/GDebug.h: Likewise.
+	* mc-boot/GM2Dependent.cc: Likewise.
+	* mc-boot/GRTint.cc: Likewise.
+	* mc-boot/GDebug.cc: Likewise.
+	* mc-boot/GmcError.cc: Likewise.
+	* mc-boot/Gmcp4.cc: Likewise.
+	* mc-boot/GM2RTS.cc: Likewise.
+	* mc-boot/GIO.cc: Likewise.
+	* mc-boot/Gmcp5.cc: Likewise.
+	* mc-boot/GDynamicStrings.cc: Likewise.
+	* mc-boot/Gmcp1.cc: Likewise.
+	* mc-boot/GFormatStrings.h: Likewise.
+	* mc-boot/Gmcp2.cc: Likewise.
+	* mc-boot/Gmcp3.cc: Likewise.
+	* pge-boot/GFIO.cc: Likewise.
+	* pge-boot/GDebug.h: Likewise.
+	* pge-boot/GM2Dependent.cc: Likewise.
+	* pge-boot/GDebug.cc: Likewise.
+	* pge-boot/GM2RTS.cc: Likewise.
+	* pge-boot/GSymbolKey.cc: Likewise.
+	* pge-boot/GIO.cc: Likewise.
+	* pge-boot/GIndexing.cc: Likewise.
+	* pge-boot/GDynamicStrings.cc: Likewise.
+	* pge-boot/GFormatStrings.h: Likewise.
+
+2024-10-24  David Malcolm  <dmalcolm@redhat.com>
+	    Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR other/116613
+	* gm2-gcc/gcc-consolidation.h: Add #define INCLUDE_MEMORY.
+	* gm2-gcc/m2configure.cc: Likewise.
+	* mc-boot/GASCII.cc: Regenerate.
+	* mc-boot/GASCII.h: Ditto.
+	* mc-boot/GArgs.cc: Ditto.
+	* mc-boot/GArgs.h: Ditto.
+	* mc-boot/GAssertion.cc: Ditto.
+	* mc-boot/GAssertion.h: Ditto.
+	* mc-boot/GBreak.cc: Ditto.
+	* mc-boot/GBreak.h: Ditto.
+	* mc-boot/GCOROUTINES.h: Ditto.
+	* mc-boot/GCmdArgs.cc: Ditto.
+	* mc-boot/GCmdArgs.h: Ditto.
+	* mc-boot/GDebug.cc: Ditto.
+	* mc-boot/GDebug.h: Ditto.
+	* mc-boot/GDynamicStrings.cc: Ditto.
+	* mc-boot/GDynamicStrings.h: Ditto.
+	* mc-boot/GEnvironment.cc: Ditto.
+	* mc-boot/GEnvironment.h: Ditto.
+	* mc-boot/GFIO.cc: Ditto.
+	* mc-boot/GFIO.h: Ditto.
+	* mc-boot/GFormatStrings.cc: Ditto.
+	* mc-boot/GFormatStrings.h: Ditto.
+	* mc-boot/GFpuIO.cc: Ditto.
+	* mc-boot/GFpuIO.h: Ditto.
+	* mc-boot/GIO.cc: Ditto.
+	* mc-boot/GIO.h: Ditto.
+	* mc-boot/GIndexing.cc: Ditto.
+	* mc-boot/GIndexing.h: Ditto.
+	* mc-boot/GM2Dependent.cc: Ditto.
+	* mc-boot/GM2Dependent.h: Ditto.
+	* mc-boot/GM2EXCEPTION.cc: Ditto.
+	* mc-boot/GM2EXCEPTION.h: Ditto.
+	* mc-boot/GM2RTS.cc: Ditto.
+	* mc-boot/GM2RTS.h: Ditto.
+	* mc-boot/GMemUtils.cc: Ditto.
+	* mc-boot/GMemUtils.h: Ditto.
+	* mc-boot/GNumberIO.cc: Ditto.
+	* mc-boot/GNumberIO.h: Ditto.
+	* mc-boot/GPushBackInput.cc: Ditto.
+	* mc-boot/GPushBackInput.h: Ditto.
+	* mc-boot/GRTExceptions.cc: Ditto.
+	* mc-boot/GRTExceptions.h: Ditto.
+	* mc-boot/GRTco.h: Ditto.
+	* mc-boot/GRTentity.h: Ditto.
+	* mc-boot/GRTint.cc: Ditto.
+	* mc-boot/GRTint.h: Ditto.
+	* mc-boot/GSArgs.cc: Ditto.
+	* mc-boot/GSArgs.h: Ditto.
+	* mc-boot/GSFIO.cc: Ditto.
+	* mc-boot/GSFIO.h: Ditto.
+	* mc-boot/GSYSTEM.h: Ditto.
+	* mc-boot/GSelective.h: Ditto.
+	* mc-boot/GStdIO.cc: Ditto.
+	* mc-boot/GStdIO.h: Ditto.
+	* mc-boot/GStorage.cc: Ditto.
+	* mc-boot/GStorage.h: Ditto.
+	* mc-boot/GStrCase.cc: Ditto.
+	* mc-boot/GStrCase.h: Ditto.
+	* mc-boot/GStrIO.cc: Ditto.
+	* mc-boot/GStrIO.h: Ditto.
+	* mc-boot/GStrLib.cc: Ditto.
+	* mc-boot/GStrLib.h: Ditto.
+	* mc-boot/GStringConvert.cc: Ditto.
+	* mc-boot/GStringConvert.h: Ditto.
+	* mc-boot/GSysExceptions.h: Ditto.
+	* mc-boot/GSysStorage.cc: Ditto.
+	* mc-boot/GSysStorage.h: Ditto.
+	* mc-boot/GTimeString.cc: Ditto.
+	* mc-boot/GTimeString.h: Ditto.
+	* mc-boot/GUnixArgs.h: Ditto.
+	* mc-boot/Galists.cc: Ditto.
+	* mc-boot/Galists.h: Ditto.
+	* mc-boot/Gdecl.cc: Ditto.
+	* mc-boot/Gdecl.h: Ditto.
+	* mc-boot/Gdtoa.h: Ditto.
+	* mc-boot/Gerrno.h: Ditto.
+	* mc-boot/Gkeyc.cc: Ditto.
+	* mc-boot/Gkeyc.h: Ditto.
+	* mc-boot/Gldtoa.h: Ditto.
+	* mc-boot/Glibc.h: Ditto.
+	* mc-boot/Glibm.h: Ditto.
+	* mc-boot/Glists.cc: Ditto.
+	* mc-boot/Glists.h: Ditto.
+	* mc-boot/GmcComment.cc: Ditto.
+	* mc-boot/GmcComment.h: Ditto.
+	* mc-boot/GmcComp.cc: Ditto.
+	* mc-boot/GmcComp.h: Ditto.
+	* mc-boot/GmcDebug.cc: Ditto.
+	* mc-boot/GmcDebug.h: Ditto.
+	* mc-boot/GmcError.cc: Ditto.
+	* mc-boot/GmcError.h: Ditto.
+	* mc-boot/GmcFileName.cc: Ditto.
+	* mc-boot/GmcFileName.h: Ditto.
+	* mc-boot/GmcLexBuf.cc: Ditto.
+	* mc-boot/GmcLexBuf.h: Ditto.
+	* mc-boot/GmcMetaError.cc: Ditto.
+	* mc-boot/GmcMetaError.h: Ditto.
+	* mc-boot/GmcOptions.cc: Ditto.
+	* mc-boot/GmcOptions.h: Ditto.
+	* mc-boot/GmcPreprocess.cc: Ditto.
+	* mc-boot/GmcPreprocess.h: Ditto.
+	* mc-boot/GmcPretty.cc: Ditto.
+	* mc-boot/GmcPretty.h: Ditto.
+	* mc-boot/GmcPrintf.cc: Ditto.
+	* mc-boot/GmcPrintf.h: Ditto.
+	* mc-boot/GmcQuiet.cc: Ditto.
+	* mc-boot/GmcQuiet.h: Ditto.
+	* mc-boot/GmcReserved.cc: Ditto.
+	* mc-boot/GmcReserved.h: Ditto.
+	* mc-boot/GmcSearch.cc: Ditto.
+	* mc-boot/GmcSearch.h: Ditto.
+	* mc-boot/GmcStack.cc: Ditto.
+	* mc-boot/GmcStack.h: Ditto.
+	* mc-boot/GmcStream.cc: Ditto.
+	* mc-boot/GmcStream.h: Ditto.
+	* mc-boot/Gmcflex.h: Ditto.
+	* mc-boot/Gmcp1.cc: Ditto.
+	* mc-boot/Gmcp1.h: Ditto.
+	* mc-boot/Gmcp2.cc: Ditto.
+	* mc-boot/Gmcp2.h: Ditto.
+	* mc-boot/Gmcp3.cc: Ditto.
+	* mc-boot/Gmcp3.h: Ditto.
+	* mc-boot/Gmcp4.cc: Ditto.
+	* mc-boot/Gmcp4.h: Ditto.
+	* mc-boot/Gmcp5.cc: Ditto.
+	* mc-boot/Gmcp5.h: Ditto.
+	* mc-boot/GnameKey.cc: Ditto.
+	* mc-boot/GnameKey.h: Ditto.
+	* mc-boot/GsymbolKey.cc: Ditto.
+	* mc-boot/GsymbolKey.h: Ditto.
+	* mc-boot/Gtermios.h: Ditto.
+	* mc-boot/Gtop.cc: Ditto.
+	* mc-boot/Gvarargs.cc: Ditto.
+	* mc-boot/Gvarargs.h: Ditto.
+	* mc-boot/Gwlists.cc: Ditto.
+	* mc-boot/Gwlists.h: Ditto.
+	* mc-boot/Gwrapc.h: Ditto.
+	* mc/keyc.mod (checkGccConfigSystem): Add
+	#define INCLUDE_MEMORY.
+	* pge-boot/GASCII.cc: Regenerate.
+	* pge-boot/GASCII.h: Ditto.
+	* pge-boot/GArgs.cc: Ditto.
+	* pge-boot/GArgs.h: Ditto.
+	* pge-boot/GAssertion.cc: Ditto.
+	* pge-boot/GAssertion.h: Ditto.
+	* pge-boot/GBreak.h: Ditto.
+	* pge-boot/GCmdArgs.h: Ditto.
+	* pge-boot/GDebug.cc: Ditto.
+	* pge-boot/GDebug.h: Ditto.
+	* pge-boot/GDynamicStrings.cc: Ditto.
+	* pge-boot/GDynamicStrings.h: Ditto.
+	* pge-boot/GEnvironment.h: Ditto.
+	* pge-boot/GFIO.cc: Ditto.
+	* pge-boot/GFIO.h: Ditto.
+	* pge-boot/GFormatStrings.h: Ditto.
+	* pge-boot/GFpuIO.h: Ditto.
+	* pge-boot/GIO.cc: Ditto.
+	* pge-boot/GIO.h: Ditto.
+	* pge-boot/GIndexing.cc: Ditto.
+	* pge-boot/GIndexing.h: Ditto.
+	* pge-boot/GLists.cc: Ditto.
+	* pge-boot/GLists.h: Ditto.
+	* pge-boot/GM2Dependent.cc: Ditto.
+	* pge-boot/GM2Dependent.h: Ditto.
+	* pge-boot/GM2EXCEPTION.cc: Ditto.
+	* pge-boot/GM2EXCEPTION.h: Ditto.
+	* pge-boot/GM2RTS.cc: Ditto.
+	* pge-boot/GM2RTS.h: Ditto.
+	* pge-boot/GNameKey.cc: Ditto.
+	* pge-boot/GNameKey.h: Ditto.
+	* pge-boot/GNumberIO.cc: Ditto.
+	* pge-boot/GNumberIO.h: Ditto.
+	* pge-boot/GOutput.cc: Ditto.
+	* pge-boot/GOutput.h: Ditto.
+	* pge-boot/GPushBackInput.cc: Ditto.
+	* pge-boot/GPushBackInput.h: Ditto.
+	* pge-boot/GRTExceptions.cc: Ditto.
+	* pge-boot/GRTExceptions.h: Ditto.
+	* pge-boot/GSArgs.h: Ditto.
+	* pge-boot/GSEnvironment.h: Ditto.
+	* pge-boot/GSFIO.cc: Ditto.
+	* pge-boot/GSFIO.h: Ditto.
+	* pge-boot/GSYSTEM.h: Ditto.
+	* pge-boot/GScan.h: Ditto.
+	* pge-boot/GStdIO.cc: Ditto.
+	* pge-boot/GStdIO.h: Ditto.
+	* pge-boot/GStorage.cc: Ditto.
+	* pge-boot/GStorage.h: Ditto.
+	* pge-boot/GStrCase.cc: Ditto.
+	* pge-boot/GStrCase.h: Ditto.
+	* pge-boot/GStrIO.cc: Ditto.
+	* pge-boot/GStrIO.h: Ditto.
+	* pge-boot/GStrLib.cc: Ditto.
+	* pge-boot/GStrLib.h: Ditto.
+	* pge-boot/GStringConvert.h: Ditto.
+	* pge-boot/GSymbolKey.cc: Ditto.
+	* pge-boot/GSymbolKey.h: Ditto.
+	* pge-boot/GSysExceptions.h: Ditto.
+	* pge-boot/GSysStorage.cc: Ditto.
+	* pge-boot/GSysStorage.h: Ditto.
+	* pge-boot/GTimeString.h: Ditto.
+	* pge-boot/GUnixArgs.h: Ditto.
+	* pge-boot/Gbnflex.cc: Ditto.
+	* pge-boot/Gbnflex.h: Ditto.
+	* pge-boot/Gdtoa.h: Ditto.
+	* pge-boot/Gerrno.h: Ditto.
+	* pge-boot/Gldtoa.h: Ditto.
+	* pge-boot/Glibc.h: Ditto.
+	* pge-boot/Glibm.h: Ditto.
+	* pge-boot/Gpge.cc: Ditto.
+	* pge-boot/Gtermios.h: Ditto.
+	* pge-boot/Gwrapc.h: Ditto.
+
+2024-10-20  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	* gm2-compiler/M2MetaError.mod (op): Corrected ordering.
+	* gm2-compiler/P2SymBuild.def: Remove comment.
+	* gm2-compiler/P2SymBuild.mod (GetComparison): Replace
+	the word less with fewer.
+
+2024-10-19  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	* gm2-compiler/M2MetaError.mod (op): Alphabetically order
+	each case label and comment.
+
+2024-10-19  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/115328
+	* gm2-compiler/M2MetaError.def: Extend comment documentating
+	new format specifiers.
+	* gm2-compiler/M2MetaError.mod (GetTokProcedure): New declaration.
+	(doErrorScopeModule): New procedure.
+	(doErrorScopeForward): Ditto.
+	(doErrorScopeMod): Reimplement.
+	(doErrorScopeFor): New procedure.
+	(declarationMod): Ditto.
+	(doErrorScopeDefinition): Ditto.
+	(doErrorScopeDef): Reimplement.
+	(declaredDef): New procedure.
+	(declaredFor): Ditto.
+	(doErrorScopeProc): Ditto.
+	(declaredVar): Ditto.
+	(declaredType): Ditto.
+	(declaredFull): Ditto.
+	* gm2-compiler/M2Options.mod (SetAutoInit): Add missing
+	return type.
+	(GetDumpGimple): Remove duplicate implementation.
+	* gm2-compiler/M2Quads.def (DupFrame): New procedure.
+	* gm2-compiler/M2Quads.mod (DupFrame): New procedure.
+	* gm2-compiler/M2Reserved.def (ForwardTok): New variable.
+	* gm2-compiler/M2Reserved.mod (ForwardTok): Initialize variable.
+	* gm2-compiler/M2Scaffold.mod (DeclareArgEnvParams): Add
+	tokno parameter for call to PutParam.
+	* gm2-compiler/P0SymBuild.def (EndForward): New procedure.
+	* gm2-compiler/P0SymBuild.mod (EndForward): New procedure.
+	* gm2-compiler/P0SyntaxCheck.bnf (BlockAssert): New procedure.
+	(ProcedureDeclaration): Reimplement rule.
+	(PostProcedureHeading): New rule.
+	(ForwardDeclaration): Ditto.
+	(ProperProcedure): Ditto.
+	* gm2-compiler/P1Build.bnf (ProcedureDeclaration): Reimplement rule.
+	(PostProcedureHeading): New rule.
+	(ForwardDeclaration): Ditto.
+	(ProperProcedure): Ditto.
+	* gm2-compiler/P1SymBuild.def (Export): Removed unnecessary
+	export.
+	(EndBuildForward): New procedure.
+	* gm2-compiler/P1SymBuild.mod (StartBuildProcedure): Reimplement.
+	(EndBuildProcedure): Ditto.
+	(EndBuildForward): Ditto.
+	* gm2-compiler/P2Build.bnf (ProcedureDeclaration): Reimplement rule.
+	(PostProcedureHeading): New rule.
+	(ForwardDeclaration): Ditto.
+	(ProperProcedure): Ditto.
+	* gm2-compiler/P2SymBuild.def (BuildProcedureDefinedByForward):
+	New procedure.
+	(BuildProcedureDefinedByProper): Ditto.
+	(CheckProcedure): Ditto.
+	(EndBuildForward): Ditto.
+	* gm2-compiler/P2SymBuild.mod (EndBuildProcedure): Reimplement.
+	(EndBuildForward): New procedure.
+	(BuildFPSection): Reimplement to allow forward declaration or
+	checking of parameters.
+	(BuildProcedureDefinedByProper): New procedure.
+	(BuildProcedureDefinedByForward): Ditto
+	(FailParameter): Remove.
+	(ParameterError): New procedure.
+	(ParameterMismatch): Ditto.
+	(EndBuildFormalParameters): Add parameter number check.
+	(GetComparison): New procedure function.
+	(GetSourceDesc): Ditto.
+	(GetCurSrcDesc): Ditto.
+	(GetDeclared): New procedure.
+	(ReturnTypeMismatch): Ditto.
+	(BuildFunction): Reimplement.
+	(CheckProcedure): New procedure.
+	(CheckFormalParameterSection): Reimplement using ParameterError.
+	* gm2-compiler/P3Build.bnf (ProcedureDeclaration): Reimplement rule.
+	(PostProcedureHeading): New rule.
+	(ForwardDeclaration): Ditto.
+	(ProperProcedure): Ditto.
+	* gm2-compiler/P3SymBuild.def (Export): Remove unnecessary export.
+	(EndBuildForward): New procedure.
+	* gm2-compiler/P3SymBuild.mod (EndBuildForward): New procedure.
+	* gm2-compiler/PCBuild.bnf (ProcedureDeclaration): Reimplement rule.
+	(PostProcedureHeading): New rule.
+	(ForwardDeclaration): Ditto.
+	(ProperProcedure): Ditto.
+	* gm2-compiler/PCSymBuild.def (EndBuildForward): New procedure.
+	* gm2-compiler/PCSymBuild.mod (EndBuildForward): Ditto.
+	* gm2-compiler/PHBuild.bnf (ProcedureDeclaration): Reimplement rule.
+	(PostProcedureHeading): New rule.
+	(ForwardDeclaration): Ditto.
+	(ProperProcedure): Ditto.
+	* gm2-compiler/SymbolTable.def (PutVarTok): New procedure.
+	(PutParam): Add typetok parameter.
+	(PutVarParam): Ditto.
+	(PutParamName): Ditto.
+	(GetDeclaredFor): New procedure function.
+	(AreParametersDefinedInDefinition): Ditto.
+	(PutParametersDefinedByForward): New procedure.
+	(GetParametersDefinedByForward): New procedure function.
+	(PutParametersDefinedByProper): New procedure.
+	(GetParametersDefinedByProper): New procedure function.
+	(GetProcedureDeclaredForward): Ditto.
+	(PutProcedureDeclaredForward): New procedure.
+	(GetProcedureDeclaredProper): New procedure function.
+	(PutProcedureDeclaredProper): New procedure.
+	(GetProcedureDeclaredDefinition): New procedure function.
+	(PutProcedureDeclaredDefinition): New procedure.
+	(GetVarDeclTypeTok): Ditto.
+	(PutVarDeclTypeTok): New procedure.
+	(GetVarDeclTok): Ditto.
+	(PutVarDeclTok): New procedure.
+	(GetVarDeclFullTok): Ditto.
+	* gm2-compiler/SymbolTable.mod (ProcedureDecl): New record type.
+	(VarDecl): Ditto.
+	(SymProcedure): Add new field Declared.
+	(SymVar): Add new field Declared.
+	(PutVarTok): New procedure.
+	(PutParam): Add typetok parameter.
+	(PutVarParam): Ditto.
+	(PutParamName): Ditto.
+	(GetDeclaredFor): New procedure function.
+	(AreParametersDefinedInDefinition): Ditto.
+	(PutParametersDefinedByForward): New procedure.
+	(GetParametersDefinedByForward): New procedure function.
+	(PutParametersDefinedByProper): New procedure.
+	(GetParametersDefinedByProper): New procedure function.
+	(GetProcedureDeclaredForward): Ditto.
+	(PutProcedureDeclaredForward): New procedure.
+	(GetProcedureDeclaredProper): New procedure function.
+	(PutProcedureDeclaredProper): New procedure.
+	(GetProcedureDeclaredDefinition): New procedure function.
+	(PutProcedureDeclaredDefinition): New procedure.
+	(GetVarDeclTypeTok): Ditto.
+	(PutVarDeclTypeTok): New procedure.
+	(GetVarDeclTok): Ditto.
+	(PutVarDeclTok): New procedure.
+	(GetVarDeclFullTok): Ditto.
+	(MakeProcedure): Initialize Declared field.
+	(MakeVar): Initialize Declared field.
+	* gm2-libs-log/FileSystem.def (FileNameChar): Add
+	missing return type.
+	* m2.flex: Add FORWARD keyword.
+
+2024-10-04  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/116918
+	* gm2-compiler/M2Swig.mod (DoCheckUnbounded): Escape
+	the % character used in array_functions with %%.
+
+2024-10-01  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	* gm2-libs/Indexing.def (FindIndice): New procedure
+	function.
+	* gm2-libs/Indexing.mod (FindIndice): Implement new
+	procedure function.
+
+2024-10-01  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/116918
+	* gm2-compiler/M2Swig.mod (AnnotateProcedure): Capitalize
+	the generated comment, split comment into multiple lines and
+	terminate the comment with ".  */".
+	(DoCheckUnbounded): Escape the % character with %%.
+	(DoWriteFile): Ditto.
+
+2024-09-25  Mikael Morin  <mikael@gcc.gnu.org>
+
+	PR other/116801
+	* lang.opt.urls: Regenerate.
+
+2024-09-23  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	* Make-lang.in (m2/gm2-libs-boot/M2RTS.o): Remove
+	--suppress-noreturn.
+	* gm2-libs/M2RTS.mod (HaltC): Add noreturn attribute.
+	* gm2-libs-min/M2RTS.mod (HALT): Add LOOP END.
+
+2024-09-21  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	* gm2-compiler/M2Comp.mod (GenerateDependencies): Remove
+	unused parameter.
+	(WriteDep): Remove parameter dep.
+	(WritePhoneDep): Ditto.
+
+2024-09-20  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	* gm2-compiler/M2Check.mod (checkUnboundedArray): New
+	procedure function.
+	(checkUnboundedUnbounded): Ditto.
+	(checkUnbounded): Rewrite to check the unbounded data
+	type.
+	(checkPair): Add comment.
+	(doCheckPair): Add comment.
+	Remove tinfo parameter from the call to checkTypeKindViolation.
+	(checkTypeKindViolation): Remove ununsed parameter tinfo.
+	* gm2-libs-ch/UnixArgs.cc (GM2RTS.h): Remove include.
+	* gm2-libs-ch/m2rts.h (M2RTS_INIT): New define.
+	(M2RTS_DEP): Ditto.
+	(M2RTS_RegisterModule): New prototype.
+	(GM2RTS.h): Add include to the MC_M2 block.
+
+2024-09-16  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	* Make-lang.in (GM2_BOOT_INCLUDES): New variable.
+	(m2/gm2-compiler-boot/M2GCCDeclare.o): Rewrite to use
+	GM2_BOOT_INCLUDES.
+	(m2/gm2-compiler-boot/M2Error.o): Ditto.
+	(m2/gm2-compiler-boot/%.o): Ditto.
+
+2024-09-16  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/116181
+	* Make-lang.in (GM2-GCC-DEFS): Add gcctypes.def and
+	CDataTypes.def.
+	(MC-LIB-DEFS): Add CDataTypes.def.
+	* Make-maintainer.in (m2/gm2-pge-boot/$(SRC_PREFIX)M2RTS.o):
+	Change include path to pge-boot.
+	(m2/gm2-pge-boot/$(SRC_PREFIX)SymbolKey.o): Ditto.
+	(m2/gm2-pge-boot/$(SRC_PREFIX)NameKey.o): Ditto.
+	(m2/gm2-pge-boot/$(SRC_PREFIX)Lists.o): Ditto.
+	(m2/gm2-pge-boot/$(SRC_PREFIX)Output.o): Ditto.
+	(m2/gm2-pge-boot/$(SRC_PREFIX)bnflex.o): Ditto.
+	(m2/gm2-pge-boot/$(SRC_PREFIX)RTentity.h): Ditto.
+	(m2/gm2-pge-boot/$(SRC_PREFIX)RTentity.o): Ditto.
+	(m2/gm2-pge-boot/$(SRC_PREFIX)%.o): Ditto.
+	(GM2PATH): Add -I$(srcdir)/m2/gm2-gcc.
+	(m2/mc-boot-gen/$(SRC_PREFIX)%.h): Add -I$(srcdir)/m2/gm2-gcc.
+	(m2/mc-boot-gen/$(SRC_PREFIX)%.cc): Ditto.
+	* gm2-compiler/M2ALU.def (PushIntegerTree): Replace Tree with tree.
+	(PopIntegerTree): Ditto.
+	(PushRealTree): Ditto.
+	(PopRealTree): Ditto.
+	(PushComplexTree): Ditto.
+	(PopComplexTree): Ditto.
+	(PushSetTree): Ditto.
+	(PopSetTree): Ditto.
+	(PopConstructorTree): Ditto.
+	(ConstructSetConstant): Ditto.
+	(BuildRange): Ditto.
+	(CheckOrResetOverflow): Ditto.
+	(PushTypeOfTree): Ditto.
+	* gm2-compiler/M2ALU.mod (Tree): Replace with ...
+	(tree): ... this.
+	(gcctypes): Import location_t and tree.
+	(m2linemap): Remove import of location_t.
+	* gm2-compiler/M2Base.def (m2linemap): Replace with ...
+	(gcctypes): ... this.
+	* gm2-compiler/M2Base.mod (gcctypes): Import of location_t.
+	(m2linemap): Remove import of location_t.
+	* gm2-compiler/M2Bitset.mod (m2tree): Remove import of Tree.
+	* gm2-compiler/M2CaseList.mod (gcctypes): Import tree.
+	(m2tree): Remove import of Tree.
+	(Tree): Replace with ...
+	(tree): ... this.
+	* gm2-compiler/M2Emit.def (gcctypes): Import location_t.
+	* gm2-compiler/M2GCCDeclare.def (gcctypes): Import tree.
+	(PromoteToString): Replace Tree with tree.
+	(PromoteToCString): Ditto.
+	(ConstantKnownAndUsed): Ditto.
+	* gm2-compiler/M2GCCDeclare.mod (gcctypes): Import tree.
+	(m2tree): Remove import of Tree.
+	(Tree): Replace with ...
+	(tree): ... this.
+	* gm2-compiler/M2GenGCC.def (gcctypes): Import tree.
+	(m2tree): Remove import of Tree.
+	(Tree): Replace with ...
+	(tree): ... this.
+	(GetHighFromUnbounded): Replace Tree with tree.
+	(StringToChar): Ditto.
+	(LValueToGenericPtr): Ditto.
+	(ZConstToTypedConst): Ditto.
+	(PrepareCopyString): Ditto.
+	* gm2-compiler/M2GenGCC.mod (gcctypes): Import tree.
+	(m2tree): Remove import of Tree.
+	(Tree): Replace with ...
+	(tree): ... this.
+	* gm2-compiler/M2LangDump.def (gcctypes): Import tree.
+	(m2tree): Remove import of Tree.
+	(Tree): Replace with ...
+	(tree): ... this.
+	* gm2-compiler/M2LangDump.mod (Tree): Replace with ...
+	(tree): ... this.
+	* gm2-compiler/M2LexBuf.def (m2linemap): Replace with ...
+	(gcctypes): ... this.
+	* gm2-compiler/M2LexBuf.mod (m2linemap): Replace with ...
+	(gcctypes): ... this.
+	* gm2-compiler/M2Options.def (m2linemap): Replace with ...
+	(gcctypes): ... this.
+	* gm2-compiler/M2Options.mod (m2linemap): Replace with ...
+	(gcctypes): ... this.
+	* gm2-compiler/M2Range.def (m2linemap): Replace with ...
+	(gcctypes): ... this.
+	(CDataTypes): Import ConstCharStar.
+	(CodeErrorCheck): Replace Tree with tree.
+	(OverlapsRange): Ditto.
+	(IsEqual): Ditto.
+	(IsGreaterOrEqual): Ditto.
+	(IsGreater): Ditto.
+	(BuildIfCallWholeHandlerLoc): Replace Tree with tree.
+	Replace ADDRESS with ConstCharStar.
+	(BuildIfCallRealHandlerLoc): Ditto.
+	(GetMinMax): Ditto.
+	* gm2-compiler/M2Range.mod (m2tree): Remove Tree.
+	(CodeErrorCheck): Replace Tree with tree.
+	(OverlapsRange): Ditto.
+	(IsEqual): Ditto.
+	(IsGreaterOrEqual): Ditto.
+	(IsGreater): Ditto.
+	(GetMinMax): Ditto.
+	(BuildIfCallWholeHandlerLoc): Replace Tree with tree.
+	Replace ADDRESS with ConstCharStar.
+	(BuildIfCallRealHandlerLoc): Ditto.
+	* gm2-compiler/M2System.def (m2linemap): Replace with ...
+	(gcctypes): ... this.
+	* gm2-compiler/M2System.mod (m2linemap): Replace with ...
+	(gcctypes): ... this.
+	(CreateMinMaxFor): Replace Tree with tree.
+	(CreateType): Ditto.
+	(AttemptToCreateType): Ditto.
+	(CreateSetType): Ditto.
+	(AttemptToCreateSetType): Ditto.
+	* gm2-compiler/P2SymBuild.mod (m2linemap): Replace with ...
+	(gcctypes): ... this.
+	* gm2-compiler/SymbolConversion.def (m2tree): Replace with ...
+	(gcctypes): ... this.
+	(Mod2Gcc): Replace Tree with tree.
+	(Gcc2Mod): Ditto.
+	(AddModGcc): Ditto.
+	* gm2-compiler/SymbolConversion.mod (m2tree): Replace with ...
+	(gcctypes): ... this.
+	(Mod2Gcc): Replace Tree with tree.
+	(Gcc2Mod): Ditto.
+	(AddModGcc): Ditto.
+	(Mod2GccWithoutGCCPoison): Ditto.
+	* gm2-compiler/SymbolTable.def (m2tree): Replace with ...
+	(gcctypes): ... this.
+	(PutModuleFinallyFunction): Replace Tree with tree.
+	(GetModuleFinallyFunction): Ditto.
+	* gm2-compiler/SymbolTable.mod (m2tree): Replace with ...
+	(gcctypes): ... this.
+	(PutModuleFinallyFunction): Replace Tree with tree.
+	(GetModuleFinallyFunction): Ditto.
+	* gm2-compiler/m2flex.def (m2linemap): Replace with ...
+	(gcctypes): ... this.
+	* gm2-gcc/init.def (PerCompilationInit): Replace ADDRESS with ConstCharStar.
+	(CDataTypes): Import ConstCharStar.
+	* gm2-gcc/m2block.def (SYSTEM): Remove import.
+	(CDataTypes): Import ConstCharStar.
+	(m2linemap): Remove import.
+	(m2tree): Remove import.
+	(gcctypes): Import tree.
+	(global_constant): Replace Tree with tree.
+	(RememberInitModuleFunction): Ditto.
+	(DumpGlobalConstants): Ditto.
+	(RememberConstant): Ditto.
+	(RememberType): Ditto.
+	(pushDecl): Ditto.
+	(popFunctionScope): Ditto.
+	(pushFunctionScope): Ditto.
+	(finishFunctionCode): Ditto.
+	(finishFunctionDecl): Ditto.
+	(GetErrorNode): Ditto.
+	(includeDecl): Ditto.
+	(GetGlobals): Ditto.
+	(GetGlobalContext): Ditto.
+	(begin_statement_list): Ditto.
+	(push_statement_list): Ditto.
+	(pop_statement_list): Ditto.
+	(getLabel): Replace Tree with tree.
+	Replace ADDRESS with ConstCharStar.
+	* gm2-gcc/m2builtins.def (CDataTypes): Import ConstCharStar.
+	(GetBuiltinConst): Replace Tree with tree.
+	(GetBuiltinConstType): Ditto.
+	(GetBuiltinTypeInfoType): Ditto.
+	(GetBuiltinTypeInfo): Ditto.
+	(BuiltinExists): Ditto.
+	(BuildBuiltinTree): Ditto.
+	(BuiltinMemCopy): Ditto.
+	(BuiltinMemSet): Ditto.
+	(BuiltInAlloca): Ditto.
+	(BuiltInIsfinite): Ditto.
+	* gm2-gcc/m2convert.def (CDataTypes): Import ConstCharStar.
+	(ToWord): Ditto.
+	(ToCardinal): Ditto.
+	(ToInteger): Ditto.
+	(ToBitset): Ditto.
+	(ConvertToPtr): Ditto.
+	(BuildConvert): Ditto.
+	(ConvertConstantAndCheck): Ditto.
+	(ConvertString): Ditto.
+	(GenericToType): Ditto.
+	* gm2-gcc/m2decl.cc (m2decl_BuildParameterDeclaration): Add
+	const attribute.
+	* gm2-gcc/m2decl.def (CDataTypes): Import ConstCharStar.
+	(BuildModuleCtor): Ditto.
+	(DeclareModuleCtor): Ditto.
+	(DeclareM2linkForcedModuleInitOrder): Ditto.
+	(DeclareM2linkStaticInitialization): Ditto.
+	(BuildPtrToTypeString): Ditto.
+	(BuildIntegerConstant): Ditto.
+	(BuildStringConstantType): Ditto.
+	(DeclareKnownVariable): Ditto.
+	(DeclareKnownConstant): Ditto.
+	(BuildParameterDeclaration): Ditto.
+	(BuildEndFunctionDeclaration): Ditto.
+	(RememberVariables): Ditto.
+	(BuildConstLiteralNumber): Ditto.
+	(BuildStringConstant): Ditto.
+	(BuildCStringConstant): Ditto.
+	(GetDeclContext): Ditto.
+	* gm2-gcc/m2decl.h (m2decl_BuildParameterDeclaration): Add
+	const attribute.
+	* gm2-gcc/m2except.def (CDataTypes): Import ConstCharStar.
+	(BuildThrow): Ditto.
+	(BuildTryBegin): Ditto.
+	(BuildTryEnd): Ditto.
+	(BuildCatchBegin): Ditto.
+	(BuildCatchEnd): Ditto.
+	* gm2-gcc/m2expr.def (CDataTypes): Import ConstCharStar.
+	(CSTIntToString): Ditto.
+	(CSTIntToChar): Ditto.
+	(CheckConstStrZtypeRange): Ditto.
+	(CompareTrees): Ditto.
+	(GetPointerOne): Ditto.
+	(GetPointerZero): Ditto.
+	(GetWordOne): Ditto.
+	(GetWordZero): Ditto.
+	(GetIntegerOne): Ditto.
+	(GetIntegerZero): Ditto.
+	(GetCardinalOne): Ditto.
+	(GetCardinalZero): Ditto.
+	(GetSizeOfInBits): Ditto.
+	(GetSizeOf): Ditto.
+	(BuildLogicalRotate): Ditto.
+	(BuildLRRn): Ditto.
+	(BuildLRLn): Ditto.
+	(BuildMask): Ditto.
+	(BuildMult): Ditto.
+	(BuildMultCheck): Ditto.
+	(BuildLRR): Ditto.
+	(BuildLRL): Ditto.
+	(BuildLogicalShift): Ditto.
+	(BuildLSR): Ditto.
+	(BuildLSL): Ditto.
+	(BuildDivM2): Ditto.
+	(BuildDivM2Check): Ditto.
+	(BuildModM2): Ditto.
+	(BuildModM2Check): Ditto.
+	(BuildModFloor): Ditto.
+	(BuildDivCeil): Ditto.
+	(BuildModCeil): Ditto.
+	(BuildDivFloor): Ditto.
+	(BuildModTrunc): Ditto.
+	(BuildDivTrunc): Ditto.
+	(BuildDivTruncCheck): Ditto.
+	(BuildRDiv): Ditto.
+	(BuildSubCheck): Ditto.
+	(BuildAddCheck): Ditto.
+	(BuildSub): Ditto.
+	(BuildAdd): Ditto.
+	(FoldAndStrip): Ditto.
+	(StringLength): Ditto.
+	(TreeOverflow): Ditto.
+	(RemoveOverflow): Ditto.
+	(BuildCoerce): Ditto.
+	(BuildTrunc): Ditto.
+	(BuildNegate): Ditto.
+	(BuildNegateCheck): Ditto.
+	(BuildSetNegate): Ditto.
+	(BuildTBitSize): Ditto.
+	(BuildSize): Ditto.
+	(BuildAddr): Ditto.
+	(BuildOffset1): Ditto.
+	(BuildOffset): Ditto.
+	(BuildLogicalOrAddress): Ditto.
+	(BuildLogicalOr): Ditto.
+	(BuildLogicalAnd): Ditto.
+	(BuildSymmetricDifference): Ditto.
+	(BuildLogicalDifference): Ditto.
+	(BuildLessThan): Ditto.
+	(BuildGreaterThan): Ditto.
+	(BuildLessThanOrEqual): Ditto.
+	(BuildGreaterThanOrEqual): Ditto.
+	(BuildEqualTo): Ditto.
+	(BuildNotEqualTo): Ditto.
+	(BuildIsSuperset): Ditto.
+	(BuildIsNotSuperset): Ditto.
+	(BuildIsSubset): Ditto.
+	(BuildIsNotSubset): Ditto.
+	(BuildIfConstInVar): Ditto.
+	(BuildIfNotConstInVar): Ditto.
+	(BuildIfVarInVar): Ditto.
+	(BuildIfNotVarInVar): Ditto.
+	(BuildForeachWordInSetDoIfExpr): Ditto.
+	(BuildIfInRangeGoto): Ditto.
+	(BuildIfNotInRangeGoto): Ditto.
+	(BuildArray): Ditto.
+	(BuildComponentRef): Ditto.
+	(BuildIndirect): Ditto.
+	(IsTrue): Ditto.
+	(IsFalse): Ditto.
+	(GetCstInteger): Ditto.
+	(AreConstantsEqual): Ditto.
+	(AreRealOrComplexConstantsEqual): Ditto.
+	(DetermineSign): Ditto.
+	(BuildCap): Ditto.
+	(BuildAbs): Ditto.
+	(BuildRe): Ditto.
+	(BuildIm): Ditto.
+	(BuildCmplx): Ditto.
+	(BuildBinaryForeachWordDo): Ditto.
+	(BuildBinarySetDo): Ditto.
+	(ConstantExpressionWarning): Ditto.
+	(BuildAddAddress): Ditto.
+	(calcNbits): Ditto.
+	(OverflowZType): Ditto.
+	(BuildCondIfExpression): Ditto.
+	* gm2-gcc/m2linemap.def (CDataTypes): Import ConstCharStar.
+	* gm2-gcc/m2misc.def (m2tree): Replace with ...
+	(gcctypes): ... this.
+	(DebugTree): Replace Tree with tree.
+	* gm2-gcc/m2pp.def (m2tree): Replace with ...
+	(gcctypes): ... this.
+	(DumpGimpleFd): Replace Tree with tree.
+	* gm2-gcc/m2statement.cc (m2statement_BuildBuiltinCallTree):
+	Remove unused location parameter.
+	* gm2-gcc/m2statement.def (m2linemap): Replace with ...
+	(gcctypes): ... this.
+	(CDataTypes): Import CharStar.
+	(DoJump): Replace Tree with tree.
+	Replace ADDRESS with CharStar.
+	(BuildStartFunctionCode): Replace Tree with tree.
+	(BuildEndFunctionCode): Ditto.
+	(BuildReturnValueCode): Ditto.
+	(BuildAssignmentTree): Ditto.
+	(BuildAssignmentStatement): Ditto.
+	(BuildGoto): Ditto.
+	(DeclareLabel): Ditto.
+	(BuildIfThenDoEnd): Ditto.
+	(BuildIfThenElseEnd): Ditto.
+	(BuildParam): Ditto.
+	(BuildFunctionCallTree): Ditto.
+	(BuildProcedureCallTree): Ditto.
+	(BuildIndirectProcedureCallTree): Ditto.
+	(BuildFunctValue): Ditto.
+	(BuildCall2): Ditto.
+	(BuildCall3): Ditto.
+	(SetLastFunction): Ditto.
+	(GetLastFunction): Ditto.
+	(GetParamTree): Ditto.
+	(BuildTryFinally): Ditto.
+	(BuildCleanUp): Ditto.
+	(BuildAsm): Ditto.
+	(BuildUnaryForeachWordDo): Ditto.
+	(BuildExcludeVarConst): Ditto.
+	(BuildExcludeVarVar): Ditto.
+	(BuildIncludeVarConst): Ditto.
+	(BuildIncludeVarVar): Ditto.
+	(BuildStart): Ditto.
+	(BuildEnd): Ditto.
+	(BuildCallInner): Ditto.
+	(BuildBuiltinCallTree):  Remove unused location parameter.
+	* gm2-gcc/m2statement.h (m2statement_BuildBuiltinCallTree): Remove
+	unused location parameter.
+	* gm2-gcc/m2tree.def (gcctypes): Import tree.
+	(IsAConstant): Replace Tree with tree.
+	(IsOrdinal): Ditto.
+	(IsTreeOverflow): Ditto.
+	(skip_const_decl): Ditto.
+	(skip_type_decl): Ditto.
+	(is_type): Ditto.
+	(is_array): Ditto.
+	(is_var): Ditto.
+	(debug_tree): Ditto.
+	(IstreeOverflow): Ditto.
+	* gm2-gcc/m2treelib.def (m2linemap): Replace with ...
+	(gcctypes): ... this.
+	(get_set_address_if_var): Ditto.
+	(get_set_field_rhs): Ditto.
+	(get_set_field_lhs): Ditto.
+	(get_set_address): Ditto.
+	(get_set_value): Ditto.
+	(get_field_no): Ditto.
+	(get_rvalue): Ditto.
+	(DoCall): Ditto.
+	(build_modify_expr): Ditto.
+	(do_jump_if_bit): Ditto.
+	* gm2-gcc/m2type.def (m2linemap): Replace with ...
+	(gcctypes): ... this.
+	(m2tree): Remove.
+	(CDataTypes): Import ConstCharStar and charStar.
+	(ValueInTypeRange): Replace Tree with tree.
+	(ValueOutOfTypeRange): Ditto.
+	(ExceedsTypeRange): Ditto.
+	(WithinTypeRange): Ditto.
+	(BuildSubrangeType): Ditto.
+	(BuildCharConstant): Ditto.
+	(BuildCharConstantChar): Ditto.
+	(BuildArrayConstructorElement): Ditto.
+	(BuildEndArrayConstructor): Ditto.
+	(BuildStartArrayConstructor): Ditto.
+	(BuildRecordConstructorElement): Ditto.
+	(BuildEndRecordConstructor): Ditto.
+	(BuildStartRecordConstructor): Ditto.
+	(BuildEndSetConstructor): Ditto.
+	(BuildSetConstructorElement): Ditto.
+	(BuildStartSetConstructor): Ditto.
+	(BuildSetType): Ditto.
+	(BuildConstPointerType): Ditto.
+	(BuildPointerType): Ditto.
+	(BuildEnumerator): Ditto.
+	(BuildEndEnumeration): Ditto.
+	(BuildStartEnumeration): Ditto.
+	(BuildTypeDeclaration): Ditto.
+	(GetMaxFrom): Ditto.
+	(GetMinFrom): Ditto.
+	(GetDefaultType): Ditto.
+	(BuildEndType): Ditto.
+	(BuildStartType): Ditto.
+	(BuildVariableArrayAndDeclare): Ditto.
+	(BuildProcTypeParameterDeclaration): Ditto.
+	(BuildStartFunctionType): Ditto.
+	(BuildEndFunctionType): Ditto.
+	(GetTreeType): Ditto.
+	(DeclareKnownType): Ditto.
+	(GetM2ZType): Ditto.
+	(GetM2RType): Ditto.
+	(BuildSetTypeFromSubrange): Ditto.
+	(BuildSmallestTypeRange): Ditto.
+	(GetBooleanType): Ditto.
+	(GetBooleanFalse): Ditto.
+	(GetBooleanTrue): Ditto.
+	(GetPackedBooleanType): Ditto.
+	(GetCharType): Ditto.
+	(GetByteType): Ditto.
+	(GetVoidType): Ditto.
+	(GetBitnumType): Ditto.
+	(GetRealType): Ditto.
+	(GetLongRealType): Ditto.
+	(GetShortRealType): Ditto.
+	(GetLongIntType): Ditto.
+	(GetPointerType): Ditto.
+	(GetCardinalType): Ditto.
+	(GetIntegerType): Ditto.
+	(GetWordType): Ditto.
+	(GetM2CardinalType): Ditto.
+	(GetBitsetType): Ditto.
+	(GetM2CType): Ditto.
+	(GetProcType): Ditto.
+	(GetM2ComplexType): Ditto.
+	(GetM2LongComplexType): Ditto.
+	(GetM2ShortComplexType): Ditto.
+	(GetM2Complex128): Ditto.
+	(GetM2Complex96): Ditto.
+	(GetM2Complex64): Ditto.
+	(GetM2Complex32): Ditto.
+	(GetM2Real128): Ditto.
+	(GetM2Real96): Ditto.
+	(GetM2Real64): Ditto.
+	(GetM2Real32): Ditto.
+	(GetM2Bitset32): Ditto.
+	(GetM2Bitset16): Ditto.
+	(GetM2Bitset8): Ditto.
+	(GetM2Word64): Ditto.
+	(GetM2Word32): Ditto.
+	(GetM2Word16): Ditto.
+	(GetM2Cardinal64): Ditto.
+	(GetM2Cardinal32): Ditto.
+	(GetM2Cardinal16): Ditto.
+	(GetM2Cardinal8): Ditto.
+	(GetM2Integer64): Ditto.
+	(GetM2Integer32): Ditto.
+	(GetM2Integer16): Ditto.
+	(GetM2Integer8): Ditto.
+	(GetISOLocType): Ditto.
+	(GetISOByteType): Ditto.
+	(GetISOWordType): Ditto.
+	(GetShortCardType): Ditto.
+	(GetM2ShortCardType): Ditto.
+	(GetShortIntType): Ditto.
+	(GetM2ShortIntType): Ditto.
+	(GetM2LongCardType): Ditto.
+	(GetM2LongIntType): Ditto.
+	(GetM2LongRealType): Ditto.
+	(GetM2RealType): Ditto.
+	(GetM2ShortRealType): Ditto.
+	(GetM2IntegerType): Ditto.
+	(GetM2CharType): Ditto.
+	(GetCSizeTType): Ditto.
+	(GetCSSizeTType): Ditto.
+	(BuildArrayStringConstructor): Ditto.
+	(RealToTree): Ditto.
+	(BuildStartRecord): Ditto.
+	(BuildStartUnion): Ditto.
+	(BuildStartVarient): Ditto.
+	(BuildEndVarient): Ditto.
+	(BuildStartFieldVarient): Ditto.
+	(BuildEndFieldVarient): Ditto.
+	(BuildStartFieldRecord): Ditto.
+	(BuildFieldRecord): Ditto.
+	(ChainOn): Ditto.
+	(ChainOnParamValue): Ditto.
+	(AddStringToTreeList): Ditto.
+	(BuildEndRecord): Ditto.
+	(SetAlignment): Ditto.
+	(SetDeclPacked): Ditto.
+	(SetTypePacked): Ditto.
+	(SetRecordFieldOffset): Ditto.
+	(BuildPackedFieldRecord): Ditto.
+	(BuildNumberOfArrayElements): Ditto.
+	(AddStatement): Ditto.
+	(MarkFunctionReferenced): Ditto.
+	(BuildArrayIndexType): Ditto.
+	(GetArrayNoOfElements): Ditto.
+	(BuildEndArrayType): Ditto.
+	(PutArrayType): Ditto.
+	(BuildStartArrayType): Ditto.
+	(IsAddress): Ditto.
+	(SameRealType): Ditto.
+	* m2.flex (Gm2linemap.h): Include.
+	* mc-boot/GDynamicStrings.cc: Rebuild.
+	* mc-boot/GFIO.cc: Ditto.
+	* mc-boot/GIndexing.cc: Ditto.
+	* mc-boot/GM2Dependent.cc: Ditto.
+	* mc-boot/GSArgs.cc: Ditto.
+	* mc-boot/GStringConvert.cc: Ditto.
+	* mc-boot/Gdecl.cc: Ditto.
+	* mc-boot/Gdecl.h: Ditto.
+	* mc-boot/Gdtoa.h: Ditto.
+	* mc-boot/Gkeyc.cc: Ditto.
+	* mc-boot/Gkeyc.h: Ditto.
+	* mc-boot/Glibc.h: Ditto.
+	* mc-boot/GmcComp.cc: Ditto.
+	* mc-boot/GmcLexBuf.cc: Ditto.
+	* mc-boot/GmcPreprocess.cc: Ditto.
+	* mc-boot/GmcStream.cc: Ditto.
+	* mc-boot/Gmcp1.cc: Ditto.
+	* mc-boot/Gmcp3.cc: Ditto.
+	* mc-boot/Gmcp4.cc: Ditto.
+	* mc-boot/Gmcp5.cc: Ditto.
+	* mc-boot/GnameKey.cc: Ditto.
+	* mc-boot/Gvarargs.cc: Ditto.
+	* mc/decl.def (putDefUnqualified): New procedure function.
+	(isDefUnqualified): Ditto.
+	* mc/decl.mod (defT): Add unqualified field.
+	(charStarN): New variable.
+	(constCharStarN): Ditto.
+	(checkGccType): New procedure.
+	(checkCDataTypes): Ditto.
+	(import): Call checkGccType and checkCDataTypes.
+	(putDefUnqualified): New procedure function.
+	(isDefUnqualified): Ditto.
+	* mc/keyc.def (useGccTree): New procedure.
+	(useGccLocation): Ditto.
+	* mc/keyc.mod (checkGccConfigSystem): Call checkGccConfigSystem.
+	(useGccTree): New procedure.
+	(useGccLocation): Ditto.
+	* mc/mcp1.bnf (decl): Import putDefUnqualified.
+	(Export): Call putDefUnqualified.
+	* gm2-gcc/CDataTypes.def: New file.
+	* gm2-gcc/gcctypes.def: New file.
+
 2024-09-02  Gaius Mulley  <gaiusmod2@gmail.com>
 
 	PR modula2/116557

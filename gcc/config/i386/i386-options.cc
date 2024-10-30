@@ -18,6 +18,7 @@ along with GCC; see the file COPYING3.  If not see
 
 #define IN_TARGET_CODE 1
 
+#define INCLUDE_MEMORY
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
@@ -754,7 +755,7 @@ static unsigned HOST_WIDE_INT initial_ix86_arch_features[X86_ARCH_LAST] = {
   ~m_386,
 };
 
-/* This table must be in sync with enum processor_type in i386.h.  */ 
+/* This table must be in sync with enum processor_type in i386.h.  */
 static const struct processor_costs *processor_cost_table[] =
 {
   &generic_cost,
@@ -1545,9 +1546,9 @@ ix86_valid_target_attribute_p (tree fndecl,
   tree old_optimize = build_optimization_node (&global_options,
 					       &global_options_set);
 
-  /* Get the optimization options of the current function.  */  
+  /* Get the optimization options of the current function.  */
   tree func_optimize = DECL_FUNCTION_SPECIFIC_OPTIMIZATION (fndecl);
- 
+
   if (!func_optimize)
     func_optimize = old_optimize;
 
@@ -2836,7 +2837,7 @@ ix86_option_override_internal (bool main_args_p,
   /* For all chips supporting SSE2, -mfpmath=sse performs better than
      fpmath=387.  The second is however default at many targets since the
      extra 80bit precision of temporaries is considered to be part of ABI.
-     Overwrite the default at least for -ffast-math. 
+     Overwrite the default at least for -ffast-math.
      TODO: -mfpmath=both seems to produce same performing code with bit
      smaller binaries.  It is however not clear if register allocation is
      ready for this setting.
@@ -3680,8 +3681,8 @@ char *
 ix86_offload_options (void)
 {
   if (TARGET_LP64)
-    return xstrdup ("-foffload-abi=lp64");
-  return xstrdup ("-foffload-abi=ilp32");
+    return xstrdup ("-foffload-abi=lp64 -foffload-abi-host-opts=-m64");
+  return xstrdup ("-foffload-abi=ilp32 -foffload-abi-host-opts=-m32");
 }
 
 /* Handle "cdecl", "stdcall", "fastcall", "regparm", "thiscall",

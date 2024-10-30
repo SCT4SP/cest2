@@ -36,7 +36,12 @@
 // ISO C++ 14882: <ccytpe>
 //
 
+#ifndef _GLIBCXX_CCTYPE
+#define _GLIBCXX_CCTYPE 1
+
+#ifdef _GLIBCXX_SYSHDR
 #pragma GCC system_header
+#endif
 
 #include <bits/c++config.h>
 #if !_GLIBCXX_CEST_VERSION
@@ -173,9 +178,6 @@ _GLIBCXX_CEST_CONSTEXPR int toupper(int c) {
 
 #endif // _GLIBCXX_CEST_CCTYPE
 #endif // _GLIBCXX_CEST_VERSION
-
-#ifndef _GLIBCXX_CCTYPE
-#define _GLIBCXX_CCTYPE 1
 
 // Get rid of those macros defined in <ctype.h> in lieu of real functions.
 #undef isalnum

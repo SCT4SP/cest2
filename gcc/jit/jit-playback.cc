@@ -19,6 +19,7 @@ along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
 #include "config.h"
+#define INCLUDE_MEMORY
 #define INCLUDE_MUTEX
 #include "libgccjit.h"
 #include "system.h"
@@ -3686,14 +3687,9 @@ add_error_va (location *loc, const char *fmt, va_list ap)
 
 void
 playback::context::
-add_diagnostic (diagnostic_context *diag_context,
+add_diagnostic (const char *text,
 		const diagnostic_info &diagnostic)
 {
-  /* At this point the text has been formatted into the pretty-printer's
-     output buffer.  */
-  pretty_printer *pp = diag_context->printer;
-  const char *text = pp_formatted_text (pp);
-
   /* Get location information (if any) from the diagnostic.
      The recording::context::add_error[_va] methods require a
      recording::location.  We can't lookup the playback::location
@@ -3713,7 +3709,6 @@ add_diagnostic (diagnostic_context *diag_context,
     }
 
   m_recording_ctxt->add_error (rec_loc, "%s", text);
-  pp_clear_output_area (pp);
 }
 
 /* Dealing with the linemap API.  */

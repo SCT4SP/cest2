@@ -943,6 +943,18 @@ make_location (cp_token *caret, cp_token *start, cp_token *end)
   return make_location (caret->location, start->location, end->location);
 }
 
+/* Location for the whitespace between two tokens.  */
+
+static location_t
+location_between (cp_token *stok, cp_token *etok)
+{
+  location_t s = get_finish (stok->location);
+  s = linemap_position_for_loc_and_offset (line_table, s, 1);
+  location_t e = get_start (etok->location);
+  e = linemap_position_for_loc_and_offset (line_table, e, -1);
+  return make_location (s, s, e);
+}
+
 /* nonzero if we are presently saving tokens.  */
 
 static inline int
@@ -3504,6 +3516,7 @@ cp_parser_check_for_definition_in_return_type (cp_declarator *declarator,
   if (declarator
       && declarator->kind == cdk_function)
     {
+      auto_diagnostic_group d;
       error_at (type_location,
 		"new types may not be defined in a return type");
       inform (type_location,
@@ -5086,24 +5099,27 @@ cp_parser_userdef_numeric_literal (cp_parser *parser)
 	}
     }
 
-  bool complained
-    = emit_diagnostic (kind, input_location, opt,
-		       "unable to find numeric literal operator %qD", name);
+  {
+    auto_diagnostic_group d;
+    bool complained
+      = emit_diagnostic (kind, input_location, opt,
+			 "unable to find numeric literal operator %qD", name);
 
-  if (!complained)
-    /* Don't inform either.  */;
-  else if (i14)
-    {
-      inform (token->location, "add %<using namespace std::complex_literals%> "
-	      "(from %<<complex>%>) to enable the C++14 user-defined literal "
-	      "suffixes");
-      if (ext)
-	inform (token->location, "or use %<j%> instead of %<i%> for the "
-		"GNU built-in suffix");
-    }
-  else if (!ext)
-    inform (token->location, "use %<-fext-numeric-literals%> "
-	    "to enable more built-in suffixes");
+    if (!complained)
+      /* Don't inform either.  */;
+    else if (i14)
+      {
+	inform (token->location, "add %<using namespace std::complex_literals%> "
+		"(from %<<complex>%>) to enable the C++14 user-defined literal "
+		"suffixes");
+	if (ext)
+	  inform (token->location, "or use %<j%> instead of %<i%> for the "
+		  "GNU built-in suffix");
+      }
+    else if (!ext)
+      inform (token->location, "use %<-fext-numeric-literals%> "
+	      "to enable more built-in suffixes");
+  }
 
   if (kind == DK_ERROR)
     value = error_mark_node;
@@ -7159,6 +7175,7 @@ cp_parser_nested_name_specifier_opt (cp_parser *parser,
 	      if (TREE_CODE (tid) == TEMPLATE_ID_EXPR
 		  && TREE_CODE (TREE_OPERAND (tid, 0)) != IDENTIFIER_NODE)
 		{
+		  auto_diagnostic_group d;
 		  tree tmpl = NULL_TREE;
 		  if (is_overloaded_fn (tid))
 		    {
@@ -9145,9 +9162,15 @@ cp_parser_unary_expression (cp_parser *parser, cp_id_kind * pidk,
 
 	    /* Save away the PEDANTIC flag.  */
 	    cp_parser_extension_opt (parser, &saved_pedantic);
+	    /* Also suppress -Wconditionally-supported.  */
+	    diagnostic_push_diagnostics (global_dc, input_location);
+	    diagnostic_classify_diagnostic
+	      (global_dc, OPT_Wconditionally_supported,
+	       DK_IGNORED, input_location);
 	    /* Parse the cast-expression.  */
 	    expr = cp_parser_simple_cast_expression (parser);
 	    /* Restore the PEDANTIC flag.  */
+	    diagnostic_pop_diagnostics (global_dc, input_location);
 	    pedantic = saved_pedantic;
 
 	    return expr;
@@ -9641,10 +9664,13 @@ cp_parser_new_expression (cp_parser* parser)
 	 message for this case.  */
       if (cp_lexer_next_token_is (parser->lexer, CPP_OPEN_SQUARE))
 	{
-	  error_at (token->location,
-		    "array bound forbidden after parenthesized type-id");
-	  inform (token->location,
-		  "try removing the parentheses around the type-id");
+	  {
+	    auto_diagnostic_group d;
+	    error_at (token->location,
+		      "array bound forbidden after parenthesized type-id");
+	    inform (token->location,
+		    "try removing the parentheses around the type-id");
+	  }
 	  cp_parser_direct_new_declarator (parser);
 	}
     }
@@ -10450,6 +10476,7 @@ cp_parser_binary_expression (cp_parser* parser, bool cast_p,
           && token->type == CPP_RSHIFT
           && !parser->greater_than_is_operator_p)
         {
+	  auto_diagnostic_group d;
           if (warning_at (token->location, OPT_Wc__11_compat,
 			  "%<>>%> operator is treated"
 			  " as two right angle brackets in C++11"))
@@ -11724,6 +11751,7 @@ cp_parser_lambda_introducer (cp_parser* parser, tree lambda_expr)
 	  else if (!VAR_P (capture_init_expr)
 		   && TREE_CODE (capture_init_expr) != PARM_DECL)
 	    {
+	      auto_diagnostic_group d;
 	      error_at (capture_token->location,
 			"capture of non-variable %qE",
 			capture_init_expr);
@@ -11735,6 +11763,7 @@ cp_parser_lambda_introducer (cp_parser* parser, tree lambda_expr)
 	  if (VAR_P (capture_init_expr)
 	      && decl_storage_duration (capture_init_expr) != dk_auto)
 	    {
+	      auto_diagnostic_group d;
 	      if (pedwarn (capture_token->location, 0, "capture of variable "
 			   "%qD with non-automatic storage duration",
 			   capture_init_expr))
@@ -11873,6 +11902,11 @@ cp_parser_lambda_declarator_opt (cp_parser* parser, tree lambda_expr)
 	pedwarn (parser->lexer->next_token->location, OPT_Wc__20_extensions,
 		 "lambda templates are only available with "
 		 "%<-std=c++20%> or %<-std=gnu++20%>");
+
+      /* Even though the whole lambda may be a default argument, its
+	 template-parameter-list is a context where it's OK to create
+	 new parameters.  */
+      auto lvf = make_temp_override (parser->local_variables_forbidden_p, 0u);
 
       cp_lexer_consume_token (parser->lexer);
 
@@ -14377,11 +14411,13 @@ warn_for_range_copy (tree decl, tree expr)
   else if (!CP_TYPE_CONST_P (type))
     return;
 
-  /* Since small trivially copyable types are cheap to copy, we suppress the
-     warning for them.  64B is a common size of a cache line.  */
+  /* Since small trivially constructible types are cheap to construct, we
+     suppress the warning for them.  64B is a common size of a cache line.  */
+  tree vec = make_tree_vec (1);
+  TREE_VEC_ELT (vec, 0) = TREE_TYPE (expr);
   if (TREE_CODE (TYPE_SIZE_UNIT (type)) != INTEGER_CST
       || (tree_to_uhwi (TYPE_SIZE_UNIT (type)) <= 64
-	  && trivially_copyable_p (type)))
+	  && is_trivially_xible (INIT_EXPR, type, vec)))
     return;
 
   /* If we can initialize a reference directly, suggest that to avoid the
@@ -14463,6 +14499,15 @@ cp_convert_range_for (tree statement, tree range_decl, tree range_expr,
 	{
 	  range_temp = build_range_temp (range_expr);
 	  pushdecl (range_temp);
+	  if (flag_range_for_ext_temps)
+	    {
+	      /* P2718R0 - put the range_temp declaration and everything
+		 until end of the range for body into an extra STATEMENT_LIST
+		 which will have CLEANUP_POINT_EXPR around it, so that all
+		 temporaries are destroyed at the end of it.  */
+	      gcc_assert (FOR_INIT_STMT (statement) == NULL_TREE);
+	      FOR_INIT_STMT (statement) = push_stmt_list ();
+	    }
 	  cp_finish_decl (range_temp, range_expr,
 			  /*is_constant_init*/false, NULL_TREE,
 			  LOOKUP_ONLYCONVERTING);
@@ -14513,8 +14558,6 @@ cp_convert_range_for (tree statement, tree range_decl, tree range_expr,
   cp_finish_decl (range_decl, deref_begin,
 		  /*is_constant_init*/false, NULL_TREE,
 		  LOOKUP_ONLYCONVERTING, decomp);
-  if (DECL_DECOMPOSITION_P (range_decl))
-    cp_finish_decomp (range_decl, decomp);
 
   warn_for_range_copy (range_decl, deref_begin);
 
@@ -15238,6 +15281,7 @@ cp_parser_module_declaration (cp_parser *parser, module_parse mp_state,
     }
   else if (scope != global_namespace)
     {
+      auto_diagnostic_group d;
       error_at (token->location, "module-declaration must be at global scope");
       inform (DECL_SOURCE_LOCATION (scope), "scope opened here");
       goto skip_eol;
@@ -15315,19 +15359,22 @@ cp_parser_import_declaration (cp_parser *parser, module_parse mp_state,
 
   if (mp_state == MP_PURVIEW || mp_state == MP_PRIVATE)
     {
+      auto_diagnostic_group d;
       error_at (token->location, "post-module-declaration"
 		" imports must be contiguous");
-    note_lexer:
       inform (token->location, "perhaps insert a line break after"
 	      " %<import%>, or other disambiguation, to prevent this"
 	      " being considered a module control-line");
-    skip_eol:
       cp_parser_skip_to_pragma_eol (parser, token);
     }
   else if (current_scope () != global_namespace)
     {
+      auto_diagnostic_group d;
       error_at (token->location, "import-declaration must be at global scope");
-      goto note_lexer;
+      inform (token->location, "perhaps insert a line break after"
+	      " %<import%>, or other disambiguation, to prevent this"
+	      " being considered a module control-line");
+      cp_parser_skip_to_pragma_eol (parser, token);
     }
   else
     {
@@ -15355,7 +15402,10 @@ cp_parser_import_declaration (cp_parser *parser, module_parse mp_state,
       tree attrs = cp_parser_attributes_opt (parser);
 
       if (!mod || !cp_parser_require (parser, CPP_SEMICOLON, RT_SEMICOLON))
-	goto skip_eol;
+	{
+	  cp_parser_skip_to_pragma_eol (parser, token);
+	  return;
+	}
       cp_parser_require_pragma_eol (parser, token);
 
       if (mp_state == MP_PURVIEW_IMPORTS || mp_state == MP_PRIVATE_IMPORTS)
@@ -15648,6 +15698,7 @@ cp_parser_declaration (cp_parser* parser, tree prefix_attrs)
 	  if (!c_dialect_objc ())
 	    {
 	      location_t where = get_finish (t2->location);
+	      auto_diagnostic_group d;
 	      warning_at (token1->location, OPT_Wattributes, "attributes are"
 			  " not permitted in this position");
 	      where = linemap_position_for_loc_and_offset (line_table,
@@ -16429,13 +16480,12 @@ cp_parser_decomposition_declaration (cp_parser *parser,
       if (decl != error_mark_node)
 	{
 	  cp_decomp decomp = { prev, cnt };
-	  cp_finish_decl (decl, initializer, non_constant_p, NULL_TREE,
-			  (is_direct_init ? LOOKUP_NORMAL : LOOKUP_IMPLICIT),
-			  &decomp);
 	  if (keyword != RID_MAX)
 	    DECL_DECOMP_BASE (decl)
 	      = keyword == RID_SWITCH ? integer_one_node : integer_zero_node;
-	  cp_finish_decomp (decl, &decomp);
+	  cp_finish_decl (decl, initializer, non_constant_p, NULL_TREE,
+			  (is_direct_init ? LOOKUP_NORMAL : LOOKUP_IMPLICIT),
+			  &decomp);
 	}
     }
   else if (decl != error_mark_node)
@@ -16899,6 +16949,7 @@ cp_parser_decl_specifier_seq (cp_parser* parser,
 
       if (decl_specs->std_attributes)
 	{
+	  auto_diagnostic_group d;
 	  error_at (decl_specs->locations[ds_std_attribute],
 		    "standard attributes in middle of decl-specifiers");
 	  inform (decl_specs->locations[ds_std_attribute],
@@ -18286,6 +18337,8 @@ cp_parser_operator (cp_parser* parser, location_t start_loc)
 	if (cxx_dialect == cxx98)
 	  maybe_warn_cpp0x (CPP0X_USER_DEFINED_LITERALS);
 
+	token = cp_lexer_peek_token (parser->lexer);
+
 	/* Consume the string.  */
 	cp_expr str = cp_parser_userdef_string_literal (parser,
 							/*lookup_udlit=*/false);
@@ -18301,13 +18354,24 @@ cp_parser_operator (cp_parser* parser, location_t start_loc)
 	  {
 	    string_tree = str;
 	    /* Look for the suffix identifier.  */
-	    token = cp_lexer_peek_token (parser->lexer);
-	    if (token->type == CPP_NAME)
+	    cp_token *id_tok = cp_lexer_peek_token (parser->lexer);
+	    if (id_tok->type == CPP_NAME)
 	      {
 		id = cp_parser_identifier (parser);
-		end_loc = token->location;
+		end_loc = id_tok->location;
+
+		/* Deprecated by CWG2521 in C++23.  */
+		if (warn_deprecated_literal_operator)
+		  {
+		    gcc_rich_location
+		      space (location_between (token, id_tok));
+		    space.add_fixit_remove ();
+		    warning_at (&space, OPT_Wdeprecated_literal_operator,
+				"space between quotes and suffix is "
+				"deprecated in C++23");
+		  }
 	      }
-	    else if (token->type == CPP_KEYWORD)
+	    else if (id_tok->type == CPP_KEYWORD)
 	      {
 		error ("unexpected keyword;"
 		       " remove space between quotes and suffix identifier");
@@ -19148,6 +19212,7 @@ cp_parser_template_id (cp_parser *parser,
 	}
       /* Otherwise, emit an error about the invalid digraph, but continue
 	 parsing because we got our argument list.  */
+      auto_diagnostic_group d;
       if (permerror (next_token->location,
 		     "%<<::%> cannot begin a template-argument list"))
 	{
@@ -19187,6 +19252,7 @@ cp_parser_template_id (cp_parser *parser,
 	      /* C++20 says that "function-name < a;" is now ill-formed.  */
 	      if (cp_parser_error_occurred (parser))
 		{
+		  auto_diagnostic_group d;
 		  error_at (token->location, "invalid template-argument-list");
 		  inform (token->location, "function name as the left hand "
 			  "operand of %<<%> is ill-formed in C++20; wrap the "
@@ -19432,10 +19498,13 @@ cp_parser_template_name (cp_parser* parser,
 	  cp_token_position start = 0;
 
 	  /* Explain what went wrong.  */
-	  error_at (token->location, "non-template %qD used as template",
-		    identifier);
-	  inform (token->location, "use %<%T::template %D%> to indicate that it is a template",
-		  parser->scope, identifier);
+	  {
+	    auto_diagnostic_group d;
+	    error_at (token->location, "non-template %qD used as template",
+		      identifier);
+	    inform (token->location, "use %<%T::template %D%> to indicate "
+		    "that it is a template", parser->scope, identifier);
+	  }
 	  /* If parsing tentatively, find the location of the "<" token.  */
 	  if (cp_parser_simulate_error (parser))
 	    start = cp_lexer_token_position (parser->lexer, true);
@@ -19795,9 +19864,11 @@ cp_parser_template_argument (cp_parser* parser)
 
      -- the name of a non-type template-parameter; or
 
-     -- the name of an object or function with external linkage...
+     -- the name of an object or function with external (or internal,
+	since C++11) linkage...
 
-     -- the address of an object or function with external linkage...
+     -- the address of an object or function with external (or internal,
+	since C++11) linkage...
 
      -- a pointer to member...  */
   /* Look for a non-type template parameter.  */
@@ -19860,11 +19931,16 @@ cp_parser_template_argument (cp_parser* parser)
 	    probe = TREE_OPERAND (probe, 1);
 	  if (VAR_P (probe))
 	    {
-	      /* A variable without external linkage might still be a
+	      /* A variable without valid linkage might still be a
 		 valid constant-expression, so no error is issued here
 		 if the external-linkage check fails.  */
-	      if (!address_p && !DECL_EXTERNAL_LINKAGE_P (probe))
-		cp_parser_simulate_error (parser);
+	      if (!address_p)
+		{
+		  linkage_kind linkage = decl_linkage (probe);
+		  if (linkage != lk_external
+		      && (cxx_dialect < cxx11 || linkage != lk_internal))
+		    cp_parser_simulate_error (parser);
+		}
 	    }
 	  else if (is_overloaded_fn (argument))
 	    /* All overloaded functions are allowed; if the external
@@ -20103,6 +20179,7 @@ cp_parser_explicit_specialization (cp_parser* parser)
   bool need_lang_pop = current_lang_name == lang_name_c;
   if (need_lang_pop)
     {
+      auto_diagnostic_group d;
       error_at (token->location, "template specialization with C linkage");
       maybe_show_extern_c_location ();
 
@@ -20935,6 +21012,7 @@ cp_parser_placeholder_type_specifier (cp_parser *parser, location_t loc,
     {
       if (!tentative)
 	{
+	  auto_diagnostic_group d;
 	  error_at (loc, "%qE does not constrain a type", DECL_NAME (con));
 	  inform (DECL_SOURCE_LOCATION (con), "concept defined here");
 	}
@@ -20948,8 +21026,8 @@ cp_parser_placeholder_type_specifier (cp_parser *parser, location_t loc,
       /* In a default argument we may not be creating new parameters.  */
       if (parser->local_variables_forbidden_p & LOCAL_VARS_FORBIDDEN)
 	{
-	  /* If this assert turns out to be false, do error() instead.  */
-	  gcc_assert (tentative);
+	  if (!tentative)
+	    error_at (loc, "invalid use of concept-name %qD", con);
 	  return error_mark_node;
 	}
       return build_constrained_parameter (con, proto, args);
@@ -21548,6 +21626,7 @@ cp_parser_elaborated_type_specifier (cp_parser* parser,
 		 "attributes ignored on template instantiation");
       else if (is_friend && cxx11_attribute_p (attributes))
 	{
+	  auto_diagnostic_group d;
 	  if (warning (OPT_Wattributes, "attribute ignored"))
 	    inform (input_location, "an attribute that appertains to a friend "
 		    "declaration that is not a definition is ignored");
@@ -21900,6 +21979,7 @@ cp_parser_enum_specifier (cp_parser* parser)
 	}
       else
 	{
+	  auto_diagnostic_group d;
 	  error_at (type_start_token->location,
 		    "multiple definition of %q#T", type);
 	  inform (DECL_SOURCE_LOCATION (TYPE_MAIN_DECL (type)),
@@ -22947,6 +23027,7 @@ cp_parser_asm_definition (cp_parser* parser)
 	  case RID_VOLATILE:
 	    if (volatile_loc)
 	      {
+		auto_diagnostic_group d;
 		error_at (loc, "duplicate %<asm%> qualifier %qT",
 			  token->u.value);
 		inform (volatile_loc, "first seen here");
@@ -22964,6 +23045,7 @@ cp_parser_asm_definition (cp_parser* parser)
 	  case RID_INLINE:
 	    if (inline_loc)
 	      {
+		auto_diagnostic_group d;
 		error_at (loc, "duplicate %<asm%> qualifier %qT",
 			  token->u.value);
 		inform (inline_loc, "first seen here");
@@ -22978,6 +23060,7 @@ cp_parser_asm_definition (cp_parser* parser)
 	  case RID_GOTO:
 	    if (goto_loc)
 	      {
+		auto_diagnostic_group d;
 		error_at (loc, "duplicate %<asm%> qualifier %qT",
 			  token->u.value);
 		inform (goto_loc, "first seen here");
@@ -23791,12 +23874,13 @@ cp_parser_init_declarator (cp_parser* parser,
      attributes -- but ignores them.  Made a permerror in GCC 8.  */
   if (cp_parser_allow_gnu_extensions_p (parser)
       && initialization_kind == CPP_OPEN_PAREN
-      && cp_parser_attributes_opt (parser)
-      && permerror (input_location,
-		    "attributes after parenthesized initializer ignored"))
+      && cp_parser_attributes_opt (parser))
     {
       static bool hint;
-      if (flag_permissive && !hint)
+      auto_diagnostic_group d;
+      if (permerror (input_location,
+		     "attributes after parenthesized initializer ignored")
+	  && flag_permissive && !hint)
 	{
 	  hint = true;
 	  inform (input_location,
@@ -24496,6 +24580,7 @@ cp_parser_direct_declarator (cp_parser* parser,
 		    else if (qualifying_scope
 			     && CLASSTYPE_USE_TEMPLATE (name_type))
 		      {
+			auto_diagnostic_group d;
 			error_at (declarator_id_start_token->location,
 				  "invalid use of constructor as a template");
 			inform (declarator_id_start_token->location,
@@ -25945,10 +26030,15 @@ cp_parser_parameter_declaration (cp_parser *parser,
 
   bool xobj_param_p
     = decl_spec_seq_has_spec_p (&decl_specifiers, ds_this);
-  if (xobj_param_p && template_parm_p)
+  if (xobj_param_p
+      && (template_parm_p || current_binding_level->requires_expression))
     {
-      error_at (decl_specifiers.locations[ds_this],
-		"%<this%> specifier in template parameter declaration");
+      if (template_parm_p)
+	error_at (decl_specifiers.locations[ds_this],
+		  "%<this%> specifier in template parameter declaration");
+      else
+	error_at (decl_specifiers.locations[ds_this],
+		  "%<this%> specifier in a requires-expression parameter");
       xobj_param_p = false;
       decl_specifiers.locations[ds_this] = 0;
     }
@@ -27885,11 +27975,12 @@ cp_parser_class_head (cp_parser* parser,
 
   /* If this type was already complete, and we see another definition,
      that's an error.  Likewise if the type is already being defined:
-     this can happen, eg, when it's defined from within an expression 
+     this can happen, eg, when it's defined from within an expression
      (c++/84605).  */
   if (type != error_mark_node
       && (COMPLETE_TYPE_P (type) || TYPE_BEING_DEFINED (type)))
     {
+      auto_diagnostic_group d;
       error_at (type_start_token->location, "redefinition of %q#T",
 		type);
       inform (location_of (type), "previous definition of %q#T",
@@ -28344,6 +28435,7 @@ cp_parser_member_declaration (cp_parser* parser)
 		      && cxx11_attribute_p (decl_specifiers.attributes))
 		    {
 		      decl_specifiers.attributes = NULL_TREE;
+		      auto_diagnostic_group d;
 		      if (warning_at (decl_spec_token_start->location,
 				      OPT_Wattributes, "attribute ignored"))
 			inform (decl_spec_token_start->location, "an attribute "
@@ -29924,11 +30016,10 @@ cp_nth_tokens_can_be_std_attribute_p (cp_parser *parser, size_t n)
 {
   cp_token *token = cp_lexer_peek_nth_token (parser->lexer, n);
 
-  return (cxx_dialect >= cxx11
-	  && ((token->type == CPP_KEYWORD && token->keyword == RID_ALIGNAS)
-	      || (token->type == CPP_OPEN_SQUARE
-		  && (token = cp_lexer_peek_nth_token (parser->lexer, n + 1))
-		  && token->type == CPP_OPEN_SQUARE)));
+  return ((token->type == CPP_KEYWORD && token->keyword == RID_ALIGNAS)
+	  || (token->type == CPP_OPEN_SQUARE
+	      && (token = cp_lexer_peek_nth_token (parser->lexer, n + 1))
+	      && token->type == CPP_OPEN_SQUARE));
 }
 
 /* Return TRUE iff the next Nth tokens in the stream are possibly the
@@ -32449,6 +32540,7 @@ cp_parser_lookup_name (cp_parser *parser, tree name,
 	 cp_parser_error, so we incorporate its actions directly.  */
       if (!cp_parser_simulate_error (parser))
 	{
+	  auto_diagnostic_group d;
 	  error_at (name_location, "reference to %qD is ambiguous",
 		    name);
 	  print_candidates (decl);
@@ -32882,7 +32974,7 @@ cp_parser_constructor_declarator_p (cp_parser *parser, cp_parser_flags flags,
 	     use a qualified name.
 
 	     Parse with an empty set of declaration specifiers since we're
-	     trying to match a decl-specifier-seq of the first parameter.  
+	     trying to match a decl-specifier-seq of the first parameter.
 	     This must be non-null so that cp_parser_simple_type_specifier
 	     will recognize a constrained placeholder type such as:
 	     'C<int> auto' where C is a type concept.  */
@@ -33260,6 +33352,7 @@ cp_parser_explicit_template_declaration (cp_parser* parser, bool member_p)
      A template ... shall not have C linkage.  */
   if (current_lang_name == lang_name_c)
     {
+      auto_diagnostic_group d;
       error_at (location, "template with C linkage");
       maybe_show_extern_c_location ();
       /* Give it C++ linkage to avoid confusing other parts of the
@@ -33600,7 +33693,7 @@ cp_parser_functional_cast (cp_parser* parser, tree type)
 					   parser->lexer);
   cast = build_functional_cast (combined_loc, type, expression_list,
                                 tf_warning_or_error);
-  
+
   /* [expr.const]/1: In an integral constant expression "only type
      conversions to integral or enumeration type can be used".  */
   if (TREE_CODE (type) == TYPE_DECL)
@@ -35236,6 +35329,7 @@ cp_parser_check_class_key (cp_parser *parser, location_t key_loc,
   bool seen_as_union = TREE_CODE (type) == UNION_TYPE;
   if (seen_as_union != (class_key == union_type))
     {
+      auto_diagnostic_group d;
       if (permerror (input_location, "%qs tag used in naming %q#T",
 		     class_key == union_type ? "union"
 		     : class_key == record_type ? "struct" : "class",
@@ -44583,7 +44677,8 @@ cp_parser_omp_for_loop_init (cp_parser *parser,
 void
 cp_convert_omp_range_for (tree &this_pre_body, tree &sl,
 			  tree &decl, tree &orig_decl, tree &init,
-			  tree &orig_init, tree &cond, tree &incr)
+			  tree &orig_init, tree &cond, tree &incr,
+			  bool tmpl_p)
 {
   tree begin, end, range_temp_decl = NULL_TREE;
   tree iter_type, begin_expr, end_expr;
@@ -44641,11 +44736,29 @@ cp_convert_omp_range_for (tree &this_pre_body, tree &sl,
       else
 	{
 	  range_temp = build_range_temp (init);
-	  DECL_NAME (range_temp) = NULL_TREE;
+	  tree name = DECL_NAME (range_temp);
+	  /* Temporarily clear DECL_NAME of the __for_range temporary.
+	     While it contains a space at the end and outside of templates
+	     it works even without doing this, when cp_convert_omp_range_for
+	     is called from tsubst_omp_for_iterator, all the associated loops
+	     are in a single scope and so loop nests with 2 or more range
+	     based for loops would error.  */
+	  if (tmpl_p)
+	    DECL_NAME (range_temp) = NULL_TREE;
 	  pushdecl (range_temp);
+	  /* Restore the name back.  This is needed for cp_finish_decl
+	     lifetime extension of temporaries, and can be helpful for user
+	     during debugging after the DECL_NAME is changed to __for_range
+	     without space at the end.  */
+	  if (tmpl_p)
+	    DECL_NAME (range_temp) = name;
 	  cp_finish_decl (range_temp, init,
 			  /*is_constant_init*/false, NULL_TREE,
 			  LOOKUP_ONLYCONVERTING);
+	  /* And clear the name again.  pop_scope requires that the name
+	     used during pushdecl didn't change.  */
+	  if (tmpl_p)
+	    DECL_NAME (range_temp) = NULL_TREE;
 	  range_temp_decl = range_temp;
 	  range_temp = convert_from_reference (range_temp);
 	}
@@ -44745,7 +44858,7 @@ cp_convert_omp_range_for (tree &this_pre_body, tree &sl,
      the whole loop nest.  The remaining elements are decls of derived
      decomposition variables that are bound inside the loop body.  This
      structure is further mangled by finish_omp_for into the form required
-     for the OMP_FOR_ORIG_DECLS field of the OMP_FOR tree node.  */\
+     for the OMP_FOR_ORIG_DECLS field of the OMP_FOR tree node.  */
   unsigned decomp_cnt = decomp ? decomp->count : 0;
   tree v = make_tree_vec (decomp_cnt + 3);
   TREE_VEC_ELT (v, 0) = range_temp_decl;
@@ -44810,8 +44923,6 @@ cp_finish_omp_range_for (tree orig, tree begin)
 					NULL_TREE, tf_warning_or_error),
 		  /*is_constant_init*/false, NULL_TREE,
 		  LOOKUP_ONLYCONVERTING, decomp);
-  if (DECL_DECOMPOSITION_P (decl))
-    cp_finish_decomp (decl, decomp);
 }
 
 /* Return true if next tokens contain a standard attribute that contains
@@ -45316,7 +45427,7 @@ cp_parser_omp_loop_nest (cp_parser *parser, bool *if_p)
 
 	  cp_convert_omp_range_for (this_pre_body, sl, decl,
 				    orig_decl, init, orig_init,
-				    cond, incr);
+				    cond, incr, false);
 
 	  if (omp_for_parse_state->ordered_cl)
 	    error_at (OMP_CLAUSE_LOCATION (omp_for_parse_state->ordered_cl),
@@ -45579,10 +45690,29 @@ cp_parser_omp_loop_nest (cp_parser *parser, bool *if_p)
 
   /* Pop and remember the init block.  */
   if (sl)
-    add_stmt (pop_stmt_list (sl));
+    {
+      sl = pop_stmt_list (sl);
+      /* P2718R0 - Add CLEANUP_POINT_EXPR so that temporaries in
+	 for-range-initializer whose lifetime is extended are destructed
+	 here.  */
+      if (flag_range_for_ext_temps
+	  && is_range_for
+	  && !processing_template_decl)
+	sl = maybe_cleanup_point_expr_void (sl);
+      add_stmt (sl);
+    }
+  tree range_for_decl[3] = { NULL_TREE, NULL_TREE, NULL_TREE };
+  if (is_range_for && !processing_template_decl)
+    find_range_for_decls (range_for_decl);
   finish_compound_stmt (init_scope);
   init_block = pop_stmt_list (init_block);
   omp_for_parse_state->init_blockv[depth] = init_block;
+
+  if (is_range_for && !processing_template_decl)
+    for (int i = 0; i < 3; i++)
+      if (range_for_decl[i])
+	DECL_NAME (range_for_decl[i])
+	  = cp_global_trees[CPTI_FOR_RANGE_IDENTIFIER + i];
 
   /* Return the init placeholder rather than the remembered init block.
      Again, this is just a unique cookie that will be used to reassemble
@@ -49480,6 +49610,9 @@ cp_parser_omp_declare_target (cp_parser *parser, cp_token *pragma_tok)
   int device_type = 0;
   bool indirect = false;
   bool only_device_type_or_indirect = true;
+  if (flag_openmp)
+    omp_requires_mask
+      = (enum omp_requires) (omp_requires_mask | OMP_REQUIRES_TARGET_USED);
   if (cp_lexer_next_token_is (parser->lexer, CPP_NAME)
       || (cp_lexer_next_token_is (parser->lexer, CPP_COMMA)
 	  && cp_lexer_nth_token_is (parser->lexer, 2, CPP_NAME)))
@@ -50200,6 +50333,8 @@ cp_parser_omp_requires (cp_parser *parser, cp_token *pragma_tok)
 	    this_req = OMP_REQUIRES_UNIFIED_ADDRESS;
 	  else if (!strcmp (p, "unified_shared_memory"))
 	    this_req = OMP_REQUIRES_UNIFIED_SHARED_MEMORY;
+	  else if (!strcmp (p, "self_maps"))
+	    this_req = OMP_REQUIRES_SELF_MAPS;
 	  else if (!strcmp (p, "dynamic_allocators"))
 	    this_req = OMP_REQUIRES_DYNAMIC_ALLOCATORS;
 	  else if (!strcmp (p, "reverse_offload"))
@@ -50272,6 +50407,7 @@ cp_parser_omp_requires (cp_parser *parser, cp_token *pragma_tok)
 	    {
 	      error_at (cloc, "expected %<unified_address%>, "
 			      "%<unified_shared_memory%>, "
+			      "%<self_maps%>, "
 			      "%<dynamic_allocators%>, "
 			       "%<reverse_offload%> "
 			       "or %<atomic_default_mem_order%> clause");

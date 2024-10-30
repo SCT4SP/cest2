@@ -276,26 +276,22 @@ namespace ranges
 	{
 	  if (!std::__is_constant_evaluated())
 	    {
-	      if constexpr (__memcpyable<_Iter, _Out>::__value)
+	      if constexpr (__memcpyable<_Out, _Iter>::__value)
 		{
 		  using _ValueTypeI = iter_value_t<_Iter>;
-		  static_assert(_IsMove
-		      ? is_move_assignable_v<_ValueTypeI>
-		      : is_copy_assignable_v<_ValueTypeI>);
 		  auto __num = __last - __first;
-		  if (__num)
+		  if (__num > 1) [[likely]]
 		    __builtin_memmove(__result, __first,
-			sizeof(_ValueTypeI) * __num);
+				      sizeof(_ValueTypeI) * __num);
+		  else if (__num == 1)
+		    std::__assign_one<_IsMove>(__result, __first);
 		  return {__first + __num, __result + __num};
 		}
 	    }
 
 	  for (auto __n = __last - __first; __n > 0; --__n)
 	    {
-	      if constexpr (_IsMove)
-		*__result = std::move(*__first);
-	      else
-		*__result = *__first;
+	      std::__assign_one<_IsMove>(__result, __first);
 	      ++__first;
 	      ++__result;
 	    }
@@ -305,10 +301,7 @@ namespace ranges
 	{
 	  while (__first != __last)
 	    {
-	      if constexpr (_IsMove)
-		*__result = std::move(*__first);
-	      else
-		*__result = *__first;
+	      std::__assign_one<_IsMove>(__result, __first);
 	      ++__first;
 	      ++__result;
 	    }
@@ -414,14 +407,14 @@ namespace ranges
 	      if constexpr (__memcpyable<_Out, _Iter>::__value)
 		{
 		  using _ValueTypeI = iter_value_t<_Iter>;
-		  static_assert(_IsMove
-		      ? is_move_assignable_v<_ValueTypeI>
-		      : is_copy_assignable_v<_ValueTypeI>);
 		  auto __num = __last - __first;
-		  if (__num)
-		    __builtin_memmove(__result - __num, __first,
+		  __result -= __num;
+		  if (__num > 1) [[likely]]
+		    __builtin_memmove(__result, __first,
 				      sizeof(_ValueTypeI) * __num);
-		  return {__first + __num, __result - __num};
+		  else if (__num == 1)
+		    std::__assign_one<_IsMove>(__result, __first);
+		  return {__first + __num, __result};
 		}
 	    }
 
@@ -432,10 +425,7 @@ namespace ranges
 	    {
 	      --__tail;
 	      --__result;
-	      if constexpr (_IsMove)
-		*__result = std::move(*__tail);
-	      else
-		*__result = *__tail;
+	      std::__assign_one<_IsMove>(__result, __tail);
 	    }
 	  return {std::move(__lasti), std::move(__result)};
 	}
@@ -448,10 +438,7 @@ namespace ranges
 	    {
 	      --__tail;
 	      --__result;
-	      if constexpr (_IsMove)
-		*__result = std::move(*__tail);
-	      else
-		*__result = *__tail;
+	      std::__assign_one<_IsMove>(__result, __tail);
 	    }
 	  return {std::move(__lasti), std::move(__result)};
 	}
@@ -536,7 +523,9 @@ namespace ranges
 
   struct __fill_n_fn
   {
-    template<typename _Tp, output_iterator<const _Tp&> _Out>
+    template<typename _Out,
+	     typename _Tp _GLIBCXX26_DEF_VAL_T(iter_value_t<_Out>)>
+      requires output_iterator<_Out, const _Tp&>
       constexpr _Out
       operator()(_Out __first, iter_difference_t<_Out> __n,
 		 const _Tp& __value) const
@@ -581,8 +570,10 @@ namespace ranges
 
   struct __fill_fn
   {
-    template<typename _Tp,
-	     output_iterator<const _Tp&> _Out, sentinel_for<_Out> _Sent>
+    template<typename _Out,
+	     sentinel_for<_Out> _Sent,
+	     typename _Tp _GLIBCXX26_DEF_VAL_T(iter_value_t<_Out>)>
+      requires output_iterator<_Out, const _Tp&>
       constexpr _Out
       operator()(_Out __first, _Sent __last, const _Tp& __value) const
       {
@@ -591,7 +582,7 @@ namespace ranges
 	if constexpr (sized_sentinel_for<_Sent, _Out>)
 	  {
 	    const auto __len = __last - __first;
-	    return ranges::fill_n(__first, __len, __value);
+	    return ranges::fill_n(std::move(__first), __len, __value);
 	  }
 	else if constexpr (is_scalar_v<_Tp>)
 	  {
@@ -608,7 +599,9 @@ namespace ranges
 	  }
       }
 
-    template<typename _Tp, output_range<const _Tp&> _Range>
+    template<typename _Range,
+	     typename _Tp _GLIBCXX26_DEF_VAL_T(range_value_t<_Range>)>
+      requires output_range<_Range, const _Tp&>
       constexpr borrowed_iterator_t<_Range>
       operator()(_Range&& __r, const _Tp& __value) const
       {

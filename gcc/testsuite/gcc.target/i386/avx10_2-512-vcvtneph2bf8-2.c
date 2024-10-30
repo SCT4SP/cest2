@@ -1,20 +1,19 @@
 /* { dg-do run } */
-/* { dg-options "-O2 -mavx10.2-512" } */
+/* { dg-options "-O2 -march=x86-64-v3 -mavx10.2-512" } */
 /* { dg-require-effective-target avx10_2_512 } */
 
 #ifndef AVX10_2
 #define AVX10_2
 #define AVX10_2_512
 #define AVX10_512BIT
-#define AVX512F_LEN 512
-#define AVX512F_LEN_HALF 256
 #endif
 
 #include "avx10-helper.h"
 #include "fp8-helper.h"
 
 #define SIZE_SRC (AVX512F_LEN / 16)
-#define SIZE_RES (AVX512F_LEN_HALF / 8)
+#define SIZE (AVX512F_LEN_HALF / 8)
+#include "avx512f-mask-type.h"
 
 void
 CALC (unsigned char *r, _Float16 *s)
@@ -24,7 +23,7 @@ CALC (unsigned char *r, _Float16 *s)
   hf8_bf8 = 1;
   saturate = 0;
   
-  for (i = 0; i < SIZE_RES; i++)
+  for (i = 0; i < SIZE; i++)
     {
       r[i] = 0;
       if (i < SIZE_SRC)
@@ -39,9 +38,10 @@ void
 TEST (void)
 {
   int i,sign;
-  UNION_TYPE (AVX512F_LEN_HALF, i_b) res; 
+  UNION_TYPE (AVX512F_LEN_HALF, i_b) res1, res2, res3; 
   UNION_TYPE (AVX512F_LEN, h) src;
-  unsigned char res_ref[SIZE_RES];
+  MASK_TYPE mask = MASK_VALUE;
+  unsigned char res_ref[SIZE];
 
   sign = 1;
   for (i = 0; i < SIZE_SRC; i++)
@@ -50,9 +50,22 @@ TEST (void)
       sign = -sign;
     }
 
-  res.x = INTRINSIC (_cvtneph_pbf8) (src.x);
+  for (i = 0; i < SIZE; i++)
+    res2.a[i] = DEFAULT_VALUE;
+
   CALC(res_ref, src.a);
-  
-  if (UNION_CHECK (AVX512F_LEN_HALF, i_b) (res, res_ref))
+
+  res1.x = INTRINSIC (_cvtneph_pbf8) (src.x);
+  if (UNION_CHECK (AVX512F_LEN_HALF, i_b) (res1, res_ref))
+    abort ();
+
+  res2.x = INTRINSIC (_mask_cvtneph_pbf8) (res2.x, mask, src.x);
+  MASK_MERGE (i_b) (res_ref, mask, SIZE);
+  if (UNION_CHECK (AVX512F_LEN_HALF, i_b) (res2, res_ref))
+    abort ();
+
+  res3.x = INTRINSIC (_maskz_cvtneph_pbf8) (mask, src.x);
+  MASK_ZERO (i_b) (res_ref, mask, SIZE);
+  if (UNION_CHECK (AVX512F_LEN_HALF, i_b) (res3, res_ref))
     abort ();
 }

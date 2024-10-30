@@ -22,6 +22,7 @@ along with GCC; see the file COPYING3.  If not see
 /* This file implements the parts of the language independent aspect
    of diagnostic messages that implicitly use global_dc.  */
 
+#define INCLUDE_MEMORY
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
@@ -36,7 +37,8 @@ diagnostic_context *global_dc = &global_diagnostic_context;
 /* Standard error reporting routines in increasing order of severity.  */
 
 /* Text to be emitted verbatim to the error message stream; this
-   produces no prefix and disables line-wrapping.  Use rarely.  */
+   produces no prefix and disables line-wrapping.  Use rarely.
+   It is ignored for machine-readable output formats.  */
 void
 verbatim (const char *gmsgid, ...)
 {
@@ -44,8 +46,7 @@ verbatim (const char *gmsgid, ...)
 
   va_start (ap, gmsgid);
   text_info text (_(gmsgid), &ap, errno);
-  pp_format_verbatim (global_dc->printer, &text);
-  pp_newline_and_flush (global_dc->printer);
+  global_dc->report_verbatim (text);
   va_end (ap);
 }
 
@@ -53,15 +54,17 @@ verbatim (const char *gmsgid, ...)
    implying global_dc and taking a variable argument list.  */
 
 bool
-emit_diagnostic (diagnostic_t kind, location_t location, int opt,
+emit_diagnostic (diagnostic_t kind,
+		 location_t location,
+		 diagnostic_option_id option_id,
 		 const char *gmsgid, ...)
 {
   auto_diagnostic_group d;
   va_list ap;
   va_start (ap, gmsgid);
   rich_location richloc (line_table, location);
-  bool ret = global_dc->diagnostic_impl (&richloc, nullptr, opt, gmsgid, &ap,
-					 kind);
+  bool ret = global_dc->diagnostic_impl (&richloc, nullptr, option_id,
+					 gmsgid, &ap, kind);
   va_end (ap);
   return ret;
 }
@@ -69,14 +72,16 @@ emit_diagnostic (diagnostic_t kind, location_t location, int opt,
 /* As above, but for rich_location *.  */
 
 bool
-emit_diagnostic (diagnostic_t kind, rich_location *richloc, int opt,
+emit_diagnostic (diagnostic_t kind,
+		 rich_location *richloc,
+		 diagnostic_option_id option_id,
 		 const char *gmsgid, ...)
 {
   auto_diagnostic_group d;
   va_list ap;
   va_start (ap, gmsgid);
-  bool ret = global_dc->diagnostic_impl (richloc, nullptr, opt, gmsgid, &ap,
-					 kind);
+  bool ret = global_dc->diagnostic_impl (richloc, nullptr, option_id,
+					 gmsgid, &ap, kind);
   va_end (ap);
   return ret;
 }
@@ -84,11 +89,14 @@ emit_diagnostic (diagnostic_t kind, rich_location *richloc, int opt,
 /* As above, but taking a variable argument list.  */
 
 bool
-emit_diagnostic_valist (diagnostic_t kind, location_t location, int opt,
+emit_diagnostic_valist (diagnostic_t kind,
+			location_t location,
+			diagnostic_option_id option_id,
 			const char *gmsgid, va_list *ap)
 {
   rich_location richloc (line_table, location);
-  return global_dc->diagnostic_impl (&richloc, nullptr, opt, gmsgid, ap, kind);
+  return global_dc->diagnostic_impl (&richloc, nullptr, option_id,
+				     gmsgid, ap, kind);
 }
 
 /* As above, but with rich_location and metadata.  */
@@ -97,10 +105,11 @@ bool
 emit_diagnostic_valist_meta (diagnostic_t kind,
 			     rich_location *richloc,
 			     const diagnostic_metadata *metadata,
-			     int opt,
+			     diagnostic_option_id option_id,
 			     const char *gmsgid, va_list *ap)
 {
-  return global_dc->diagnostic_impl (richloc, metadata, opt, gmsgid, ap, kind);
+  return global_dc->diagnostic_impl (richloc, metadata, option_id,
+				     gmsgid, ap, kind);
 }
 
 /* An informative note at LOCATION.  Use this for additional details on an error
@@ -149,14 +158,14 @@ inform_n (location_t location, unsigned HOST_WIDE_INT n,
    to the relevant language specification but is likely to be buggy anyway.
    Returns true if the warning was printed, false if it was inhibited.  */
 bool
-warning (int opt, const char *gmsgid, ...)
+warning (diagnostic_option_id option_id, const char *gmsgid, ...)
 {
   auto_diagnostic_group d;
   va_list ap;
   va_start (ap, gmsgid);
   rich_location richloc (line_table, input_location);
-  bool ret = global_dc->diagnostic_impl (&richloc, nullptr, opt, gmsgid, &ap,
-					 DK_WARNING);
+  bool ret = global_dc->diagnostic_impl (&richloc, nullptr, option_id,
+					 gmsgid, &ap, DK_WARNING);
   va_end (ap);
   return ret;
 }
@@ -166,14 +175,16 @@ warning (int opt, const char *gmsgid, ...)
    Returns true if the warning was printed, false if it was inhibited.  */
 
 bool
-warning_at (location_t location, int opt, const char *gmsgid, ...)
+warning_at (location_t location,
+	    diagnostic_option_id option_id,
+	    const char *gmsgid, ...)
 {
   auto_diagnostic_group d;
   va_list ap;
   va_start (ap, gmsgid);
   rich_location richloc (line_table, location);
-  bool ret = global_dc->diagnostic_impl (&richloc, nullptr, opt, gmsgid, &ap,
-					 DK_WARNING);
+  bool ret = global_dc->diagnostic_impl (&richloc, nullptr, option_id,
+					 gmsgid, &ap, DK_WARNING);
   va_end (ap);
   return ret;
 }
@@ -181,15 +192,17 @@ warning_at (location_t location, int opt, const char *gmsgid, ...)
 /* Same as "warning at" above, but using RICHLOC.  */
 
 bool
-warning_at (rich_location *richloc, int opt, const char *gmsgid, ...)
+warning_at (rich_location *richloc,
+	    diagnostic_option_id option_id,
+	    const char *gmsgid, ...)
 {
   gcc_assert (richloc);
 
   auto_diagnostic_group d;
   va_list ap;
   va_start (ap, gmsgid);
-  bool ret = global_dc->diagnostic_impl (richloc, nullptr, opt, gmsgid, &ap,
-					 DK_WARNING);
+  bool ret = global_dc->diagnostic_impl (richloc, nullptr, option_id,
+					 gmsgid, &ap, DK_WARNING);
   va_end (ap);
   return ret;
 }
@@ -199,15 +212,16 @@ warning_at (rich_location *richloc, int opt, const char *gmsgid, ...)
 bool
 warning_meta (rich_location *richloc,
 	      const diagnostic_metadata &metadata,
-	      int opt, const char *gmsgid, ...)
+	      diagnostic_option_id option_id,
+	      const char *gmsgid, ...)
 {
   gcc_assert (richloc);
 
   auto_diagnostic_group d;
   va_list ap;
   va_start (ap, gmsgid);
-  bool ret = global_dc->diagnostic_impl (richloc, &metadata, opt, gmsgid, &ap,
-					 DK_WARNING);
+  bool ret = global_dc->diagnostic_impl (richloc, &metadata, option_id,
+					 gmsgid, &ap, DK_WARNING);
   va_end (ap);
   return ret;
 }
@@ -215,7 +229,9 @@ warning_meta (rich_location *richloc,
 /* Same as warning_n plural variant below, but using RICHLOC.  */
 
 bool
-warning_n (rich_location *richloc, int opt, unsigned HOST_WIDE_INT n,
+warning_n (rich_location *richloc,
+	   diagnostic_option_id option_id,
+	   unsigned HOST_WIDE_INT n,
 	   const char *singular_gmsgid, const char *plural_gmsgid, ...)
 {
   gcc_assert (richloc);
@@ -223,7 +239,7 @@ warning_n (rich_location *richloc, int opt, unsigned HOST_WIDE_INT n,
   auto_diagnostic_group d;
   va_list ap;
   va_start (ap, plural_gmsgid);
-  bool ret = global_dc->diagnostic_n_impl (richloc, nullptr, opt, n,
+  bool ret = global_dc->diagnostic_n_impl (richloc, nullptr, option_id, n,
 					   singular_gmsgid, plural_gmsgid,
 					   &ap, DK_WARNING);
   va_end (ap);
@@ -235,14 +251,16 @@ warning_n (rich_location *richloc, int opt, unsigned HOST_WIDE_INT n,
    Returns true if the warning was printed, false if it was inhibited.  */
 
 bool
-warning_n (location_t location, int opt, unsigned HOST_WIDE_INT n,
+warning_n (location_t location,
+	   diagnostic_option_id option_id,
+	   unsigned HOST_WIDE_INT n,
 	   const char *singular_gmsgid, const char *plural_gmsgid, ...)
 {
   auto_diagnostic_group d;
   va_list ap;
   va_start (ap, plural_gmsgid);
   rich_location richloc (line_table, location);
-  bool ret = global_dc->diagnostic_n_impl (&richloc, nullptr, opt, n,
+  bool ret = global_dc->diagnostic_n_impl (&richloc, nullptr, option_id, n,
 					   singular_gmsgid, plural_gmsgid,
 					   &ap, DK_WARNING);
   va_end (ap);
@@ -263,14 +281,16 @@ warning_n (location_t location, int opt, unsigned HOST_WIDE_INT n,
    Returns true if the warning was printed, false if it was inhibited.  */
 
 bool
-pedwarn (location_t location, int opt, const char *gmsgid, ...)
+pedwarn (location_t location,
+	 diagnostic_option_id option_id,
+	 const char *gmsgid, ...)
 {
   auto_diagnostic_group d;
   va_list ap;
   va_start (ap, gmsgid);
   rich_location richloc (line_table, location);
-  bool ret = global_dc->diagnostic_impl (&richloc, nullptr, opt, gmsgid, &ap,
-					 DK_PEDWARN);
+  bool ret = global_dc->diagnostic_impl (&richloc, nullptr, option_id,
+					 gmsgid, &ap, DK_PEDWARN);
   va_end (ap);
   return ret;
 }
@@ -278,15 +298,17 @@ pedwarn (location_t location, int opt, const char *gmsgid, ...)
 /* Same as pedwarn above, but using RICHLOC.  */
 
 bool
-pedwarn (rich_location *richloc, int opt, const char *gmsgid, ...)
+pedwarn (rich_location *richloc,
+	 diagnostic_option_id option_id,
+	 const char *gmsgid, ...)
 {
   gcc_assert (richloc);
 
   auto_diagnostic_group d;
   va_list ap;
   va_start (ap, gmsgid);
-  bool ret = global_dc->diagnostic_impl (richloc, nullptr, opt, gmsgid, &ap,
-					 DK_PEDWARN);
+  bool ret = global_dc->diagnostic_impl (richloc, nullptr, option_id,
+					 gmsgid, &ap, DK_PEDWARN);
   va_end (ap);
   return ret;
 }
@@ -332,14 +354,16 @@ permerror (rich_location *richloc, const char *gmsgid, ...)
    diagnostic can also be downgraded by -Wno-error=opt.  */
 
 bool
-permerror_opt (location_t location, int opt, const char *gmsgid, ...)
+permerror_opt (location_t location,
+	       diagnostic_option_id option_id,
+	       const char *gmsgid, ...)
 {
   auto_diagnostic_group d;
   va_list ap;
   va_start (ap, gmsgid);
   rich_location richloc (line_table, location);
-  bool ret = global_dc->diagnostic_impl (&richloc, nullptr, opt, gmsgid, &ap,
-					 DK_PERMERROR);
+  bool ret = global_dc->diagnostic_impl (&richloc, nullptr, option_id,
+					 gmsgid, &ap, DK_PERMERROR);
   va_end (ap);
   return ret;
 }
@@ -347,15 +371,17 @@ permerror_opt (location_t location, int opt, const char *gmsgid, ...)
 /* Same as "permerror" above, but at RICHLOC.  */
 
 bool
-permerror_opt (rich_location *richloc, int opt, const char *gmsgid, ...)
+permerror_opt (rich_location *richloc,
+	       diagnostic_option_id option_id,
+	       const char *gmsgid, ...)
 {
   gcc_assert (richloc);
 
   auto_diagnostic_group d;
   va_list ap;
   va_start (ap, gmsgid);
-  bool ret = global_dc->diagnostic_impl (richloc, nullptr, opt, gmsgid, &ap,
-					 DK_PERMERROR);
+  bool ret = global_dc->diagnostic_impl (richloc, nullptr, option_id,
+					 gmsgid, &ap, DK_PERMERROR);
   va_end (ap);
   return ret;
 }
@@ -525,10 +551,8 @@ fnotice (FILE *file, const char *cmsgid, ...)
      emitting free-form text on stderr will lead to corrupt output.
      Skip the message for such cases.  */
   if (file == stderr && global_dc)
-    if (const diagnostic_output_format *output_format
-	  = global_dc->get_output_format ())
-      if (output_format->machine_readable_stderr_p ())
-	return;
+    if (!global_dc->supports_fnotice_on_stderr_p ())
+      return;
 
   va_list ap;
 
