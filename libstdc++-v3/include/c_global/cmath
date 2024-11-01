@@ -2838,7 +2838,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
   constexpr int
   ilogb(_Float16 __x)
-  { return _Float16(__builtin_ilogbf(__x)); }
+  { return __builtin_ilogbf(__x); }
 
   constexpr _Float16
   lgamma(_Float16 __x)
@@ -3560,7 +3560,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
   constexpr int
   ilogb(__gnu_cxx::__bfloat16_t __x)
-  { return __gnu_cxx::__bfloat16_t(__builtin_ilogbf(__x)); }
+  { return __builtin_ilogbf(__x); }
 
   constexpr __gnu_cxx::__bfloat16_t
   lgamma(__gnu_cxx::__bfloat16_t __x)
