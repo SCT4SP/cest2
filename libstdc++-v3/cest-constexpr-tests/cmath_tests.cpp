@@ -60,7 +60,7 @@ constexpr bool floor_ceil_logb_tests()
   auto inf = std::numeric_limits<T>::infinity();
   auto qnan = std::numeric_limits<T>::quiet_NaN();
   auto snan = std::numeric_limits<T>::signaling_NaN();
-  T zero = 0, one = 1;
+  T zero = 0, one = 1, two = 2, three = 3, pi = std::numbers::pi_v<T>;
 
   bool b = true;
 
@@ -69,6 +69,7 @@ constexpr bool floor_ceil_logb_tests()
   b = b && FP_ILOGB0==std::ilogb(zero);
   b = b && INT_MAX==std::ilogb(inf);
   b = b && FP_ILOGBNAN==std::ilogb(qnan) && FP_ILOGBNAN==std::ilogb(snan);
+  b = b && std::ceil(pi) > three;
 
   return b;
 }
