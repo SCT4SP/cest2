@@ -12163,7 +12163,10 @@ tsubst_attribute (tree t, tree *decl_p, tree args,
 	    }
 	  OMP_TSS_TRAIT_SELECTORS (tss) = nreverse (selectors);
 	}
-      val = tree_cons (varid, ctx, chain);
+      if (varid == error_mark_node)
+	val = error_mark_node;
+      else
+	val = tree_cons (varid, ctx, chain);
     }
   /* If the first attribute argument is an identifier, don't
      pass it through tsubst.  Attributes like mode, format,
@@ -31728,12 +31731,16 @@ add_mergeable_specialization (bool decl_p, spec_entry *elt, tree decl,
       auto *slot = type_specializations->find_slot (elt, INSERT);
 
       /* We don't distinguish different constrained partial type
-	 specializations, so there could be duplicates.  Everything else
-	 must be new.   */
-      if (!(flags & 2 && *slot))
+	 specializations, so there could be duplicates.  In that case we
+	 must propagate TYPE_CANONICAL so that they are treated as the
+	 same type.  Everything else must be new.   */
+      if (*slot)
 	{
-	  gcc_checking_assert (!*slot);
-
+	  gcc_checking_assert (flags & 2);
+	  TYPE_CANONICAL (elt->spec) = TYPE_CANONICAL ((*slot)->spec);
+	}
+      else
+	{
 	  auto entry = ggc_alloc<spec_entry> ();
 	  *entry = *elt;
 	  *slot = entry;

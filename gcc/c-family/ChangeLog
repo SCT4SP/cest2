@@ -1,3 +1,31 @@
+2024-11-01  Jakub Jelinek  <jakub@redhat.com>
+
+	* c.opt (std=c++2b, std=c++23, std=gnu++2b, std=gnu++23): Adjust
+	description now that ISO C++ 14882:2024 is published.
+
+2024-10-31  Martin Uecker  <uecker@tugraz.at>
+
+	PR c/117145
+	PR c/117245
+	PR c/100420
+	* c-pretty-print.cc (c_pretty_printer::direct_abstract_declarator):
+	Detect arrays of unspecified size.
+
+2024-10-30  Joseph Myers  <josmyers@redhat.com>
+
+	* c.opt (std=c23, std=gnu23, std=iso9899:2024): Do not mark as
+	experimental and incomplete.
+
+2024-10-30  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c/117021
+	* c-common.cc (c_add_case_label): Emit different diagnostics for C
+	on case ranges.  Diagnose for C using pedwarn conversions of range
+	expressions changing value and don't emit further conversion
+	diagnostics if the pedwarn has been diagnosed.  For empty ranges
+	bail out after emitting warning, don't add anything into splay
+	trees nor add a CASE_LABEL_EXPR.
+
 2024-10-29  David Malcolm  <dmalcolm@redhat.com>
 
 	PR other/116613

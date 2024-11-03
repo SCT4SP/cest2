@@ -1,3 +1,107 @@
+2024-11-02  Jakub Jelinek  <jakub@redhat.com>
+
+	PR libstdc++/117406
+	* include/c_global/cmath (std::ilogb(_Float16), std::llrint(_Float16),
+	std::llround(_Float16), std::lrint(_Float16), std::lround(_Float16)):
+	Don't cast __builtin_* return to _Float16.
+	(std::ilogb(__gnu_cxx::__bfloat16_t),
+	std::llrint(__gnu_cxx::__bfloat16_t),
+	std::llround(__gnu_cxx::__bfloat16_t),
+	std::lrint(__gnu_cxx::__bfloat16_t),
+	std::lround(__gnu_cxx::__bfloat16_t)): Don't cast __builtin_* return to
+	__gnu_cxx::__bfloat16_t.
+	* testsuite/26_numerics/headers/cmath/117406.cc: New test.
+
+2024-11-01  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/unordered_map.h: Check __glibcxx_node_extract and
+	__glibcxx_unordered_map_try_emplace instead of __cplusplus.
+	* include/bits/unordered_set.h: Check __glibcxx_node_extract
+	instead of __cplusplus.
+
+2024-11-01  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/hashtable.h: Improve comments.
+
+2024-11-01  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/111055
+	* include/bits/forward_list.h
+	(forward_list(from_range, R&&, const Alloc&), assign_range)
+	(prepend_range, insert_range_after): Define.
+	* include/bits/stl_list.h (list(from_range, R&&, const Alloc&))
+	(assign_range, prepend_range, append_range, insert_range):
+	Define.
+	* include/debug/forward_list
+	(forward_list(from_range, R&&, const Alloc&), assign_range)
+	(prepend_range, insert_range_after): Define.
+	* include/debug/list (list(from_range, R&&, const Alloc&))
+	(assign_range, prepend_range, append_range, insert_range):
+	Define.
+	* testsuite/23_containers/forward_list/cons/from_range.cc: New
+	test.
+	* testsuite/23_containers/forward_list/modifiers/assign_range.cc:
+	New test.
+	* testsuite/23_containers/forward_list/modifiers/insert_range_after.cc:
+	New test.
+	* testsuite/23_containers/forward_list/modifiers/prepend_range.cc:
+	New test.
+	* testsuite/23_containers/list/cons/from_range.cc: New test.
+	* testsuite/23_containers/list/modifiers/append_range.cc: New
+	test.
+	* testsuite/23_containers/list/modifiers/assign/assign_range.cc:
+	New test.
+	* testsuite/23_containers/list/modifiers/insert/insert_range.cc:
+	New test.
+	* testsuite/23_containers/list/modifiers/prepend_range.cc: New
+	test.
+
+2024-11-01  Jonathan Wakely  <jwakely@redhat.com>
+
+	* testsuite/23_containers/unordered_set/pr115285.cc: Include
+	missing header for std::vector.
+
+2024-11-01  Jonathan Wakely  <jwakely@redhat.com>
+
+	* libsupc++/typeinfo: Remove whitespace in #endif
+
+2024-10-31  Jonathan Wakely  <jwakely@redhat.com>
+
+	* libsupc++/new (operator new): Add attribute align_alloc(2) to
+	overloads taking a std::align_val_t argument.
+	* testsuite/18_support/new_aligned_warn.cc: New test.
+
+2024-10-30  Jonathan Wakely  <jwakely@redhat.com>
+
+	* testsuite/23_containers/vector/cons/from_range.cc: Fix copy &
+	paste error in comment.
+	* testsuite/23_containers/vector/modifiers/append_range.cc:
+	Likewise.
+	* testsuite/23_containers/vector/modifiers/assign/assign_range.cc:
+	Likewise.
+	* testsuite/23_containers/vector/modifiers/insert/insert_range.cc:
+	Likewise.
+
+2024-10-30  Jonathan Wakely  <jwakely@redhat.com>
+
+	* doc/xml/manual/using_exceptions.xml: Fix typos and grammatical
+	errors.
+	* doc/html/manual/using_exceptions.html: Regenerate.
+
+2024-10-30  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/c++config (_GLIBCXX_DOUBLE_IS_IEEE_BINARY32):
+	Define.
+	(_GLIBCXX_LDOUBLE_IS_IEEE_BINARY64): Define.
+	(_GLIBCXX_LDOUBLE_IS_IEEE_BINARY32): Define.
+	* include/bits/cpp_type_traits.h (__memcpyable): Define
+	specializations when double and long double are compatible.
+
+2024-10-30  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/cpp_type_traits.h (__memcpyable): Add
+	specializations for compatible floating-point types.
+
 2024-10-29  Patrick Palka  <ppalka@redhat.com>
 
 	PR libstdc++/112641
