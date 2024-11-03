@@ -11415,6 +11415,7 @@ ix86_expand_args_builtin (const struct builtin_description *d,
     case V16QI_FTYPE_V8HI_V8HI:
     case V16HF_FTYPE_V16HF_V16HF:
     case V16SF_FTYPE_V16SF_V16SF:
+    case V16SI_FTYPE_V16SI_V16SI:
     case V8QI_FTYPE_V8QI_V8QI:
     case V8QI_FTYPE_V4HI_V4HI:
     case V8HI_FTYPE_V8HI_V8HI:
@@ -13026,6 +13027,10 @@ ix86_expand_special_args_builtin (const struct builtin_description *d,
       klass = load;
       memory = 0;
       break;
+    case CHAR_FTYPE_PCCHAR:
+    case SHORT_FTYPE_PCSHORT:
+    case INT_FTYPE_PCINT:
+    case INT64_FTYPE_PCINT64:
     case UINT64_FTYPE_PUNSIGNED:
     case V2DI_FTYPE_PV2DI:
     case V4DI_FTYPE_PV4DI:

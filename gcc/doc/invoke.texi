@@ -1482,11 +1482,11 @@ See RS/6000 and PowerPC Options.
 -mvpclmulqdq  -mavx512bitalg  -mmovdiri  -mmovdir64b  -mavx512vpopcntdq
 -mavx512vnni  -mprfchw  -mrdpid
 -mrdseed  -msgx -mavx512vp2intersect -mserialize -mtsxldtrk
--mamx-tile  -mamx-int8  -mamx-bf16 -muintr -mhreset -mavxvnni
+-mamx-tile  -mamx-int8  -mamx-bf16 -muintr -mhreset -mavxvnni -mamx-fp8
 -mavx512fp16 -mavxifma -mavxvnniint8 -mavxneconvert -mcmpccxadd -mamx-fp16
 -mprefetchi -mraoint -mamx-complex -mavxvnniint16 -msm3 -msha512 -msm4 -mapxf
 -musermsr -mavx10.1 -mavx10.1-256 -mavx10.1-512 -mevex512 -mavx10.2 -mavx10.2-256
--mavx10.2-512
+-mavx10.2-512 -mamx-avx512 -mamx-tf32 -mamx-transpose -mmovrs -mamx-movrs
 -mcldemote  -mms-bitfields  -mno-align-stringops  -minline-all-stringops
 -minline-stringops-dynamically  -mstringop-strategy=@var{alg}
 -mkl -mwidekl
@@ -2480,8 +2480,7 @@ applied with @option{-std=c11}) and a new value of
 @itemx c2x
 @itemx iso9899:2024
 ISO C23, the 2023 revision of the ISO C standard (expected to be
-published in 2024).  The support for this version is experimental and
-incomplete.  The name @samp{c2x} is deprecated.
+published in 2024).  The name @samp{c2x} is deprecated.
 
 @item c2y
 The next version of the ISO C standard, still under development.  The
@@ -2506,8 +2505,7 @@ GNU dialect of ISO C17.  This is the default for C code.
 
 @item gnu23
 @itemx gnu2x
-GNU dialect of ISO C23.  The support for this version is experimental
-and incomplete.  The name @samp{gnu2x} is deprecated.
+GNU dialect of ISO C23.  The name @samp{gnu2x} is deprecated.
 
 @item gnu2y
 The next version of the ISO C standard, still under development, plus
@@ -2568,17 +2566,19 @@ Support is experimental, and could change in incompatible ways in
 future releases.
 The name @samp{gnu++2a} is deprecated.
 
-@item c++2b
-@itemx c++23
-The next revision of the ISO C++ standard, planned for
-2023.  Support is highly experimental, and will almost certainly
-change in incompatible ways in future releases.
+@item c++23
+@itemx c++2b
+The 2023 ISO C++ standard plus amendments (published in 2024).
+Support is experimental, and could change in incompatible ways in
+future releases.
+The name @samp{c++2b} is deprecated.
 
-@item gnu++2b
-@itemx gnu++23
-GNU dialect of @option{-std=c++2b}.  Support is highly experimental,
-and will almost certainly change in incompatible ways in future
-releases.
+@item gnu++23
+@itemx gnu++2b
+GNU dialect of @option{-std=c++23}.
+Support is experimental, and could change in incompatible ways in
+future releases.
+The name @samp{gnu++2b} is deprecated.
 
 @item c++2c
 @itemx c++26
@@ -25998,8 +25998,7 @@ I/O functions are needed.
 
 @opindex mlra
 @item -mlra
-Enable Local Register Allocation.  This is still experimental for FT32,
-so by default the compiler uses standard reload.
+Does nothing.  Preserved for backward compatibility.
 
 @opindex mnodiv
 @item -mnodiv
@@ -35676,6 +35675,24 @@ preferred alignment to @option{-mpreferred-stack-boundary=2}.
 @need 200
 @opindex mavx10.2-512
 @itemx -mavx10.2-512
+@need 200
+@opindex mamx-avx512
+@itemx -mamx-avx512
+@need 200
+@opindex mamx-tf32
+@itemx -mamx-tf32
+@need 200
+@opindex mamx-transpose
+@itemx -mamx-transpose
+@need 200
+@itemx -mamx-fp8
+@opindex mamx-fp8
+@need 200
+@opindex mmovrs
+@itemx -mmovrs
+@need 200
+@opindex mamx-movrs
+@itemx -mamx-movrs
 These switches enable the use of instructions in the MMX, SSE,
 AVX512CD, AVX512VL, AVX512BW, AVX512DQ, AVX512IFMA, AVX512VBMI, SHA, AES,
 PCLMUL, CLFLUSHOPT, CLWB, FSGSBASE, PTWRITE, RDRND, F16C, FMA, PCONFIG,
@@ -35686,9 +35703,9 @@ WAITPKG, VPCLMULQDQ, AVX512BITALG, MOVDIRI, MOVDIR64B, AVX512BF16, ENQCMD,
 AVX512VPOPCNTDQ, AVX512VNNI, SERIALIZE, UINTR, HRESET, AMXTILE, AMXINT8,
 AMXBF16, KL, WIDEKL, AVXVNNI, AVX512-FP16, AVXIFMA, AVXVNNIINT8, AVXNECONVERT,
 CMPCCXADD, AMX-FP16, PREFETCHI, RAOINT, AMX-COMPLEX, AVXVNNIINT16, SM3, SHA512,
-SM4, APX_F, USER_MSR, AVX10.1, AVX10.2 or CLDEMOTE extended instruction sets.
-Each has a corresponding @option{-mno-} option to disable use of these
-instructions.
+SM4, APX_F, USER_MSR, AVX10.1, AVX10.2, AMX-AVX512, AMX-TF32, AMX-TRANSPOSE,
+AMX-FP8, MOVRS, AMX-MOVRS or CLDEMOTE extended instruction sets. Each has a
+corresponding @option{-mno-} option to disable use of these instructions.
 
 These extensions are also available as built-in functions: see
 @ref{x86 Built-in Functions}, for details of the functions enabled and
