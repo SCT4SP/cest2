@@ -12,7 +12,8 @@ VER=15.0.0    # previously 14.0.0
 # when using SCT4SP/gcc/install, but
 MYGCC="$GNUC_ROOT/bin/g++ -g -std=c++26 -Winvalid-constexpr -Wl,-rpath,"$GNUC_ROOT/lib64:$LD_LIBRARY_PATH" -I $CEST2_INCLUDE/c++/$VER -I $CEST2_INCLUDE/c++/$VER/x86_64-pc-linux-gnu -D_GLIBCXX_CEST_CONSTEXPR=constexpr -D_GLIBCXX_CEST_VERSION=1 -fsanitize=address -static-libasan"
 
-MYCLANG="clang++ -g -std=c++26 -Winvalid-constexpr -Wl,-rpath,"$GNUC_ROOT/lib64:$LD_LIBRARY_PATH" -I $CEST2_INCLUDE/c++/$VER -I $CEST2_INCLUDE/c++/$VER/x86_64-pc-linux-gnu -L $GNUC_ROOT/lib64 -D_GLIBCXX_CEST_CONSTEXPR=constexpr -D_GLIBCXX_CEST_VERSION=1 -fsanitize=address"
+#MYCLANG="clang++ -g -std=c++26 -Winvalid-constexpr -Wl,-rpath,"$GNUC_ROOT/lib64:$LD_LIBRARY_PATH" -I $CEST2_INCLUDE/c++/$VER -I $CEST2_INCLUDE/c++/$VER/x86_64-pc-linux-gnu -L $GNUC_ROOT/lib64 -D_GLIBCXX_CEST_CONSTEXPR=constexpr -D_GLIBCXX_CEST_VERSION=1 -fsanitize=address"
+MYCLANG="clang++ -g -std=c++26 -Wl,-rpath,"$GNUC_ROOT/lib64:$LD_LIBRARY_PATH" -I $CEST2_INCLUDE/c++/$VER -I $CEST2_INCLUDE/c++/$VER/x86_64-pc-linux-gnu -L $GNUC_ROOT/lib64 -D_GLIBCXX_CEST_CONSTEXPR=constexpr -D_GLIBCXX_CEST_VERSION=1 -fsanitize=address -Wno-deprecated-builtins -Wno-unknown-attributes -Wno-keyword-compat -Wno-ignored-attributes"
 # -Winvalid-constexpr (remove to avoid clang cmath errors.)
 # -Wno-deprecated-builtins -Wno-unknown-attributes -Wno-keyword-compat -Wno-ignored-attributes
 
