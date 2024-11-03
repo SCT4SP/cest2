@@ -1569,6 +1569,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  @param  __x  Element to located.
        *  @return  Number of elements with specified key.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       size_type
       count(const key_type& __x) const
       { return _M_h.count(__x); }
@@ -1747,6 +1748,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 
       template<typename _Value1, typename _Hash1, typename _Pred1,
 	       typename _Alloc1>
+        _GLIBCXX_CEST_CONSTEXPR
         friend bool
       operator==(const unordered_multiset<_Value1, _Hash1, _Pred1, _Alloc1>&,
 		 const unordered_multiset<_Value1, _Hash1, _Pred1, _Alloc1>&);
@@ -1857,6 +1859,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 #endif
 
   template<class _Value, class _Hash, class _Pred, class _Alloc>
+    _GLIBCXX_CEST_CONSTEXPR
     inline bool
     operator==(const unordered_multiset<_Value, _Hash, _Pred, _Alloc>& __x,
 	       const unordered_multiset<_Value, _Hash, _Pred, _Alloc>& __y)

@@ -435,6 +435,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       _M_uses_single_bucket(__buckets_ptr __bkts) const
       { return __builtin_expect(__bkts == &_M_single_bucket, false); }
 
+      _GLIBCXX_CEST_CONSTEXPR
       bool
       _M_uses_single_bucket() const
       { return _M_uses_single_bucket(_M_buckets); }
@@ -509,6 +510,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       void
       _M_move_assign(_Hashtable&&, false_type);
 
+      _GLIBCXX_CEST_CONSTEXPR
       void
       _M_reset() noexcept;
 
@@ -536,6 +538,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 #endif
 	}
 
+      _GLIBCXX_CEST_CONSTEXPR
       _Hashtable(_Hashtable&& __ht, __node_alloc_type&& __a,
 		 true_type /* alloc always equal */)
 	noexcept(_S_nothrow_move());
@@ -652,6 +655,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       _GLIBCXX_CEST_CONSTEXPR
       ~_Hashtable() noexcept;
 
+      _GLIBCXX_CEST_CONSTEXPR
       void
       swap(_Hashtable&)
       noexcept(__and_<__is_nothrow_swappable<_Hash>,
@@ -663,6 +667,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       begin() noexcept
       { return iterator(_M_begin()); }
 
+      _GLIBCXX_CEST_CONSTEXPR
       const_iterator
       begin() const noexcept
       { return const_iterator(_M_begin()); }
@@ -672,6 +677,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       end() noexcept
       { return iterator(nullptr); }
 
+      _GLIBCXX_CEST_CONSTEXPR
       const_iterator
       end() const noexcept
       { return const_iterator(nullptr); }
@@ -706,6 +712,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       { return __node_alloc_traits::max_size(this->_M_node_allocator()); }
 
       // Observers
+      _GLIBCXX_CEST_CONSTEXPR
       key_equal
       key_eq() const
       { return this->_M_eq(); }
@@ -787,9 +794,11 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       iterator
       find(const key_type& __k);
 
+      _GLIBCXX_CEST_CONSTEXPR
       const_iterator
       find(const key_type& __k) const;
 
+      _GLIBCXX_CEST_CONSTEXPR
       size_type
       count(const key_type& __k) const;
 
@@ -926,6 +935,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       }
 
       // Get the node before __n in the bucket __bkt
+      _GLIBCXX_CEST_CONSTEXPR
       __node_base_ptr
       _M_get_previous_node(size_type __bkt, __node_ptr __n);
 
@@ -1048,6 +1058,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       size_type
       _M_erase(false_type __uks, const key_type&);
 
+      _GLIBCXX_CEST_CONSTEXPR
       iterator
       _M_erase(size_type __bkt, __node_base_ptr __prev_n, __node_ptr __n);
 
@@ -1071,11 +1082,13 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       // Insert member functions via inheritance.
 
       // Erase
+      _GLIBCXX_CEST_CONSTEXPR
       iterator
       erase(const_iterator);
 
       // _GLIBCXX_RESOLVE_LIB_DEFECTS
       // 2059. C++0x ambiguity problem with map::erase
+      _GLIBCXX_CEST_CONSTEXPR
       iterator
       erase(iterator __it)
       { return erase(const_iterator(__it)); }
@@ -1529,6 +1542,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	   typename _ExtractKey, typename _Equal,
 	   typename _Hash, typename _RangeHash, typename _Unused,
 	   typename _RehashPolicy, typename _Traits>
+    _GLIBCXX_CEST_CONSTEXPR
     void
     _Hashtable<_Key, _Value, _Alloc, _ExtractKey, _Equal,
 	       _Hash, _RangeHash, _Unused, _RehashPolicy, _Traits>::
@@ -1622,6 +1636,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	   typename _ExtractKey, typename _Equal,
 	   typename _Hash, typename _RangeHash, typename _Unused,
 	   typename _RehashPolicy, typename _Traits>
+    _GLIBCXX_CEST_CONSTEXPR
     _Hashtable<_Key, _Value, _Alloc, _ExtractKey, _Equal,
 	       _Hash, _RangeHash, _Unused, _RehashPolicy, _Traits>::
     _Hashtable(_Hashtable&& __ht, __node_alloc_type&& __a,
@@ -1746,6 +1761,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	   typename _ExtractKey, typename _Equal,
 	   typename _Hash, typename _RangeHash, typename _Unused,
 	   typename _RehashPolicy, typename _Traits>
+    _GLIBCXX_CEST_CONSTEXPR
     void
     _Hashtable<_Key, _Value, _Alloc, _ExtractKey, _Equal,
 	       _Hash, _RangeHash, _Unused, _RehashPolicy, _Traits>::
@@ -1817,6 +1833,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	   typename _ExtractKey, typename _Equal,
 	   typename _Hash, typename _RangeHash, typename _Unused,
 	   typename _RehashPolicy, typename _Traits>
+    _GLIBCXX_CEST_CONSTEXPR
     auto
     _Hashtable<_Key, _Value, _Alloc, _ExtractKey, _Equal,
 	       _Hash, _RangeHash, _Unused, _RehashPolicy, _Traits>::
@@ -1891,6 +1908,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	   typename _ExtractKey, typename _Equal,
 	   typename _Hash, typename _RangeHash, typename _Unused,
 	   typename _RehashPolicy, typename _Traits>
+    _GLIBCXX_CEST_CONSTEXPR
     auto
     _Hashtable<_Key, _Value, _Alloc, _ExtractKey, _Equal,
 	       _Hash, _RangeHash, _Unused, _RehashPolicy, _Traits>::
@@ -2194,6 +2212,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	   typename _ExtractKey, typename _Equal,
 	   typename _Hash, typename _RangeHash, typename _Unused,
 	   typename _RehashPolicy, typename _Traits>
+    _GLIBCXX_CEST_CONSTEXPR
     auto
     _Hashtable<_Key, _Value, _Alloc, _ExtractKey, _Equal,
 	       _Hash, _RangeHash, _Unused, _RehashPolicy, _Traits>::
@@ -2457,6 +2476,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	   typename _ExtractKey, typename _Equal,
 	   typename _Hash, typename _RangeHash, typename _Unused,
 	   typename _RehashPolicy, typename _Traits>
+    _GLIBCXX_CEST_CONSTEXPR
     auto
     _Hashtable<_Key, _Value, _Alloc, _ExtractKey, _Equal,
 	       _Hash, _RangeHash, _Unused, _RehashPolicy, _Traits>::
@@ -2477,6 +2497,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	   typename _ExtractKey, typename _Equal,
 	   typename _Hash, typename _RangeHash, typename _Unused,
 	   typename _RehashPolicy, typename _Traits>
+    _GLIBCXX_CEST_CONSTEXPR
     auto
     _Hashtable<_Key, _Value, _Alloc, _ExtractKey, _Equal,
 	       _Hash, _RangeHash, _Unused, _RehashPolicy, _Traits>::

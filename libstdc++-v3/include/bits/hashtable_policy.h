@@ -331,6 +331,7 @@ namespace __detail
     _GLIBCXX_CEST_CONSTEXPR
     _Hash_node_base() noexcept : _M_nxt() { }
 
+    _GLIBCXX_CEST_CONSTEXPR
     _Hash_node_base(_Hash_node_base* __next) noexcept : _M_nxt(__next) { }
   };
 
@@ -542,6 +543,7 @@ namespace __detail
       _Node_const_iterator(const __iterator& __x) noexcept
       : __base_type(__x._M_cur) { }
 
+      _GLIBCXX_CEST_CONSTEXPR
       reference
       operator*() const noexcept
       { return this->_M_cur->_M_v(); }
@@ -550,6 +552,7 @@ namespace __detail
       operator->() const noexcept
       { return this->_M_cur->_M_valptr(); }
 
+      _GLIBCXX_CEST_CONSTEXPR
       _Node_const_iterator&
       operator++() noexcept
       {
@@ -557,6 +560,7 @@ namespace __detail
 	return *this;
       }
 
+      _GLIBCXX_CEST_CONSTEXPR
       _Node_const_iterator
       operator++(int) noexcept
       {
@@ -690,6 +694,7 @@ namespace __detail
     _M_state() const
     { return _M_next_resize; }
 
+    _GLIBCXX_CEST_CONSTEXPR
     void
     _M_reset() noexcept
     { _M_next_resize = 0; }
@@ -1528,6 +1533,7 @@ namespace __detail
 		   const _Hash_node_code_cache<true>& __from) const
       { __to._M_hash_code = __from._M_hash_code; }
 
+      _GLIBCXX_CEST_CONSTEXPR
       void
       _M_swap(_Hash_code_base& __x)
       { std::swap(__ebo_hash::_M_get(), __x.__ebo_hash::_M_get()); }
@@ -1846,6 +1852,7 @@ namespace __detail
       _S_equals(__hash_code, const _Hash_node_code_cache<false>&)
       { return true; }
 
+      _GLIBCXX_CEST_CONSTEXPR
       static bool
       _S_node_equals(const _Hash_node_code_cache<false>&,
 		     const _Hash_node_code_cache<false>&)
@@ -1909,6 +1916,7 @@ namespace __detail
 					    __hash_cached::value>& __n) const
 	{ return _S_equals(__c, __n) && _M_key_equals_tr(__k, __n); }
 
+      _GLIBCXX_CEST_CONSTEXPR
       bool
       _M_node_equals(
 	const _Hash_node_value<_Value, __hash_cached::value>& __lhn,
@@ -1918,6 +1926,7 @@ namespace __detail
 	  && _M_key_equals(_ExtractKey{}(__lhn._M_v()), __rhn);
       }
 
+      _GLIBCXX_CEST_CONSTEXPR
       void
       _M_swap(_Hashtable_base& __x)
       {
@@ -2011,6 +2020,7 @@ namespace __detail
 				     _Hash, _RangeHash, _Unused,
 				     _RehashPolicy, _Traits>;
 
+      _GLIBCXX_CEST_CONSTEXPR
       bool
       _M_equal(const __hashtable&) const;
     };
@@ -2019,6 +2029,7 @@ namespace __detail
 	   typename _ExtractKey, typename _Equal,
 	   typename _Hash, typename _RangeHash, typename _Unused,
 	   typename _RehashPolicy, typename _Traits>
+    _GLIBCXX_CEST_CONSTEXPR
     bool
     _Equality<_Key, _Value, _Alloc, _ExtractKey, _Equal,
 	      _Hash, _RangeHash, _Unused, _RehashPolicy, _Traits, false>::

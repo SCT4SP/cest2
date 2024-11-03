@@ -13,13 +13,13 @@ VER=15.0.0    # previously 14.0.0
 MYGCC="$GNUC_ROOT/bin/g++ -g -std=c++26 -Winvalid-constexpr -Wl,-rpath,"$GNUC_ROOT/lib64:$LD_LIBRARY_PATH" -I $CEST2_INCLUDE/c++/$VER -I $CEST2_INCLUDE/c++/$VER/x86_64-pc-linux-gnu -D_GLIBCXX_CEST_CONSTEXPR=constexpr -D_GLIBCXX_CEST_VERSION=1 -fsanitize=address -static-libasan"
 
 #MYCLANG="clang++ -g -std=c++26 -Winvalid-constexpr -Wl,-rpath,"$GNUC_ROOT/lib64:$LD_LIBRARY_PATH" -I $CEST2_INCLUDE/c++/$VER -I $CEST2_INCLUDE/c++/$VER/x86_64-pc-linux-gnu -L $GNUC_ROOT/lib64 -D_GLIBCXX_CEST_CONSTEXPR=constexpr -D_GLIBCXX_CEST_VERSION=1 -fsanitize=address"
-MYCLANG="clang++ -g -std=c++26 -Wl,-rpath,"$GNUC_ROOT/lib64:$LD_LIBRARY_PATH" -I $CEST2_INCLUDE/c++/$VER -I $CEST2_INCLUDE/c++/$VER/x86_64-pc-linux-gnu -L $GNUC_ROOT/lib64 -D_GLIBCXX_CEST_CONSTEXPR=constexpr -D_GLIBCXX_CEST_VERSION=1 -fsanitize=address -Wno-deprecated-builtins -Wno-unknown-attributes -Wno-keyword-compat -Wno-ignored-attributes"
+MYCLANG="clang++ -g -std=c++26 -Wl,-rpath,"$GNUC_ROOT/lib64:$LD_LIBRARY_PATH" -I $CEST2_INCLUDE/c++/$VER -I $CEST2_INCLUDE/c++/$VER/x86_64-pc-linux-gnu -L $GNUC_ROOT/lib64 -D_GLIBCXX_CEST_CONSTEXPR=constexpr -D_GLIBCXX_CEST_VERSION=1 -fsanitize=address -Wno-deprecated-builtins -Wno-unknown-attributes -Wno-keyword-compat -Wno-ignored-attributes -Wno-ambiguous-ellipsis -Wno-user-defined-literals -Wno-unknown-warning-option -Wno-inline-namespace-reopened-noninline"
 # -Winvalid-constexpr (remove to avoid clang cmath errors.)
-# -Wno-deprecated-builtins -Wno-unknown-attributes -Wno-keyword-compat -Wno-ignored-attributes
+# -Wno-deprecated-builtins -Wno-unknown-attributes -Wno-keyword-compat -Wno-ignored-attributes -Wno-ambiguous-ellipsis -Wno-user-defined-literals -Wno-unknown-warning-option -Wno-inline-namespace-reopened-noninline
 
-FILES_GCC="deque_tests.cpp list_tests.cpp queue_tests.cpp forward_list_tests.cpp map_tests.cpp set_tests.cpp iostream_tests.cpp algorithm_tests.cpp stringstream_tests.cpp cctype_tests.cpp memory_tests.cpp functional_tests.cpp policy_tests.cpp string_tests.cpp chrono_tests.cpp stack_tests.cpp multiset_tests.cpp unordered_set_tests.cpp priority_queue_tests.cpp cmath_tests.cpp"
+FILES_GCC="deque_tests.cpp list_tests.cpp queue_tests.cpp forward_list_tests.cpp map_tests.cpp set_tests.cpp iostream_tests.cpp algorithm_tests.cpp stringstream_tests.cpp cctype_tests.cpp memory_tests.cpp functional_tests.cpp policy_tests.cpp string_tests.cpp chrono_tests.cpp stack_tests.cpp multiset_tests.cpp unordered_set_tests.cpp priority_queue_tests.cpp cmath_tests.cpp unordered_multiset_tests.cpp"
 
-FILES_CLANG="deque_tests.cpp list_tests.cpp queue_tests.cpp forward_list_tests.cpp map_tests.cpp set_tests.cpp iostream_tests.cpp algorithm_tests.cpp stringstream_tests.cpp cctype_tests.cpp memory_tests.cpp functional_tests.cpp policy_tests.cpp string_tests.cpp chrono_tests.cpp stack_tests.cpp multiset_tests.cpp unordered_set_tests.cpp priority_queue_tests.cpp cmath_tests.cpp"
+FILES_CLANG="deque_tests.cpp list_tests.cpp queue_tests.cpp forward_list_tests.cpp map_tests.cpp set_tests.cpp iostream_tests.cpp algorithm_tests.cpp stringstream_tests.cpp cctype_tests.cpp memory_tests.cpp functional_tests.cpp policy_tests.cpp string_tests.cpp chrono_tests.cpp stack_tests.cpp multiset_tests.cpp unordered_set_tests.cpp priority_queue_tests.cpp cmath_tests.cpp unordered_multiset_tests.cpp"
 
 for FILE in $FILES_GCC
 do
