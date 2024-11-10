@@ -227,6 +227,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  the initializer_list.  This is linear in N if the list is already
        *  sorted, and NlogN otherwise (where N is @a __l.size()).
        */
+      _GLIBCXX_CEST_CONSTEXPR
       multimap(initializer_list<value_type> __l,
 	       const _Compare& __comp = _Compare(),
 	       const allocator_type& __a = allocator_type())
@@ -272,6 +273,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  and NlogN otherwise (where N is distance(__first,__last)).
        */
       template<typename _InputIterator>
+	_GLIBCXX_CEST_CONSTEXPR
 	multimap(_InputIterator __first, _InputIterator __last)
 	: _M_t()
 	{ _M_t._M_insert_range_equal(__first, __last); }
@@ -460,11 +462,14 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 
       // capacity
       /** Returns true if the %multimap is empty.  */
-      _GLIBCXX_NODISCARD bool
+      _GLIBCXX_NODISCARD
+      _GLIBCXX_CEST_CONSTEXPR
+      bool
       empty() const _GLIBCXX_NOEXCEPT
       { return _M_t.empty(); }
 
       /** Returns the size of the %multimap.  */
+      _GLIBCXX_CEST_CONSTEXPR
       size_type
       size() const _GLIBCXX_NOEXCEPT
       { return _M_t.size(); }
