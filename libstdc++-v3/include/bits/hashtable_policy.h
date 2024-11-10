@@ -574,6 +574,7 @@ namespace __detail
       operator==(const _Node_const_iterator&,
 		 const _Node_const_iterator&) = default;
 
+      _GLIBCXX_CEST_CONSTEXPR
       friend bool
       operator==(const _Node_const_iterator& __x, const __iterator& __y)
       {
@@ -1060,6 +1061,7 @@ namespace __detail
 			_NodeGetter&, true_type __uks);
 
       template<typename _InputIterator, typename _NodeGetter>
+	_GLIBCXX_CEST_CONSTEXPR
 	void
 	_M_insert_range(_InputIterator __first, _InputIterator __last,
 			_NodeGetter&, false_type __uks);
@@ -1154,6 +1156,7 @@ namespace __detail
 	   typename _Hash, typename _RangeHash, typename _Unused,
 	   typename _RehashPolicy, typename _Traits>
     template<typename _InputIterator, typename _NodeGetter>
+      _GLIBCXX_CEST_CONSTEXPR
       void
       _Insert_base<_Key, _Value, _Alloc, _ExtractKey, _Equal,
 		   _Hash, _RangeHash, _Unused,
@@ -1349,6 +1352,7 @@ namespace __detail
 	__this->__rehash_policy(_RehashPolicy(__z));
       }
 
+      _GLIBCXX_CEST_CONSTEXPR
       void
       reserve(std::size_t __n)
       {
@@ -1450,6 +1454,7 @@ namespace __detail
     public:
       typedef _Hash					hasher;
 
+      _GLIBCXX_CEST_CONSTEXPR
       hasher
       hash_function() const
       { return _M_hash(); }
@@ -1483,6 +1488,7 @@ namespace __detail
 	  return _M_hash()(__k);
 	}
 
+      _GLIBCXX_CEST_CONSTEXPR
       __hash_code
       _M_hash_code(const _Hash_node_value<_Value, false>& __n) const
       { return _M_hash_code(_ExtractKey{}(__n._M_v())); }

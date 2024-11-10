@@ -313,6 +313,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  that the resulting %multiset's size is the same as the number
        *  of elements assigned.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       multiset&
       operator=(initializer_list<value_type> __l)
       {
@@ -324,6 +325,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
       // accessors:
 
       ///  Returns the comparison object.
+      _GLIBCXX_CEST_CONSTEXPR
       key_compare
       key_comp() const
       { return _M_t.key_comp(); }
@@ -332,6 +334,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
       value_comp() const
       { return _M_t.key_comp(); }
       ///  Returns the memory allocation object.
+      _GLIBCXX_CEST_CONSTEXPR
       allocator_type
       get_allocator() const _GLIBCXX_NOEXCEPT
       { return allocator_type(_M_t.get_allocator()); }
@@ -617,6 +620,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 	friend struct std::_Rb_tree_merge_helper;
 
       template<typename _Compare1>
+	_GLIBCXX_CEST_CONSTEXPR
 	void
 	merge(multiset<_Key, _Compare1, _Alloc>& __source)
 	{
@@ -1098,6 +1102,7 @@ _GLIBCXX_END_NAMESPACE_CONTAINER
       _S_get_tree(_GLIBCXX_STD_C::set<_Val, _Cmp2, _Alloc>& __set)
       { return __set._M_t; }
 
+      _GLIBCXX_CEST_CONSTEXPR
       static auto&
       _S_get_tree(_GLIBCXX_STD_C::multiset<_Val, _Cmp2, _Alloc>& __set)
       { return __set._M_t; }

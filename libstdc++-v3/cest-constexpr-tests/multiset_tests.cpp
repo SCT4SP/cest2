@@ -4,7 +4,7 @@
 constexpr bool multiset_test1()
 {
   std::multiset<int> m1{};
-  std::multiset<int> m2{std::less<int>{}};
+  std::multiset<int> m2{m1.key_comp(), m1.get_allocator()};
   bool b = m1.empty() && m1.size() == 0;
   m1.insert(42);
   b = b && m1.size()==1;
@@ -17,7 +17,10 @@ constexpr bool multiset_test1()
   std::multiset<int> m4(m3);
   std::multiset<int> m5(std::move(m4));
   std::multiset<int> m6{3, 2, 1, 2, 4, 4, 6};
-  b = b && m3 == m5 && m5.size() == 2;
+  m6 = {3, 2, 1, 2, 4, 4, 6};
+  const auto& mc = m6;
+  b = b && m3 == m5 && m5.size() == 2 && m6.cend() == m6.end();
+  b = b && mc.end() == m6.end() && mc.begin() == m6.begin();
   std::multiset<int> m7{m6.cbegin(),  m6.cend()};
   std::multiset<int> m8{m6.rbegin(),  m6.rend()};
   std::multiset<int> m9{m6.crbegin(), m6.crend()}; // {6, 4, 4, 2, 1, 2, 3}
@@ -31,6 +34,9 @@ constexpr bool multiset_test1()
   nh.value() = 5;
   // m8.insert(std::move(nh)); // this shouldn't be needed
   b = b && 5==nh.value();
+  std::multiset<char> p{'C', 'B', 'B', 'A'}, q{'E', 'D', 'E', 'C'};
+  p.merge(q);
+  b = b && p.size()==8 && q.empty();
   return b;
 }
 

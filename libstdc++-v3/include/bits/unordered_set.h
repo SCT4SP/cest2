@@ -1130,6 +1130,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
       : unordered_multiset(__n, hasher(), key_equal(), __a)
       { }
 
+      _GLIBCXX_CEST_CONSTEXPR
       unordered_multiset(size_type __n, const hasher& __hf,
 			 const allocator_type& __a)
       : unordered_multiset(__n, __hf, key_equal(), __a)
@@ -1172,6 +1173,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  and that the resulting %unordered_multiset's size is the same as the
        *  number of elements assigned.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       unordered_multiset&
       operator=(initializer_list<value_type> __l)
       {
@@ -1180,6 +1182,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
       }
 
       ///  Returns the allocator object used by the %unordered_multiset.
+      _GLIBCXX_CEST_CONSTEXPR
       allocator_type
       get_allocator() const noexcept
       { return _M_h.get_allocator(); }
@@ -1217,6 +1220,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
       begin() noexcept
       { return _M_h.begin(); }
 
+      _GLIBCXX_CEST_CONSTEXPR
       const_iterator
       begin() const noexcept
       { return _M_h.begin(); }
@@ -1227,10 +1231,12 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  Returns a read-only (constant) iterator that points one past the last
        *  element in the %unordered_multiset.
        */
+      _GLIBCXX_CEST_CONSTEXPR
       iterator
       end() noexcept
       { return _M_h.end(); }
 
+      _GLIBCXX_CEST_CONSTEXPR
       const_iterator
       end() const noexcept
       { return _M_h.end(); }
@@ -1481,6 +1487,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 	friend class std::_Hash_merge_helper;
 
       template<typename _H2, typename _P2>
+	_GLIBCXX_CEST_CONSTEXPR
 	void
 	merge(unordered_multiset<_Value, _H2, _P2, _Alloc>& __source)
 	{
@@ -1513,12 +1520,14 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 
       ///  Returns the hash functor object with which the %unordered_multiset
       ///  was constructed.
+      _GLIBCXX_CEST_CONSTEXPR
       hasher
       hash_function() const
       { return _M_h.hash_function(); }
 
       ///  Returns the key comparison object with which the %unordered_multiset
       ///  was constructed.
+      _GLIBCXX_CEST_CONSTEXPR
       key_equal
       key_eq() const
       { return _M_h.key_eq(); }
@@ -1636,11 +1645,13 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
       // bucket interface.
 
       /// Returns the number of buckets of the %unordered_multiset.
+      _GLIBCXX_CEST_CONSTEXPR
       size_type
       bucket_count() const noexcept
       { return _M_h.bucket_count(); }
 
       /// Returns the maximum number of buckets of the %unordered_multiset.
+      _GLIBCXX_CEST_CONSTEXPR
       size_type
       max_bucket_count() const noexcept
       { return _M_h.max_bucket_count(); }
@@ -1918,6 +1929,7 @@ _GLIBCXX_END_NAMESPACE_CONTAINER
       _S_get_table(unordered_set<_Val, _Hash2, _Eq2, _Alloc>& __set)
       { return __set._M_h; }
 
+      _GLIBCXX_CEST_CONSTEXPR
       static auto&
       _S_get_table(unordered_multiset<_Val, _Hash2, _Eq2, _Alloc>& __set)
       { return __set._M_h; }

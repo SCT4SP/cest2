@@ -634,6 +634,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	return *this;
       }
 
+      _GLIBCXX_CEST_CONSTEXPR
       _Hashtable&
       operator=(initializer_list<value_type> __l)
       {
@@ -682,6 +683,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       end() const noexcept
       { return const_iterator(nullptr); }
 
+      _GLIBCXX_CEST_CONSTEXPR
       const_iterator
       cbegin() const noexcept
       { return const_iterator(_M_begin()); }
@@ -702,6 +704,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       empty() const noexcept
       { return size() == 0; }
 
+      _GLIBCXX_CEST_CONSTEXPR
       allocator_type
       get_allocator() const noexcept
       { return allocator_type(this->_M_node_allocator()); }
@@ -720,10 +723,12 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       // hash_function, if present, comes from _Hash_code_base.
 
       // Bucket operations
+      _GLIBCXX_CEST_CONSTEXPR
       size_type
       bucket_count() const noexcept
       { return _M_bucket_count; }
 
+      _GLIBCXX_CEST_CONSTEXPR
       size_type
       max_bucket_count() const noexcept
       { return max_size(); }
@@ -781,6 +786,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       // Generalization of max_load_factor.  Extension, not found in
       // TR1.  Only useful if _RehashPolicy is something other than
       // the default.
+      _GLIBCXX_CEST_CONSTEXPR
       const _RehashPolicy&
       __rehash_policy() const
       { return _M_rehash_policy; }
@@ -1106,6 +1112,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
       // Set number of buckets keeping it appropriate for container's number
       // of elements.
+      _GLIBCXX_CEST_CONSTEXPR
       void rehash(size_type __bkt_count);
 
       // DR 1189.
@@ -1202,6 +1209,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       // Only use the possibly cached node's hash code if its hash function
       // _H2 matches _Hash and is stateless. Otherwise recompute it using _Hash.
       template<typename _H2>
+	_GLIBCXX_CEST_CONSTEXPR
 	__hash_code
 	_M_src_hash_code(const _H2&, const key_type& __k,
 			 const __node_value_type& __src_n) const
@@ -1215,6 +1223,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
     public:
       // Extract a node.
+      _GLIBCXX_CEST_CONSTEXPR
       node_type
       extract(const_iterator __pos)
       {
@@ -1287,6 +1296,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
       /// Merge from a compatible container into one with equivalent keys.
       template<typename _Compatible_Hashtable>
+	_GLIBCXX_CEST_CONSTEXPR
 	void
 	_M_merge_multi(_Compatible_Hashtable& __src)
 	{
@@ -2698,6 +2708,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	   typename _ExtractKey, typename _Equal,
 	   typename _Hash, typename _RangeHash, typename _Unused,
 	   typename _RehashPolicy, typename _Traits>
+    _GLIBCXX_CEST_CONSTEXPR
     void
     _Hashtable<_Key, _Value, _Alloc, _ExtractKey, _Equal,
 	       _Hash, _RangeHash, _Unused, _RehashPolicy, _Traits>::

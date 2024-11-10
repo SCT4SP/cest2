@@ -1,10 +1,12 @@
 #include <unordered_set>
+#include <limits>
 #include <cassert>
 
 constexpr bool unordered_multiset_test1()
 {
   std::unordered_multiset<int> m1{};
-  std::unordered_multiset<int> m2{100, std::hash<int>{}};
+  std::unordered_multiset<int> m2{100, m1.hash_function(), m1.key_eq(),
+                                  m1.get_allocator()};
   bool b = m1.empty() && m1.size() == 0;
   m1.insert(42);
   b = b && m1.size()==1;
@@ -17,7 +19,10 @@ constexpr bool unordered_multiset_test1()
   std::unordered_multiset<int> m4(m3);
   std::unordered_multiset<int> m5(std::move(m4));
   std::unordered_multiset<int> m6{3, 2, 1, 2, 4, 4, 6};
-  b = b && m3 == m5 && m5.size() == 2;
+  m6 = {3, 2, 1, 2, 4, 4, 6};
+  const auto& mc = m6;
+  b = b && m3 == m5 && m5.size() == 2 && m6.cend() == m6.end();
+  b = b && mc.end() == m6.end() && mc.begin() == m6.begin();
   std::unordered_multiset<int> m7{m6.cbegin(),  m6.cend()}, m8;
   b = b && m6.size() == 7 && m7.size() == 7;
 
@@ -30,6 +35,10 @@ constexpr bool unordered_multiset_test1()
   nh.value() = 5;
   // m8.insert(std::move(nh)); // this shouldn't be needed
   b = b && 5==nh.value();
+  std::unordered_multiset<char> p{'C', 'B', 'B', 'A'}, q{'E', 'D', 'E', 'C'};
+  p.merge(q);
+  b = b && p.size()==8 && q.empty();
+  b = b && 11 == p.bucket_count() && p.max_bucket_count() > 0;
   return b;
 }
 
