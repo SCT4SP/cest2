@@ -356,6 +356,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     _Sp_counted_base<_S_atomic>::_M_release() noexcept
     {
       _GLIBCXX_SYNCHRONIZATION_HAPPENS_BEFORE(&_M_use_count);
+#if ! _GLIBCXX_CEST_VERSION
 #if ! _GLIBCXX_TSAN
       constexpr bool __lock_free
 	= __atomic_always_lock_free(sizeof(long long), 0)
@@ -365,8 +366,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       // The ref-count members follow the vptr, so are aligned to
       // alignof(void*).
       constexpr bool __aligned = __alignof(long long) <= alignof(void*);
-      constexpr bool __not_ce = !__builtin_is_constant_evaluated(); // ~TSAN
-      if _GLIBCXX17_CONSTEXPR (__lock_free && __double_word && __aligned && __not_ce)
+      if _GLIBCXX17_CONSTEXPR (__lock_free && __double_word && __aligned)
 	{
 	  constexpr int __wordbits = __CHAR_BIT__ * sizeof(_Atomic_word);
 	  constexpr int __shiftbits = __double_word ? __wordbits : 0;
@@ -396,6 +396,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	}
       else
 #endif
+#endif // ! _GLIBCXX_CEST_VERSION
       if (__gnu_cxx::__exchange_and_add_dispatch(&_M_use_count, -1) == 1)
 	{
 	  _M_release_last_use();
