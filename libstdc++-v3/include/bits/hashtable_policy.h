@@ -676,7 +676,14 @@ namespace __detail
     _GLIBCXX_CEST_CONSTEXPR
     std::size_t
     _M_bkt_for_elements(std::size_t __n) const
-    { return __builtin_ceil(__n / (double)_M_max_load_factor); }
+    {
+#if _GLIBCXX_CEST_VERSION && defined(__clang__)
+      auto __builtin_ceil = [](std::floating_point auto f) -> decltype(f) {
+          return static_cast<int>(f <= 0 ? f : f + 1);
+      };
+#endif
+      return __builtin_ceil(__n / (double)_M_max_load_factor);
+    }
 
     // __n_bkt is current bucket count, __n_elt is current element count,
     // and __n_ins is number of elements to be inserted.  Do we need to
