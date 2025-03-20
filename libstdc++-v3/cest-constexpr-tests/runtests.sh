@@ -17,8 +17,8 @@ MYCLANG="clang++ -g -std=c++26 -Wl,-rpath,"$GNUC_ROOT/lib64:$LD_LIBRARY_PATH" -I
 # -Winvalid-constexpr (remove to avoid clang cmath errors.)
 # -Wno-deprecated-builtins -Wno-unknown-attributes -Wno-keyword-compat -Wno-ignored-attributes -Wno-ambiguous-ellipsis -Wno-user-defined-literals -Wno-unknown-warning-option -Wno-inline-namespace-reopened-noninline
 
-# GCC problem with stringstream_tests.cpp
-#FILES_GCC="stringstream_tests.cpp"
+# GCC runtime problem with stringstream_tests.cpp's istringstream_test1
+# FILES_GCC="stringstream_tests.cpp"
 FILES_GCC="deque_tests.cpp list_tests.cpp queue_tests.cpp forward_list_tests.cpp map_tests.cpp set_tests.cpp iostream_tests.cpp algorithm_tests.cpp cctype_tests.cpp memory_tests.cpp functional_tests.cpp policy_tests.cpp string_tests.cpp chrono_tests.cpp stack_tests.cpp multiset_tests.cpp unordered_set_tests.cpp priority_queue_tests.cpp cmath_tests.cpp unordered_multiset_tests.cpp multimap_tests.cpp"
 
 FILES_CLANG="deque_tests.cpp list_tests.cpp queue_tests.cpp forward_list_tests.cpp map_tests.cpp set_tests.cpp iostream_tests.cpp algorithm_tests.cpp stringstream_tests.cpp cctype_tests.cpp memory_tests.cpp functional_tests.cpp policy_tests.cpp string_tests.cpp chrono_tests.cpp stack_tests.cpp multiset_tests.cpp unordered_set_tests.cpp priority_queue_tests.cpp cmath_tests.cpp unordered_multiset_tests.cpp multimap_tests.cpp"
