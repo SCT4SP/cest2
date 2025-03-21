@@ -80,7 +80,10 @@ void stringstream_tests() {
 
   using std_isbi = std::istreambuf_iterator<char>;
 
+#ifdef __clang__
+  // See bugs/basic_ios_bug.cpp
   assert((istringstream_test1<std::istringstream, std::string>()));
+#endif
   assert((istringstream_test2<std::istringstream, std::string>()));
   assert((istringstream_test3<std::ifstream, std::string, std_isbi>()));
   assert(ostringstream_test1());

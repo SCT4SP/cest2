@@ -34,7 +34,7 @@ constexpr bool iostream_test2()
   return b;
 }
 
-constexpr bool istream_test1()
+constexpr bool stringbuf_test1()
 {
   std::stringbuf sb("ok");
   std::istream s1(&sb);
@@ -50,7 +50,7 @@ void iostream_tests()
 
   static_assert(iostream_test1());
   // static_assert(iostream_test2<std::string,std::ifstream,std::istream>());
-  static_assert(istream_test1());
+  static_assert(stringbuf_test1());
 
   assert(iostream_test1());
   assert(iostream_test2());
