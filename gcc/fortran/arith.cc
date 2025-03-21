@@ -1,5 +1,5 @@
 /* Compiler arithmetic
-   Copyright (C) 2000-2024 Free Software Foundation, Inc.
+   Copyright (C) 2000-2025 Free Software Foundation, Inc.
    Contributed by Andy Vaught
 
 This file is part of GCC.
@@ -23,7 +23,6 @@ along with GCC; see the file COPYING3.  If not see
    would evaluate them.  We use the GNU MP library and the MPFR
    library to do arithmetic, and this file provides the interface.  */
 
-#define INCLUDE_MEMORY
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
@@ -1144,6 +1143,20 @@ arith_power (gfc_expr *op1, gfc_expr *op2, gfc_expr **resultp)
 		 op2->value.complex, GFC_MPC_RND_MODE);
       }
       break;
+    case BT_UNSIGNED:
+      {
+	int k;
+	mpz_t x;
+	gcc_assert (op1->ts.type == BT_UNSIGNED);
+	k = gfc_validate_kind (BT_UNSIGNED, op1->ts.kind, false);
+	/* Exponentiation is performed modulo x = 2**n.  */
+	mpz_init (x);
+	mpz_add_ui (x, gfc_unsigned_kinds[k].huge, 1);
+	mpz_powm (result->value.integer, op1->value.integer,
+		  op2->value.integer, x);
+	mpz_clear (x);
+      }
+      break;
     default:
       gfc_internal_error ("arith_power(): unknown type");
     }
@@ -1828,10 +1841,11 @@ eval_intrinsic (gfc_intrinsic_op op,
     gcc_fallthrough ();
     /* Numeric binary  */
     case INTRINSIC_POWER:
-      if (flag_unsigned && op == INTRINSIC_POWER)
+      if (pedantic && (op1->ts.type == BT_UNSIGNED || op2->ts.type == BT_UNSIGNED))
 	{
-	  if (op1->ts.type == BT_UNSIGNED || op2->ts.type == BT_UNSIGNED)
-	    goto runtime;
+	  gfc_error ("Unsigned exponentiation not permitted with -pedantic "
+		     "at %L", &op1->where);
+	  goto runtime;
 	}
 
       gcc_fallthrough ();
@@ -1941,7 +1955,6 @@ runtime:
   /* Create a run-time expression.  */
   result = gfc_get_operator_expr (&op1->where, op, op1, op2);
   result->ts = temp.ts;
-
   return result;
 }
 

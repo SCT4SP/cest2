@@ -1,4 +1,4 @@
-// Copyright (C) 2020-2024 Free Software Foundation, Inc.
+// Copyright (C) 2020-2025 Free Software Foundation, Inc.
 
 // This file is part of GCC.
 
@@ -59,8 +59,24 @@ private:
    * }
    *
    */
-  std::unique_ptr<Item> clone_impl (std::unique_ptr<AssociatedItem> &&clone_fn,
-				    std::string name);
+  std::unique_ptr<Item>
+  clone_impl (std::unique_ptr<AssociatedItem> &&clone_fn, std::string name,
+	      const std::vector<std::unique_ptr<GenericParam>> &type_generics);
+
+  /**
+   * Get the path to use for matching and creating a variant when matching on an
+   * enum. E.g. for the `Option` enum, with the `None` variant, this will create
+   * a path `Option::None`
+   */
+  PathInExpression variant_match_path (Enum &item, const Identifier &variant);
+
+  /**
+   * Implementation of clone for all possible variants of an enum
+   */
+  MatchCase clone_enum_identifier (Enum &item,
+				   const std::unique_ptr<EnumItem> &variant);
+  MatchCase clone_enum_tuple (Enum &item, const EnumItemTuple &variant);
+  MatchCase clone_enum_struct (Enum &item, const EnumItemStruct &variant);
 
   virtual void visit_struct (StructStruct &item);
   virtual void visit_tuple (TupleStruct &item);

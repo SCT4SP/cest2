@@ -1,5 +1,5 @@
 /* Definitions of target machine for GCC for IA-32.
-   Copyright (C) 1988-2024 Free Software Foundation, Inc.
+   Copyright (C) 1988-2025 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -232,6 +232,8 @@ struct processor_costs {
 					   to be unrolled.  */
   const unsigned small_unroll_factor;   /* Unroll factor for small loop to
 					   be unrolled.  */
+  const int br_mispredict_scale;	/* Branch mispredict scale for ifcvt
+					   threshold.  */
 };
 
 extern const struct processor_costs *ix86_cost;
@@ -430,6 +432,12 @@ extern unsigned char ix86_tune_features[X86_TUNE_LAST];
 	ix86_tune_features[X86_TUNE_FUSE_CMP_AND_BRANCH_SOFLAGS]
 #define TARGET_FUSE_ALU_AND_BRANCH \
 	ix86_tune_features[X86_TUNE_FUSE_ALU_AND_BRANCH]
+#define TARGET_FUSE_ALU_AND_BRANCH_MEM \
+	ix86_tune_features[X86_TUNE_FUSE_ALU_AND_BRANCH_MEM]
+#define TARGET_FUSE_ALU_AND_BRANCH_MEM_IMM \
+	ix86_tune_features[X86_TUNE_FUSE_ALU_AND_BRANCH_MEM_IMM]
+#define TARGET_FUSE_ALU_AND_BRANCH_RIP_RELATIVE\
+	ix86_tune_features[X86_TUNE_FUSE_ALU_AND_BRANCH_RIP_RELATIVE]
 #define TARGET_FUSE_MOV_AND_ALU \
 	ix86_tune_features[X86_TUNE_FUSE_MOV_AND_ALU]
 #define TARGET_OPT_AGU ix86_tune_features[X86_TUNE_OPT_AGU]
@@ -453,6 +461,10 @@ extern unsigned char ix86_tune_features[X86_TUNE_LAST];
     ix86_tune_features[X86_TUNE_ADJUST_UNROLL]
 #define TARGET_AVOID_FALSE_DEP_FOR_BMI \
 	ix86_tune_features[X86_TUNE_AVOID_FALSE_DEP_FOR_BMI]
+#define TARGET_AVOID_FALSE_DEP_FOR_TZCNT \
+	ix86_tune_features[X86_TUNE_AVOID_FALSE_DEP_FOR_TZCNT]
+#define TARGET_AVOID_FALSE_DEP_FOR_BLS \
+	ix86_tune_features[X86_TUNE_AVOID_FALSE_DEP_FOR_BLS]
 #define TARGET_ONE_IF_CONV_INSN \
 	ix86_tune_features[X86_TUNE_ONE_IF_CONV_INSN]
 #define TARGET_AVOID_MFENCE ix86_tune_features[X86_TUNE_AVOID_MFENCE]
@@ -466,6 +478,9 @@ extern unsigned char ix86_tune_features[X86_TUNE_LAST];
 #define TARGET_USE_RCR ix86_tune_features[X86_TUNE_USE_RCR]
 #define TARGET_SSE_MOVCC_USE_BLENDV \
 	ix86_tune_features[X86_TUNE_SSE_MOVCC_USE_BLENDV]
+#define TARGET_ALIGN_TIGHT_LOOPS \
+	 ix86_tune_features[X86_TUNE_ALIGN_TIGHT_LOOPS]
+
 
 /* Feature tests against the various architecture variations.  */
 enum ix86_arch_indices {
@@ -1096,7 +1111,7 @@ extern const char *host_detect_local_cpu (int argc, const char **argv);
    || (MODE) == V8HFmode || (MODE) == V4HFmode || (MODE) == V2HFmode	\
    || (MODE) == V8BFmode || (MODE) == V4BFmode || (MODE) == V2BFmode	\
    || (MODE) == V4QImode || (MODE) == V2HImode || (MODE) == V1SImode	\
-   || (MODE) == V2DImode || (MODE) == V2QImode				\
+   || (MODE) == V2DImode || (MODE) == V2QImode || (MODE) == HImode	\
    || (MODE) == DFmode	|| (MODE) == DImode				\
    || (MODE) == HFmode || (MODE) == BFmode)
 
@@ -1158,9 +1173,10 @@ extern const char *host_detect_local_cpu (int argc, const char **argv);
 #define SSE_FLOAT_MODE_P(MODE) \
   ((TARGET_SSE && (MODE) == SFmode) || (TARGET_SSE2 && (MODE) == DFmode))
 
-#define SSE_FLOAT_MODE_SSEMATH_OR_HF_P(MODE)				\
-  ((SSE_FLOAT_MODE_P (MODE) && TARGET_SSE_MATH)				\
-   || (TARGET_AVX512FP16 && (MODE) == HFmode))
+#define SSE_FLOAT_MODE_SSEMATH_OR_HFBF_P(MODE)                          \
+  ((SSE_FLOAT_MODE_P (MODE) && TARGET_SSE_MATH)                         \
+   || (TARGET_AVX512FP16 && (MODE) == HFmode)                           \
+   || (TARGET_AVX10_2_256 && (MODE) == BFmode))
 
 #define FMA4_VEC_FLOAT_MODE_P(MODE) \
   (TARGET_FMA4 && ((MODE) == V4SFmode || (MODE) == V2DFmode \
@@ -1460,12 +1476,6 @@ enum reg_class
    or could index an array.  */
 
 #define REGNO_REG_CLASS(REGNO) (regclass_map[(REGNO)])
-
-/* When this hook returns true for MODE, the compiler allows
-   registers explicitly used in the rtl to be used as spill registers
-   but prevents the compiler from extending the lifetime of these
-   registers.  */
-#define TARGET_SMALL_REGISTER_CLASSES_FOR_MODE_P hook_bool_mode_true
 
 #define QI_REG_P(X) (REG_P (X) && QI_REGNO_P (REGNO (X)))
 #define QI_REGNO_P(N) IN_RANGE ((N), FIRST_QI_REG, LAST_QI_REG)
@@ -2229,7 +2239,7 @@ extern unsigned int const svr4_debugger_register_map[FIRST_PSEUDO_REGISTER];
 #define ASM_OUTPUT_SYMBOL_REF(FILE, SYM) \
   do {							\
     const char *name					\
-      = assemble_name_resolve (XSTR (x, 0));		\
+      = assemble_name_resolve (XSTR (SYM, 0));		\
     /* In -masm=att wrap identifiers that start with $	\
        into parens.  */					\
     if (ASSEMBLER_DIALECT == ASM_ATT			\
@@ -2310,6 +2320,7 @@ enum processor_type
   PROCESSOR_ARROWLAKE,
   PROCESSOR_ARROWLAKE_S,
   PROCESSOR_PANTHERLAKE,
+  PROCESSOR_DIAMONDRAPIDS,
   PROCESSOR_INTEL,
   PROCESSOR_LUJIAZUI,
   PROCESSOR_YONGFENG,
@@ -2433,6 +2444,16 @@ constexpr wide_int_bitmask PTA_CLEARWATERFOREST = PTA_SIERRAFOREST
   | PTA_AVXVNNIINT16 | PTA_SHA512 | PTA_SM3 | PTA_SM4 | PTA_USER_MSR
   | PTA_PREFETCHI;
 constexpr wide_int_bitmask PTA_PANTHERLAKE = PTA_ARROWLAKE_S | PTA_PREFETCHI;
+constexpr wide_int_bitmask PTA_DIAMONDRAPIDS = PTA_SKYLAKE | PTA_PKU | PTA_SHA
+  | PTA_GFNI | PTA_VAES | PTA_VPCLMULQDQ | PTA_RDPID | PTA_PCONFIG
+  | PTA_WBNOINVD | PTA_CLWB | PTA_MOVDIRI | PTA_MOVDIR64B | PTA_ENQCMD
+  | PTA_CLDEMOTE | PTA_PTWRITE | PTA_WAITPKG | PTA_SERIALIZE | PTA_TSXLDTRK
+  | PTA_AMX_TILE | PTA_AMX_INT8 | PTA_AMX_BF16 | PTA_UINTR | PTA_AVXVNNI
+  | PTA_AMX_FP16 | PTA_PREFETCHI | PTA_AMX_COMPLEX | PTA_AVX10_1_512
+  | PTA_AVXIFMA | PTA_AVXNECONVERT | PTA_AVXVNNIINT16 | PTA_AVXVNNIINT8
+  | PTA_CMPCCXADD | PTA_SHA512 | PTA_SM3 | PTA_SM4 | PTA_AVX10_2_512
+  | PTA_APX_F | PTA_AMX_AVX512 | PTA_AMX_FP8 | PTA_AMX_TF32 | PTA_AMX_TRANSPOSE
+  | PTA_MOVRS | PTA_AMX_MOVRS | PTA_USER_MSR;
 
 constexpr wide_int_bitmask PTA_BDVER1 = PTA_64BIT | PTA_MMX | PTA_SSE
   | PTA_SSE2 | PTA_SSE3 | PTA_SSE4A | PTA_CX16 | PTA_ABM | PTA_SSSE3
@@ -2879,6 +2900,9 @@ struct GTY(()) machine_function {
 
   /* True if red zone is used.  */
   BOOL_BITFIELD red_zone_used : 1;
+
+  /* True if inline asm with redzone clobber has been seen.  */
+  BOOL_BITFIELD asm_redzone_clobber_seen : 1;
 
   /* The largest alignment, in bytes, of stack slot actually used.  */
   unsigned int max_used_stack_alignment;

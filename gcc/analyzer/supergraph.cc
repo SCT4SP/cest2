@@ -1,5 +1,5 @@
 /* "Supergraph" classes that combine CFGs and callgraph into one digraph.
-   Copyright (C) 2019-2024 Free Software Foundation, Inc.
+   Copyright (C) 2019-2025 Free Software Foundation, Inc.
    Contributed by David Malcolm <dmalcolm@redhat.com>.
 
 This file is part of GCC.
@@ -19,7 +19,6 @@ along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
 #include "config.h"
-#define INCLUDE_MEMORY
 #include "system.h"
 #include "coretypes.h"
 #include "tree.h"
@@ -54,6 +53,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree-cfg.h"
 #include "analyzer/supergraph.h"
 #include "analyzer/analyzer-logging.h"
+#include "make-unique.h"
 
 #if ENABLE_ANALYZER
 
@@ -462,29 +462,29 @@ supergraph::dump_dot (const char *path, const dump_args_t &dump_args) const
    {"nodes" : [objs for snodes],
     "edges" : [objs for sedges]}.  */
 
-json::object *
+std::unique_ptr<json::object>
 supergraph::to_json () const
 {
-  json::object *sgraph_obj = new json::object ();
+  auto sgraph_obj = ::make_unique<json::object> ();
 
   /* Nodes.  */
   {
-    json::array *nodes_arr = new json::array ();
+    auto nodes_arr = ::make_unique<json::array> ();
     unsigned i;
     supernode *n;
     FOR_EACH_VEC_ELT (m_nodes, i, n)
       nodes_arr->append (n->to_json ());
-    sgraph_obj->set ("nodes", nodes_arr);
+    sgraph_obj->set ("nodes", std::move (nodes_arr));
   }
 
   /* Edges.  */
   {
-    json::array *edges_arr = new json::array ();
+    auto edges_arr = ::make_unique<json::array> ();
     unsigned i;
     superedge *n;
     FOR_EACH_VEC_ELT (m_edges, i, n)
       edges_arr->append (n->to_json ());
-    sgraph_obj->set ("edges", edges_arr);
+    sgraph_obj->set ("edges", std::move (edges_arr));
   }
 
   return sgraph_obj;
@@ -717,10 +717,10 @@ supernode::dump_dot_id (pretty_printer *pp) const
     "phis": [str],
     "stmts" : [str]}.  */
 
-json::object *
+std::unique_ptr<json::object>
 supernode::to_json () const
 {
-  json::object *snode_obj = new json::object ();
+  auto snode_obj = ::make_unique<json::object> ();
 
   snode_obj->set_integer ("idx", m_index);
   snode_obj->set_integer ("bb_idx", m_bb->index);
@@ -737,7 +737,7 @@ supernode::to_json () const
 
   /* Phi nodes.  */
   {
-    json::array *phi_arr = new json::array ();
+    auto phi_arr = ::make_unique<json::array> ();
     for (gphi_iterator gpi = const_cast<supernode *> (this)->start_phis ();
 	 !gsi_end_p (gpi); gsi_next (&gpi))
       {
@@ -747,12 +747,12 @@ supernode::to_json () const
 	pp_gimple_stmt_1 (&pp, stmt, 0, (dump_flags_t)0);
 	phi_arr->append_string (pp_formatted_text (&pp));
       }
-    snode_obj->set ("phis", phi_arr);
+    snode_obj->set ("phis", std::move (phi_arr));
   }
 
   /* Statements.  */
   {
-    json::array *stmt_arr = new json::array ();
+    auto stmt_arr = ::make_unique<json::array> ();
     int i;
     gimple *stmt;
     FOR_EACH_VEC_ELT (m_stmts, i, stmt)
@@ -762,7 +762,7 @@ supernode::to_json () const
 	pp_gimple_stmt_1 (&pp, stmt, 0, (dump_flags_t)0);
 	stmt_arr->append_string (pp_formatted_text (&pp));
       }
-    snode_obj->set ("stmts", stmt_arr);
+    snode_obj->set ("stmts", std::move (stmt_arr));
   }
 
   return snode_obj;
@@ -980,10 +980,10 @@ superedge::dump_dot (graphviz_out *gv, const dump_args_t &) const
     "dst_idx": int, the index of the destination supernode,
     "desc"   : str.  */
 
-json::object *
+std::unique_ptr<json::object>
 superedge::to_json () const
 {
-  json::object *sedge_obj = new json::object ();
+  auto sedge_obj = ::make_unique<json::object> ();
   sedge_obj->set_string ("kind", edge_kind_to_string (m_kind));
   sedge_obj->set_integer ("src_idx", m_src->m_index);
   sedge_obj->set_integer ("dst_idx", m_dest->m_index);

@@ -1,6 +1,6 @@
 // Algorithm implementation -*- C++ -*-
 
-// Copyright (C) 2001-2024 Free Software Foundation, Inc.
+// Copyright (C) 2001-2025 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -2415,6 +2415,7 @@ _GLIBCXX_END_INLINE_ABI_NAMESPACE(_V2)
   /// This is a helper function for the merge routines.
   template<typename _BidirectionalIterator, typename _Distance,
 	   typename _Compare>
+    _GLIBCXX26_CONSTEXPR
     void
     __merge_without_buffer(_BidirectionalIterator __first,
 			   _BidirectionalIterator __middle,
@@ -2723,6 +2724,7 @@ _GLIBCXX_END_INLINE_ABI_NAMESPACE(_V2)
 
   /// This is a helper function for the stable sorting routines.
   template<typename _RandomAccessIterator, typename _Compare>
+    _GLIBCXX26_CONSTEXPR
     void
     __inplace_stable_sort(_RandomAccessIterator __first,
 			  _RandomAccessIterator __last, _Compare __comp)
@@ -3471,6 +3473,8 @@ _GLIBCXX_END_INLINE_ABI_NAMESPACE(_V2)
     }
 
 #if __cplusplus > 201103L
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wc++17-extensions" // if constexpr
   template<typename _ForwardIterator1, typename _ForwardIterator2,
 	   typename _BinaryPredicate>
     _GLIBCXX20_CONSTEXPR
@@ -3485,12 +3489,10 @@ _GLIBCXX_END_INLINE_ABI_NAMESPACE(_V2)
 	= typename iterator_traits<_ForwardIterator2>::iterator_category;
       using _It1_is_RA = is_same<_Cat1, random_access_iterator_tag>;
       using _It2_is_RA = is_same<_Cat2, random_access_iterator_tag>;
-      constexpr bool __ra_iters = _It1_is_RA() && _It2_is_RA();
-      if (__ra_iters)
+      constexpr bool __ra_iters = __and_<_It1_is_RA, _It2_is_RA>::value;
+      if constexpr (__ra_iters)
 	{
-	  auto __d1 = std::distance(__first1, __last1);
-	  auto __d2 = std::distance(__first2, __last2);
-	  if (__d1 != __d2)
+	  if ((__last1 - __first1) != (__last2 - __first2))
 	    return false;
 	}
 
@@ -3501,7 +3503,7 @@ _GLIBCXX_END_INLINE_ABI_NAMESPACE(_V2)
 	if (!__pred(__first1, __first2))
 	  break;
 
-      if (__ra_iters)
+      if constexpr (__ra_iters)
 	{
 	  if (__first1 == __last1)
 	    return true;
@@ -3532,6 +3534,7 @@ _GLIBCXX_END_INLINE_ABI_NAMESPACE(_V2)
 	}
       return true;
     }
+#pragma GCC diagnostic pop
 
   /**
    *  @brief  Checks whether a permutaion of the second sequence is equal
@@ -4970,6 +4973,7 @@ _GLIBCXX_BEGIN_NAMESPACE_ALGO
     }
 
   template<typename _RandomAccessIterator, typename _Compare>
+    _GLIBCXX26_CONSTEXPR
     inline void
     __stable_sort(_RandomAccessIterator __first, _RandomAccessIterator __last,
 		  _Compare __comp)
@@ -4983,6 +4987,12 @@ _GLIBCXX_BEGIN_NAMESPACE_ALGO
 	return;
 
 #if _GLIBCXX_HOSTED
+# if __glibcxx_constexpr_algorithms >= 202306L // >= C++26
+      if consteval {
+	return std::__inplace_stable_sort(__first, __last, __comp);
+      }
+# endif
+
       typedef _Temporary_buffer<_RandomAccessIterator, _ValueType> _TmpBuf;
       // __stable_sort_adaptive sorts the range in two halves,
       // so the buffer only needs to fit half the range at once.
@@ -5020,6 +5030,7 @@ _GLIBCXX_BEGIN_NAMESPACE_ALGO
    *  ordering after calling @p stable_sort().
   */
   template<typename _RandomAccessIterator>
+    _GLIBCXX26_CONSTEXPR
     inline void
     stable_sort(_RandomAccessIterator __first, _RandomAccessIterator __last)
     {
@@ -5054,6 +5065,7 @@ _GLIBCXX_BEGIN_NAMESPACE_ALGO
    *  relative ordering after calling @p stable_sort().
   */
   template<typename _RandomAccessIterator, typename _Compare>
+    _GLIBCXX26_CONSTEXPR
     inline void
     stable_sort(_RandomAccessIterator __first, _RandomAccessIterator __last,
 		_Compare __comp)

@@ -1,5 +1,5 @@
 /* d-codegen.cc --  Code generation and routines for manipulation of GCC trees.
-   Copyright (C) 2006-2024 Free Software Foundation, Inc.
+   Copyright (C) 2006-2025 Free Software Foundation, Inc.
 
 GCC is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -15,7 +15,6 @@ You should have received a copy of the GNU General Public License
 along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
-#define INCLUDE_MEMORY
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
@@ -44,22 +43,31 @@ along with GCC; see the file COPYING3.  If not see
 #include "d-tree.h"
 
 
-/* Return the GCC location for the D frontend location LOC.  */
+/* Return the GCC location for the D frontend source location LOC.  */
 
 location_t
-make_location_t (const Loc &loc)
+make_location_t (const SourceLoc &loc)
 {
   location_t gcc_location = input_location;
 
-  if (const char *filename = loc.filename ())
+  if (loc.filename.length != 0)
     {
-      linemap_add (line_table, LC_ENTER, 0, filename, loc.linnum ());
-      linemap_line_start (line_table, loc.linnum (), 0);
-      gcc_location = linemap_position_for_column (line_table, loc.charnum ());
+      linemap_add (line_table, LC_ENTER, 0, loc.filename.ptr, loc.line);
+      linemap_line_start (line_table, loc.line, 0);
+      gcc_location = linemap_position_for_column (line_table, loc.column);
       linemap_add (line_table, LC_LEAVE, 0, NULL, 0);
     }
 
   return gcc_location;
+}
+
+/* Likewise, but converts LOC from a compact opaque location.  */
+
+location_t
+make_location_t (const Loc loc)
+{
+  const SourceLoc sloc = loc.toSourceLoc ();
+  return make_location_t (sloc);
 }
 
 /* Return the DECL_CONTEXT for symbol DSYM.  */
@@ -247,15 +255,15 @@ build_integer_cst (dinteger_t value, tree type)
 tree
 build_float_cst (const real_t &value, Type *totype)
 {
-  real_t new_value;
+  real_value new_value;
   TypeBasic *tb = totype->isTypeBasic ();
 
   gcc_assert (tb != NULL);
 
   tree type_node = build_ctype (tb);
-  real_convert (&new_value.rv (), TYPE_MODE (type_node), &value.rv ());
+  real_convert (&new_value, TYPE_MODE (type_node), &value.rv ());
 
-  return build_real (type_node, new_value.rv ());
+  return build_real (type_node, new_value);
 }
 
 /* Returns the .length component from the D dynamic array EXP.  */
@@ -632,6 +640,37 @@ force_target_expr (tree exp)
   return build_target_expr (decl, exp);
 }
 
+/* Determine whether expression EXP can have a copy of its value elided.  */
+
+static bool
+can_elide_copy_p (Expression *exp)
+{
+  /* Explicit `__rvalue(exp)'.  */
+  if (exp->rvalue ())
+    return true;
+
+  /* Look for variable expression.  */
+  Expression *last = exp;
+  while (CommaExp *ce = last->isCommaExp ())
+    last = ce->e2;
+
+  if (VarExp *ve = last->isVarExp ())
+    {
+      if (VarDeclaration *vd = ve->var->isVarDeclaration ())
+	{
+	  /* Variable is an implicit copy of an lvalue.  */
+	  if (vd->storage_class & STCrvalue)
+	    return true;
+
+	  /* The destructor is going to run on the variable.  */
+	  if (vd->isArgDtorVar ())
+	    return true;
+	}
+    }
+
+  return false;
+}
+
 /* Returns the address of the expression EXP.  */
 
 tree
@@ -905,7 +944,7 @@ identity_compare_p (StructDeclaration *sd)
 	  if (offset != vd->offset)
 	    return false;
 
-	  offset += vd->type->size ();
+	  offset += dmd::size (vd->type);
 	}
     }
 
@@ -973,15 +1012,15 @@ lower_struct_comparison (tree_code code, StructDeclaration *sd,
 	  /* Compare inner data structures.  */
 	  tcmp = lower_struct_comparison (code, ts->sym, t1ref, t2ref);
 	}
-      else if (type->ty != TY::Tvector && type->isintegral ())
+      else if (type->ty != TY::Tvector && type->isIntegral ())
 	{
 	  /* Integer comparison, no special handling required.  */
 	  tcmp = build_boolop (code, t1ref, t2ref);
 	}
-      else if (type->ty != TY::Tvector && type->isfloating ())
+      else if (type->ty != TY::Tvector && type->isFloating ())
 	{
 	  /* Floating-point comparison, don't compare padding in type.  */
-	  if (!type->iscomplex ())
+	  if (!type->isComplex ())
 	    tcmp = build_float_identity (code, t1ref, t2ref);
 	  else
 	    {
@@ -2120,7 +2159,7 @@ call_side_effect_free_p (FuncDeclaration *func, Type *type)
 
       /* Must be a `nothrow' function.  */
       TypeFunction *tf = func->type->toTypeFunction ();
-      if (!tf->isnothrow ())
+      if (!tf->isNothrow ())
 	return false;
 
       /* Return type can't be `void' or `noreturn', as that implies all work is
@@ -2129,7 +2168,7 @@ call_side_effect_free_p (FuncDeclaration *func, Type *type)
 	return false;
 
       /* Only consider it as `pure' if it can't modify its arguments.  */
-      if (func->isPure () == PURE::const_)
+      if (dmd::isPure (func) == PURE::const_)
 	return true;
     }
 
@@ -2138,7 +2177,7 @@ call_side_effect_free_p (FuncDeclaration *func, Type *type)
       TypeFunction *tf = get_function_type (type);
 
       /* Must be a `nothrow` function type.  */
-      if (tf == NULL || !tf->isnothrow ())
+      if (tf == NULL || !tf->isNothrow ())
 	return false;
 
       /* Return type can't be `void' or `noreturn', as that implies all work is
@@ -2281,8 +2320,10 @@ d_build_call (TypeFunction *tf, tree callable, tree object,
 		 - The ABI of the function expects the callee to destroy its
 		 arguments; when the caller is handles destruction, then `targ'
 		 has already been made into a temporary. */
-	      if (arg->op == EXP::structLiteral || (!sd->postblit && !sd->dtor)
-		  || target.isCalleeDestroyingArgs (tf))
+	      if (!can_elide_copy_p (arg)
+		  && (arg->op == EXP::structLiteral
+		      || (!sd->postblit && !sd->dtor)
+		      || target.isCalleeDestroyingArgs (tf)))
 		targ = force_target_expr (targ);
 
 	      targ = convert (build_reference_type (TREE_TYPE (targ)),
@@ -2916,7 +2957,7 @@ get_frameinfo (FuncDeclaration *fd)
          symbols, give it a decent error for now.  */
       if (requiresClosure != fd->requiresClosure
 	  && (fd->nrvo_var || !global.params.useGC))
-	fd->checkClosure ();
+	dmd::checkClosure (fd);
 
       /* Set-up a closure frame, this will be allocated on the heap.  */
       FRAMEINFO_CREATES_FRAME (ffi) = 1;

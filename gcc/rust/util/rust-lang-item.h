@@ -1,4 +1,4 @@
-// Copyright (C) 2020-2024 Free Software Foundation, Inc.
+// Copyright (C) 2020-2025 Free Software Foundation, Inc.
 
 // This file is part of GCC.
 
@@ -23,12 +23,15 @@
 
 namespace Rust {
 
-// https://github.com/rust-lang/rust/blob/master/library/core/src/ops/arith.rs
 class LangItem
 {
 public:
+  // FIXME: We should clean up that enum to make it more inline with the list of
+  // lang-items in Rust 1.49
+  // https://github.com/rust-lang/rust/blob/1.49.0/compiler/rustc_hir/src/lang_items.rs
   enum class Kind
   {
+    // https://github.com/rust-lang/rust/blob/master/library/core/src/ops/arith.rs
     ADD,
     SUBTRACT,
     MULTIPLY,
@@ -42,6 +45,8 @@ public:
 
     NEGATION,
     NOT,
+    EQ,
+    PARTIAL_ORD,
 
     ADD_ASSIGN,
     SUB_ASSIGN,
@@ -82,6 +87,7 @@ public:
     COPY,
     CLONE,
     SIZED,
+    SYNC,
 
     // https://github.com/Rust-GCC/gccrs/issues/1896
     // https://github.com/rust-lang/rust/commit/afbecc0f68c4dcfc4878ba5bcb1ac942544a1bdc
@@ -116,16 +122,26 @@ public:
     STR,
     F32_RUNTIME,
     F64_RUNTIME,
+
+    OPTION_SOME,
+    OPTION_NONE,
+
+    INTOITER_INTOITER,
+    ITERATOR_NEXT,
   };
 
   static const BiMap<std::string, Kind> lang_items;
 
   static tl::optional<Kind> Parse (const std::string &item);
   static std::string ToString (Kind type);
+  static std::string PrettyString (Kind type);
   static Kind OperatorToLangItem (ArithmeticOrLogicalOperator op);
   static Kind
   CompoundAssignmentOperatorToLangItem (ArithmeticOrLogicalOperator op);
   static Kind NegationOperatorToLangItem (NegationOperator op);
+  static Kind ComparisonToLangItem (ComparisonOperator op);
+
+  static std::string ComparisonToSegment (ComparisonOperator op);
 };
 
 } // namespace Rust

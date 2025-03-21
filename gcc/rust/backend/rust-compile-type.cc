@@ -1,4 +1,4 @@
-// Copyright (C) 2020-2024 Free Software Foundation, Inc.
+// Copyright (C) 2020-2025 Free Software Foundation, Inc.
 
 // This file is part of GCC.
 
@@ -22,6 +22,7 @@
 #include "rust-gcc.h"
 
 #include "tree.h"
+#include "stor-layout.h"
 
 namespace Rust {
 namespace Compile {
@@ -54,7 +55,7 @@ TyTyResolveCompile::compile (Context *ctx, const TyTy::BaseType *ty,
 // see: gcc/c/c-decl.cc:8230-8241
 // https://github.com/Rust-GCC/gccrs/blob/0024bc2f028369b871a65ceb11b2fddfb0f9c3aa/gcc/c/c-decl.c#L8229-L8241
 tree
-TyTyResolveCompile::get_implicit_enumeral_node_type (Context *ctx)
+TyTyResolveCompile::get_implicit_enumeral_node_type ()
 {
   // static tree enum_node = NULL_TREE;
   // if (enum_node == NULL_TREE)
@@ -88,7 +89,7 @@ TyTyResolveCompile::get_implicit_enumeral_node_type (Context *ctx)
 }
 
 tree
-TyTyResolveCompile::get_unit_type (Context *ctx)
+TyTyResolveCompile::get_unit_type ()
 {
   static tree unit_type;
   if (unit_type == nullptr)
@@ -147,7 +148,7 @@ TyTyResolveCompile::visit (const TyTy::PlaceholderType &type)
 void
 TyTyResolveCompile::visit (const TyTy::ClosureType &type)
 {
-  auto mappings = ctx->get_mappings ();
+  auto &mappings = ctx->get_mappings ();
 
   std::vector<Backend::typed_identifier> fields;
 
@@ -155,9 +156,9 @@ TyTyResolveCompile::visit (const TyTy::ClosureType &type)
   for (const auto &capture : type.get_captures ())
     {
       // lookup the HirId
-      HirId ref = UNKNOWN_HIRID;
-      bool ok = mappings->lookup_node_to_hir (capture, &ref);
-      rust_assert (ok);
+      tl::optional<HirId> hid = mappings.lookup_node_to_hir (capture);
+      rust_assert (hid.has_value ());
+      auto ref = hid.value ();
 
       // lookup the var decl type
       TyTy::BaseType *lookup = nullptr;
@@ -201,20 +202,20 @@ TyTyResolveCompile::visit (const TyTy::FnType &type)
     {
       auto ret = TyTyResolveCompile::compile (ctx, hir_type, trait_object_mode);
       location_t return_type_locus
-	= ctx->get_mappings ()->lookup_location (hir_type->get_ref ());
+	= ctx->get_mappings ().lookup_location (hir_type->get_ref ());
       results.push_back (
 	Backend::typed_identifier ("_", ret, return_type_locus));
     }
 
   for (auto &param_pair : type.get_params ())
     {
-      auto param_tyty = param_pair.second;
+      auto param_tyty = param_pair.get_type ();
       auto compiled_param_type
 	= TyTyResolveCompile::compile (ctx, param_tyty, trait_object_mode);
 
       auto compiled_param = Backend::typed_identifier (
-	param_pair.first->as_string (), compiled_param_type,
-	ctx->get_mappings ()->lookup_location (param_tyty->get_ref ()));
+	param_pair.get_pattern ().as_string (), compiled_param_type,
+	ctx->get_mappings ().lookup_location (param_tyty->get_ref ()));
 
       parameters.push_back (compiled_param);
     }
@@ -263,13 +264,13 @@ TyTyResolveCompile::visit (const TyTy::ADTType &type)
 	    = TyTyResolveCompile::compile (ctx, field->get_field_type ());
 
 	  Backend::typed_identifier f (field->get_name (), compiled_field_ty,
-				       ctx->get_mappings ()->lookup_location (
+				       ctx->get_mappings ().lookup_location (
 					 type.get_ty_ref ()));
 	  fields.push_back (std::move (f));
 	}
 
-      type_record = type.is_union () ? Backend::union_type (fields)
-				     : Backend::struct_type (fields);
+      type_record = type.is_union () ? Backend::union_type (fields, false)
+				     : Backend::struct_type (fields, false);
     }
   else
     {
@@ -297,21 +298,39 @@ TyTyResolveCompile::visit (const TyTy::ADTType &type)
       // Ada, qual_union_types might still work for this but I am not 100% sure.
       // I ran into some issues lets reuse our normal union and ask Ada people
       // about it.
+      //
+      // I think the above is actually wrong and it should actually be this
+      //
+      // struct {
+      //     int RUST$ENUM$DISR; // take into account the repr for this TODO
+      //     union {
+      //         // Variant A
+      //         struct {
+      //             // No additional fields
+      //         } A;
+
+      //         // Variant B
+      //         struct {
+      //             // No additional fields
+      //         } B;
+
+      //         // Variant C
+      //         struct {
+      //             char c;
+      //         } C;
+
+      //         // Variant D
+      //         struct {
+      //             int64_t x;
+      //             int64_t y;
+      //         } D;
+      //     } payload; // The union of all variant data
+      // };
 
       std::vector<tree> variant_records;
       for (auto &variant : type.get_variants ())
 	{
 	  std::vector<Backend::typed_identifier> fields;
-
-	  // add in the qualifier field for the variant
-	  tree enumeral_type
-	    = TyTyResolveCompile::get_implicit_enumeral_node_type (ctx);
-	  Backend::typed_identifier f (RUST_ENUM_DISR_FIELD_NAME, enumeral_type,
-				       ctx->get_mappings ()->lookup_location (
-					 variant->get_id ()));
-	  fields.push_back (std::move (f));
-
-	  // compile the rest of the fields
 	  for (size_t i = 0; i < variant->num_fields (); i++)
 	    {
 	      const TyTy::StructFieldType *field
@@ -326,7 +345,7 @@ TyTyResolveCompile::visit (const TyTy::ADTType &type)
 
 	      Backend::typed_identifier f (
 		field_name, compiled_field_ty,
-		ctx->get_mappings ()->lookup_location (type.get_ty_ref ()));
+		ctx->get_mappings ().lookup_location (type.get_ty_ref ()));
 	      fields.push_back (std::move (f));
 	    }
 
@@ -334,9 +353,6 @@ TyTyResolveCompile::visit (const TyTy::ADTType &type)
 	  tree named_variant_record
 	    = Backend::named_type (variant->get_ident ().path.get (),
 				   variant_record, variant->get_ident ().locus);
-
-	  // set the qualifier to be a builtin
-	  DECL_ARTIFICIAL (TYPE_FIELDS (variant_record)) = 1;
 
 	  // add them to the list
 	  variant_records.push_back (named_variant_record);
@@ -353,13 +369,32 @@ TyTyResolveCompile::visit (const TyTy::ADTType &type)
 	  std::string implicit_variant_name = variant->get_identifier ();
 
 	  Backend::typed_identifier f (implicit_variant_name, variant_record,
-				       ctx->get_mappings ()->lookup_location (
+				       ctx->get_mappings ().lookup_location (
 					 type.get_ty_ref ()));
 	  enum_fields.push_back (std::move (f));
 	}
 
+      //
+      location_t locus = ctx->get_mappings ().lookup_location (type.get_ref ());
+
       // finally make the union or the enum
-      type_record = Backend::union_type (enum_fields);
+      tree variants_union = Backend::union_type (enum_fields, false);
+      layout_type (variants_union);
+      tree named_union_record
+	= Backend::named_type ("payload", variants_union, locus);
+
+      // create the overall struct
+      tree enumeral_type
+	= TyTyResolveCompile::get_implicit_enumeral_node_type ();
+      Backend::typed_identifier discrim (RUST_ENUM_DISR_FIELD_NAME,
+					 enumeral_type, locus);
+      Backend::typed_identifier variants_union_field ("payload",
+						      named_union_record,
+						      locus);
+
+      std::vector<Backend::typed_identifier> fields
+	= {discrim, variants_union_field};
+      type_record = Backend::struct_type (fields, false);
     }
 
   // Handle repr options
@@ -381,6 +416,7 @@ TyTyResolveCompile::visit (const TyTy::ADTType &type)
       SET_TYPE_ALIGN (type_record, repr.align * 8);
       TYPE_USER_ALIGN (type_record) = 1;
     }
+  layout_type (type_record);
 
   std::string named_struct_str
     = type.get_ident ().path.get () + type.subst_as_string ();
@@ -393,7 +429,7 @@ TyTyResolveCompile::visit (const TyTy::TupleType &type)
 {
   if (type.num_fields () == 0)
     {
-      translated = get_unit_type (ctx);
+      translated = get_unit_type ();
       return;
     }
 
@@ -411,7 +447,7 @@ TyTyResolveCompile::visit (const TyTy::TupleType &type)
       // approach makes it simpler to use a C-only debugger, or
       // GDB's C mode, when debugging Rust.
       Backend::typed_identifier f ("__" + std::to_string (i), compiled_field_ty,
-				   ctx->get_mappings ()->lookup_location (
+				   ctx->get_mappings ().lookup_location (
 				     type.get_ty_ref ()));
       fields.push_back (std::move (f));
     }
@@ -428,7 +464,7 @@ TyTyResolveCompile::visit (const TyTy::ArrayType &type)
     = TyTyResolveCompile::compile (ctx, type.get_element_type ());
 
   ctx->push_const_context ();
-  tree capacity_expr = CompileExpr::Compile (&type.get_capacity_expr (), ctx);
+  tree capacity_expr = CompileExpr::Compile (type.get_capacity_expr (), ctx);
   ctx->pop_const_context ();
 
   tree folded_capacity_expr = fold_expr (capacity_expr);
@@ -686,7 +722,7 @@ TyTyResolveCompile::visit (const TyTy::StrType &type)
 void
 TyTyResolveCompile::visit (const TyTy::NeverType &)
 {
-  translated = get_unit_type (ctx);
+  translated = get_unit_type ();
 }
 
 void
@@ -714,14 +750,14 @@ TyTyResolveCompile::create_dyn_obj_record (const TyTy::DynamicObjectType &type)
   tree uintptr_ty = build_pointer_type (uint);
 
   Backend::typed_identifier f ("pointer", uintptr_ty,
-			       ctx->get_mappings ()->lookup_location (
+			       ctx->get_mappings ().lookup_location (
 				 type.get_ty_ref ()));
   fields.push_back (std::move (f));
 
   tree vtable_size = build_int_cst (size_type_node, items.size ());
   tree vtable_type = Backend::array_type (uintptr_ty, vtable_size);
   Backend::typed_identifier vtf ("vtable", vtable_type,
-				 ctx->get_mappings ()->lookup_location (
+				 ctx->get_mappings ().lookup_location (
 				   type.get_ty_ref ()));
   fields.push_back (std::move (vtf));
 

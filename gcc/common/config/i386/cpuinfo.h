@@ -1,5 +1,5 @@
 /* Get CPU type and Features for x86 processors.
-   Copyright (C) 2012-2024 Free Software Foundation, Inc.
+   Copyright (C) 2012-2025 Free Software Foundation, Inc.
    Contributed by Sriraman Tallam (tmsriram@google.com)
 
 This file is part of GCC.
@@ -600,6 +600,7 @@ get_intel_cpu (struct __processor_model *cpu_model,
 	CHECK___builtin_cpu_is ("grandridge");
 	cpu_model->__cpu_type = INTEL_GRANDRIDGE;
 	break;
+      case 0xb5:
       case 0xc5:
 	/* Arrow Lake.  */
 	cpu = "arrowlake";
@@ -631,6 +632,21 @@ get_intel_cpu (struct __processor_model *cpu_model,
 	CHECK___builtin_cpu_is ("pantherlake");
 	cpu_model->__cpu_type = INTEL_COREI7;
 	cpu_model->__cpu_subtype = INTEL_COREI7_PANTHERLAKE;
+	break;
+      default:
+	break;
+      }
+  /* Parse family and model for family 0x13.  */
+  else if (cpu_model2->__cpu_family == 0x13)
+    switch (cpu_model2->__cpu_model)
+      {
+      case 0x01:
+	/* Diamond Rapids.  */
+	cpu = "diamondrapids";
+	CHECK___builtin_cpu_is ("corei7");
+	CHECK___builtin_cpu_is ("diamondrapids");
+	cpu_model->__cpu_type = INTEL_COREI7;
+	cpu_model->__cpu_subtype = INTEL_COREI7_DIAMONDRAPIDS;
 	break;
       default:
 	break;
@@ -918,6 +934,8 @@ get_available_features (struct __processor_model *cpu_model,
 	    set_feature (FEATURE_RAOINT);
 	  if (edx & bit_USER_MSR)
 	    set_feature (FEATURE_USER_MSR);
+	  if (eax & bit_MOVRS)
+	    set_feature (FEATURE_MOVRS);
 	  if (avx_usable)
 	    {
 	      if (eax & bit_AVXVNNI)
@@ -992,6 +1010,25 @@ get_available_features (struct __processor_model *cpu_model,
 	    set_feature (FEATURE_WIDEKL);
 	  if (has_kl)
 	    set_feature (FEATURE_KL);
+	}
+    }
+
+  /* Get Advanced Features at level 0x1e (eax = 0x1e, ecx = 1). */
+  if (max_cpuid_level >= 0x1e)
+    {
+      __cpuid_count (0x1e, 1, eax, ebx, ecx, edx);
+      if (amx_usable)
+	{
+	  if (eax & bit_AMX_AVX512)
+	    set_feature (FEATURE_AMX_AVX512);
+	  if (eax & bit_AMX_TF32)
+	    set_feature (FEATURE_AMX_TF32);
+	  if (eax & bit_AMX_TRANSPOSE)
+	    set_feature (FEATURE_AMX_TRANSPOSE);
+	  if (eax & bit_AMX_FP8)
+	    set_feature (FEATURE_AMX_FP8);
+	  if (eax & bit_AMX_MOVRS)
+	    set_feature (FEATURE_AMX_MOVRS);
 	}
     }
 

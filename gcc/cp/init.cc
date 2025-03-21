@@ -1,5 +1,5 @@
 /* Handle initialization things in -*- C++ -*-
-   Copyright (C) 1987-2024 Free Software Foundation, Inc.
+   Copyright (C) 1987-2025 Free Software Foundation, Inc.
    Contributed by Michael Tiemann (tiemann@cygnus.com)
 
 This file is part of GCC.
@@ -20,7 +20,6 @@ along with GCC; see the file COPYING3.  If not see
 
 /* High-level class interface.  */
 
-#define INCLUDE_MEMORY
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
@@ -249,6 +248,7 @@ build_zero_init_1 (tree type, tree nelts, bool static_storage_p,
 
       /* Build a constructor to contain the initializations.  */
       init = build_constructor (type, v);
+      CONSTRUCTOR_ZERO_PADDING_BITS (init) = 1;
     }
   else if (TREE_CODE (type) == ARRAY_TYPE)
     {
@@ -467,7 +467,9 @@ build_value_init_noctor (tree type, tsubst_flags_t complain)
 	    }
 
 	  /* Build a constructor to contain the zero- initializations.  */
-	  return build_constructor (type, v);
+	  tree ret = build_constructor (type, v);
+	  CONSTRUCTOR_ZERO_PADDING_BITS (ret) = 1;
+	  return ret;
 	}
     }
   else if (TREE_CODE (type) == ARRAY_TYPE)
@@ -967,7 +969,9 @@ can_init_array_with_p (tree type, tree init)
 	return true;
     }
 
-  return false;
+  permerror (input_location, "array must be initialized "
+	     "with a brace-enclosed initializer");
+  return true;
 }
 
 /* Initialize MEMBER, a FIELD_DECL, with INIT, a TREE_LIST of
@@ -1089,7 +1093,7 @@ perform_member_init (tree member, tree init, hash_set<tree> &uninitialized)
     {
       /* With references and list-initialization, we need to deal with
 	 extending temporary lifetimes.  12.2p5: "A temporary bound to a
-	 reference member in a constructor’s ctor-initializer (12.6.2)
+	 reference member in a constructor's ctor-initializer (12.6.2)
 	 persists until the constructor exits."  */
       unsigned i; tree t;
       releasing_vec cleanups;
@@ -2974,14 +2978,17 @@ malloc_alignment ()
 
 /* Determine whether an allocation function is a namespace-scope
    non-replaceable placement new function. See DR 1748.  */
-static bool
+bool
 std_placement_new_fn_p (tree alloc_fn)
 {
-  if (DECL_NAMESPACE_SCOPE_P (alloc_fn))
+  if (DECL_NAMESPACE_SCOPE_P (alloc_fn)
+      && IDENTIFIER_NEW_OP_P (DECL_NAME (alloc_fn))
+      && !DECL_IS_REPLACEABLE_OPERATOR_NEW_P (alloc_fn))
     {
       tree first_arg = TREE_CHAIN (TYPE_ARG_TYPES (TREE_TYPE (alloc_fn)));
-      if ((TREE_VALUE (first_arg) == ptr_type_node)
-	  && TREE_CHAIN (first_arg) == void_list_node)
+      if (first_arg
+	  && (TREE_VALUE (first_arg) == ptr_type_node)
+	  && (TREE_CHAIN (first_arg) == void_list_node))
 	return true;
     }
   return false;
@@ -3522,7 +3529,7 @@ build_new_1 (vec<tree, va_gc> **placement, tree type, tree nelts,
 	  && (INTEGRAL_OR_ENUMERATION_TYPE_P (TREE_TYPE (TREE_TYPE (placement)))
 	      || VOID_TYPE_P (TREE_TYPE (TREE_TYPE (placement)))))
 	{
-	  placement_expr = get_target_expr (placement_first);
+	  placement_expr = get_internal_target_expr (placement_first);
 	  CALL_EXPR_ARG (alloc_call, 1)
 	    = fold_convert (TREE_TYPE (placement), placement_expr);
 	}
@@ -3550,7 +3557,7 @@ build_new_1 (vec<tree, va_gc> **placement, tree type, tree nelts,
 
   /* Store the result of the allocation call in a variable so that we can
      use it more than once.  */
-  alloc_expr = get_target_expr (alloc_expr);
+  alloc_expr = get_internal_target_expr (alloc_expr);
   alloc_node = TARGET_EXPR_SLOT (alloc_expr);
 
   /* Strip any COMPOUND_EXPRs from ALLOC_CALL.  */
@@ -3702,6 +3709,11 @@ build_new_1 (vec<tree, va_gc> **placement, tree type, tree nelts,
                 error ("parenthesized initializer in array new");
 	      return error_mark_node;
             }
+
+	  /* Collect flags for disabling subobject cleanups once the complete
+	     object is fully constructed.  */
+	  vec<tree, va_gc> *flags = make_tree_vector ();
+
 	  init_expr
 	    = build_vec_init (data_addr,
 			      cp_build_binary_op (input_location,
@@ -3711,7 +3723,17 @@ build_new_1 (vec<tree, va_gc> **placement, tree type, tree nelts,
 			      vecinit,
 			      explicit_value_init_p,
 			      /*from_array=*/0,
-                              complain);
+			      complain,
+			      &flags);
+
+	  for (tree f : flags)
+	    {
+	      tree cl = build_disable_temp_cleanup (f);
+	      cl = convert_to_void (cl, ICV_STATEMENT, complain);
+	      init_expr = build2 (COMPOUND_EXPR, void_type_node,
+				  init_expr, cl);
+	    }
+	  release_tree_vector (flags);
 	}
       else
 	{
@@ -3819,8 +3841,7 @@ build_new_1 (vec<tree, va_gc> **placement, tree type, tree nelts,
 	{
 	  tree end, sentry, begin;
 
-	  begin = get_target_expr (boolean_true_node);
-	  CLEANUP_EH_ONLY (begin) = 1;
+	  begin = get_internal_target_expr (boolean_true_node);
 
 	  sentry = TARGET_EXPR_SLOT (begin);
 
@@ -4658,7 +4679,7 @@ build_vec_init (tree base, tree maxindex, tree init,
   current_stmt_tree ()->stmts_are_full_exprs_p = 0;
   rval = get_temp_regvar (ptype, base);
   base = get_temp_regvar (ptype, rval);
-  tree iterator_targ = get_target_expr (maxindex);
+  tree iterator_targ = get_internal_target_expr (maxindex);
   add_stmt (iterator_targ);
   iterator = TARGET_EXPR_SLOT (iterator_targ);
 
@@ -4764,7 +4785,8 @@ build_vec_init (tree base, tree maxindex, tree init,
       tree field, elt;
       /* If the constructor already has the array type, it's been through
 	 digest_init, so we shouldn't try to do anything more.  */
-      bool digested = same_type_p (atype, TREE_TYPE (init));
+      bool digested = (TREE_CODE (TREE_TYPE (init)) == ARRAY_TYPE
+		       && same_type_p (type, TREE_TYPE (TREE_TYPE (init))));
       from_array = 0;
 
       if (length_check)
@@ -4780,7 +4802,10 @@ build_vec_init (tree base, tree maxindex, tree init,
 	  tree baseref = build1 (INDIRECT_REF, type, base);
 	  tree one_init;
 
-	  num_initialized_elts++;
+	  if (field && TREE_CODE (field) == RANGE_EXPR)
+	    num_initialized_elts += range_expr_nelts (field);
+	  else
+	    num_initialized_elts++;
 
 	  /* We need to see sub-array TARGET_EXPR before cp_fold_r so we can
 	     handle cleanup flags properly.  */
@@ -5102,6 +5127,15 @@ build_vec_init (tree base, tree maxindex, tree init,
     {
       if (!saw_non_const)
 	{
+	  /* If we're not generating the loop, we don't need to reset the
+	     iterator.  */
+	  if (cleanup_flags
+	      && !vec_safe_is_empty (*cleanup_flags))
+	    {
+	      auto l = (*cleanup_flags)->last ();
+	      gcc_assert (TREE_PURPOSE (l) == iterator);
+	      (*cleanup_flags)->pop ();
+	    }
 	  tree const_init = build_constructor (atype, const_vec);
 	  return build2 (INIT_EXPR, atype, obase, const_init);
 	}
@@ -5292,7 +5326,7 @@ build_delete (location_t loc, tree otype, tree addr,
   if (deleting)
     /* We will use ADDR multiple times so we must save it.  */
     {
-      addr_expr = get_target_expr (addr);
+      addr_expr = get_internal_target_expr (addr);
       addr = TARGET_EXPR_SLOT (addr_expr);
     }
 
@@ -5317,7 +5351,7 @@ build_delete (location_t loc, tree otype, tree addr,
      delete'.  */
   else if (use_global_delete)
     {
-      head = get_target_expr (build_headof (addr));
+      head = get_internal_target_expr (build_headof (addr));
       /* Delete the object.  */
       do_delete = build_op_delete_call (DELETE_EXPR,
 					head,
@@ -5551,7 +5585,7 @@ build_vec_delete (location_t loc, tree base, tree maxindex,
       base = mark_rvalue_use (base);
       if (TREE_SIDE_EFFECTS (base))
 	{
-	  base_init = get_target_expr (base);
+	  base_init = get_internal_target_expr (base);
 	  base = TARGET_EXPR_SLOT (base_init);
 	}
       type = strip_array_types (TREE_TYPE (type));
@@ -5572,7 +5606,7 @@ build_vec_delete (location_t loc, tree base, tree maxindex,
 	return error_mark_node;
       if (TREE_SIDE_EFFECTS (base))
 	{
-	  base_init = get_target_expr (base);
+	  base_init = get_internal_target_expr (base);
 	  base = TARGET_EXPR_SLOT (base_init);
 	}
     }

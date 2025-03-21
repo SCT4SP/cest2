@@ -1,5 +1,5 @@
 /* Definitions for CPP library.
-   Copyright (C) 1995-2024 Free Software Foundation, Inc.
+   Copyright (C) 1995-2025 Free Software Foundation, Inc.
    Written by Per Bothner, 1994-95.
 
 This program is free software; you can redistribute it and/or modify it
@@ -204,6 +204,9 @@ struct GTY(()) cpp_string {
 #define PURE_ZERO	(1 << 7) /* Single 0 digit, used by the C++ frontend,
 				    set in c-lex.cc.  */
 #define COLON_SCOPE	PURE_ZERO /* Adjacent colons in C < 23.  */
+#define NO_DOT_COLON	PURE_ZERO /* Set on CPP_NAME tokens whose expansion
+				     shouldn't start with CPP_DOT or CPP_COLON
+				     after optional CPP_PADDING.  */
 #define SP_DIGRAPH	(1 << 8) /* # or ## token was a digraph.  */
 #define SP_PREV_WHITE	(1 << 9) /* If whitespace before a ##
 				    operator, or before this token
@@ -252,8 +255,10 @@ struct GTY(()) cpp_identifier {
        spelling;
 };
 
-/* A preprocessing token.  This has been carefully packed and should
-   occupy 16 bytes on 32-bit hosts and 24 bytes on 64-bit hosts.  */
+/* A preprocessing token.  This occupies 32 bytes on a 64-bit host.  On a
+   32-bit host it occupies 20 or 24 bytes, depending whether a uint64_t
+   requires 4- or 8-byte alignment.  */
+
 struct GTY(()) cpp_token {
 
   /* Location of first char of token, together with range of full token.  */
@@ -521,6 +526,9 @@ struct cpp_options
   /* Nonzero for C++ 2014 Standard binary constants.  */
   unsigned char binary_constants;
 
+  /* Nonzero for C2Y imaginary (floating) constants.  */
+  unsigned char imaginary_constants;
+
   /* Nonzero for C++ 2014 Standard digit separators.  */
   unsigned char digit_separators;
 
@@ -550,6 +558,9 @@ struct cpp_options
 
   /* Nonzero for C++23 named universal character escape sequences.  */
   unsigned char named_uc_escape_seqs;
+
+  /* Nonzero for C++ and C23 UCNs for characters below 0xa0.  */
+  unsigned char low_ucns;
 
   /* Nonzero for C2Y 0o prefixed octal integer constants.  */
   unsigned char octal_constants;
@@ -738,6 +749,7 @@ enum cpp_warning_reason {
   CPP_W_CXX17_EXTENSIONS,
   CPP_W_CXX20_EXTENSIONS,
   CPP_W_CXX23_EXTENSIONS,
+  CPP_W_CXX26_EXTENSIONS,
   CPP_W_EXPANSION_TO_DEFINED,
   CPP_W_BIDIRECTIONAL,
   CPP_W_INVALID_UTF8,

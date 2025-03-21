@@ -1,5 +1,5 @@
 /* Code sinking for trees
-   Copyright (C) 2001-2024 Free Software Foundation, Inc.
+   Copyright (C) 2001-2025 Free Software Foundation, Inc.
    Contributed by Daniel Berlin <dan@dberlin.org>
 
 This file is part of GCC.
@@ -18,7 +18,6 @@ You should have received a copy of the GNU General Public License
 along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
-#define INCLUDE_MEMORY
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
@@ -37,6 +36,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "cfgloop.h"
 #include "tree-eh.h"
 #include "tree-ssa-live.h"
+#include "tree-dfa.h"
 
 /* TODO:
    1. Sinking store only using scalar promotion (IE without moving the RHS):
@@ -517,7 +517,8 @@ sink_common_stores_to_bb (basic_block bb)
 	      gimple *def = SSA_NAME_DEF_STMT (arg);
 	      if (! is_gimple_assign (def)
 		  || stmt_can_throw_internal (cfun, def)
-		  || (gimple_phi_arg_edge (phi, i)->flags & EDGE_ABNORMAL))
+		  || (gimple_phi_arg_edge (phi, i)->flags & EDGE_ABNORMAL)
+		  || stmt_references_abnormal_ssa_name (def))
 		{
 		  /* ???  We could handle some cascading with the def being
 		     another PHI.  We'd have to insert multiple PHIs for

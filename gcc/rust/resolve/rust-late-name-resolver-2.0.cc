@@ -1,4 +1,4 @@
-// Copyright (C) 2020-2024 Free Software Foundation, Inc.
+// Copyright (C) 2020-2025 Free Software Foundation, Inc.
 
 // This file is part of GCC.
 
@@ -18,11 +18,13 @@
 
 #include "optional.h"
 #include "rust-ast-full.h"
+#include "rust-diagnostics.h"
 #include "rust-hir-map.h"
 #include "rust-late-name-resolver-2.0.h"
 #include "rust-default-resolver.h"
 #include "rust-name-resolution-context.h"
 #include "rust-path.h"
+#include "rust-system.h"
 #include "rust-tyty.h"
 #include "rust-hir-type-check.h"
 
@@ -34,13 +36,13 @@ Late::Late (NameResolutionContext &ctx) : DefaultResolver (ctx) {}
 static NodeId
 next_node_id ()
 {
-  return Analysis::Mappings::get ()->get_next_node_id ();
+  return Analysis::Mappings::get ().get_next_node_id ();
 };
 
 static HirId
 next_hir_id ()
 {
-  return Analysis::Mappings::get ()->get_next_hir_id ();
+  return Analysis::Mappings::get ().get_next_hir_id ();
 };
 
 void
@@ -99,7 +101,7 @@ Late::setup_builtin_types ()
     }
 
   // ...here!
-  auto *unit_type = TyTy::TupleType::get_unit_type (next_hir_id ());
+  auto *unit_type = TyTy::TupleType::get_unit_type ();
   ty_ctx.insert_builtin (unit_type->get_ref (), next_node_id (), unit_type);
 }
 
@@ -125,8 +127,14 @@ Late::new_label (Identifier name, NodeId id)
 void
 Late::visit (AST::LetStmt &let)
 {
-  // so we don't need that method
-  DefaultResolver::visit (let);
+  DefaultASTVisitor::visit_outer_attrs (let);
+  if (let.has_type ())
+    visit (let.get_type ());
+  // visit expression before pattern
+  // this makes variable shadowing work properly
+  if (let.has_init_expr ())
+    visit (let.get_init_expr ());
+  visit (let.get_pattern ());
 
   // how do we deal with the fact that `let a = blipbloup` should look for a
   // label and cannot go through function ribs, but `let a = blipbloup()` can?
@@ -151,10 +159,22 @@ Late::visit (AST::IdentifierPattern &identifier)
   // do we insert in labels or in values
   // but values does not allow shadowing... since functions cannot shadow
   // do we insert functions in labels as well?
-  auto ok
-    = ctx.values.insert (identifier.get_ident (), identifier.get_node_id ());
 
-  rust_assert (ok);
+  // We do want to ignore duplicated data because some situations rely on it.
+  std::ignore = ctx.values.insert_shadowable (identifier.get_ident (),
+					      identifier.get_node_id ());
+}
+
+void
+Late::visit (AST::SelfParam &param)
+{
+  // handle similar to AST::IdentifierPattern
+
+  DefaultResolver::visit (param);
+  // FIXME: this location should be a bit off
+  // ex: would point to the begining of "mut self" instead of the "self"
+  std::ignore = ctx.values.insert (Identifier ("self", param.get_locus ()),
+				   param.get_node_id ());
 }
 
 void
@@ -163,16 +183,14 @@ Late::visit (AST::IdentifierExpr &expr)
   // TODO: same thing as visit(PathInExpression) here?
 
   tl::optional<Rib::Definition> resolved = tl::nullopt;
-  auto label = ctx.labels.get (expr.get_ident ());
-  auto value = ctx.values.get (expr.get_ident ());
 
-  if (label)
-    {
-      resolved = label;
-    }
-  else if (value)
+  if (auto value = ctx.values.get (expr.get_ident ()))
     {
       resolved = value;
+    }
+  else if (auto type = ctx.types.get (expr.get_ident ()))
+    {
+      resolved = type;
     }
   else
     {
@@ -200,18 +218,28 @@ Late::visit (AST::PathInExpression &expr)
   // in a function item` error here?
   // do we emit it in `get<Namespace::Labels>`?
 
-  auto value = ctx.values.resolve_path (expr.get_segments ());
-  if (!value.has_value ())
-    rust_unreachable (); // Should have been resolved earlier
+  auto resolved
+    = ctx.values.resolve_path (expr.get_segments ()).or_else ([&] () {
+	return ctx.types.resolve_path (expr.get_segments ());
+      });
 
-  if (value->is_ambiguous ())
+  if (!resolved)
+    {
+      rust_error_at (expr.get_locus (),
+		     "could not resolve path expression: %qs",
+		     expr.as_simple_path ().as_string ().c_str ());
+      return;
+    }
+
+  if (resolved->is_ambiguous ())
     {
       rust_error_at (expr.get_locus (), ErrorCode::E0659, "%qs is ambiguous",
 		     expr.as_string ().c_str ());
       return;
     }
+
   ctx.map_usage (Usage (expr.get_node_id ()),
-		 Definition (value->get_node_id ()));
+		 Definition (resolved->get_node_id ()));
 }
 
 void
@@ -222,16 +250,52 @@ Late::visit (AST::TypePath &type)
   // maybe we can overload `resolve_path<Namespace::Types>` to only do
   // typepath-like path resolution? that sounds good
 
-  auto resolved = ctx.types.get (type.get_segments ().back ()->as_string ());
+  auto str = type.get_segments ().back ()->get_ident_segment ().as_string ();
+  auto values = ctx.types.peek ().get_values ();
 
-  ctx.map_usage (Usage (type.get_node_id ()),
+  if (auto resolved = ctx.types.get (str))
+    ctx.map_usage (Usage (type.get_node_id ()),
+		   Definition (resolved->get_node_id ()));
+  else
+    rust_error_at (type.get_locus (), "could not resolve type path %qs",
+		   str.c_str ());
+
+  DefaultResolver::visit (type);
+}
+
+void
+Late::visit (AST::Trait &trait)
+{
+  // kind of weird how this is done
+  // names are resolved to the node id of trait.get_implicit_self ()
+  // which is then resolved to the node id of trait
+  // we set up the latter mapping here
+  ctx.map_usage (Usage (trait.get_implicit_self ().get_node_id ()),
+		 Definition (trait.get_node_id ()));
+
+  DefaultResolver::visit (trait);
+}
+
+void
+Late::visit (AST::StructStruct &s)
+{
+  auto s_vis = [this, &s] () { AST::DefaultASTVisitor::visit (s); };
+  ctx.scoped (Rib::Kind::Item, s.get_node_id (), s_vis);
+}
+
+void
+Late::visit (AST::StructExprStruct &s)
+{
+  auto resolved = ctx.types.resolve_path (s.get_struct_name ().get_segments ());
+
+  ctx.map_usage (Usage (s.get_struct_name ().get_node_id ()),
 		 Definition (resolved->get_node_id ()));
 }
 
 void
 Late::visit (AST::StructExprStructBase &s)
 {
-  auto resolved = ctx.types.get (s.get_struct_name ().as_string ());
+  auto resolved = ctx.types.resolve_path (s.get_struct_name ().get_segments ());
 
   ctx.map_usage (Usage (s.get_struct_name ().get_node_id ()),
 		 Definition (resolved->get_node_id ()));
@@ -241,12 +305,44 @@ Late::visit (AST::StructExprStructBase &s)
 void
 Late::visit (AST::StructExprStructFields &s)
 {
-  auto resolved = ctx.types.get (s.get_struct_name ().as_string ());
+  auto resolved = ctx.types.resolve_path (s.get_struct_name ().get_segments ());
 
   ctx.map_usage (Usage (s.get_struct_name ().get_node_id ()),
 		 Definition (resolved->get_node_id ()));
 
   DefaultResolver::visit (s);
+}
+
+// needed because Late::visit (AST::GenericArg &) is non-virtual
+void
+Late::visit (AST::GenericArgs &args)
+{
+  for (auto &lifetime : args.get_lifetime_args ())
+    visit (lifetime);
+
+  for (auto &generic : args.get_generic_args ())
+    visit (generic);
+
+  for (auto &binding : args.get_binding_args ())
+    visit (binding);
+}
+
+void
+Late::visit (AST::GenericArg &arg)
+{
+  if (arg.get_kind () == AST::GenericArg::Kind::Either)
+    {
+      // prefer type parameter to const parameter on ambiguity
+      auto type = ctx.types.get (arg.get_path ());
+      auto value = ctx.values.get (arg.get_path ());
+
+      if (!type.has_value () && value.has_value ())
+	arg = arg.disambiguate_to_const ();
+      else
+	arg = arg.disambiguate_to_type ();
+    }
+
+  DefaultResolver::visit (arg);
 }
 
 } // namespace Resolver2_0

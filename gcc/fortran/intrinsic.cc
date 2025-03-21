@@ -1,6 +1,6 @@
 /* Build up a list of intrinsic subroutines and functions for the
    name-resolution stage.
-   Copyright (C) 2000-2024 Free Software Foundation, Inc.
+   Copyright (C) 2000-2025 Free Software Foundation, Inc.
    Contributed by Andy Vaught & Katherine Holcomb
 
 This file is part of GCC.
@@ -19,7 +19,6 @@ You should have received a copy of the GNU General Public License
 along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
-#define INCLUDE_MEMORY
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
@@ -1365,7 +1364,8 @@ add_functions (void)
     *n = "n", *ncopies= "ncopies", *nm = "name", *num = "number",
     *ord = "order", *p = "p", *p1 = "path1", *p2 = "path2",
     *pad = "pad", *pid = "pid", *pos = "pos", *pt = "pointer",
-    *r = "r", *s = "s", *set = "set", *sh = "shift", *shp = "shape",
+    *r = "r", *rd = "round",
+    *s = "s", *set = "set", *sh = "shift", *shp = "shape",
     *sig = "sig", *src = "source", *ssg = "substring",
     *sta = "string_a", *stb = "string_b", *stg = "string",
     *sub = "sub", *sz = "size", *tg = "target", *team = "team", *tm = "time",
@@ -2568,6 +2568,22 @@ add_functions (void)
 
   make_generic ("maskr", GFC_ISYM_MASKR, GFC_STD_F2008);
 
+  add_sym_2 ("umaskl", GFC_ISYM_UMASKL, CLASS_ELEMENTAL, ACTUAL_NO,
+	     BT_INTEGER, di, GFC_STD_F2008,
+	     gfc_check_mask, gfc_simplify_umaskl, gfc_resolve_umasklr,
+	     i, BT_INTEGER, di, REQUIRED,
+	     kind, BT_INTEGER, di, OPTIONAL);
+
+  make_generic ("umaskl", GFC_ISYM_UMASKL, GFC_STD_F2008);
+
+  add_sym_2 ("umaskr", GFC_ISYM_UMASKR, CLASS_ELEMENTAL, ACTUAL_NO,
+	     BT_INTEGER, di, GFC_STD_F2008,
+	     gfc_check_mask, gfc_simplify_umaskr, gfc_resolve_umasklr,
+	     i, BT_INTEGER, di, REQUIRED,
+	     kind, BT_INTEGER, di, OPTIONAL);
+
+  make_generic ("umaskr", GFC_ISYM_UMASKR, GFC_STD_F2008);
+
   add_sym_2 ("matmul", GFC_ISYM_MATMUL, CLASS_TRANSFORMATIONAL, ACTUAL_NO, BT_REAL, dr, GFC_STD_F95,
 	     gfc_check_matmul, gfc_simplify_matmul, gfc_resolve_matmul,
 	     ma, BT_REAL, dr, REQUIRED, mb, BT_REAL, dr, REQUIRED);
@@ -2774,14 +2790,16 @@ add_functions (void)
 
   make_generic ("not", GFC_ISYM_NOT, GFC_STD_F95);
 
-  add_sym_2 ("norm2", GFC_ISYM_NORM2, CLASS_TRANSFORMATIONAL, ACTUAL_NO, BT_REAL, dr,
-	     GFC_STD_F2008, gfc_check_norm2, gfc_simplify_norm2, gfc_resolve_norm2,
+  add_sym_2 ("norm2", GFC_ISYM_NORM2, CLASS_TRANSFORMATIONAL, ACTUAL_NO,
+	     BT_REAL, dr, GFC_STD_F2008,
+	     gfc_check_norm2, gfc_simplify_norm2, gfc_resolve_norm2,
 	     x, BT_REAL, dr, REQUIRED,
 	     dm, BT_INTEGER, ii, OPTIONAL);
 
   make_generic ("norm2", GFC_ISYM_NORM2, GFC_STD_F2008);
 
-  add_sym_1 ("null", GFC_ISYM_NULL, CLASS_TRANSFORMATIONAL, ACTUAL_NO, BT_INTEGER, di, GFC_STD_F95,
+  add_sym_1 ("null", GFC_ISYM_NULL, CLASS_TRANSFORMATIONAL, ACTUAL_NO,
+	     BT_INTEGER, di, GFC_STD_F95,
 	     gfc_check_null, gfc_simplify_null, NULL,
 	     mo, BT_INTEGER, di, OPTIONAL);
 
@@ -2793,7 +2811,17 @@ add_functions (void)
 	     dist, BT_INTEGER, di, OPTIONAL,
 	     failed, BT_LOGICAL, dl, OPTIONAL);
 
-  add_sym_3 ("pack", GFC_ISYM_PACK, CLASS_TRANSFORMATIONAL, ACTUAL_NO, BT_REAL, dr, GFC_STD_F95,
+  add_sym_3 ("out_of_range", GFC_ISYM_OUT_OF_RANGE, CLASS_ELEMENTAL, ACTUAL_NO,
+	     BT_LOGICAL, dl, GFC_STD_F2018,
+	     gfc_check_out_of_range, gfc_simplify_out_of_range, NULL,
+	     x, BT_REAL, dr, REQUIRED,
+	     mo, BT_INTEGER, di, REQUIRED,
+	     rd, BT_LOGICAL, dl, OPTIONAL);
+
+  make_generic ("out_of_range", GFC_ISYM_OUT_OF_RANGE, GFC_STD_F2018);
+
+  add_sym_3 ("pack", GFC_ISYM_PACK, CLASS_TRANSFORMATIONAL, ACTUAL_NO,
+	     BT_REAL, dr, GFC_STD_F95,
 	     gfc_check_pack, gfc_simplify_pack, gfc_resolve_pack,
 	     ar, BT_REAL, dr, REQUIRED, msk, BT_LOGICAL, dl, REQUIRED,
 	     v, BT_REAL, dr, OPTIONAL);
@@ -2801,8 +2829,9 @@ add_functions (void)
   make_generic ("pack", GFC_ISYM_PACK, GFC_STD_F95);
 
 
-  add_sym_2 ("parity", GFC_ISYM_PARITY, CLASS_TRANSFORMATIONAL, ACTUAL_NO, BT_LOGICAL, dl,
-	     GFC_STD_F2008, gfc_check_parity, gfc_simplify_parity, gfc_resolve_parity,
+  add_sym_2 ("parity", GFC_ISYM_PARITY, CLASS_TRANSFORMATIONAL, ACTUAL_NO,
+	     BT_LOGICAL, dl, GFC_STD_F2008,
+	     gfc_check_parity, gfc_simplify_parity, gfc_resolve_parity,
 	     msk, BT_LOGICAL, dl, REQUIRED,
 	     dm, BT_INTEGER, ii, OPTIONAL);
 
@@ -3130,6 +3159,14 @@ add_functions (void)
 	     x, BT_UNKNOWN, 0, REQUIRED);
   make_from_module();
 
+  add_sym_2 ("f_c_string", GFC_ISYM_F_C_STRING, CLASS_TRANSFORMATIONAL,
+	     ACTUAL_NO,
+	     BT_CHARACTER, dc, GFC_STD_F2023,
+	     gfc_check_f_c_string, NULL, NULL,
+	     stg, BT_CHARACTER, dc, REQUIRED,
+	     "asis", BT_CHARACTER, dc, OPTIONAL);
+  make_from_module();
+
   add_sym_1 ("c_sizeof", GFC_ISYM_C_SIZEOF, CLASS_INQUIRY, ACTUAL_NO,
 	     BT_INTEGER, gfc_index_integer_kind, GFC_STD_F2008,
 	     gfc_check_c_sizeof, gfc_simplify_sizeof, NULL,
@@ -3286,7 +3323,8 @@ add_functions (void)
 
   make_generic ("transpose", GFC_ISYM_TRANSPOSE, GFC_STD_F95);
 
-  add_sym_1 ("trim", GFC_ISYM_TRIM, CLASS_TRANSFORMATIONAL, ACTUAL_NO, BT_CHARACTER, dc, GFC_STD_F95,
+  add_sym_1 ("trim", GFC_ISYM_TRIM, CLASS_TRANSFORMATIONAL, ACTUAL_NO,
+	     BT_CHARACTER, dc, GFC_STD_F95,
 	     gfc_check_trim, gfc_simplify_trim, gfc_resolve_trim,
 	     stg, BT_CHARACTER, dc, REQUIRED);
 
@@ -3483,6 +3521,13 @@ add_functions (void)
 	     BT_REAL, dr, GFC_STD_GNU, NULL, NULL, NULL,
 	     x, BT_REAL, dr, REQUIRED);
   make_from_module();
+
+  add_sym_3 (GFC_PREFIX ("caf_is_present_on_remote"),
+	     GFC_ISYM_CAF_IS_PRESENT_ON_REMOTE, CLASS_IMPURE, ACTUAL_NO,
+	     BT_LOGICAL, dl, GFC_STD_GNU, NULL, NULL, NULL, ca, BT_VOID, di,
+	     REQUIRED, val, BT_INTEGER, di, REQUIRED, i, BT_INTEGER, di,
+	     REQUIRED);
+  make_from_module ();
 }
 
 
@@ -3853,6 +3898,10 @@ add_subroutines (void)
 	      "y", BT_REAL, dr, REQUIRED, INTENT_IN);
   make_from_module();
 
+  add_sym_2s (GFC_PREFIX ("caf_sendget"), GFC_ISYM_CAF_SENDGET, CLASS_IMPURE,
+	      BT_UNKNOWN, 0, GFC_STD_GNU, NULL, NULL, NULL, "x", BT_REAL, dr,
+	      REQUIRED, INTENT_OUT, "y", BT_REAL, dr, REQUIRED, INTENT_IN);
+  make_from_module ();
 
   /* More G77 compatibility garbage.  */
   add_sym_3s ("alarm", GFC_ISYM_ALARM, CLASS_IMPURE, BT_UNKNOWN, 0, GFC_STD_GNU,

@@ -1,5 +1,5 @@
 /* Control flow functions for trees.
-   Copyright (C) 2001-2024 Free Software Foundation, Inc.
+   Copyright (C) 2001-2025 Free Software Foundation, Inc.
    Contributed by Diego Novillo <dnovillo@redhat.com>
 
 This file is part of GCC.
@@ -18,7 +18,6 @@ You should have received a copy of the GNU General Public License
 along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
-#define INCLUDE_MEMORY
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
@@ -66,6 +65,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "asan.h"
 #include "profile.h"
 #include "sreal.h"
+#include "gcc-urlifier.h"
 
 /* This file contains functions for building the Control Flow Graph (CFG)
    for a function tree.  */
@@ -168,7 +168,7 @@ static edge gimple_try_redirect_by_replacing_jump (edge, basic_block);
 static inline bool stmt_starts_bb_p (gimple *, gimple *);
 static bool gimple_verify_flow_info (void);
 static void gimple_make_forwarder_block (edge);
-static gimple *first_non_label_stmt (basic_block);
+static gimple *first_non_label_nondebug_stmt (basic_block);
 static bool verify_gimple_transaction (gtransaction *);
 static bool call_can_make_abnormal_goto (gimple *);
 
@@ -1251,7 +1251,7 @@ assign_discriminators (void)
 	    }
 	  /* Allocate a new discriminator for CALL stmt.  */
 	  if (gimple_code (stmt) == GIMPLE_CALL)
-	    curr_discr = next_discriminator_for_locus (curr_locus);
+	    curr_discr = next_discriminator_for_locus (curr_locus_e.line);
 	}
 
       gimple *last = last_nondebug_stmt (bb);
@@ -1263,7 +1263,7 @@ assign_discriminators (void)
 
       FOR_EACH_EDGE (e, ei, bb->succs)
 	{
-	  gimple *first = first_non_label_stmt (e->dest);
+	  gimple *first = first_non_label_nondebug_stmt (e->dest);
 	  gimple *last = last_nondebug_stmt (e->dest);
 
 	  gimple *stmt_on_same_line = NULL;
@@ -2948,14 +2948,13 @@ first_stmt (basic_block bb)
   return stmt;
 }
 
-/* Return the first non-label statement in basic block BB.  */
+/* Return the first non-label/non-debug statement in basic block BB.  */
 
 static gimple *
-first_non_label_stmt (basic_block bb)
+first_non_label_nondebug_stmt (basic_block bb)
 {
-  gimple_stmt_iterator i = gsi_start_bb (bb);
-  while (!gsi_end_p (i) && gimple_code (gsi_stmt (i)) == GIMPLE_LABEL)
-    gsi_next (&i);
+  gimple_stmt_iterator i;
+  i = gsi_start_nondebug_after_labels_bb (bb);
   return !gsi_end_p (i) ? gsi_stmt (i) : NULL;
 }
 
@@ -3176,7 +3175,7 @@ verify_types_in_gimple_reference (tree expr, bool require_lvalue)
 	      return true;
 	    }
 	  if (!AGGREGATE_TYPE_P (TREE_TYPE (op))
-	      && maybe_gt (size + bitpos,
+	      && known_gt (size + bitpos,
 			   tree_to_poly_uint64 (TYPE_SIZE (TREE_TYPE (op)))))
 	    {
 	      error ("position plus size exceeds size of referenced object in "
@@ -5344,6 +5343,7 @@ tree_node_can_be_shared (tree t)
       || TREE_CODE (t) == SSA_NAME
       || TREE_CODE (t) == IDENTIFIER_NODE
       || TREE_CODE (t) == CASE_LABEL_EXPR
+      || TREE_CODE (t) == OMP_NEXT_VARIANT
       || is_gimple_min_invariant (t))
     return true;
 
@@ -9938,6 +9938,8 @@ do_warn_unused_result (gimple_seq seq)
 
 	  if (lookup_attribute ("warn_unused_result", TYPE_ATTRIBUTES (ftype)))
 	    {
+	      auto_urlify_attributes sentinel;
+
 	      location_t loc = gimple_location (g);
 
 	      if (fdecl)

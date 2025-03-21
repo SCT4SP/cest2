@@ -1,0 +1,188 @@
+2025-03-20  Iain Sandoe  <iain@sandoe.co.uk>
+
+	* cdfval.h (struct cdfval_t): Overload long instead of int64_t.
+
+2025-03-18  Iain Sandoe  <iain@sandoe.co.uk>
+
+	* gcobolspec.cc (append_rpath): Remove.
+	(lang_specific_driver): Remove hard-wired rpath and library
+	names.
+
+2025-03-18  Iain Sandoe  <iain@sandoe.co.uk>
+
+	PR cobol/119301
+	* util.cc: Check for the availability of get_current_dir_name
+	snf fall back to getcwd() if it is not present on the host.
+
+2025-03-18  Richard Biener  <rguenther@suse.de>
+
+	* gengen.cc (gg_finalize_function): Dump to TDI_original.
+
+2025-03-18  Bob Dubner  <rdubner@symas.com>
+
+	* cdf.y: Make compatible with C++14.
+	* copybook.h: Likewise.
+	* dts.h: Likewise.
+	* except.cc: Likewise.
+	* genapi.cc: Likewise.
+	* genutil.cc: Likewise.
+	* genutil.h: Likewise.
+	* lexio.cc: Likewise.
+	* parse.y: Likewise.
+	* parse_ante.h: Likewise.
+	* show_parse.h: Likewise.
+	* symbols.cc: Likewise.
+	* symbols.h: Likewise.
+	* util.cc: Likewise.
+
+2025-03-18  Matthias Klose  <doko@ubuntu.com>
+
+	* Make-lang.in (GCOBC_TARGET_INSTALL_NAME, gcobol-cross): New.
+	(cobol.all.cross): Depend on gcobol-cross.
+	(cobol.install-common): Adjust install for the cross build.
+	(cobol.uninstall): Use *_INSTALL_NAME for uninstall.
+
+2025-03-18  Iain Sandoe  <iain@sandoe.co.uk>
+
+	* util.cc (cbl_field_t::report_invalid_initial_value): Avoid
+	auto here and specify const char *.
+
+2025-03-18  Jose E. Marchesi  <jose.marchesi@oracle.com>
+
+	* cdf-copy.cc (copybook_elem_t::open_file): Use ldirname rather
+	than dirname.
+
+2025-03-18  Iain Sandoe  <iain@sandoe.co.uk>
+
+	* parse.y: Remove c++ header includes appearing after
+	system.h.
+
+2025-03-17  Bob Dubner  <rdubner@symas.com>
+
+	PR cobol/119213
+	* Make-lang.in: Eliminate CPPFLAGS= assignment.
+	* cdf.y: Modify #includes that reference libgcobol.
+	* cobol1.cc: Modify #includes that reference libgcobol.
+	* except.cc: Modify #includes that reference libgcobol.
+	* gcobolspec.cc: Modify #includes that reference libgcobol.
+	* genapi.cc: Modify #includes that reference libgcobol.
+	* gengen.cc: Modify #includes that reference libgcobol.
+	* genmath.cc: Modify #includes that reference libgcobol.
+	* genutil.cc: Modify #includes that reference libgcobol.
+	* parse.y: Modify #includes that reference libgcobol.
+	* scan.l: Modify #includes that reference libgcobol.
+	* structs.cc: Modify #includes that reference libgcobol.
+	* symbols.cc: Modify #includes that reference libgcobol.
+	* symfind.cc: Modify #includes that reference libgcobol.
+	* util.cc: Modify #includes that reference libgcobol.
+
+2025-03-14  Robert Dubner  <rdubner@symas.com>
+
+	PR cobol/119214
+	* gengen.cc: applies if( !optimize ) test
+
+2025-03-13  Matthias Klose  <doko@ubuntu.com>
+
+	* Make-lang.in (cobol.install-common, cobol.install-man): Honor
+	GCOBOL_INSTALL_NAME.
+
+2025-03-13  Richard Biener  <rguenther@suse.de>
+
+	PR cobol/119229
+	* gengen.cc (gg_declare_variable): Use DECL_EXTERNAL and
+	drop TREE_STATIC for vs_external_reference.
+
+2025-03-12  Mark Wielaard  <mark@klomp.org>
+
+	* lang.opt.urls: Regenerated.
+
+2025-03-12  Simon Martin  <simon@nasilyan.com>
+
+	* Make-lang.in: Remove unnecessary CPPFLAGS update.
+
+2025-03-12  Richard Biener  <rguenther@suse.de>
+
+	* Make-lang.in (lang_checks): Add check-cobol.
+
+2025-03-11  Richard Biener  <rguenther@suse.de>
+
+	* gcobolspec.cc (lang_specific_driver): For OPT_print_* do
+	not error on no input files.
+
+2025-03-11  Jakub Jelinek  <jakub@redhat.com>
+
+	* Make-lang.in: Remove .exe extension from comments.
+	(cobol.serial): Set to cobol1$(exeext).
+	(cobol1$(exeext)): Depend on $(cobol.prev).  Add
+	LINK_PROGRESS calls before/after the link command.
+
+2025-03-11  Jakub Jelinek  <jakub@redhat.com>
+
+	* Make-lang.in (cobol/parse.c, cobol/cdf.c, cobol/scan.c): Remove.
+	(cobol/parse.cc, cobol/cdf.cc, cobol/scan.cc): New goals.
+	(cobol/cdf.o): Depend on cobol/cdf.cc rather than cobol/cdf.c.
+	(cobol/parse.o): Depend on cobol/parse.cc rather than cobol/parse.c.
+	(cobol/scan.o): Depend on cobol/scan.cc rather than cobol/scan.c,
+	on cobol/cdf.cc rather than cobol/cdf.c and on cobol/parse.cc rather
+	than cobol/parse.c.
+	(cobol.srcextra): Depend on cobol/parse.cc cobol/cdf.cc cobol/scan.cc
+	rather than cobol/parse.c cobol/cdf.c cobol/scan.c.
+
+2025-03-11  James K. Lowden  <jklowden@symas.com>
+
+	* LICENSE: New file.
+	* Make-lang.in: New file.
+	* config-lang.in: New file.
+	* lang.opt: New file.
+	* lang.opt.urls: New file.
+	* cbldiag.h: New file.
+	* cdfval.h: New file.
+	* cobol-system.h: New file.
+	* copybook.h: New file.
+	* dts.h: New file.
+	* exceptg.h: New file.
+	* gengen.h: New file.
+	* genmath.h: New file.
+	* genutil.h: New file.
+	* inspect.h: New file.
+	* lang-specs.h: New file.
+	* lexio.h: New file.
+	* parse_ante.h: New file.
+	* parse_util.h: New file.
+	* scan_ante.h: New file.
+	* scan_post.h: New file.
+	* show_parse.h: New file.
+	* structs.h: New file.
+	* symbols.h: New file.
+	* token_names.h: New file.
+	* util.h: New file.
+	* cdf-copy.cc: New file.
+	* lexio.cc: New file.
+	* scan.l: New file.
+	* parse.y: New file.
+	* genapi.cc: New file.
+	* genapi.h: New file.
+	* gengen.cc: New file.
+	* genmath.cc: New file.
+	* genutil.cc: New file.
+	* cdf.y: New file.
+	* cobol1.cc: New file.
+	* convert.cc: New file.
+	* except.cc: New file.
+	* gcobolspec.cc: New file.
+	* structs.cc: New file.
+	* symbols.cc: New file.
+	* symfind.cc: New file.
+	* util.cc: New file.
+	* gcobc: New file.
+	* gcobol.1: New file.
+	* gcobol.3: New file.
+	* help.gen: New file.
+	* udf/stored-char-length.cbl: New file.
+
+
+Copyright (C) 2025 Free Software Foundation, Inc.
+
+Copying and distribution of this file, with or without modification,
+are permitted in any medium without royalty provided the copyright
+notice and this notice are preserved.

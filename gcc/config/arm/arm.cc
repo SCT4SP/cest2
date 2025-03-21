@@ -1,5 +1,5 @@
 /* Output routines for GCC for ARM.
-   Copyright (C) 1991-2024 Free Software Foundation, Inc.
+   Copyright (C) 1991-2025 Free Software Foundation, Inc.
    Contributed by Pieter `Tiggr' Schoenmakers (rcpieter@win.tue.nl)
    and Martin Simmons (@harleqn.co.uk).
    More major hacks by Richard Earnshaw (rearnsha@arm.com).
@@ -23,7 +23,6 @@
 #define IN_TARGET_CODE 1
 
 #include "config.h"
-#define INCLUDE_MEMORY
 #define INCLUDE_STRING
 #include "system.h"
 #include "coretypes.h"
@@ -77,6 +76,7 @@
 #include "aarch-common.h"
 #include "aarch-common-protos.h"
 #include "machmode.h"
+#include "arm-builtins.h"
 
 /* This file should be included last.  */
 #include "target-def.h"
@@ -279,6 +279,7 @@ static rtx_insn *arm_pic_static_addr (rtx orig, rtx reg);
 static bool cortex_a9_sched_adjust_cost (rtx_insn *, int, rtx_insn *, int *);
 static bool xscale_sched_adjust_cost (rtx_insn *, int, rtx_insn *, int *);
 static bool fa726te_sched_adjust_cost (rtx_insn *, int, rtx_insn *, int *);
+static opt_machine_mode arm_array_mode (machine_mode, unsigned HOST_WIDE_INT);
 static bool arm_array_mode_supported_p (machine_mode,
 					unsigned HOST_WIDE_INT);
 static machine_mode arm_preferred_simd_mode (scalar_mode);
@@ -516,6 +517,8 @@ static const scoped_attribute_specs *const arm_attribute_table[] =
 #define TARGET_SHIFT_TRUNCATION_MASK arm_shift_truncation_mask
 #undef TARGET_VECTOR_MODE_SUPPORTED_P
 #define TARGET_VECTOR_MODE_SUPPORTED_P arm_vector_mode_supported_p
+#undef TARGET_ARRAY_MODE
+#define TARGET_ARRAY_MODE arm_array_mode
 #undef TARGET_ARRAY_MODE_SUPPORTED_P
 #define TARGET_ARRAY_MODE_SUPPORTED_P arm_array_mode_supported_p
 #undef TARGET_VECTORIZE_PREFERRED_SIMD_MODE
@@ -2857,7 +2860,9 @@ arm_gimple_fold_builtin (gimple_stmt_iterator *gsi)
   switch (code & ARM_BUILTIN_CLASS)
     {
     case ARM_BUILTIN_GENERAL:
+      new_stmt = arm_general_gimple_fold_builtin (subcode, stmt);
       break;
+
     case ARM_BUILTIN_MVE:
       new_stmt = arm_mve::gimple_fold_builtin (subcode, stmt);
     }
@@ -2904,6 +2909,7 @@ arm_build_builtin_va_list (void)
 			     get_identifier ("__va_list"),
 			     va_list_type);
   DECL_ARTIFICIAL (va_list_name) = 1;
+  TREE_PUBLIC (va_list_name) = 1;
   TYPE_NAME (va_list_type) = va_list_name;
   TYPE_STUB_DECL (va_list_type) = va_list_name;
   /* Create the __ap field.  */
@@ -3013,17 +3019,17 @@ arm_option_check_internal (struct gcc_options *opts)
       /* We only support -mslow-flash-data on M-profile targets with
 	 MOVT.  */
       if (target_slow_flash_data && (!TARGET_HAVE_MOVT || common_unsupported_modes))
-	error ("%s only supports non-pic code on M-profile targets with the "
+	error ("%qs only supports non-pic code on M-profile targets with the "
 	       "MOVT instruction", flag);
 
       /* We only support -mpure-code on M-profile targets.  */
       if (target_pure_code && common_unsupported_modes)
-	error ("%s only supports non-pic code on M-profile targets", flag);
+	error ("%qs only supports non-pic code on M-profile targets", flag);
 
       /* Cannot load addresses: -mslow-flash-data forbids literal pool and
 	 -mword-relocations forbids relocation of MOVT/MOVW.  */
       if (target_word_relocations)
-	error ("%s incompatible with %<-mword-relocations%>", flag);
+	error ("%qs is incompatible with %<-mword-relocations%>", flag);
     }
 }
 
@@ -8080,8 +8086,8 @@ legitimate_pic_operand_p (rtx x)
 
 /* Record that the current function needs a PIC register.  If PIC_REG is null,
    a new pseudo is allocated as PIC register, otherwise PIC_REG is used.  In
-   both case cfun->machine->pic_reg is initialized if we have not already done
-   so.  COMPUTE_NOW decide whether and where to set the PIC register.  If true,
+   both cases cfun->machine->pic_reg is initialized if we have not already done
+   so.  COMPUTE_NOW decides whether and where to set the PIC register.  If true,
    PIC register is reloaded in the current position of the instruction stream
    irregardless of whether it was loaded before.  Otherwise, it is only loaded
    if not already done so (crtl->uses_pic_offset_table is null).  Note that
@@ -8101,6 +8107,7 @@ require_pic_register (rtx pic_reg, bool compute_now)
   if (!crtl->uses_pic_offset_table || compute_now)
     {
       gcc_assert (can_create_pseudo_p ()
+		  || (arm_pic_register != INVALID_REGNUM)
 		  || (pic_reg != NULL_RTX
 		      && REG_P (pic_reg)
 		      && GET_MODE (pic_reg) == Pmode));
@@ -14264,6 +14271,30 @@ adjacent_mem_locations (rtx a, rtx b)
   return 0;
 }
 
+/* Helper routine for ldm_stm_operation_p.  Decompose a simple offset
+   address into the base register and the offset.  Return false iff
+   it is more complex than this.  */
+static inline bool
+decompose_addr_for_ldm_stm (rtx addr, rtx *base, HOST_WIDE_INT *offset)
+{
+  if (REG_P (addr))
+    {
+      *base = addr;
+      *offset = 0;
+      return true;
+    }
+  else if (GET_CODE (addr) == PLUS
+      && REG_P (XEXP (addr, 0))
+      && CONST_INT_P (XEXP (addr, 1)))
+    {
+      *base = XEXP (addr, 0);
+      *offset = INTVAL (XEXP (addr, 1));
+      return true;
+    }
+
+  return false;
+}
+
 /* Return true if OP is a valid load or store multiple operation.  LOAD is true
    for load operations, false for store operations.  CONSECUTIVE is true
    if the register numbers in the operation must be consecutive in the register
@@ -14279,23 +14310,25 @@ adjacent_mem_locations (rtx a, rtx b)
      1.  If offset is 0, first insn should be (SET (R_d0) (MEM (src_addr))).
      2.  REGNO (R_d0) < REGNO (R_d1) < ... < REGNO (R_dn).
      3.  If consecutive is TRUE, then for kth register being loaded,
-         REGNO (R_dk) = REGNO (R_d0) + k.
+	 REGNO (R_dk) = REGNO (R_d0) + k.
    The pattern for store is similar.  */
 bool
 ldm_stm_operation_p (rtx op, bool load, machine_mode mode,
-                     bool consecutive, bool return_pc)
+		     bool consecutive, bool return_pc)
 {
-  HOST_WIDE_INT count = XVECLEN (op, 0);
-  rtx reg, mem, addr;
-  unsigned regno;
-  unsigned first_regno;
-  HOST_WIDE_INT i = 1, base = 0, offset = 0;
+  int count = XVECLEN (op, 0);
+  rtx reg, mem;
+  rtx addr_base;
+  int reg_loc, mem_loc;
+  unsigned prev_regno;
+  HOST_WIDE_INT addr_offset;
   rtx elt;
   bool addr_reg_in_reglist = false;
   bool update = false;
-  int reg_increment;
-  int offset_adj;
-  int regs_per_val;
+  int reg_bytes;
+  int words_per_reg;  /* How many words in memory a register takes.  */
+  int elt_num = 0;
+  int base_elt_num;  /* Element number of the first transfer operation.  */
 
   /* If not in SImode, then registers must be consecutive
      (e.g., VLDM instructions for DFmode).  */
@@ -14303,138 +14336,140 @@ ldm_stm_operation_p (rtx op, bool load, machine_mode mode,
   /* Setting return_pc for stores is illegal.  */
   gcc_assert (!return_pc || load);
 
-  /* Set up the increments and the regs per val based on the mode.  */
-  reg_increment = GET_MODE_SIZE (mode);
-  regs_per_val = reg_increment / 4;
-  offset_adj = return_pc ? 1 : 0;
+  /* Set up the increments and sizes for the mode.  */
+  reg_bytes = GET_MODE_SIZE (mode);
+  words_per_reg = ARM_NUM_REGS (mode);
 
-  if (count <= 1
-      || GET_CODE (XVECEXP (op, 0, offset_adj)) != SET
-      || (load && !REG_P (SET_DEST (XVECEXP (op, 0, offset_adj)))))
+  /* If this is a return, then the first element in the par must be
+     (return).  */
+  if (return_pc)
+    {
+      if (GET_CODE (XVECEXP (op, 0, 0)) != RETURN)
+	return false;
+      elt_num++;
+    }
+
+  if (elt_num >= count)
     return false;
 
   /* Check if this is a write-back.  */
-  elt = XVECEXP (op, 0, offset_adj);
+  elt = XVECEXP (op, 0, elt_num);
+  if (GET_CODE (elt) != SET)
+    return false;
   if (GET_CODE (SET_SRC (elt)) == PLUS)
     {
-      i++;
-      base = 1;
+      elt_num++;
       update = true;
 
       /* The offset adjustment must be the number of registers being
-         popped times the size of a single register.  */
+	 popped times the size of a single register.  */
       if (!REG_P (SET_DEST (elt))
-          || !REG_P (XEXP (SET_SRC (elt), 0))
-          || (REGNO (SET_DEST (elt)) != REGNO (XEXP (SET_SRC (elt), 0)))
-          || !CONST_INT_P (XEXP (SET_SRC (elt), 1))
-          || INTVAL (XEXP (SET_SRC (elt), 1)) !=
-             ((count - 1 - offset_adj) * reg_increment))
-        return false;
+	  || !REG_P (XEXP (SET_SRC (elt), 0))
+	  || (REGNO (SET_DEST (elt)) != REGNO (XEXP (SET_SRC (elt), 0)))
+	  || !CONST_INT_P (XEXP (SET_SRC (elt), 1))
+	  /* ??? Can't this be negative for a PUSH?  */
+	  || (INTVAL (XEXP (SET_SRC (elt), 1)) !=
+	      ((count - elt_num) * reg_bytes)))
+	return false;
     }
 
-  i = i + offset_adj;
-  base = base + offset_adj;
-  /* Perform a quick check so we don't blow up below. If only one reg is loaded,
-     success depends on the type: VLDM can do just one reg,
-     LDM must do at least two.  */
-  if ((count <= i) && (mode == SImode))
-      return false;
+  base_elt_num = elt_num;
+  /* There must be at least one register to transfer.  */
+  if (base_elt_num >= count)
+    return false;
 
-  elt = XVECEXP (op, 0, i - 1);
+  elt = XVECEXP (op, 0, elt_num);
   if (GET_CODE (elt) != SET)
     return false;
 
+  /* Where to look for the register and memory elements.  These save us
+     needing to check LOAD multiple times in the loop.  */
   if (load)
     {
-      reg = SET_DEST (elt);
-      mem = SET_SRC (elt);
+      reg_loc = 0;  /* SET_DEST.  */
+      mem_loc = 1;  /* SET_SRC.  */
     }
   else
     {
-      reg = SET_SRC (elt);
-      mem = SET_DEST (elt);
+      mem_loc = 0;  /* SET_DEST.  */
+      reg_loc = 1;  /* SET_SRC.  */
     }
+
+  reg = XEXP (elt, reg_loc);
+  mem = XEXP (elt, mem_loc);
 
   if (!REG_P (reg) || !MEM_P (mem))
     return false;
 
-  regno = REGNO (reg);
-  first_regno = regno;
-  addr = XEXP (mem, 0);
-  if (GET_CODE (addr) == PLUS)
+  prev_regno = REGNO (reg);
+  if (!decompose_addr_for_ldm_stm (XEXP (mem, 0), &addr_base, &addr_offset))
+    return false;
+
+  /* Don't allow SP to be loaded unless it is also the base register.
+     Otherwise SP will not be correctly restored if an LDM instruction is
+     interrupted (low latency interrupt or address fault), which can result in
+     stack corruption.  */
+  if (load && (REGNO (reg) == SP_REGNUM) && (REGNO (addr_base) != SP_REGNUM))
+    return false;
+
+  addr_reg_in_reglist = (prev_regno == REGNO (addr_base));
+
+  for (elt_num++; elt_num < count; elt_num++)
     {
-      if (!CONST_INT_P (XEXP (addr, 1)))
+      rtx elt_base;
+      HOST_WIDE_INT elt_offset;
+
+      elt = XVECEXP (op, 0, elt_num);
+      if (GET_CODE (elt) != SET)
 	return false;
 
-      offset = INTVAL (XEXP (addr, 1));
-      addr = XEXP (addr, 0);
-    }
-
-  if (!REG_P (addr))
-    return false;
-
-  /* Don't allow SP to be loaded unless it is also the base register. It
-     guarantees that SP is reset correctly when an LDM instruction
-     is interrupted. Otherwise, we might end up with a corrupt stack.  */
-  if (load && (REGNO (reg) == SP_REGNUM) && (REGNO (addr) != SP_REGNUM))
-    return false;
-
-  if (regno == REGNO (addr))
-    addr_reg_in_reglist = true;
-
-  for (; i < count; i++)
-    {
-      elt = XVECEXP (op, 0, i);
-      if (GET_CODE (elt) != SET)
-        return false;
-
-      if (load)
-        {
-          reg = SET_DEST (elt);
-          mem = SET_SRC (elt);
-        }
-      else
-        {
-          reg = SET_SRC (elt);
-          mem = SET_DEST (elt);
-        }
+      reg = XEXP (elt, reg_loc);
+      mem = XEXP (elt, mem_loc);
 
       if (!REG_P (reg)
-          || GET_MODE (reg) != mode
-          || REGNO (reg) <= regno
-          || (consecutive
-              && (REGNO (reg) !=
-                  (unsigned int) (first_regno + regs_per_val * (i - base))))
-          /* Don't allow SP to be loaded unless it is also the base register. It
-             guarantees that SP is reset correctly when an LDM instruction
-             is interrupted. Otherwise, we might end up with a corrupt stack.  */
-          || (load && (REGNO (reg) == SP_REGNUM) && (REGNO (addr) != SP_REGNUM))
-          || !MEM_P (mem)
-          || GET_MODE (mem) != mode
-          || ((GET_CODE (XEXP (mem, 0)) != PLUS
-	       || !rtx_equal_p (XEXP (XEXP (mem, 0), 0), addr)
-	       || !CONST_INT_P (XEXP (XEXP (mem, 0), 1))
-	       || (INTVAL (XEXP (XEXP (mem, 0), 1)) !=
-                   offset + (i - base) * reg_increment))
-	      && (!REG_P (XEXP (mem, 0))
-		  || offset + (i - base) * reg_increment != 0)))
-        return false;
+	  || GET_MODE (reg) != mode
+	  || REGNO (reg) <= prev_regno
+	  || (consecutive
+	      && REGNO (reg) != prev_regno + words_per_reg)
+	  /* Don't allow SP to be loaded unless it is also the base register
+	     (see similar comment above).  */
+	  || (load
+	      && (REGNO (reg) == SP_REGNUM)
+	      && (REGNO (addr_base) != SP_REGNUM))
+	  || !MEM_P (mem)
+	  || GET_MODE (mem) != mode
+	  || !decompose_addr_for_ldm_stm (XEXP (mem, 0), &elt_base,
+					  &elt_offset)
+	  || REGNO (addr_base) != REGNO (elt_base)
+	  || addr_offset + (elt_num - base_elt_num) * reg_bytes != elt_offset)
+	return false;
 
-      regno = REGNO (reg);
-      if (regno == REGNO (addr))
-        addr_reg_in_reglist = true;
+      prev_regno = REGNO (reg);
+      if (prev_regno == REGNO (addr_base))
+	{
+	  /* Storing the base register is unpredictable if it is not the first
+	     transfer register and the base register is being modified.  */
+	  if (update && !load)
+	    return false;
+	  addr_reg_in_reglist = true;
+	}
     }
 
   if (load)
     {
       if (update && addr_reg_in_reglist)
-        return false;
+	return false;
 
-      /* For Thumb-1, address register is always modified - either by write-back
-         or by explicit load.  If the pattern does not describe an update,
-         then the address register must be in the list of loaded registers.  */
+      /* A return instruction must load PC last.  */
+      if (return_pc && prev_regno != PC_REGNUM)
+	return false;
+
+      /* For Thumb-1, address register is always modified - either by
+	 write-back or by explicit load.  If the pattern does not describe an
+	 update, then the address register must be in the list of loaded
+	 registers.  */
       if (TARGET_THUMB1)
-        return update || addr_reg_in_reglist;
+	return update || addr_reg_in_reglist;
     }
 
   return true;
@@ -20773,9 +20808,13 @@ output_move_neon (rtx *operands)
   nregs = REG_NREGS (reg) / 2;
   gcc_assert (VFP_REGNO_OK_FOR_DOUBLE (regno)
 	      || NEON_REGNO_OK_FOR_QUAD (regno));
-  gcc_assert (VALID_NEON_DREG_MODE (mode)
-	      || VALID_NEON_QREG_MODE (mode)
-	      || VALID_NEON_STRUCT_MODE (mode));
+  gcc_assert ((TARGET_NEON
+	       && (VALID_NEON_DREG_MODE (mode)
+		   || VALID_NEON_QREG_MODE (mode)
+		   || VALID_NEON_STRUCT_MODE (mode)))
+	      || (TARGET_HAVE_MVE
+		  && (VALID_MVE_MODE (mode)
+		      || VALID_MVE_STRUCT_MODE (mode))));
   gcc_assert (MEM_P (mem));
 
   addr = XEXP (mem, 0);
@@ -20878,8 +20917,9 @@ output_move_neon (rtx *operands)
   return "";
 }
 
-/* Compute and return the length of neon_mov<mode>, where <mode> is
-   one of VSTRUCT modes: EI, OI, CI or XI.  */
+/* Compute and return the length of neon_mov<mode>, where <mode> is one of
+   VSTRUCT modes: EI, OI, CI or XI for Neon, and V2x16QI, V2x8HI, V2x4SI,
+   V2x8HF, V2x4SF, V2x16QI, V2x8HI, V2x4SI, V2x8HF, V2x4SF for MVE.  */
 int
 arm_attr_length_move_neon (rtx_insn *insn)
 {
@@ -20896,10 +20936,20 @@ arm_attr_length_move_neon (rtx_insn *insn)
 	{
 	case E_EImode:
 	case E_OImode:
+	case E_V2x16QImode:
+	case E_V2x8HImode:
+	case E_V2x4SImode:
+	case E_V2x8HFmode:
+	case E_V2x4SFmode:
 	  return 8;
 	case E_CImode:
 	  return 12;
 	case E_XImode:
+	case E_V4x16QImode:
+	case E_V4x8HImode:
+	case E_V4x4SImode:
+	case E_V4x8HFmode:
+	case E_V4x4SFmode:
 	  return 16;
 	default:
 	  gcc_unreachable ();
@@ -22497,27 +22547,54 @@ static void
 arm_emit_multi_reg_pop (unsigned long saved_regs_mask)
 {
   int num_regs = 0;
-  int i, j;
   rtx par;
   rtx dwarf = NULL_RTX;
   rtx tmp, reg;
   bool return_in_pc = saved_regs_mask & (1 << PC_REGNUM);
   int offset_adj;
   int emit_update;
+  unsigned long reg_bits;
 
   offset_adj = return_in_pc ? 1 : 0;
-  for (i = 0; i <= LAST_ARM_REGNUM; i++)
-    if (saved_regs_mask & (1 << i))
-      num_regs++;
+  for (reg_bits = saved_regs_mask; reg_bits;
+       reg_bits &= ~(reg_bits & -reg_bits))
+    num_regs++;
 
   gcc_assert (num_regs && num_regs <= 16);
 
   /* If SP is in reglist, then we don't emit SP update insn.  */
   emit_update = (saved_regs_mask & (1 << SP_REGNUM)) ? 0 : 1;
 
+  /* If popping just one register, use LDR reg, [SP], #4, unless
+     we're generating Thumb code and reg is a low reg.  */
+  if (num_regs == 1
+      && emit_update
+      && !return_in_pc
+      && (TARGET_ARM
+	  /* For Thumb we want to use POP for a single low register.  */
+	  || (saved_regs_mask & ~0xff)))
+    {
+      int i = exact_log2 (saved_regs_mask);
+
+      rtx dwarf_reg = reg = gen_rtx_REG (SImode, i);
+      if (arm_current_function_pac_enabled_p () && i == IP_REGNUM)
+	dwarf_reg = gen_rtx_REG (SImode, RA_AUTH_CODE);
+      /* Emit single load with writeback.	 */
+      tmp = gen_frame_mem (SImode,
+			   gen_rtx_POST_INC (Pmode,
+					     stack_pointer_rtx));
+      tmp = emit_insn (gen_rtx_SET (reg, tmp));
+      REG_NOTES (tmp) = alloc_reg_note (REG_CFA_RESTORE, dwarf_reg,
+					dwarf);
+      arm_add_cfa_adjust_cfa_note (tmp, UNITS_PER_WORD,
+				   stack_pointer_rtx, stack_pointer_rtx);
+      return;
+    }
+
   /* The parallel needs to hold num_regs SETs
      and one SET for the stack update.  */
-  par = gen_rtx_PARALLEL (VOIDmode, rtvec_alloc (num_regs + emit_update + offset_adj));
+  par = gen_rtx_PARALLEL (VOIDmode,
+			  rtvec_alloc (num_regs + emit_update + offset_adj));
 
   if (return_in_pc)
     XVECEXP (par, 0, 0) = ret_rtx;
@@ -22525,58 +22602,49 @@ arm_emit_multi_reg_pop (unsigned long saved_regs_mask)
   if (emit_update)
     {
       /* Increment the stack pointer, based on there being
-         num_regs 4-byte registers to restore.  */
+	 num_regs 4-byte registers to restore.	*/
       tmp = gen_rtx_SET (stack_pointer_rtx,
-                         plus_constant (Pmode,
-                                        stack_pointer_rtx,
-                                        4 * num_regs));
+			 plus_constant (Pmode,
+					stack_pointer_rtx,
+					4 * num_regs));
       RTX_FRAME_RELATED_P (tmp) = 1;
       XVECEXP (par, 0, offset_adj) = tmp;
     }
 
   /* Now restore every reg, which may include PC.  */
-  for (j = 0, i = 0; j < num_regs; i++)
-    if (saved_regs_mask & (1 << i))
-      {
-	rtx dwarf_reg = reg = gen_rtx_REG (SImode, i);
-	if (arm_current_function_pac_enabled_p () && i == IP_REGNUM)
-	  dwarf_reg = gen_rtx_REG (SImode, RA_AUTH_CODE);
-        if ((num_regs == 1) && emit_update && !return_in_pc)
-          {
-            /* Emit single load with writeback.  */
-            tmp = gen_frame_mem (SImode,
-                                 gen_rtx_POST_INC (Pmode,
-                                                   stack_pointer_rtx));
-            tmp = emit_insn (gen_rtx_SET (reg, tmp));
-	    REG_NOTES (tmp) = alloc_reg_note (REG_CFA_RESTORE, dwarf_reg,
-					      dwarf);
-            return;
-          }
+  int j = 0;
+  int elt = emit_update + offset_adj;
+  for (reg_bits = saved_regs_mask; reg_bits;
+       reg_bits &= ~(reg_bits & -reg_bits))
+    {
+      int i = exact_log2 (reg_bits & -reg_bits);
+      rtx dwarf_reg = reg = gen_rtx_REG (SImode, i);
 
-        tmp = gen_rtx_SET (reg,
-                           gen_frame_mem
-                           (SImode,
-                            plus_constant (Pmode, stack_pointer_rtx, 4 * j)));
-        RTX_FRAME_RELATED_P (tmp) = 1;
-        XVECEXP (par, 0, j + emit_update + offset_adj) = tmp;
+      if (i == IP_REGNUM && arm_current_function_pac_enabled_p ())
+	dwarf_reg = gen_rtx_REG (SImode, RA_AUTH_CODE);
+      tmp = gen_rtx_SET (reg,
+			 gen_frame_mem
+			 (SImode,
+			  plus_constant (Pmode, stack_pointer_rtx, 4 * j)));
+      RTX_FRAME_RELATED_P (tmp) = 1;
+      XVECEXP (par, 0, elt) = tmp;
 
-        /* We need to maintain a sequence for DWARF info too.  As dwarf info
-           should not have PC, skip PC.  */
-        if (i != PC_REGNUM)
-	  dwarf = alloc_reg_note (REG_CFA_RESTORE, dwarf_reg, dwarf);
+      /* We need to maintain a sequence for DWARF info too.  As dwarf info
+	 should not have PC, skip PC.	 */
+      if (i != PC_REGNUM)
+	dwarf = alloc_reg_note (REG_CFA_RESTORE, dwarf_reg, dwarf);
+      j++;
+      elt++;
+    }
 
-        j++;
-      }
-
-  if (return_in_pc)
-    par = emit_jump_insn (par);
-  else
-    par = emit_insn (par);
-
+  par = return_in_pc ? emit_jump_insn (par) : emit_insn (par);
   REG_NOTES (par) = dwarf;
-  if (!return_in_pc)
+
+  if (!return_in_pc && emit_update)
     arm_add_cfa_adjust_cfa_note (par, UNITS_PER_WORD * num_regs,
 				 stack_pointer_rtx, stack_pointer_rtx);
+  else if (!return_in_pc)
+    RTX_FRAME_RELATED_P (par) = 1;
 }
 
 /* Generate and emit an insn pattern that we will recognize as a pop_multi
@@ -24950,7 +25018,8 @@ arm_print_operand_address (FILE *stream, machine_mode mode, rtx x)
 			 REGNO (XEXP (x, 0)),
 			 GET_CODE (x) == PRE_DEC ? "-" : "",
 			 GET_MODE_SIZE (mode));
-	  else if (TARGET_HAVE_MVE && (mode == OImode || mode == XImode))
+	  else if (TARGET_HAVE_MVE
+		   && VALID_MVE_STRUCT_MODE (mode))
 	    asm_fprintf (stream, "[%r]!", REGNO (XEXP (x,0)));
 	  else
 	    asm_fprintf (stream, "[%r], #%s%d", REGNO (XEXP (x, 0)),
@@ -25840,7 +25909,17 @@ arm_hard_regno_mode_ok (unsigned int regno, machine_mode mode)
      if (TARGET_HAVE_MVE)
        return ((VALID_MVE_MODE (mode) && NEON_REGNO_OK_FOR_QUAD (regno))
 	       || (mode == OImode && NEON_REGNO_OK_FOR_NREGS (regno, 4))
-	       || (mode == XImode && NEON_REGNO_OK_FOR_NREGS (regno, 8)));
+	       || (mode == V2x16QImode && NEON_REGNO_OK_FOR_NREGS (regno, 4))
+	       || (mode == V2x8HImode && NEON_REGNO_OK_FOR_NREGS (regno, 4))
+	       || (mode == V2x4SImode && NEON_REGNO_OK_FOR_NREGS (regno, 4))
+	       || (mode == V2x8HFmode && NEON_REGNO_OK_FOR_NREGS (regno, 4))
+	       || (mode == V2x4SFmode && NEON_REGNO_OK_FOR_NREGS (regno, 4))
+	       || (mode == XImode && NEON_REGNO_OK_FOR_NREGS (regno, 8))
+	       || (mode == V4x16QImode && NEON_REGNO_OK_FOR_NREGS (regno, 8))
+	       || (mode == V4x8HImode && NEON_REGNO_OK_FOR_NREGS (regno, 8))
+	       || (mode == V4x4SImode && NEON_REGNO_OK_FOR_NREGS (regno, 8))
+	       || (mode == V4x8HFmode && NEON_REGNO_OK_FOR_NREGS (regno, 8))
+	       || (mode == V4x4SFmode && NEON_REGNO_OK_FOR_NREGS (regno, 8)));
 
       return false;
     }
@@ -27705,35 +27784,40 @@ thumb2_expand_return (bool simple_return)
       /* TODO: Verify that this path is never taken for cmse_nonsecure_entry
 	 functions or adapt code to handle according to ACLE.  This path should
 	 not be reachable for cmse_nonsecure_entry functions though we prefer
-	 to assert it for now to ensure that future code changes do not silently
-	 change this behavior.  */
+	 to assert it for now to ensure that future code changes do not
+	 silently change this behavior.  */
       gcc_assert (!IS_CMSE_ENTRY (arm_current_func_type ()));
       if (arm_current_function_pac_enabled_p ())
-        {
-          gcc_assert (!(saved_regs_mask & (1 << PC_REGNUM)));
-          arm_emit_multi_reg_pop (saved_regs_mask);
-          emit_insn (gen_aut_nop ());
-          emit_jump_insn (simple_return_rtx);
-        }
-      else if (num_regs == 1)
-        {
-          rtx par = gen_rtx_PARALLEL (VOIDmode, rtvec_alloc (2));
-          rtx reg = gen_rtx_REG (SImode, PC_REGNUM);
-          rtx addr = gen_rtx_MEM (SImode,
-                                  gen_rtx_POST_INC (SImode,
-                                                    stack_pointer_rtx));
-          set_mem_alias_set (addr, get_frame_alias_set ());
-          XVECEXP (par, 0, 0) = ret_rtx;
-          XVECEXP (par, 0, 1) = gen_rtx_SET (reg, addr);
-          RTX_FRAME_RELATED_P (XVECEXP (par, 0, 1)) = 1;
-          emit_jump_insn (par);
-        }
+	{
+	  gcc_assert (!(saved_regs_mask & (1 << PC_REGNUM)));
+	  arm_emit_multi_reg_pop (saved_regs_mask);
+	  emit_insn (gen_aut_nop ());
+	  emit_jump_insn (simple_return_rtx);
+	}
+      /* Use LDR PC, [sp], #4.  Only do this if not optimizing for size and
+	 there's a known performance benefit (we don't know this exactly, but
+	 preferring LDRD/STRD over LDM/STM is a reasonable proxy).  */
+      else if (num_regs == 1
+	       && !optimize_size
+	       && current_tune->prefer_ldrd_strd)
+	{
+	  rtx par = gen_rtx_PARALLEL (VOIDmode, rtvec_alloc (2));
+	  rtx reg = gen_rtx_REG (SImode, PC_REGNUM);
+	  rtx addr = gen_rtx_MEM (SImode,
+				  gen_rtx_POST_INC (SImode,
+						    stack_pointer_rtx));
+	  set_mem_alias_set (addr, get_frame_alias_set ());
+	  XVECEXP (par, 0, 0) = ret_rtx;
+	  XVECEXP (par, 0, 1) = gen_rtx_SET (reg, addr);
+	  RTX_FRAME_RELATED_P (XVECEXP (par, 0, 1)) = 1;
+	  emit_jump_insn (par);
+	}
       else
-        {
-          saved_regs_mask &= ~ (1 << LR_REGNUM);
-          saved_regs_mask |=   (1 << PC_REGNUM);
-          arm_emit_multi_reg_pop (saved_regs_mask);
-        }
+	{
+	  saved_regs_mask &= ~ (1 << LR_REGNUM);
+	  saved_regs_mask |=   (1 << PC_REGNUM);
+	  arm_emit_multi_reg_pop (saved_regs_mask);
+	}
     }
   else
     {
@@ -28147,7 +28231,10 @@ arm_expand_epilogue (bool really_return)
           return_in_pc = true;
         }
 
-      if (num_regs == 1 && (!IS_INTERRUPT (func_type) || !return_in_pc))
+      if (num_regs == 1
+	  && !optimize_size
+	  && current_tune->prefer_ldrd_strd
+	  && !(IS_INTERRUPT (func_type) && return_in_pc))
         {
           for (i = 0; i <= LAST_ARM_REGNUM; i++)
             if (saved_regs_mask & (1 << i))
@@ -29784,6 +29871,27 @@ arm_vector_mode_supported_p (machine_mode mode)
     return true;
 
   return false;
+}
+
+/* Implements target hook array_mode.  */
+static opt_machine_mode
+arm_array_mode (machine_mode mode, unsigned HOST_WIDE_INT nelems)
+{
+  if (TARGET_HAVE_MVE
+      /* MVE accepts only tuples of 2 or 4 vectors.  */
+      && (nelems == 2
+	  || nelems == 4))
+    {
+      machine_mode struct_mode;
+      FOR_EACH_MODE_IN_CLASS (struct_mode, GET_MODE_CLASS (mode))
+	{
+	  if (GET_MODE_INNER (struct_mode) == GET_MODE_INNER (mode)
+	      && known_eq (GET_MODE_NUNITS (struct_mode),
+			   GET_MODE_NUNITS (mode) * nelems))
+	    return struct_mode;
+	}
+    }
+  return opt_machine_mode ();
 }
 
 /* Implements target hook array_mode_supported_p.  */
@@ -31804,50 +31912,6 @@ arm_expand_vector_compare (rtx target, rtx_code code, rtx op0, rtx op1,
     }
 }
 
-/* Expand a vcond or vcondu pattern with operands OPERANDS.
-   CMP_RESULT_MODE is the mode of the comparison result.  */
-
-void
-arm_expand_vcond (rtx *operands, machine_mode cmp_result_mode)
-{
-  /* When expanding for MVE, we do not want to emit a (useless) vpsel in
-     arm_expand_vector_compare, and another one here.  */
-  rtx mask;
-
-  if (TARGET_HAVE_MVE)
-    mask = gen_reg_rtx (arm_mode_to_pred_mode (cmp_result_mode).require ());
-  else
-    mask = gen_reg_rtx (cmp_result_mode);
-
-  bool inverted = arm_expand_vector_compare (mask, GET_CODE (operands[3]),
-					     operands[4], operands[5], true);
-  if (inverted)
-    std::swap (operands[1], operands[2]);
-  if (TARGET_NEON)
-  emit_insn (gen_neon_vbsl (GET_MODE (operands[0]), operands[0],
-			    mask, operands[1], operands[2]));
-  else
-    {
-      machine_mode cmp_mode = GET_MODE (operands[0]);
-
-      switch (GET_MODE_CLASS (cmp_mode))
-	{
-	case MODE_VECTOR_INT:
-	  emit_insn (gen_mve_q (VPSELQ_S, VPSELQ_S, cmp_mode, operands[0],
-				operands[1], operands[2], mask));
-	  break;
-	case MODE_VECTOR_FLOAT:
-	  if (TARGET_HAVE_MVE_FLOAT)
-	    emit_insn (gen_mve_q_f (VPSELQ_F, cmp_mode, operands[0],
-				    operands[1], operands[2], mask));
-	  else
-	    gcc_unreachable ();
-	  break;
-	default:
-	  gcc_unreachable ();
-	}
-    }
-}
 
 #define MAX_VECT_LEN 16
 
@@ -33492,6 +33556,15 @@ aarch_gen_bti_j (void)
   return gen_bti_nop ();
 }
 
+/* For AArch32, we always return false because indirect_return attribute
+   is only supported on AArch64 targets.  */
+
+bool
+aarch_fun_is_indirect_return (rtx_insn *)
+{
+  return false;
+}
+
 /* Implement TARGET_SCHED_CAN_SPECULATE_INSN.  Return true if INSN can be
    scheduled for speculative execution.  Reject the long-running division
    and square-root instructions.  */
@@ -34481,6 +34554,30 @@ arm_coproc_ldc_stc_legitimate_address (rtx op)
   return false;
 }
 
+/* Return true if OP is a valid memory operand for LDRD/STRD without any
+   register overlap restrictions.  Allow [base] and [base, imm] for now.  */
+bool
+arm_ldrd_legitimate_address (rtx op)
+{
+  if (!MEM_P (op))
+    return false;
+
+  op = XEXP (op, 0);
+  if (REG_P (op))
+    return true;
+
+  if (GET_CODE (op) != PLUS)
+    return false;
+  if (!REG_P (XEXP (op, 0)) || !CONST_INT_P (XEXP (op, 1)))
+    return false;
+
+  HOST_WIDE_INT val = INTVAL (XEXP (op, 1));
+
+  if (TARGET_ARM)
+    return IN_RANGE (val, -255, 255);
+  return IN_RANGE (val, -1020, 1020) && (val & 3) == 0;
+}
+
 /* Return the diagnostic message string if conversion from FROMTYPE to
    TOTYPE is not allowed, NULL otherwise.  */
 
@@ -35370,9 +35467,10 @@ arm_mve_dlstp_check_dec_counter (loop *loop, rtx_insn* vctp_insn,
     return NULL;
   else if (REG_P (condconst))
     {
-      basic_block pre_loop_bb = single_pred (loop_preheader_edge (loop)->src);
-      if (!pre_loop_bb)
+      basic_block preheader_b = loop_preheader_edge (loop)->src;
+      if (!single_pred_p (preheader_b))
 	return NULL;
+      basic_block pre_loop_bb = single_pred (preheader_b);
 
       rtx initial_compare = NULL_RTX;
       if (!(prev_nonnote_nondebug_insn_bb (BB_END (pre_loop_bb))
@@ -35838,7 +35936,8 @@ arm_attempt_dlstp_transform (rtx label)
 	  df_ref insn_uses = NULL;
 	  FOR_EACH_INSN_USE (insn_uses, insn)
 	  {
-	    if (rtx_equal_p (vctp_vpr_generated, DF_REF_REG (insn_uses)))
+	    if (reg_overlap_mentioned_p (vctp_vpr_generated,
+					 DF_REF_REG (insn_uses)))
 	      {
 		end_sequence ();
 		return 1;
@@ -36086,6 +36185,9 @@ arm_mode_base_reg_class (machine_mode mode)
   return MODE_BASE_REG_REG_CLASS (mode);
 }
 
+#undef TARGET_DOCUMENTATION_NAME
+#define TARGET_DOCUMENTATION_NAME "ARM"
+
 struct gcc_target targetm = TARGET_INITIALIZER;
 
 /* Implement TARGET_VECTORIZE_GET_MASK_MODE.  */
@@ -36100,9 +36202,57 @@ arm_get_mask_mode (machine_mode mode)
 }
 
 /* Helper function to determine whether SEQ represents a sequence of
+   instructions representing the vsel<cond> floating point instructions.
+   This is an heuristic to check whether the proposed optimisation is desired,
+   the choice has no consequence for correctness.  */
+static bool
+arm_is_vsel_fp_insn (rtx_insn *seq)
+{
+  rtx_insn *curr_insn = seq;
+  rtx set = NULL_RTX;
+  /* The pattern may start with a simple set with register operands.  Skip
+     through any of those.  */
+  while (curr_insn)
+    {
+      set = single_set (curr_insn);
+      if (!set
+	  || !REG_P (SET_DEST (set)))
+	return false;
+
+      if (!REG_P (SET_SRC (set)))
+	break;
+      curr_insn = NEXT_INSN (curr_insn);
+    }
+
+  if (!set)
+    return false;
+
+  /* The next instruction should be a compare.  */
+  if (!REG_P (SET_DEST (set))
+      || GET_CODE (SET_SRC (set)) != COMPARE)
+    return false;
+
+  curr_insn = NEXT_INSN (curr_insn);
+  if (!curr_insn)
+    return false;
+
+  /* And the last instruction should be an IF_THEN_ELSE.  */
+  set = single_set (curr_insn);
+  if (!set
+      || !REG_P (SET_DEST (set))
+      || GET_CODE (SET_SRC (set)) != IF_THEN_ELSE)
+    return false;
+
+  return !NEXT_INSN (curr_insn);
+}
+
+
+/* Helper function to determine whether SEQ represents a sequence of
    instructions representing the Armv8.1-M Mainline conditional arithmetic
    instructions: csinc, csneg and csinv. The cinc instruction is generated
-   using a different mechanism.  */
+   using a different mechanism.
+   This is an heuristic to check whether the proposed optimisation is desired,
+   the choice has no consequence for correctness.  */
 
 static bool
 arm_is_v81m_cond_insn (rtx_insn *seq)
@@ -36171,13 +36321,18 @@ arm_is_v81m_cond_insn (rtx_insn *seq)
    hook to only allow "noce" to generate the patterns that are profitable.  */
 
 bool
-arm_noce_conversion_profitable_p (rtx_insn *seq, struct noce_if_info *)
+arm_noce_conversion_profitable_p (rtx_insn *seq, struct noce_if_info *if_info)
 {
   if (!TARGET_COND_ARITH
       || reload_completed)
-    return true;
+    return default_noce_conversion_profitable_p (seq, if_info);
 
   if (arm_is_v81m_cond_insn (seq))
+    return true;
+
+  /* Look for vsel<cond> opportunities as we still want to codegen these for
+     Armv8.1-M Mainline targets.  */
+  if (arm_is_vsel_fp_insn (seq))
     return true;
 
   return false;

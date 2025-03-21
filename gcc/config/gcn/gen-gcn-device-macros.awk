@@ -1,6 +1,6 @@
 # Generate $objdir/gcn-device-macros.h from gcn-devices.def
 #
-# Copyright (C) 2024 Free Software Foundation, Inc.
+# Copyright (C) 2024-2025 Free Software Foundation, Inc.
 #
 # This file is part of GCC.
 #
@@ -117,7 +117,9 @@ BEGIN {
 # same. - LLVM <= 17 defaults to 4 while LLVM >= 18 defaults to 5.
 # GCC supports LLVM >= 13.0.1 and only LLVM >= 14 supports version 5.
 # Code object V6 is supported since LLVM 19.
-
+#
+# Keep in sync with 'amdhsa.version' in gcn.cc
+#
 END {
   print ""
   print ""

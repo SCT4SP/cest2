@@ -1,6 +1,6 @@
 // Range access functions for containers -*- C++ -*-
 
-// Copyright (C) 2010-2024 Free Software Foundation, Inc.
+// Copyright (C) 2010-2025 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -51,7 +51,8 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
   template<typename _Container>
     [[__nodiscard__, __gnu__::__always_inline__]]
     inline _GLIBCXX17_CONSTEXPR auto
-    begin(_Container& __cont) -> decltype(__cont.begin())
+    begin(_Container& __cont) noexcept(noexcept(__cont.begin()))
+    -> decltype(__cont.begin())
     { return __cont.begin(); }
 
   /**
@@ -62,7 +63,8 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
   template<typename _Container>
     [[__nodiscard__, __gnu__::__always_inline__]]
     inline _GLIBCXX17_CONSTEXPR auto
-    begin(const _Container& __cont) -> decltype(__cont.begin())
+    begin(const _Container& __cont) noexcept(noexcept(__cont.begin()))
+    -> decltype(__cont.begin())
     { return __cont.begin(); }
 
   /**
@@ -73,7 +75,8 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
   template<typename _Container>
     [[__nodiscard__, __gnu__::__always_inline__]]
     inline _GLIBCXX17_CONSTEXPR auto
-    end(_Container& __cont) -> decltype(__cont.end())
+    end(_Container& __cont) noexcept(noexcept(__cont.end()))
+    -> decltype(__cont.end())
     { return __cont.end(); }
 
   /**
@@ -84,7 +87,8 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
   template<typename _Container>
     [[__nodiscard__, __gnu__::__always_inline__]]
     inline _GLIBCXX17_CONSTEXPR auto
-    end(const _Container& __cont) -> decltype(__cont.end())
+    end(const _Container& __cont) noexcept(noexcept(__cont.end()))
+    -> decltype(__cont.end())
     { return __cont.end(); }
 
   /**
@@ -149,7 +153,8 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
   template<typename _Container>
     [[__nodiscard__, __gnu__::__always_inline__]]
     inline _GLIBCXX17_CONSTEXPR auto
-    rbegin(_Container& __cont) -> decltype(__cont.rbegin())
+    rbegin(_Container& __cont) noexcept(noexcept(__cont.rbegin()))
+      -> decltype(__cont.rbegin())
     { return __cont.rbegin(); }
 
   /**
@@ -160,7 +165,8 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
   template<typename _Container>
     [[__nodiscard__, __gnu__::__always_inline__]]
     inline _GLIBCXX17_CONSTEXPR auto
-    rbegin(const _Container& __cont) -> decltype(__cont.rbegin())
+    rbegin(const _Container& __cont) noexcept(noexcept(__cont.rbegin()))
+      -> decltype(__cont.rbegin())
     { return __cont.rbegin(); }
 
   /**
@@ -171,7 +177,8 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
   template<typename _Container>
     [[__nodiscard__, __gnu__::__always_inline__]]
     inline _GLIBCXX17_CONSTEXPR auto
-    rend(_Container& __cont) -> decltype(__cont.rend())
+    rend(_Container& __cont) noexcept(noexcept(__cont.rend()))
+      -> decltype(__cont.rend())
     { return __cont.rend(); }
 
   /**
@@ -182,7 +189,8 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
   template<typename _Container>
     [[__nodiscard__, __gnu__::__always_inline__]]
     inline _GLIBCXX17_CONSTEXPR auto
-    rend(const _Container& __cont) -> decltype(__cont.rend())
+    rend(const _Container& __cont) noexcept(noexcept(__cont.rend()))
+      -> decltype(__cont.rend())
     { return __cont.rend(); }
 
   /**
@@ -237,7 +245,8 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
   template<typename _Container>
     [[__nodiscard__, __gnu__::__always_inline__]]
     inline _GLIBCXX17_CONSTEXPR auto
-    crbegin(const _Container& __cont) -> decltype(std::rbegin(__cont))
+    crbegin(const _Container& __cont) noexcept(noexcept(std::rbegin(__cont)))
+      -> decltype(std::rbegin(__cont))
     { return std::rbegin(__cont); }
 
   /**
@@ -248,7 +257,8 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
   template<typename _Container>
     [[__nodiscard__, __gnu__::__always_inline__]]
     inline _GLIBCXX17_CONSTEXPR auto
-    crend(const _Container& __cont) -> decltype(std::rend(__cont))
+    crend(const _Container& __cont) noexcept(noexcept(std::rend(__cont)))
+      -> decltype(std::rend(__cont))
     { return std::rend(__cont); }
 
 #endif // C++14
@@ -351,8 +361,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
   template<typename _Container>
     [[nodiscard, __gnu__::__always_inline__]]
     constexpr auto
-    ssize(const _Container& __cont)
-    noexcept(noexcept(__cont.size()))
+    ssize(const _Container& __cont) noexcept(noexcept(__cont.size()))
     -> common_type_t<ptrdiff_t, make_signed_t<decltype(__cont.size())>>
     {
       using type = make_signed_t<decltype(__cont.size())>;

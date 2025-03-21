@@ -1,5 +1,5 @@
 /* Part of CPP library.  (Macro and #define handling.)
-   Copyright (C) 1986-2024 Free Software Foundation, Inc.
+   Copyright (C) 1986-2025 Free Software Foundation, Inc.
    Written by Per Bothner, 1994.
    Based on CCCP program by Paul Rubin, June 1986
    Adapted to ANSI C, Richard Stallman, Jan 1987
@@ -364,10 +364,10 @@ static cpp_hashnode* macro_of_context (cpp_context *context);
 
 /* Statistical counter tracking the number of macros that got
    expanded.  */
-unsigned num_expanded_macros_counter = 0;
+line_map_uint_t num_expanded_macros_counter = 0;
 /* Statistical counter tracking the total number tokens resulting
    from macro expansion.  */
-unsigned num_macro_tokens_counter = 0;
+line_map_uint_t num_macro_tokens_counter = 0;
 
 /* Wrapper around cpp_get_token to skip CPP_PADDING tokens
    and not consume CPP_EOF.  */
@@ -2579,10 +2579,8 @@ tokens_buff_new (cpp_reader *pfile, size_t len,
 		 location_t **virt_locs)
 {
   size_t tokens_size = len * sizeof (cpp_token *);
-  size_t locs_size = len * sizeof (location_t);
-
   if (virt_locs != NULL)
-    *virt_locs = XNEWVEC (location_t, locs_size);
+    *virt_locs = XNEWVEC (location_t, len);
   return _cpp_get_buff (pfile, tokens_size);
 }
 
@@ -3076,6 +3074,9 @@ cpp_get_token_1 (cpp_reader *pfile, location_t *location)
 	  if (pfile->state.prevent_expansion)
 	    break;
 
+	  if ((result->flags & NO_DOT_COLON) != 0)
+	    pfile->diagnose_dot_colon_from_macro_p = true;
+
 	  /* Conditional macros require that a predicate be evaluated
 	     first.  */
 	  if ((node->flags & NODE_CONDITIONAL) != 0)
@@ -3224,6 +3225,20 @@ cpp_get_token_1 (cpp_reader *pfile, location_t *location)
 
 	  result = tmp;
 	}
+    }
+
+  if (pfile->diagnose_dot_colon_from_macro_p
+      && !pfile->about_to_expand_macro_p
+      && result->type != CPP_PADDING
+      && result->type != CPP_COMMENT)
+    {
+      if (result->type == CPP_DOT || result->type == CPP_COLON)
+	cpp_error_with_line (pfile, CPP_DL_ERROR,
+			     result->src_loc, 0,
+			     "%qc in module name or partition "
+			     "comes from or after macro expansion",
+			     result->type == CPP_DOT ? '.' : ':');
+      pfile->diagnose_dot_colon_from_macro_p = false;
     }
 
   return result;

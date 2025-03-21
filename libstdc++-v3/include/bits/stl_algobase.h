@@ -1,6 +1,6 @@
 // Core algorithmic facilities -*- C++ -*-
 
-// Copyright (C) 2001-2024 Free Software Foundation, Inc.
+// Copyright (C) 2001-2025 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -359,27 +359,13 @@ _GLIBCXX_END_NAMESPACE_CONTAINER
 #endif // HOSTED
 
 #if __cpp_lib_concepts
-  // N.B. this is not the same as nothrow-forward-iterator, which doesn't
-  // require noexcept operations, it just says it's undefined if they throw.
-  // Here we require them to be actually noexcept.
-  template<typename _Iter>
-    concept __nothrow_contiguous_iterator
-      = contiguous_iterator<_Iter> && requires (_Iter __i) {
-	// If this operation can throw then the iterator could cause
-	// the algorithm to exit early via an exception, in which case
-	// we can't use memcpy.
-	{ *__i } noexcept;
-      };
-
   template<typename _OutIter, typename _InIter, typename _Sent = _InIter>
     concept __memcpyable_iterators
-      = __nothrow_contiguous_iterator<_OutIter>
-	  && __nothrow_contiguous_iterator<_InIter>
+      = contiguous_iterator<_OutIter> && contiguous_iterator<_InIter>
 	  && sized_sentinel_for<_Sent, _InIter>
-	  && requires (_OutIter __o, _InIter __i, _Sent __s) {
+	  && requires (_OutIter __o, _InIter __i) {
 	    requires !!__memcpyable<decltype(std::to_address(__o)),
 				    decltype(std::to_address(__i))>::__value;
-	    { __i != __s } noexcept;
 	  };
 #endif
 
@@ -457,9 +443,10 @@ _GLIBCXX_END_NAMESPACE_CONTAINER
 	      void* __dest = std::to_address(__result);
 	      const void* __src = std::to_address(__first);
 	      size_t __nbytes = __n * sizeof(iter_value_t<_InIter>);
-	      // Advance the iterators first, in case doing so throws.
-	      __result += __n;
-	      __first += __n;
+	      // Advance the iterators and convert to pointers first.
+	      // This gives the iterators a chance to do bounds checking.
+	      (void) std::to_address(__result += __n);
+	      (void) std::to_address(__first += __n);
 	      __builtin_memmove(__dest, __src, __nbytes);
 	    }
 	  else if (__n == 1)
@@ -579,9 +566,10 @@ _GLIBCXX_END_NAMESPACE_CONTAINER
 	      void* __dest = std::to_address(__result);
 	      const void* __src = std::to_address(__first);
 	      size_t __nbytes = __n * sizeof(iter_value_t<_InputIterator>);
-	      // Advance the iterators first, in case doing so throws.
-	      __result += __n;
-	      __first += __n;
+	      // Advance the iterators and convert to pointers first.
+	      // This gives the iterators a chance to do bounds checking.
+	      (void) std::to_address(__result += __n);
+	      (void) std::to_address(__first += __n);
 	      __builtin_memmove(__dest, __src, __nbytes);
 	    }
 	  else if (__n == 1)
@@ -727,9 +715,10 @@ _GLIBCXX_END_NAMESPACE_CONTAINER
 	  if (auto __n = __last - __first; __n > 1) [[likely]]
 	    {
 	      const void* __src = std::to_address(__first);
-	      // Advance the iterators first, in case doing so throws.
-	      __result -= __n;
-	      __first += __n;
+	      // Advance the iterators and convert to pointers first.
+	      // This gives the iterators a chance to do bounds checking.
+	      (void) std::to_address(__result -= __n);
+	      (void) std::to_address(__first += __n);
 	      void* __dest = std::to_address(__result);
 	      size_t __nbytes = __n * sizeof(iter_value_t<_BI1>);
 	      __builtin_memmove(__dest, __src, __nbytes);
@@ -943,7 +932,7 @@ _GLIBCXX_END_NAMESPACE_CONTAINER
     inline typename
     __gnu_cxx::__enable_if<__is_byte<_Up>::__value
 			     && (__are_same<_Up, _Tp>::__value // for std::byte
-				   || __memcpyable_integer<_Tp>::__value),
+				   || __memcpyable_integer<_Tp>::__width),
 			   void>::__type
     __fill_a1(_Up* __first, _Up* __last, const _Tp& __x)
     {
@@ -955,6 +944,7 @@ _GLIBCXX_END_NAMESPACE_CONTAINER
 	{
 	  for (; __first != __last; ++__first)
 	    *__first = __val;
+	  return;
 	}
 #endif
       if (const size_t __len = __last - __first)
@@ -1640,6 +1630,9 @@ _GLIBCXX_BEGIN_NAMESPACE_ALGO
     }
 
 #if __cplusplus >= 201103L
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wc++17-extensions" // if constexpr
+
   // 4-iterator version of std::equal<It1, It2> for use in C++11.
   template<typename _II1, typename _II2>
     _GLIBCXX20_CONSTEXPR
@@ -1650,20 +1643,20 @@ _GLIBCXX_BEGIN_NAMESPACE_ALGO
       using _Cat1 = typename iterator_traits<_II1>::iterator_category;
       using _Cat2 = typename iterator_traits<_II2>::iterator_category;
       using _RAIters = __and_<is_same<_Cat1, _RATag>, is_same<_Cat2, _RATag>>;
-      if (_RAIters())
+      if constexpr (_RAIters::value)
 	{
-	  auto __d1 = std::distance(__first1, __last1);
-	  auto __d2 = std::distance(__first2, __last2);
-	  if (__d1 != __d2)
+	  if ((__last1 - __first1) != (__last2 - __first2))
 	    return false;
 	  return _GLIBCXX_STD_A::equal(__first1, __last1, __first2);
 	}
-
-      for (; __first1 != __last1 && __first2 != __last2;
-	  ++__first1, (void)++__first2)
-	if (!(*__first1 == *__first2))
-	  return false;
-      return __first1 == __last1 && __first2 == __last2;
+      else
+	{
+	  for (; __first1 != __last1 && __first2 != __last2;
+	       ++__first1, (void)++__first2)
+	    if (!(*__first1 == *__first2))
+	      return false;
+	  return __first1 == __last1 && __first2 == __last2;
+	}
     }
 
   // 4-iterator version of std::equal<It1, It2, BinaryPred> for use in C++11.
@@ -1677,22 +1670,23 @@ _GLIBCXX_BEGIN_NAMESPACE_ALGO
       using _Cat1 = typename iterator_traits<_II1>::iterator_category;
       using _Cat2 = typename iterator_traits<_II2>::iterator_category;
       using _RAIters = __and_<is_same<_Cat1, _RATag>, is_same<_Cat2, _RATag>>;
-      if (_RAIters())
+      if constexpr (_RAIters::value)
 	{
-	  auto __d1 = std::distance(__first1, __last1);
-	  auto __d2 = std::distance(__first2, __last2);
-	  if (__d1 != __d2)
+	  if ((__last1 - __first1) != (__last2 - __first2))
 	    return false;
 	  return _GLIBCXX_STD_A::equal(__first1, __last1, __first2,
 				       __binary_pred);
 	}
-
-      for (; __first1 != __last1 && __first2 != __last2;
-	  ++__first1, (void)++__first2)
-	if (!bool(__binary_pred(*__first1, *__first2)))
-	  return false;
-      return __first1 == __last1 && __first2 == __last2;
+      else
+	{
+	  for (; __first1 != __last1 && __first2 != __last2;
+	       ++__first1, (void)++__first2)
+	    if (!bool(__binary_pred(*__first1, *__first2)))
+	      return false;
+	  return __first1 == __last1 && __first2 == __last2;
+	}
     }
+#pragma GCC diagnostic pop
 #endif // C++11
 
 #ifdef __glibcxx_robust_nonmodifying_seq_ops // C++ >= 14

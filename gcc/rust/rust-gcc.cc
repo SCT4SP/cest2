@@ -1,5 +1,5 @@
 // rust-gcc.cc -- Rust frontend to gcc IR.
-// Copyright (C) 2011-2024 Free Software Foundation, Inc.
+// Copyright (C) 2011-2025 Free Software Foundation, Inc.
 // Contributed by Ian Lance Taylor, Google.
 // forked from gccgo
 
@@ -592,23 +592,24 @@ function_ptr_type (tree result_type, const std::vector<tree> &parameters,
 // Make a struct type.
 
 tree
-struct_type (const std::vector<typed_identifier> &fields)
+struct_type (const std::vector<typed_identifier> &fields, bool layout)
 {
-  return fill_in_fields (make_node (RECORD_TYPE), fields);
+  return fill_in_fields (make_node (RECORD_TYPE), fields, layout);
 }
 
 // Make a union type.
 
 tree
-union_type (const std::vector<typed_identifier> &fields)
+union_type (const std::vector<typed_identifier> &fields, bool layout)
 {
-  return fill_in_fields (make_node (UNION_TYPE), fields);
+  return fill_in_fields (make_node (UNION_TYPE), fields, layout);
 }
 
 // Fill in the fields of a struct or union type.
 
 tree
-fill_in_fields (tree fill, const std::vector<typed_identifier> &fields)
+fill_in_fields (tree fill, const std::vector<typed_identifier> &fields,
+		bool layout)
 {
   tree field_trees = NULL_TREE;
   tree *pp = &field_trees;
@@ -625,7 +626,9 @@ fill_in_fields (tree fill, const std::vector<typed_identifier> &fields)
       pp = &DECL_CHAIN (field);
     }
   TYPE_FIELDS (fill) = field_trees;
-  layout_type (fill);
+
+  if (layout)
+    layout_type (fill);
 
   // Because Rust permits converting between named struct types and
   // equivalent struct types, for which we use VIEW_CONVERT_EXPR, and
@@ -939,7 +942,7 @@ operator_to_tree_code (NegationOperator op)
     case NegationOperator::NEGATE:
       return NEGATE_EXPR;
     case NegationOperator::NOT:
-      return TRUTH_NOT_EXPR;
+      return BIT_NOT_EXPR;
     default:
       rust_unreachable ();
     }
@@ -1103,6 +1106,17 @@ arithmetic_or_logical_expression (ArithmeticOrLogicalOperator op, tree left,
   if (floating_point && extended_type != NULL_TREE)
     ret = convert (original_type, ret);
 
+  if (op == ArithmeticOrLogicalOperator::DIVIDE
+      && (integer_zerop (right) || fixed_zerop (right)))
+    {
+      rust_error_at (location, "division by zero");
+    }
+  else if (op == ArithmeticOrLogicalOperator::LEFT_SHIFT
+	   && (compare_tree_int (right, TYPE_PRECISION (TREE_TYPE (ret))) >= 0))
+    {
+      rust_error_at (location, "left shift count >= width of type");
+    }
+
   return ret;
 }
 
@@ -1149,15 +1163,6 @@ fetch_overflow_builtins (ArithmeticOrLogicalOperator op)
   rust_assert (abort);
   rust_assert (builtin);
 
-  // FIXME: ARTHUR: This is really ugly. The builtin context should take care of
-  // that
-  TREE_SIDE_EFFECTS (abort) = 1;
-  TREE_READONLY (abort) = 0;
-
-  // FIXME: ARTHUR: Same here. Remove these!
-  TREE_SIDE_EFFECTS (builtin) = 1;
-  TREE_READONLY (builtin) = 0;
-
   return {abort, builtin};
 }
 
@@ -1192,10 +1197,6 @@ arithmetic_or_logical_expression_checked (ArithmeticOrLogicalOperator op,
 
   auto abort_call = build_call_expr_loc (location, abort, 0);
 
-  // FIXME: ARTHUR: Is that needed?
-  TREE_SIDE_EFFECTS (abort_call) = 1;
-  TREE_READONLY (abort_call) = 0;
-
   auto builtin_call
     = build_call_expr_loc (location, builtin, 3, left, right, result_ref);
   auto overflow_check
@@ -1204,10 +1205,6 @@ arithmetic_or_logical_expression_checked (ArithmeticOrLogicalOperator op,
 
   auto if_block = build3_loc (location, COND_EXPR, void_type_node,
 			      overflow_check, abort_call, NULL_TREE);
-
-  // FIXME: ARTHUR: Needed?
-  TREE_SIDE_EFFECTS (if_block) = 1;
-  TREE_READONLY (if_block) = 0;
 
   return if_block;
 }
@@ -1355,7 +1352,7 @@ constructor_expression (tree type_tree, bool is_variant,
 	      if (!TREE_CONSTANT (elt->value))
 		is_constant = false;
 	    }
-	  gcc_assert (field == NULL_TREE);
+	  // gcc_assert (field == NULL_TREE);
 	}
     }
 

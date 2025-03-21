@@ -1,5 +1,5 @@
 /* Standard problems for dataflow support routines.
-   Copyright (C) 1999-2024 Free Software Foundation, Inc.
+   Copyright (C) 1999-2025 Free Software Foundation, Inc.
    Originally contributed by Michael P. Hayes
              (m.hayes@elec.canterbury.ac.nz, mhayes@redhat.com)
    Major rewrite contributed by Danny Berlin (dberlin@dberlin.org)
@@ -3893,9 +3893,11 @@ df_simulate_defs (rtx_insn *insn, bitmap live)
     {
       unsigned int dregno = DF_REF_REGNO (def);
 
-      /* If the def is to only part of the reg, it does
-	 not kill the other defs that reach here.  */
-      if (!(DF_REF_FLAGS (def) & (DF_REF_PARTIAL | DF_REF_CONDITIONAL)))
+      /* If the def is to only part of the reg, model it as a RMW operation
+	 by marking it live.  It only kills the reg if it is a complete def.  */
+      if (DF_REF_FLAGS (def) & (DF_REF_PARTIAL | DF_REF_CONDITIONAL))
+	bitmap_set_bit (live, dregno);
+      else
 	bitmap_clear_bit (live, dregno);
     }
 }

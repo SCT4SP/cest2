@@ -1,5 +1,5 @@
 ; Options for the Fortran front end.
-; Copyright (C) 2003-2024 Free Software Foundation, Inc.
+; Copyright (C) 2003-2025 Free Software Foundation, Inc.
 ;
 ; This file is part of GCC.
 ;
@@ -240,6 +240,10 @@ Warn about most implicit conversions.
 Wdo-subscript
 Fortran Var(warn_do_subscript) Warning LangEnabledBy(Fortran,Wextra)
 Warn about possibly incorrect subscripts in do loops.
+
+Wexternal-argument-mismatch
+Fortran Var(warn_external_argument_mismatch) Warning LangEnabledBy(Fortran,Wall || fc-prototypes-external)
+Warn when arguments of external procedures do not match.
 
 Wextra
 Fortran Warning

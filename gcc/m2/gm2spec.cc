@@ -1,6 +1,6 @@
 /* gm2spec.cc specific flags and argument handling within GNU Modula-2.
 
-Copyright (C) 2007-2024 Free Software Foundation, Inc.
+Copyright (C) 2007-2025 Free Software Foundation, Inc.
 Contributed by Gaius Mulley <gaius@glam.ac.uk>.
 
 This file is part of GNU Modula-2.
@@ -576,6 +576,12 @@ lang_specific_driver (struct cl_decoded_option **in_decoded_options,
 	  args[i] |= SKIPOPT; /* We will add the option if it is needed.  */
 	  m2_path_name = decoded_options[i].arg;
 	  break;
+	case OPT__help:
+	case OPT__help_:
+	  /* Let gcc.cc handle this, as it has a really
+	     cool facility for handling --help and --verbose --help.  */
+	  *in_added_libraries = 0;
+	  return;
 	case OPT_I:
 	  args[i] |= SKIPOPT; /* We will add the option if it is needed.  */
 	  push_back_Ipath (decoded_options[i].arg);

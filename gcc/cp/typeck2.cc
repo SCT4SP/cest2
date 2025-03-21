@@ -1,6 +1,6 @@
 /* Report error messages, build initializers, and perform
    some front-end optimizations for C++ compiler.
-   Copyright (C) 1987-2024 Free Software Foundation, Inc.
+   Copyright (C) 1987-2025 Free Software Foundation, Inc.
    Hacked by Michael Tiemann (tiemann@cygnus.com)
 
 This file is part of GCC.
@@ -25,7 +25,6 @@ along with GCC; see the file COPYING3.  If not see
    including computing the types of the result, C and C++ specific error
    checks, and some optimization.  */
 
-#define INCLUDE_MEMORY
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
@@ -458,9 +457,8 @@ maybe_push_temp_cleanup (tree sub, vec<tree,va_gc> **flags)
   if (tree cleanup
       = cxx_maybe_build_cleanup (sub, tf_warning_or_error))
     {
-      tree tx = get_target_expr (boolean_true_node);
+      tree tx = get_internal_target_expr (boolean_true_node);
       tree flag = TARGET_EXPR_SLOT (tx);
-      CLEANUP_EH_ONLY (tx) = true;
       TARGET_EXPR_CLEANUP (tx) = build3 (COND_EXPR, void_type_node,
 					 flag, cleanup, void_node);
       add_stmt (tx);
@@ -656,6 +654,11 @@ split_nonconstant_init_1 (tree dest, tree init, bool last,
 			  && make_safe_copy_elision (sub, value))
 			goto build_init;
 
+		      if (TREE_CODE (value) == TARGET_EXPR)
+			/* We have to add this constructor, so we will not
+			   elide.  */
+			TARGET_EXPR_ELIDING_P (value) = false;
+
 		      tree name = (DECL_FIELD_IS_BASE (field_index)
 				   ? base_ctor_identifier
 				   : complete_ctor_identifier);
@@ -758,7 +761,7 @@ split_nonconstant_init (tree dest, tree init)
 	init = NULL_TREE;
 
       for (tree f : flags)
-	add_stmt (build_disable_temp_cleanup (f));
+	finish_expr_stmt (build_disable_temp_cleanup (f));
       release_tree_vector (flags);
 
       code = pop_stmt_list (code);
@@ -1312,6 +1315,36 @@ digest_init_r (tree type, tree init, int nested, int flags,
 	 a parenthesized list.  */
       if (nested && !(flags & LOOKUP_AGGREGATE_PAREN_INIT))
 	flags |= LOOKUP_NO_NARROWING;
+      if (TREE_CODE (init) == RAW_DATA_CST && !TYPE_UNSIGNED (type))
+	{
+	  tree ret = init;
+	  if ((flags & LOOKUP_NO_NARROWING) || warn_conversion)
+	    for (unsigned int i = 0;
+		 i < (unsigned) RAW_DATA_LENGTH (init); ++i)
+	      if (RAW_DATA_SCHAR_ELT (init, i) < 0)
+		{
+		  if ((flags & LOOKUP_NO_NARROWING))
+		    {
+		      tree elt
+			= build_int_cst (integer_type_node,
+					 RAW_DATA_UCHAR_ELT (init, i));
+		      if (!check_narrowing (type, elt, complain, false))
+			{
+			  if (!(complain & tf_warning_or_error))
+			    ret = error_mark_node;
+			  continue;
+			}
+		    }
+		  if (warn_conversion)
+		    warning (OPT_Wconversion,
+			     "conversion from %qT to %qT changes value from "
+			     "%qd to %qd",
+			     integer_type_node, type,
+			     RAW_DATA_UCHAR_ELT (init, i),
+			     RAW_DATA_SCHAR_ELT (init, i));
+		}
+	  return ret;
+	}
       init = convert_for_initialization (0, type, init, flags,
 					 ICR_INIT, NULL_TREE, 0,
 					 complain);
@@ -1539,10 +1572,10 @@ massage_init_elt (tree type, tree init, int nested, int flags,
     new_flags |= LOOKUP_AGGREGATE_PAREN_INIT;
   init = digest_init_r (type, init, nested ? 2 : 1, new_flags, complain);
   /* When we defer constant folding within a statement, we may want to
-     defer this folding as well.  Don't call this on CONSTRUCTORs because
-     their elements have already been folded, and we must avoid folding
-     the result of get_nsdmi.  */
-  if (TREE_CODE (init) != CONSTRUCTOR)
+     defer this folding as well.  Don't call this on CONSTRUCTORs in
+     a template because their elements have already been folded, and
+     we must avoid folding the result of get_nsdmi.  */
+  if (!(processing_template_decl && TREE_CODE (init) == CONSTRUCTOR))
     {
       tree t = fold_non_dependent_init (init, complain);
       if (TREE_CONSTANT (t))
@@ -1560,7 +1593,7 @@ static int
 process_init_constructor_array (tree type, tree init, int nested, int flags,
 				tsubst_flags_t complain)
 {
-  unsigned HOST_WIDE_INT i, len = 0;
+  unsigned HOST_WIDE_INT i, j, len = 0;
   int picflags = 0;
   bool unbounded = false;
   constructor_elt *ce;
@@ -1603,11 +1636,12 @@ process_init_constructor_array (tree type, tree init, int nested, int flags,
 	return PICFLAG_ERRONEOUS;
     }
 
+  j = 0;
   FOR_EACH_VEC_SAFE_ELT (v, i, ce)
     {
       if (!ce->index)
-	ce->index = size_int (i);
-      else if (!check_array_designated_initializer (ce, i))
+	ce->index = size_int (j);
+      else if (!check_array_designated_initializer (ce, j))
 	ce->index = error_mark_node;
       gcc_assert (ce->value);
       ce->value
@@ -1629,6 +1663,10 @@ process_init_constructor_array (tree type, tree init, int nested, int flags,
 	  CONSTRUCTOR_PLACEHOLDER_BOUNDARY (init) = 1;
 	  CONSTRUCTOR_PLACEHOLDER_BOUNDARY (ce->value) = 0;
 	}
+      if (TREE_CODE (ce->value) == RAW_DATA_CST)
+	j += RAW_DATA_LENGTH (ce->value);
+      else
+	++j;
     }
 
   /* No more initializers. If the array is unbounded, we are done. Otherwise,
@@ -2473,7 +2511,7 @@ build_functional_cast_1 (location_t loc, tree exp, tree parms,
 	  else if (cxx_dialect < cxx23)
 	    pedwarn (loc, OPT_Wc__23_extensions,
 		     "%<auto(x)%> only available with "
-		     "%<-std=c++2b%> or %<-std=gnu++2b%>");
+		     "%<-std=c++23%> or %<-std=gnu++23%>");
 	}
       else
 	{

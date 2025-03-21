@@ -6,7 +6,7 @@
  *                                                                          *
  *                          C Implementation File                           *
  *                                                                          *
- *          Copyright (C) 1992-2024, Free Software Foundation, Inc.         *
+ *          Copyright (C) 1992-2025, Free Software Foundation, Inc.         *
  *                                                                          *
  * GNAT is free software;  you can  redistribute it  and/or modify it under *
  * terms of the  GNU General Public License as published  by the Free Soft- *
@@ -3110,14 +3110,24 @@ gnat_to_gnu_entity (Entity_Id gnat_entity, tree gnu_expr, bool definition)
 	tree gnu_string_index_type
 	  = get_base_type (TREE_TYPE (TYPE_INDEX_TYPE
 				      (TYPE_DOMAIN (gnu_string_array_type))));
+
+        /* For a null string literal we set the bounds to 1 .. 0, to
+           avoid a possible overflow when calculating the upper bound
+           as LOWER_BOUND + LENGTH - 1.  */
+        const bool is_null_string
+          = String_Literal_Length (gnat_entity) == Uint_0;
 	tree gnu_lower_bound
-	  = convert (gnu_string_index_type,
+	  = is_null_string ?
+	    build_int_cst (gnu_string_index_type, 1) :
+	    convert (gnu_string_index_type,
 		     gnat_to_gnu (String_Literal_Low_Bound (gnat_entity)));
 	tree gnu_length
 	  = UI_To_gnu (String_Literal_Length (gnat_entity),
 		       gnu_string_index_type);
 	tree gnu_upper_bound
-	  = build_binary_op (PLUS_EXPR, gnu_string_index_type,
+	  = is_null_string ?
+	    build_int_cst (gnu_string_index_type, 0) :
+	    build_binary_op (PLUS_EXPR, gnu_string_index_type,
 			     gnu_lower_bound,
 			     int_const_binop (MINUS_EXPR, gnu_length,
 					      convert (gnu_string_index_type,
@@ -3641,6 +3651,14 @@ gnat_to_gnu_entity (Entity_Id gnat_entity, tree gnu_expr, bool definition)
 	      TYPE_PACKED (gnu_type) = TYPE_PACKED (gnu_base_type);
 	      TYPE_REVERSE_STORAGE_ORDER (gnu_type)
 		= Reverse_Storage_Order (gnat_entity);
+
+	      /* Do the same for subtypes as for the base type, since pointers
+		 to them may symmetrically also point to the latter.  */
+	      prepend_one_attribute
+		(&attr_list, ATTR_MACHINE_ATTRIBUTE,
+		 get_identifier ("may_alias"), NULL_TREE,
+		 gnat_entity);
+
 	      process_attributes (&gnu_type, &attr_list, true, gnat_entity);
 
 	      /* Set the size, alignment and alias set of the type to match
@@ -4457,12 +4475,8 @@ gnat_to_gnu_entity (Entity_Id gnat_entity, tree gnu_expr, bool definition)
       process_attributes (&gnu_type, &attr_list, false, gnat_entity);
 
       /* See if a size was specified, by means of either an Object_Size or
-         a regular Size clause, and validate it if so.
-
-	 ??? Don't set the size for a String_Literal since it is either
-	 confirming or we don't handle it properly (if the low bound is
-	 non-constant).  */
-      if (!gnu_size && kind != E_String_Literal_Subtype)
+         a regular Size clause, and validate it if so.  */
+      if (!gnu_size)
 	{
 	  const char *size_s = "size for %s too small{, minimum allowed is ^}";
 	  const char *type_s = is_by_ref ? "by-reference type &" : "&";
@@ -4552,8 +4566,8 @@ gnat_to_gnu_entity (Entity_Id gnat_entity, tree gnu_expr, bool definition)
 				     false, definition, false);
 
 	  if (gnu_type != orig_type && !gnu_decl)
-	    create_type_decl (gnu_entity_name, orig_type, true, debug_info_p,
-			      gnat_entity);
+	    create_type_decl (gnu_entity_name, orig_type, artificial_p,
+			      debug_info_p, gnat_entity);
 	}
 
       /* Now set the RM size of the type.  We cannot do it before padding
@@ -7349,15 +7363,30 @@ static tree
 elaborate_expression_2 (tree gnu_expr, Entity_Id gnat_entity, const char *s,
 			bool definition, bool need_for_debug, unsigned int align)
 {
-  tree unit_align = size_int (align / BITS_PER_UNIT);
-  return
-    size_binop (MULT_EXPR,
-		elaborate_expression_1 (size_binop (EXACT_DIV_EXPR,
-						    gnu_expr,
-						    unit_align),
-					gnat_entity, s, definition,
-					need_for_debug),
-		unit_align);
+  /* Nothing more to do if the factor is already explicit in the tree.  */
+  if (TREE_CODE (gnu_expr) == MULT_EXPR
+      && TREE_CONSTANT (TREE_OPERAND (gnu_expr, 1))
+      && value_factor_p (TREE_OPERAND (gnu_expr, 1), align / BITS_PER_UNIT))
+    return
+      size_binop (MULT_EXPR,
+		  elaborate_expression_1 (TREE_OPERAND (gnu_expr, 0),
+					  gnat_entity, s, definition,
+					  need_for_debug),
+		  TREE_OPERAND (gnu_expr, 1));
+
+  /* Otherwise divide by the factor, elaborate the result and multiply back.  */
+  else
+    {
+      tree unit_align = size_int (align / BITS_PER_UNIT);
+      return
+	size_binop (MULT_EXPR,
+		    elaborate_expression_1 (size_binop (EXACT_DIV_EXPR,
+							gnu_expr,
+							unit_align),
+					    gnat_entity, s, definition,
+					    need_for_debug),
+		    unit_align);
+    }
 }
 
 /* Structure to hold internal data for elaborate_reference.  */

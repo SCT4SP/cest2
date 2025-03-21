@@ -1,6 +1,6 @@
 // Core concepts and definitions for <ranges> -*- C++ -*-
 
-// Copyright (C) 2019-2024 Free Software Foundation, Inc.
+// Copyright (C) 2019-2025 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -40,6 +40,10 @@
 #include <ext/numeric_traits.h>
 #include <bits/max_size_type.h>
 #include <bits/version.h>
+
+#if __glibcxx_ranges_to_container // C++ >= 23
+# include <bits/utility.h> // for tuple_element_t
+#endif
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wpedantic" // __int128
@@ -642,11 +646,13 @@ namespace ranges
   namespace __access
   {
 #if __glibcxx_ranges_as_const // >= C++23
-    template<typename _Range>
+    template<input_range _Range>
       constexpr auto&
       __possibly_const_range(_Range& __r) noexcept
       {
-	if constexpr (constant_range<const _Range> && !constant_range<_Range>)
+	// _GLIBCXX_RESOLVE_LIB_DEFECTS
+	// 4027. possibly-const-range should prefer returning const R&
+	if constexpr (input_range<const _Range>)
 	  return const_cast<const _Range&>(__r);
 	else
 	  return __r;
@@ -1081,12 +1087,30 @@ namespace ranges
   inline constexpr from_range_t from_range{};
 
 /// @cond undocumented
+  template<typename _T1, typename _T2>
+    struct pair;
+
 namespace __detail
 {
   template<typename _Rg, typename _Tp>
     concept __container_compatible_range
       = ranges::input_range<_Rg>
 	  && convertible_to<ranges::range_reference_t<_Rg>, _Tp>;
+
+  // _GLIBCXX_RESOLVE_LIB_DEFECTS
+  // 4223. Deduction guides for maps are mishandling tuples and references
+  template<ranges::input_range _Range>
+    using __range_key_type
+      = remove_const_t<tuple_element_t<0, ranges::range_value_t<_Range>>>;
+
+  template<ranges::input_range _Range>
+    using __range_mapped_type
+      = tuple_element_t<1, ranges::range_value_t<_Range>>;
+
+  // The allocator's value_type for map-like containers.
+  template<ranges::input_range _Range>
+    using __range_to_alloc_type
+      = pair<const __range_key_type<_Range>, __range_mapped_type<_Range>>;
 }
 /// @endcond
 #endif

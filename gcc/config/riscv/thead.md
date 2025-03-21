@@ -1,5 +1,5 @@
 ;; Machine description for T-Head vendor extensions
-;; Copyright (C) 2021-2024 Free Software Foundation, Inc.
+;; Copyright (C) 2021-2025 Free Software Foundation, Inc.
 
 ;; This file is part of GCC.
 
@@ -154,11 +154,11 @@
 
 ;; XTheadCondMov
 
-(define_insn "*th_cond_mov<GPR:mode><GPR2:mode>"
+(define_insn "*th_cond_mov<GPR:mode>"
   [(set (match_operand:GPR 0 "register_operand" "=r,r")
 	(if_then_else:GPR
 	 (match_operator 4 "equality_operator"
-		[(match_operand:GPR2 1 "register_operand" "r,r")
+		[(match_operand:X 1 "register_operand" "r,r")
 		 (const_int 0)])
 	 (match_operand:GPR 2 "reg_or_0_operand" "rJ,0")
 	 (match_operand:GPR 3 "reg_or_0_operand" "0,rJ")))]

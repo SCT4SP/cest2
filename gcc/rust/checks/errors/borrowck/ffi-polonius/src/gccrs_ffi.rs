@@ -1,4 +1,4 @@
-// Copyright (C) 2020-2024 Free Software Foundation, Inc.
+// Copyright (C) 2020-2025 Free Software Foundation, Inc.
 
 // This file is part of GCC.
 
@@ -30,7 +30,17 @@
 // ```
 include!("gccrs_ffi_generated.rs");
 
+use std::marker::{PhantomData, PhantomPinned};
+
 use crate::GccrsAtom;
+
+// We define an opaque C type per the nomicon's recommendation:
+// https://doc.rust-lang.org/nomicon/ffi.html#representing-opaque-structs
+#[repr(C)]
+pub struct FFIVector {
+    _empty: [u8; 0],
+    marker: PhantomData<(*mut u8, PhantomPinned)>,
+}
 
 impl<T1, T2> Into<(GccrsAtom, GccrsAtom)> for Pair<T1, T2>
 where

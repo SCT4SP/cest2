@@ -1,6 +1,6 @@
 ; Options for the rs6000 port of the compiler
 ;
-; Copyright (C) 2005-2024 Free Software Foundation, Inc.
+; Copyright (C) 2005-2025 Free Software Foundation, Inc.
 ; Contributed by Aldy Hernandez <aldy@quesejoda.com>.
 ;
 ; This file is part of GCC.
@@ -299,6 +299,10 @@ Use only one TOC entry per procedure.
 mfull-toc
 Target
 Put everything in the regular TOC.
+
+msplit-patch-nops
+Target Var(TARGET_SPLIT_PATCH_NOPS) Init(0)
+Emit NOPs before global and after local entry point for -fpatchable-function-entry.
 
 mvrsave
 Target Var(TARGET_ALTIVEC_VRSAVE) Save

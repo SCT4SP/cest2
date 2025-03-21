@@ -1,5 +1,5 @@
 /* RunTime Type Identification
-   Copyright (C) 1995-2024 Free Software Foundation, Inc.
+   Copyright (C) 1995-2025 Free Software Foundation, Inc.
    Mostly written by Jason Merrill (jason@cygnus.com).
 
 This file is part of GCC.
@@ -18,7 +18,6 @@ You should have received a copy of the GNU General Public License
 along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
-#define INCLUDE_MEMORY
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
@@ -1742,7 +1741,8 @@ emit_tinfo_decl (tree decl)
       /* Avoid targets optionally bumping up the alignment to improve
 	 vector instruction accesses, tinfo are never accessed this way.  */
 #ifdef DATA_ABI_ALIGNMENT
-      SET_DECL_ALIGN (decl, DATA_ABI_ALIGNMENT (decl, TYPE_ALIGN (TREE_TYPE (decl))));
+      SET_DECL_ALIGN (decl, DATA_ABI_ALIGNMENT (TREE_TYPE (decl),
+						TYPE_ALIGN (TREE_TYPE (decl))));
       DECL_USER_ALIGN (decl) = true;
 #endif
       return true;

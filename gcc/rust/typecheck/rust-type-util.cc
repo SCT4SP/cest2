@@ -1,4 +1,4 @@
-// Copyright (C) 2020-2024 Free Software Foundation, Inc.
+// Copyright (C) 2020-2025 Free Software Foundation, Inc.
 
 // This file is part of GCC.
 
@@ -33,7 +33,7 @@ namespace Resolver {
 bool
 query_type (HirId reference, TyTy::BaseType **result)
 {
-  Analysis::Mappings *mappings = Analysis::Mappings::get ();
+  auto &mappings = Analysis::Mappings::get ();
   TypeCheckContext *context = TypeCheckContext::get ();
 
   if (context->query_in_progress (reference))
@@ -45,7 +45,7 @@ query_type (HirId reference, TyTy::BaseType **result)
   context->insert_query (reference);
 
   std::pair<HIR::Enum *, HIR::EnumItem *> enum_candidiate
-    = mappings->lookup_hir_enumitem (reference);
+    = mappings.lookup_hir_enumitem (reference);
   bool enum_candidiate_ok
     = enum_candidiate.first != nullptr && enum_candidiate.second != nullptr;
   if (enum_candidiate_ok)
@@ -61,61 +61,53 @@ query_type (HirId reference, TyTy::BaseType **result)
       return true;
     }
 
-  HIR::Item *item = mappings->lookup_hir_item (reference);
-  if (item != nullptr)
+  if (auto item = mappings.lookup_hir_item (reference))
     {
-      rust_debug_loc (item->get_locus (), "resolved item {%u} to", reference);
-      *result = TypeCheckItem::Resolve (*item);
+      rust_debug_loc (item.value ()->get_locus (), "resolved item {%u} to",
+		      reference);
+      *result = TypeCheckItem::Resolve (*item.value ());
       context->query_completed (reference);
       return true;
     }
 
-  HirId parent_impl_id = UNKNOWN_HIRID;
-  HIR::ImplItem *impl_item
-    = mappings->lookup_hir_implitem (reference, &parent_impl_id);
-  if (impl_item != nullptr)
+  if (auto impl_item = mappings.lookup_hir_implitem (reference))
     {
-      HIR::ImplBlock *impl_block
-	= mappings->lookup_hir_impl_block (parent_impl_id);
-      rust_assert (impl_block != nullptr);
+      auto impl_block
+	= mappings.lookup_hir_impl_block (impl_item->second).value ();
 
       // found an impl item
-      rust_debug_loc (impl_item->get_locus (), "resolved impl-item {%u} to",
-		      reference);
+      rust_debug_loc (impl_item->first->get_locus (),
+		      "resolved impl-item {%u} to", reference);
 
-      *result = TypeCheckItem::ResolveImplItem (*impl_block, *impl_item);
+      *result = TypeCheckItem::ResolveImplItem (*impl_block, *impl_item->first);
       context->query_completed (reference);
       return true;
     }
 
   // is it an impl_type?
-  HIR::ImplBlock *impl_block_by_type = nullptr;
-  bool found_impl_block_type
-    = mappings->lookup_impl_block_type (reference, &impl_block_by_type);
-  if (found_impl_block_type)
+  if (auto impl_block_by_type = mappings.lookup_impl_block_type (reference))
     {
-      *result = TypeCheckItem::ResolveImplBlockSelf (*impl_block_by_type);
+      *result
+	= TypeCheckItem::ResolveImplBlockSelf (*impl_block_by_type.value ());
       context->query_completed (reference);
       return true;
     }
 
   // is it an extern item?
-  HirId parent_extern_block_id = UNKNOWN_HIRID;
-  HIR::ExternalItem *extern_item
-    = mappings->lookup_hir_extern_item (reference, &parent_extern_block_id);
-  if (extern_item != nullptr)
+  if (auto extern_item = mappings.lookup_hir_extern_item (reference))
     {
-      HIR::ExternBlock *block
-	= mappings->lookup_hir_extern_block (parent_extern_block_id);
-      rust_assert (block != nullptr);
+      auto block = mappings.lookup_hir_extern_block (extern_item->second);
+      rust_assert (block.has_value ());
 
-      *result = TypeCheckTopLevelExternItem::Resolve (extern_item, *block);
+      *result
+	= TypeCheckTopLevelExternItem::Resolve (*extern_item.value ().first,
+						*block.value ());
       context->query_completed (reference);
       return true;
     }
 
   // more?
-  location_t possible_locus = mappings->lookup_location (reference);
+  location_t possible_locus = mappings.lookup_location (reference);
   rust_debug_loc (possible_locus, "query system failed to resolve: [%u]",
 		  reference);
   context->query_completed (reference);

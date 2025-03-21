@@ -1,5 +1,5 @@
 /* Default target hook functions.
-   Copyright (C) 2003-2024 Free Software Foundation, Inc.
+   Copyright (C) 2003-2025 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -173,6 +173,7 @@ extern void default_emit_call_builtin___clear_cache (rtx, rtx);
 extern poly_int64 default_return_pops_args (tree, tree, poly_int64);
 extern reg_class_t default_ira_change_pseudo_allocno_class (int, reg_class_t,
 							    reg_class_t);
+extern int default_ira_callee_saved_register_cost_scale (int);
 extern bool default_lra_p (void);
 extern int default_register_priority (int);
 extern bool default_register_usage_leveling_p (void);
@@ -234,6 +235,11 @@ extern tree default_builtin_tm_load_store (tree);
 extern int default_memory_move_cost (machine_mode, reg_class_t, bool);
 extern int default_register_move_cost (machine_mode, reg_class_t,
 				       reg_class_t);
+extern int default_callee_save_cost (spill_cost_type, unsigned int,
+				     machine_mode, unsigned int, int,
+				     const HARD_REG_SET &, bool);
+extern int default_frame_allocation_cost (frame_cost_type,
+					  const HARD_REG_SET &);
 extern bool default_slow_unaligned_access (machine_mode, unsigned int);
 extern HOST_WIDE_INT default_estimated_poly_value (poly_int64,
 						   poly_value_estimate_kind);
@@ -253,6 +259,9 @@ extern reg_class_t default_preferred_output_reload_class (rtx, reg_class_t);
 extern reg_class_t default_preferred_rename_class (reg_class_t rclass);
 extern bool default_class_likely_spilled_p (reg_class_t);
 extern unsigned char default_class_max_nregs (reg_class_t, machine_mode);
+
+extern bool default_avoid_store_forwarding_p (vec<store_fwd_info>, rtx, int,
+					      bool);
 
 extern enum unwind_info_type default_debug_unwind_info (void);
 

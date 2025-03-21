@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 S p e c                                  --
 --                                                                          --
---          Copyright (C) 2020-2024, Free Software Foundation, Inc.         --
+--          Copyright (C) 2020-2025, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -124,7 +124,9 @@ package Gen_IL.Types is
       N_Subexpr,
       N_Subprogram_Specification,
       N_Unary_Op,
-      N_Unit_Body,
+      N_Lib_Unit_Declaration,
+      N_Lib_Unit_Renaming_Declaration,
+      N_Lib_Unit_Body,
 
       --  End of abstract node types.
 
@@ -269,7 +271,6 @@ package Gen_IL.Types is
       N_Slice,
       N_Target_Name,
       N_Type_Conversion,
-      N_Unchecked_Expression,
       N_Unchecked_Type_Conversion,
       N_Subtype_Indication,
       N_Component_Declaration,

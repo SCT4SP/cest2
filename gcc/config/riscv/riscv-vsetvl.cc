@@ -1,5 +1,5 @@
 /* VSETVL pass for RISC-V 'V' Extension for GNU compiler.
-   Copyright (C) 2022-2024 Free Software Foundation, Inc.
+   Copyright (C) 2022-2025 Free Software Foundation, Inc.
    Contributed by Juzhe Zhong (juzhe.zhong@rivai.ai), RiVAI Technologies Ltd.
 
 This file is part of GCC.
@@ -63,7 +63,6 @@ along with GCC; see the file COPYING3.  If not see
 #define IN_TARGET_CODE 1
 #define INCLUDE_ALGORITHM
 #define INCLUDE_FUNCTIONAL
-#define INCLUDE_MEMORY
 #define INCLUDE_ARRAY
 
 #include "config.h"
@@ -223,6 +222,8 @@ enum emit_type
   EMIT_BEFORE,
   EMIT_AFTER,
 };
+
+static const int MAX_LMUL = 8;
 
 /* dump helper functions */
 static const char *
@@ -779,6 +780,36 @@ enum class avl_demand_type : unsigned
   ignore_avl = demand_flags::DEMAND_EMPTY_P,
 };
 
+/* Go through all uses of INSN looking for a single use of register REG.
+   Return true if we find
+    - Uses in a non-RVV insn
+    - More than one use in an RVV insn
+    - A single use in the VL operand of an RVV insn
+   and false otherwise.
+   A single use in the AVL operand does not count as use as we take care of
+   those separately in the pass.  */
+
+static bool
+reg_used (insn_info *insn, rtx reg)
+{
+  unsigned int regno = REGNO (reg);
+  const hash_set<use_info *> vl_uses = get_all_real_uses (insn, regno);
+  for (use_info *use : vl_uses)
+    {
+      gcc_assert (use->insn ()->is_real ());
+      rtx_insn *rinsn = use->insn ()->rtl ();
+      if (!has_vl_op (rinsn)
+	  || count_regno_occurrences (rinsn, regno) != 1)
+	return true;
+
+      rtx avl = ::get_avl (rinsn);
+      if (!avl || !REG_P (avl) || regno != REGNO (avl))
+	return true;
+    }
+  return false;
+}
+
+
 class vsetvl_info
 {
 private:
@@ -902,7 +933,8 @@ public:
   bool valid_p () const { return m_state == state_type::VALID; }
   bool unknown_p () const { return m_state == state_type::UNKNOWN; }
   bool empty_p () const { return m_state == state_type::EMPTY; }
-  bool change_vtype_only_p () const { return m_change_vtype_only; }
+  bool change_vtype_only_p () const { return m_change_vtype_only
+					     && !TARGET_XTHEADVECTOR; }
 
   void set_valid () { m_state = state_type::VALID; }
   void set_unknown () { m_state = state_type::UNKNOWN; }
@@ -1140,27 +1172,7 @@ public:
 
     /* Determine if dest operand(vl) has been used by non-RVV instructions.  */
     if (dest_vl)
-      {
-	const hash_set<use_info *> vl_uses
-	  = get_all_real_uses (get_insn (), REGNO (dest_vl));
-	for (use_info *use : vl_uses)
-	  {
-	    gcc_assert (use->insn ()->is_real ());
-	    rtx_insn *rinsn = use->insn ()->rtl ();
-	    if (!has_vl_op (rinsn)
-		|| count_regno_occurrences (rinsn, REGNO (dest_vl)) != 1)
-	      {
-		m_vl_used_by_non_rvv_insn = true;
-		break;
-	      }
-	    rtx avl = ::get_avl (rinsn);
-	    if (!avl || !REG_P (avl) || REGNO (dest_vl) != REGNO (avl))
-	      {
-		m_vl_used_by_non_rvv_insn = true;
-		break;
-	      }
-	  }
-      }
+      m_vl_used_by_non_rvv_insn = reg_used (get_insn (), dest_vl);
 
     /* Collect the read vl insn for the fault-only-first rvv loads.  */
     if (fault_first_load_p (insn->rtl ()))
@@ -1367,6 +1379,35 @@ public:
   void set_empty_info () { global_info.set_empty (); }
 };
 
+/* Same as REG_USED () but looks for a single use in an RVV insn's AVL
+   operand.  */
+static bool
+reg_single_use_in_avl (insn_info *insn, rtx reg)
+{
+  if (!reg)
+    return false;
+  unsigned int regno = REGNO (reg);
+  const hash_set<use_info *> vl_uses = get_all_real_uses (insn, regno);
+  for (use_info *use : vl_uses)
+    {
+      gcc_assert (use->insn ()->is_real ());
+      rtx_insn *rinsn = use->insn ()->rtl ();
+      if (!has_vl_op (rinsn)
+	  || count_regno_occurrences (rinsn, regno) != 1)
+	return false;
+
+      vsetvl_info info = vsetvl_info (use->insn ());
+
+      if (!info.has_nonvlmax_reg_avl ())
+	return false;
+
+      rtx avl = info.get_avl ();
+      if (avl && REG_P (avl) && regno == REGNO (avl))
+	return true;
+    }
+  return false;
+}
+
 /* Demand system is the RVV-based VSETVL info analysis tools wrapper.
    It defines compatible rules for SEW/LMUL, POLICY and AVL.
    Also, it provides 3 interfaces available_p, compatible_p and
@@ -1446,14 +1487,13 @@ private:
   inline bool prev_ratio_valid_for_next_sew_p (const vsetvl_info &prev,
 					       const vsetvl_info &next)
   {
-    return prev.get_ratio () >= (next.get_sew () / 8);
+    return prev.get_ratio () >= (next.get_sew () / MAX_LMUL);
   }
   inline bool next_ratio_valid_for_prev_sew_p (const vsetvl_info &prev,
 					       const vsetvl_info &next)
   {
-    return next.get_ratio () >= (prev.get_sew () / 8);
+    return next.get_ratio () >= (prev.get_sew () / MAX_LMUL);
   }
-
   inline bool sew_ge_and_ratio_eq_p (const vsetvl_info &prev,
 				     const vsetvl_info &next)
   {
@@ -1471,6 +1511,13 @@ private:
     return sew_ge_p (prev, next) && prev_sew_le_next_max_sew_p (prev, next)
 	   && next_ratio_valid_for_prev_sew_p (prev, next);
   }
+  inline bool
+  sew_ge_and_prev_sew_le_next_max_sew_and_ratio_eq_p (
+    const vsetvl_info &prev, const vsetvl_info &next)
+  {
+    return sew_ge_p (prev, next) && prev_sew_le_next_max_sew_p (prev, next)
+	   && ratio_eq_p (prev, next);
+  }
   inline bool sew_le_and_next_sew_le_prev_max_sew_p (const vsetvl_info &prev,
 						     const vsetvl_info &next)
   {
@@ -1480,8 +1527,15 @@ private:
   max_sew_overlap_and_next_ratio_valid_for_prev_sew_p (const vsetvl_info &prev,
 						       const vsetvl_info &next)
   {
-    return next_ratio_valid_for_prev_sew_p (prev, next)
-	   && max_sew_overlap_p (prev, next);
+    if (next_ratio_valid_for_prev_sew_p (prev, next)
+	&& max_sew_overlap_p (prev, next))
+      {
+	if (next.get_sew () < prev.get_sew ()
+	    && (!next.get_ta () || !next.get_ma ()))
+	  return false;
+	return true;
+      }
+    return false;
   }
   inline bool
   sew_le_and_next_sew_le_prev_max_sew_and_ratio_eq_p (const vsetvl_info &prev,
@@ -1714,8 +1768,11 @@ private:
   }
   inline void use_max_sew (vsetvl_info &prev, const vsetvl_info &next)
   {
-    int max_sew = MAX (prev.get_sew (), next.get_sew ());
-    prev.set_sew (max_sew);
+    bool prev_sew_larger = prev.get_sew () >= next.get_sew ();
+    const vsetvl_info from = prev_sew_larger ? prev : next;
+    prev.set_sew (from.get_sew ());
+    prev.set_vlmul (from.get_vlmul ());
+    prev.set_ratio (from.get_ratio ());
     use_min_of_max_sew (prev, next);
   }
   inline void use_next_sew_lmul (vsetvl_info &prev, const vsetvl_info &next)
@@ -1740,7 +1797,8 @@ private:
   inline void use_max_sew_and_lmul_with_next_ratio (vsetvl_info &prev,
 						    const vsetvl_info &next)
   {
-    prev.set_vlmul (calculate_vlmul (prev.get_sew (), next.get_ratio ()));
+    int max_sew = MAX (prev.get_sew (), next.get_sew ());
+    prev.set_vlmul (calculate_vlmul (max_sew, next.get_ratio ()));
     use_max_sew (prev, next);
     prev.set_ratio (next.get_ratio ());
   }
@@ -2778,8 +2836,18 @@ pre_vsetvl::fuse_local_vsetvl_info ()
 		     64 into 32.  */
 		  prev_info.set_max_sew (
 		    MIN (prev_info.get_max_sew (), curr_info.get_max_sew ()));
-		  if (!curr_info.vl_used_by_non_rvv_insn_p ()
-		      && vsetvl_insn_p (curr_info.get_insn ()->rtl ()))
+
+		  /* If we fuse and the current, to be deleted vsetvl has uses
+		     of its VL as AVL operand in other vsetvls those will be
+		     orphaned.  Therefore only delete if that's not the case.
+		     */
+		  rtx cur_dest = curr_info.has_vl ()
+		    ? curr_info.get_vl ()
+		    : NULL_RTX;
+
+		  if (vsetvl_insn_p (curr_info.get_insn ()->rtl ())
+		      && !reg_single_use_in_avl (curr_info.get_insn (),
+						 cur_dest))
 		    m_delete_list.safe_push (curr_info);
 
 		  if (curr_info.get_read_vl_insn ())

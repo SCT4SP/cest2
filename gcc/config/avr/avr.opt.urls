@@ -5,6 +5,9 @@
 mcall-prologues
 UrlSuffix(gcc/AVR-Options.html#index-mcall-prologues)
 
+mcvt
+UrlSuffix(gcc/AVR-Options.html#index-mcvt)
+
 mmcu=
 UrlSuffix(gcc/AVR-Options.html#index-mmcu)
 
@@ -13,6 +16,9 @@ UrlSuffix(gcc/AVR-Options.html#index-mgas-isr-prologues)
 
 mn-flash=
 UrlSuffix(gcc/AVR-Options.html#index-mn-flash)
+
+mcall-main
+UrlSuffix(gcc/AVR-Options.html#index-mcall-main)
 
 mskip-bug
 UrlSuffix(gcc/AVR-Options.html#index-mskip-bug)
@@ -44,6 +50,12 @@ UrlSuffix(gcc/AVR-Options.html#index-mrelax)
 maccumulate-args
 UrlSuffix(gcc/AVR-Options.html#index-maccumulate-args)
 
+msplit-bit-shift
+UrlSuffix(gcc/AVR-Options.html#index-msplit-bit-shift)
+
+msplit-ldst
+UrlSuffix(gcc/AVR-Options.html#index-msplit-ldst)
+
 mstrict-X
 UrlSuffix(gcc/AVR-Options.html#index-mstrict-X)
 
@@ -70,6 +82,12 @@ UrlSuffix(gcc/AVR-Options.html#index-Wmisspelled-isr)
 
 mfract-convert-truncate
 UrlSuffix(gcc/AVR-Options.html#index-mfract-convert-truncate)
+
+mfuse-move
+UrlSuffix(gcc/AVR-Options.html#index-mfuse-move)
+
+mfuse-move=
+UrlSuffix(gcc/AVR-Options.html#index-mfuse-move)
 
 mabsdata
 UrlSuffix(gcc/AVR-Options.html#index-mabsdata)

@@ -1,5 +1,5 @@
 /* Classes for representing locations within the program.
-   Copyright (C) 2019-2024 Free Software Foundation, Inc.
+   Copyright (C) 2019-2025 Free Software Foundation, Inc.
    Contributed by David Malcolm <dmalcolm@redhat.com>.
 
 This file is part of GCC.
@@ -19,7 +19,6 @@ along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
 #include "config.h"
-#define INCLUDE_MEMORY
 #define INCLUDE_VECTOR
 #include "system.h"
 #include "coretypes.h"
@@ -54,6 +53,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "analyzer/exploded-graph.h"
 #include "analyzer/analysis-plan.h"
 #include "analyzer/inlining-iterator.h"
+#include "make-unique.h"
 
 #if ENABLE_ANALYZER
 
@@ -313,10 +313,10 @@ program_point::dump () const
     "stmt_idx": int (only for kind=='PK_BEFORE_STMT',
     "call_string": object for the call_string}.  */
 
-json::object *
+std::unique_ptr<json::object>
 program_point::to_json () const
 {
-  json::object *point_obj = new json::object ();
+  auto point_obj = ::make_unique<json::object> ();
 
   point_obj->set_string ("kind", point_kind_to_string (get_kind ()));
 

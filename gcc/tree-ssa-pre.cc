@@ -1,5 +1,5 @@
 /* Full and partial redundancy elimination and code hoisting on SSA GIMPLE.
-   Copyright (C) 2001-2024 Free Software Foundation, Inc.
+   Copyright (C) 2001-2025 Free Software Foundation, Inc.
    Contributed by Daniel Berlin <dan@dberlin.org> and Steven Bosscher
    <stevenb@suse.de>
 
@@ -19,7 +19,6 @@ You should have received a copy of the GNU General Public License
 along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
-#define INCLUDE_MEMORY
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
@@ -1186,41 +1185,6 @@ get_or_alloc_expr_for_constant (tree constant)
   return newexpr;
 }
 
-/* Return the folded version of T if T, when folded, is a gimple
-   min_invariant or an SSA name.  Otherwise, return T.  */
-
-static pre_expr
-fully_constant_expression (pre_expr e)
-{
-  switch (e->kind)
-    {
-    case CONSTANT:
-      return e;
-    case NARY:
-      {
-	vn_nary_op_t nary = PRE_EXPR_NARY (e);
-	tree res = vn_nary_simplify (nary);
-	if (!res)
-	  return e;
-	if (is_gimple_min_invariant (res))
-	  return get_or_alloc_expr_for_constant (res);
-	if (TREE_CODE (res) == SSA_NAME)
-	  return get_or_alloc_expr_for_name (res);
-	return e;
-      }
-    case REFERENCE:
-      {
-	vn_reference_t ref = PRE_EXPR_REFERENCE (e);
-	tree folded;
-	if ((folded = fully_constant_vn_reference_p (ref)))
-	  return get_or_alloc_expr_for_constant (folded);
-	return e;
-      }
-    default:
-      return e;
-    }
-}
-
 /* Translate the VUSE backwards through phi nodes in E->dest, so that
    it has the value it would have in E->src.  Set *SAME_VALID to true
    in case the new vuse doesn't change the value id of the OPERANDS.  */
@@ -1431,7 +1395,7 @@ phi_translate_1 (bitmap_set_t dest,
 		unsigned int op_val_id = VN_INFO (newnary->op[i])->value_id;
 		leader = find_leader_in_sets (op_val_id, set1, set2);
 		result = phi_translate (dest, leader, set1, set2, e);
-		if (result && result != leader)
+		if (result)
 		  /* If op has a leader in the sets we translate make
 		     sure to use the value of the translated expression.
 		     We might need a new representative for that.  */
@@ -1444,57 +1408,55 @@ phi_translate_1 (bitmap_set_t dest,
 	  }
 	if (changed)
 	  {
-	    pre_expr constant;
 	    unsigned int new_val_id;
 
-	    PRE_EXPR_NARY (expr) = newnary;
-	    constant = fully_constant_expression (expr);
-	    PRE_EXPR_NARY (expr) = nary;
-	    if (constant != expr)
+	    /* Try to simplify the new NARY.  */
+	    tree res = vn_nary_simplify (newnary);
+	    if (res)
 	      {
+		if (is_gimple_min_invariant (res))
+		  return get_or_alloc_expr_for_constant (res);
+
 		/* For non-CONSTANTs we have to make sure we can eventually
 		   insert the expression.  Which means we need to have a
 		   leader for it.  */
-		if (constant->kind != CONSTANT)
+		gcc_assert (TREE_CODE (res) == SSA_NAME);
+
+		/* Do not allow simplifications to non-constants over
+		   backedges as this will likely result in a loop PHI node
+		   to be inserted and increased register pressure.
+		   See PR77498 - this avoids doing predcoms work in
+		   a less efficient way.  */
+		if (e->flags & EDGE_DFS_BACK)
+		  ;
+		else
 		  {
-		    /* Do not allow simplifications to non-constants over
-		       backedges as this will likely result in a loop PHI node
-		       to be inserted and increased register pressure.
-		       See PR77498 - this avoids doing predcoms work in
-		       a less efficient way.  */
-		    if (e->flags & EDGE_DFS_BACK)
-		      ;
-		    else
+		    unsigned value_id = VN_INFO (res)->value_id;
+		    /* We want a leader in ANTIC_OUT or AVAIL_OUT here.
+		       dest has what we computed into ANTIC_OUT sofar
+		       so pick from that - since topological sorting
+		       by sorted_array_from_bitmap_set isn't perfect
+		       we may lose some cases here.  */
+		    pre_expr constant = find_leader_in_sets (value_id, dest,
+							     AVAIL_OUT (pred));
+		    if (constant)
 		      {
-			unsigned value_id = get_expr_value_id (constant);
-			/* We want a leader in ANTIC_OUT or AVAIL_OUT here.
-			   dest has what we computed into ANTIC_OUT sofar
-			   so pick from that - since topological sorting
-			   by sorted_array_from_bitmap_set isn't perfect
-			   we may lose some cases here.  */
-			constant = find_leader_in_sets (value_id, dest,
-							AVAIL_OUT (pred));
-			if (constant)
+			if (dump_file && (dump_flags & TDF_DETAILS))
 			  {
-			    if (dump_file && (dump_flags & TDF_DETAILS))
-			      {
-				fprintf (dump_file, "simplifying ");
-				print_pre_expr (dump_file, expr);
-				fprintf (dump_file, " translated %d -> %d to ",
-					 phiblock->index, pred->index);
-				PRE_EXPR_NARY (expr) = newnary;
-				print_pre_expr (dump_file, expr);
-				PRE_EXPR_NARY (expr) = nary;
-				fprintf (dump_file, " to ");
-				print_pre_expr (dump_file, constant);
-				fprintf (dump_file, "\n");
-			      }
-			    return constant;
+			    fprintf (dump_file, "simplifying ");
+			    print_pre_expr (dump_file, expr);
+			    fprintf (dump_file, " translated %d -> %d to ",
+				     phiblock->index, pred->index);
+			    PRE_EXPR_NARY (expr) = newnary;
+			    print_pre_expr (dump_file, expr);
+			    PRE_EXPR_NARY (expr) = nary;
+			    fprintf (dump_file, " to ");
+			    print_pre_expr (dump_file, constant);
+			    fprintf (dump_file, "\n");
 			  }
+			return constant;
 		      }
 		  }
-		else
-		  return constant;
 	      }
 
 	    tree result = vn_nary_op_lookup_pieces (newnary->length,
@@ -1554,7 +1516,7 @@ phi_translate_1 (bitmap_set_t dest,
 		op_val_id = VN_INFO (op[n])->value_id;
 		leader = find_leader_in_sets (op_val_id, set1, set2);
 		opresult = phi_translate (dest, leader, set1, set2, e);
-		if (opresult && opresult != leader)
+		if (opresult)
 		  {
 		    tree name = get_representative_for (opresult);
 		    changed |= name != op[n];
@@ -2623,7 +2585,7 @@ create_component_ref_by_pieces_1 (basic_block block, vn_reference_t ref,
 							stmts);
 	if (!genop0)
 	  return NULL_TREE;
-	return fold_build1 (currop->opcode, currop->type, genop0);
+	return build1 (currop->opcode, currop->type, genop0);
       }
 
     case WITH_SIZE_EXPR:
@@ -2635,7 +2597,7 @@ create_component_ref_by_pieces_1 (basic_block block, vn_reference_t ref,
 	tree genop1 = find_or_generate_expression (block, currop->op0, stmts);
 	if (!genop1)
 	  return NULL_TREE;
-	return fold_build2 (currop->opcode, currop->type, genop0, genop1);
+	return build2 (currop->opcode, currop->type, genop0, genop1);
       }
 
     case BIT_FIELD_REF:
@@ -2648,7 +2610,7 @@ create_component_ref_by_pieces_1 (basic_block block, vn_reference_t ref,
 	tree op2 = currop->op1;
 	tree t = build3 (BIT_FIELD_REF, currop->type, genop0, op1, op2);
 	REF_REVERSE_STORAGE_ORDER (t) = currop->reverse;
-	return fold (t);
+	return t;
       }
 
       /* For array ref vn_reference_op's, operand 1 of the array ref
@@ -2726,7 +2688,7 @@ create_component_ref_by_pieces_1 (basic_block block, vn_reference_t ref,
 	    if (!genop2)
 	      return NULL_TREE;
 	  }
-	return fold_build3 (COMPONENT_REF, TREE_TYPE (op1), op0, op1, genop2);
+	return build3 (COMPONENT_REF, TREE_TYPE (op1), op0, op1, genop2);
       }
 
     case SSA_NAME:

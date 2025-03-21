@@ -1,4 +1,4 @@
-// Copyright (C) 2020-2024 Free Software Foundation, Inc.
+// Copyright (C) 2020-2025 Free Software Foundation, Inc.
 
 // This file is part of GCC.
 
@@ -140,7 +140,7 @@ public:
 	    it = values.erase (it);
 	    for (auto &node : final_fragment.get_nodes ())
 	      {
-		auto new_node = extractor (node);
+		U new_node = extractor (node);
 		if (new_node != nullptr)
 		  {
 		    it = values.insert (it, std::move (new_node));

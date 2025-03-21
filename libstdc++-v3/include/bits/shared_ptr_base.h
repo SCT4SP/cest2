@@ -1,6 +1,6 @@
 // shared_ptr and weak_ptr implementation details -*- C++ -*-
 
-// Copyright (C) 2007-2024 Free Software Foundation, Inc.
+// Copyright (C) 2007-2025 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -61,7 +61,6 @@
 #include <ext/atomicity.h>
 #include <ext/concurrence.h>
 #if __cplusplus >= 202002L
-# include <bit>          // __bit_floor
 # include <compare>
 # include <bits/align.h> // std::align
 # include <bits/stl_uninitialized.h>
@@ -1337,6 +1336,15 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     { };
 
 
+  template<typename _Tp>
+    [[__gnu__::__always_inline__]]
+    inline _Tp*
+    __shared_ptr_deref(_Tp* __p)
+    {
+      __glibcxx_assert(__p != nullptr);
+      return __p;
+    }
+
   // Define operator* and operator-> for shared_ptr<T>.
   template<typename _Tp, _Lock_policy _Lp,
 	   bool = is_array<_Tp>::value, bool = is_void<_Tp>::value>
@@ -1347,10 +1355,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
       element_type&
       operator*() const noexcept
-      {
-	__glibcxx_assert(_M_get() != nullptr);
-	return *_M_get();
-      }
+      { return *std::__shared_ptr_deref(_M_get()); }
 
       element_type*
       operator->() const noexcept
@@ -1392,10 +1397,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       [[__deprecated__("shared_ptr<T[]>::operator* is absent from C++17")]]
       element_type&
       operator*() const noexcept
-      {
-	__glibcxx_assert(_M_get() != nullptr);
-	return *_M_get();
-      }
+      { return *std::__shared_ptr_deref(_M_get()); }
 
       [[__deprecated__("shared_ptr<T[]>::operator-> is absent from C++17")]]
       element_type*
@@ -1406,13 +1408,16 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       }
 #endif
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wc++17-extensions"
       element_type&
       operator[](ptrdiff_t __i) const noexcept
       {
-	__glibcxx_assert(_M_get() != nullptr);
-	__glibcxx_assert(!extent<_Tp>::value || __i < extent<_Tp>::value);
-	return _M_get()[__i];
+	if constexpr (extent<_Tp>::value)
+	  __glibcxx_assert(__i < extent<_Tp>::value);
+	return std::__shared_ptr_deref(_M_get())[__i];
       }
+#pragma GCC diagnostic pop
 
     private:
       element_type*
@@ -2070,7 +2075,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
       __shared_ptr<_Tp, _Lp>
       lock() const noexcept
-      { return __shared_ptr<element_type, _Lp>(*this, std::nothrow); }
+      { return __shared_ptr<_Tp, _Lp>(*this, std::nothrow); }
 
       long
       use_count() const noexcept

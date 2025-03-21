@@ -1,5 +1,5 @@
 /* Symbolic values.
-   Copyright (C) 2019-2024 Free Software Foundation, Inc.
+   Copyright (C) 2019-2025 Free Software Foundation, Inc.
    Contributed by David Malcolm <dmalcolm@redhat.com>.
 
 This file is part of GCC.
@@ -19,7 +19,6 @@ along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
 #include "config.h"
-#define INCLUDE_MEMORY
 #define INCLUDE_VECTOR
 #include "system.h"
 #include "coretypes.h"
@@ -104,11 +103,11 @@ svalue::get_desc (bool simple) const
 
 /* Return a new json::string describing the svalue.  */
 
-json::value *
+std::unique_ptr<json::value>
 svalue::to_json () const
 {
   label_text desc = get_desc (true);
-  json::value *sval_js = new json::string (desc.get ());
+  auto sval_js = ::make_unique<json::string> (desc.get ());
   return sval_js;
 }
 
@@ -468,8 +467,21 @@ cmp_csts_same_type (const_tree cst1, const_tree cst2)
     case INTEGER_CST:
       return tree_int_cst_compare (cst1, cst2);
     case STRING_CST:
-      return strcmp (TREE_STRING_POINTER (cst1),
-		     TREE_STRING_POINTER (cst2));
+      if (TREE_STRING_LENGTH (cst1) < TREE_STRING_LENGTH (cst2))
+	return -1;
+      if (TREE_STRING_LENGTH (cst1) > TREE_STRING_LENGTH (cst2))
+	return 1;
+      return memcmp (TREE_STRING_POINTER (cst1),
+		     TREE_STRING_POINTER (cst2),
+		     TREE_STRING_LENGTH (cst1));
+    case RAW_DATA_CST:
+      if (RAW_DATA_LENGTH (cst1) < RAW_DATA_LENGTH (cst2))
+	return -1;
+      if (RAW_DATA_LENGTH (cst1) > RAW_DATA_LENGTH (cst2))
+	return 1;
+      return memcmp (RAW_DATA_POINTER (cst1),
+		     RAW_DATA_POINTER (cst2),
+		     RAW_DATA_LENGTH (cst1));
     case REAL_CST:
       /* Impose an arbitrary but deterministic order.  */
       return memcmp (TREE_REAL_CST_PTR (cst1),

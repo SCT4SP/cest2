@@ -1,4 +1,4 @@
-;; Copyright (C) 2016-2024 Free Software Foundation, Inc.
+;; Copyright (C) 2016-2025 Free Software Foundation, Inc.
 
 ;; This file is free software; you can redistribute it and/or modify it under
 ;; the terms of the GNU General Public License as published by the Free
@@ -1013,6 +1013,13 @@
   "s_icache_inv"
   [(set_attr "type" "sopp")
    (set_attr "length" "4")])
+
+(define_expand "exception_receiver"
+  [(const_int 0)]
+  ""
+{
+  sorry ("exception handling not supported");
+})
 
 ;; }}}
 ;; {{{ Conditionals

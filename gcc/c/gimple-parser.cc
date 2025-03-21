@@ -1,5 +1,5 @@
 /* Parser for GIMPLE.
-   Copyright (C) 2016-2024 Free Software Foundation, Inc.
+   Copyright (C) 2016-2025 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -17,7 +17,6 @@ You should have received a copy of the GNU General Public License
 along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
-#define INCLUDE_MEMORY
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
@@ -126,6 +125,39 @@ static tree c_parser_gimple_paren_condition (gimple_parser &);
 static void c_parser_gimple_expr_list (gimple_parser &, vec<tree> *);
 
 
+/* Much like parser_build_unary_op, but avoid applying default conversions.  */
+
+static c_expr
+gimple_parser_build_unary_op (location_t loc,
+			      enum tree_code code, struct c_expr arg)
+{
+  struct c_expr result;
+
+  result.original_code = code;
+  result.original_type = NULL;
+  result.m_decimal = 0;
+
+  if (reject_gcc_builtin (arg.value))
+    {
+      result.value = error_mark_node;
+    }
+  else
+    {
+      result.value = build_unary_op (loc, code, arg.value, true);
+
+      if (TREE_OVERFLOW_P (result.value) && !TREE_OVERFLOW_P (arg.value))
+	overflow_warning (loc, result.value, arg.value);
+    }
+
+  /* We are typically called when parsing a prefix token at LOC acting on
+     ARG.  Reflect this by updating the source range of the result to
+     start at LOC and end at the end of ARG.  */
+  set_c_expr_source_range (&result,
+			   loc, arg.get_finish ());
+
+  return result;
+}
+
 /* See if VAL is an identifier matching __BB<num> and return <num>
    in *INDEX.  */
 
@@ -134,11 +166,21 @@ c_parser_gimple_parse_bb_spec (tree val, int *index)
 {
   if (!startswith (IDENTIFIER_POINTER (val), "__BB"))
     return false;
-  for (const char *p = IDENTIFIER_POINTER (val) + 4; *p; ++p)
-    if (!ISDIGIT (*p))
-      return false;
-  *index = atoi (IDENTIFIER_POINTER (val) + 4);
-  return *index > 0;
+
+  const char *bb = IDENTIFIER_POINTER (val) + 4;
+  if (! ISDIGIT (*bb))
+    return false;
+
+  char *pend;
+  errno = 0;
+  const unsigned long number = strtoul (bb, &pend, 10);
+  if (errno == ERANGE
+      || *pend != '\0'
+      || number > INT_MAX)
+    return false;
+
+  *index = number;
+  return true;
 }
 
 /* See if VAL is an identifier matching __BB<num> and return <num>
@@ -665,6 +707,16 @@ c_parser_gimple_compound_statement (gimple_parser &parser, gimple_seq *seq)
 	    break;
 	  }
 
+	case CPP_CLOSE_PAREN:
+	case CPP_CLOSE_SQUARE:
+	  /* Avoid infinite loop in error recovery:
+	     c_parser_skip_until_found stops at a closing nesting
+	     delimiter without consuming it, but here we need to consume
+	     it to proceed further.  */
+	  c_parser_error (parser, "expected statement");
+	  c_parser_consume_token (parser);
+	break;
+
 	default:
 expr_stmt:
 	  c_parser_gimple_statement (parser, seq);
@@ -880,11 +932,9 @@ c_parser_gimple_statement (gimple_parser &parser, gimple_seq *seq)
   if (lhs.value != error_mark_node
       && rhs.value != error_mark_node)
     {
-      /* If we parsed a comparison or an identifier and the next token
-	 is a '?' then parse a conditional expression.  */
-      if ((COMPARISON_CLASS_P (rhs.value)
-	   || SSA_VAR_P (rhs.value))
-	  && c_parser_next_token_is (parser, CPP_QUERY))
+      /* If we parsed an identifier and the next token  is a '?' then parse
+	 a conditional expression.  */
+      if (SSA_VAR_P (rhs.value) && c_parser_next_token_is (parser, CPP_QUERY))
 	{
 	  struct c_expr trueval, falseval;
 	  c_parser_consume_token (parser);
@@ -1186,7 +1236,7 @@ c_parser_gimple_unary_expression (gimple_parser &parser)
       c_parser_consume_token (parser);
       op = c_parser_gimple_postfix_expression (parser);
       mark_exp_read (op.value);
-      return parser_build_unary_op (op_loc, ADDR_EXPR, op);
+      return gimple_parser_build_unary_op (op_loc, ADDR_EXPR, op);
     case CPP_MULT:
       {
 	c_parser_consume_token (parser);
@@ -1211,15 +1261,15 @@ c_parser_gimple_unary_expression (gimple_parser &parser)
     case CPP_PLUS:
       c_parser_consume_token (parser);
       op = c_parser_gimple_postfix_expression (parser);
-      return parser_build_unary_op (op_loc, CONVERT_EXPR, op);
+      return gimple_parser_build_unary_op (op_loc, CONVERT_EXPR, op);
     case CPP_MINUS:
       c_parser_consume_token (parser);
       op = c_parser_gimple_postfix_expression (parser);
-      return parser_build_unary_op (op_loc, NEGATE_EXPR, op);
+      return gimple_parser_build_unary_op (op_loc, NEGATE_EXPR, op);
     case CPP_COMPL:
       c_parser_consume_token (parser);
       op = c_parser_gimple_postfix_expression (parser);
-      return parser_build_unary_op (op_loc, BIT_NOT_EXPR, op);
+      return gimple_parser_build_unary_op (op_loc, BIT_NOT_EXPR, op);
     case CPP_NOT:
       c_parser_error (parser, "%<!%> not valid in GIMPLE");
       return ret;
@@ -1229,11 +1279,11 @@ c_parser_gimple_unary_expression (gimple_parser &parser)
 	case RID_REALPART:
 	  c_parser_consume_token (parser);
 	  op = c_parser_gimple_postfix_expression (parser);
-	  return parser_build_unary_op (op_loc, REALPART_EXPR, op);
+	  return gimple_parser_build_unary_op (op_loc, REALPART_EXPR, op);
 	case RID_IMAGPART:
 	  c_parser_consume_token (parser);
 	  op = c_parser_gimple_postfix_expression (parser);
-	  return parser_build_unary_op (op_loc, IMAGPART_EXPR, op);
+	  return gimple_parser_build_unary_op (op_loc, IMAGPART_EXPR, op);
 	default:
 	  return c_parser_gimple_postfix_expression (parser);
 	}
@@ -1244,13 +1294,13 @@ c_parser_gimple_unary_expression (gimple_parser &parser)
 	    {
 	      c_parser_consume_token (parser);
 	      op = c_parser_gimple_postfix_expression (parser);
-	      return parser_build_unary_op (op_loc, ABS_EXPR, op);
+	      return gimple_parser_build_unary_op (op_loc, ABS_EXPR, op);
 	    }
 	  else if (strcmp (IDENTIFIER_POINTER (id), "__ABSU") == 0)
 	    {
 	      c_parser_consume_token (parser);
 	      op = c_parser_gimple_postfix_expression (parser);
-	      return parser_build_unary_op (op_loc, ABSU_EXPR, op);
+	      return gimple_parser_build_unary_op (op_loc, ABSU_EXPR, op);
 	    }
 	  else if (strcmp (IDENTIFIER_POINTER (id), "__MIN") == 0)
 	    return c_parser_gimple_parentized_binary_expression (parser,
@@ -2201,7 +2251,12 @@ c_parser_gimple_declaration (gimple_parser &parser)
 				    specs->typespec_kind != ctsk_none,
 				    C_DTR_NORMAL, &dummy);
 
-  if (c_parser_next_token_is (parser, CPP_SEMICOLON))
+  if (!c_parser_next_token_is (parser, CPP_SEMICOLON))
+    {
+      c_parser_error (parser, "expected %<;%>");
+      return;
+    }
+  if (declarator)
     {
       /* Handle SSA name decls specially, they do not go into the identifier
          table but we simply build the SSA name for later lookup.  */
@@ -2245,11 +2300,6 @@ c_parser_gimple_declaration (gimple_parser &parser)
 	    finish_decl (decl, UNKNOWN_LOCATION, NULL_TREE, NULL_TREE,
 			 NULL_TREE);
 	}
-    }
-  else
-    {
-      c_parser_error (parser, "expected %<;%>");
-      return;
     }
 }
 

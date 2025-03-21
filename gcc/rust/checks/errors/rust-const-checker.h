@@ -1,4 +1,4 @@
-// Copyright (C) 2020-2024 Free Software Foundation, Inc.
+// Copyright (C) 2020-2025 Free Software Foundation, Inc.
 
 // This file is part of GCC.
 
@@ -128,11 +128,11 @@ private:
   virtual void visit (WhileLetLoopExpr &expr) override;
   virtual void visit (IfExpr &expr) override;
   virtual void visit (IfExprConseqElse &expr) override;
-  virtual void visit (IfLetExpr &expr) override;
-  virtual void visit (IfLetExprConseqElse &expr) override;
   virtual void visit (MatchExpr &expr) override;
   virtual void visit (AwaitExpr &expr) override;
   virtual void visit (AsyncBlockExpr &expr) override;
+  virtual void visit (InlineAsm &expr) override;
+
   virtual void visit (TypeParam &param) override;
   virtual void visit (ConstGenericParam &param) override;
   virtual void visit (LifetimeWhereClauseItem &item) override;

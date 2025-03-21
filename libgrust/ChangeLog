@@ -1,3 +1,44 @@
+2025-03-17  badumbatish  <tanghocle456@gmail.com>
+
+	* libformat_parser/generic_format_parser/src/lib.rs:
+	Remove repr(C)
+	* libformat_parser/src/bin.rs: Use ffi
+	* libformat_parser/src/lib.rs: pub ffi, create ParseMode and match
+	rustc's parse mode
+
+2025-03-17  badumbatish  <tanghocle456@gmail.com>
+
+	* libformat_parser/generic_format_parser/src/lib.rs: Likewise.
+	* libformat_parser/src/bin.rs: Likewise.
+	* libformat_parser/src/lib.rs: Likewise.
+
+2025-03-17  Kushal Pal  <kushalpal109@gmail.com>
+
+	* libformat_parser/Cargo.toml:
+	Used crate-type instead of depricated crate_type.
+	* libformat_parser/generic_format_parser/src/lib.rs:
+	Remove dead code.
+	* libformat_parser/src/lib.rs: Likewise.
+
+2024-12-09  Arthur Cohen  <arthur.cohen@embecosm.com>
+
+	* libformat_parser/Cargo.toml: Change Rust edition from 2021 to 2018.
+	* libformat_parser/generic_format_parser/Cargo.toml: Likewise.
+	* libformat_parser/generic_format_parser/src/lib.rs: Remove usage of
+	then-unstable std features and language constructs.
+	* libformat_parser/src/lib.rs: Likewise, plus provide extension trait
+	for String::leak.
+
+2024-12-09  Thomas Schwinge  <tschwinge@baylibre.com>
+
+	* libformat_parser/src/lib.rs: Work around 'error[E0599]:
+	no method named `leak` found for struct `std::string::String` in the current scope'.
+
+2024-12-09  Thomas Schwinge  <tschwinge@baylibre.com>
+
+	* libformat_parser/generic_format_parser/src/lib.rs: Work around
+	'error[E0658]: `let...else` statements are unstable'.
+
 2024-08-01  Arthur Cohen  <arthur.cohen@embecosm.com>
 
 	* libformat_parser/src/lib.rs: Use new Handle struct and expose it.
@@ -1036,9 +1077,8 @@
 	* libproc_macro/proc_macro.cc: New file.
 	* libproc_macro/proc_macro.h: New file.
 	* libproc_macro/Makefile.in: Generate.
-
 
-Copyright (C) 2023-2024 Free Software Foundation, Inc.
+Copyright (C) 2023-2025 Free Software Foundation, Inc.
 
 Copying and distribution of this file, with or without modification,
 are permitted in any medium without royalty provided the copyright

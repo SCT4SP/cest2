@@ -1,5 +1,5 @@
 ;; Predicate definitions for HP PA-RISC.
-;; Copyright (C) 2005-2024 Free Software Foundation, Inc.
+;; Copyright (C) 2005-2025 Free Software Foundation, Inc.
 ;;
 ;; This file is part of GCC.
 ;;
@@ -191,6 +191,22 @@
 	  && CONSTANT_P (op) && ! TARGET_PORTABLE_RUNTIME);
 })
 
+;; True iff OP is a SImode r25 register operand.
+
+(define_predicate "r25_operand"
+  (match_code "reg")
+{
+  return mode == SImode && REG_P (op) && REGNO (op) == 25;
+})
+
+;; True iff OP is a SImode r26 register operand.
+
+(define_predicate "r26_operand"
+  (match_code "reg")
+{
+  return mode == SImode && REG_P (op) && REGNO (op) == 26;
+})
+
 ;; True iff OP can be used as the divisor in a div millicode call.
 
 (define_predicate "div_operand"
@@ -285,7 +301,7 @@
       return false;
 
     default:
-      return (INTVAL (op) % GET_MODE_SIZE (mode)) == 0;
+      return (INTVAL (op) & (GET_MODE_SIZE (mode) - 1)) == 0;
     }
 
   return false;

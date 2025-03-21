@@ -1,4 +1,4 @@
-// Copyright (C) 2020-2024 Free Software Foundation, Inc.
+// Copyright (C) 2020-2025 Free Software Foundation, Inc.
 
 // This file is part of GCC.
 
@@ -24,6 +24,12 @@
 
 namespace Rust {
 namespace Analysis {
+
+class Attributes
+{
+public:
+  static bool is_known (const std::string &attribute_path);
+};
 
 enum CompilerPass
 {

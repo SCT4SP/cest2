@@ -1,5 +1,5 @@
 /* Build expressions with type checking for C++ compiler.
-   Copyright (C) 1987-2024 Free Software Foundation, Inc.
+   Copyright (C) 1987-2025 Free Software Foundation, Inc.
    Hacked by Michael Tiemann (tiemann@cygnus.com)
 
 This file is part of GCC.
@@ -24,7 +24,6 @@ along with GCC; see the file COPYING3.  If not see
    including computing the types of the result, C and C++ specific error
    checks, and some optimization.  */
 
-#define INCLUDE_MEMORY
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
@@ -1623,6 +1622,12 @@ structural_comptypes (tree t1, tree t2, int strict)
 	      && comp_template_args (PACK_EXPANSION_EXTRA_ARGS (t1),
 				     PACK_EXPANSION_EXTRA_ARGS (t2)));
 
+    case PACK_INDEX_TYPE:
+      return (cp_tree_equal (PACK_INDEX_PACK (t1),
+			     PACK_INDEX_PACK (t2))
+	      && cp_tree_equal (PACK_INDEX_INDEX (t1),
+				PACK_INDEX_INDEX (t2)));
+
     case DECLTYPE_TYPE:
       if (DECLTYPE_TYPE_ID_EXPR_OR_MEMBER_ACCESS_P (t1)
           != DECLTYPE_TYPE_ID_EXPR_OR_MEMBER_ACCESS_P (t2))
@@ -1685,6 +1690,14 @@ structural_comptypes (tree t1, tree t2, int strict)
     }
 
   return true;
+}
+
+/* C++ implementation of compatible_types_for_indirection_note_p.  */
+
+bool
+compatible_types_for_indirection_note_p (tree type1, tree type2)
+{
+  return same_type_p (type1, type2);
 }
 
 /* Return true if T1 and T2 are related as allowed by STRICT.  STRICT
@@ -2967,7 +2980,7 @@ build_class_member_access_expr (cp_expr object, tree member,
 				    /*nonnull=*/1, complain);
 	  /* If we found the base successfully then we should be able
 	     to convert to it successfully.  */
-	  gcc_assert (object != error_mark_node);
+	  gcc_assert (object != error_mark_node || seen_error ());
 	}
 
       /* If MEMBER is from an anonymous aggregate, we have converted
@@ -3857,7 +3870,11 @@ cp_build_indirect_ref_1 (location_t loc, tree ptr, ref_operator errorstring,
 	  return error_mark_node;
 	}
       else if (do_fold && TREE_CODE (pointer) == ADDR_EXPR
-	       && same_type_p (t, TREE_TYPE (TREE_OPERAND (pointer, 0))))
+	       && same_type_p (t, TREE_TYPE (TREE_OPERAND (pointer, 0)))
+	       /* Don't let this change the value category.  '*&TARGET_EXPR'
+		  is an lvalue, but folding it into 'TARGET_EXPR' would turn
+		  it into a prvalue of class type.  */
+	       && lvalue_p (TREE_OPERAND (pointer, 0)))
 	/* The POINTER was something like `&x'.  We simplify `*&x' to
 	   `x'.  */
 	return TREE_OPERAND (pointer, 0);
@@ -4092,7 +4109,8 @@ cp_build_array_ref (location_t loc, tree array, tree idx,
     tree ar = cp_default_conversion (array, complain);
     tree ind = cp_default_conversion (idx, complain);
 
-    if (!first && flag_strong_eval_order == 2 && TREE_SIDE_EFFECTS (ind))
+    if (!processing_template_decl
+	&& !first && flag_strong_eval_order == 2 && TREE_SIDE_EFFECTS (ind))
       ar = first = save_expr (ar);
 
     /* Put the integer in IND to simplify error checking.  */
@@ -4205,16 +4223,14 @@ get_member_function_from_ptrfunc (tree *instance_ptrptr, tree function,
 	      && !DECL_P (instance_ptr)
 	      && !TREE_CONSTANT (instance_ptr)))
 	instance_ptr = instance_save_expr
-	  = force_target_expr (TREE_TYPE (instance_ptr), instance_ptr,
-			       complain);
+	  = get_internal_target_expr (instance_ptr);
 
       /* See above comment.  */
       if (TREE_SIDE_EFFECTS (function)
 	  || (!nonvirtual
 	      && !DECL_P (function)
 	      && !TREE_CONSTANT (function)))
-	function
-	  = force_target_expr (TREE_TYPE (function), function, complain);
+	function = get_internal_target_expr (function);
 
       /* Start by extracting all the information from the PMF itself.  */
       e3 = pfn_from_ptrmemfunc (function);
@@ -4499,9 +4515,11 @@ cp_build_function_call_vec (tree function, vec<tree, va_gc> **params,
 
   /* Check for errors in format strings and inappropriately
      null parameters.  */
-  bool warned_p = check_function_arguments (input_location, fndecl, fntype,
-					    nargs, argarray, NULL,
-					    cp_comp_parm_types);
+  bool warned_p
+    = ((complain & tf_warning)
+       && check_function_arguments (input_location, fndecl, fntype,
+				    nargs, argarray, NULL,
+				    cp_comp_parm_types));
 
   ret = build_cxx_call (function, nargs, argarray, complain, orig_fndecl);
 
@@ -4851,6 +4869,11 @@ tree
 build_omp_array_section (location_t loc, tree array_expr, tree index,
 			 tree length)
 {
+  if (TREE_CODE (array_expr) == TYPE_DECL
+      || type_dependent_expression_p (array_expr))
+    return build3_loc (loc, OMP_ARRAY_SECTION, NULL_TREE, array_expr, index,
+		       length);
+
   tree type = TREE_TYPE (array_expr);
   gcc_assert (type);
   type = non_reference (type);
@@ -5457,7 +5480,7 @@ cp_build_binary_op (const op_location_t &location,
           case stv_firstarg:
             {
               op0 = convert (TREE_TYPE (type1), op0);
-	      op0 = save_expr (op0);
+	      op0 = cp_save_expr (op0);
               op0 = build_vector_from_val (type1, op0);
 	      orig_type0 = type0 = TREE_TYPE (op0);
               code0 = TREE_CODE (type0);
@@ -5467,7 +5490,7 @@ cp_build_binary_op (const op_location_t &location,
           case stv_secondarg:
             {
               op1 = convert (TREE_TYPE (type0), op1);
-	      op1 = save_expr (op1);
+	      op1 = cp_save_expr (op1);
               op1 = build_vector_from_val (type0, op1);
 	      orig_type1 = type1 = TREE_TYPE (op1);
               code1 = TREE_CODE (type1);
@@ -5816,23 +5839,28 @@ cp_build_binary_op (const op_location_t &location,
 	warning_at (location, OPT_Wfloat_equal,
 		    "comparing floating-point with %<==%> "
 		    "or %<!=%> is unsafe");
-      if (complain & tf_warning)
-	{
-	  tree stripped_orig_op0 = tree_strip_any_location_wrapper (orig_op0);
-	  tree stripped_orig_op1 = tree_strip_any_location_wrapper (orig_op1);
-	  if ((TREE_CODE (stripped_orig_op0) == STRING_CST
-	       && !integer_zerop (cp_fully_fold (op1)))
-	      || (TREE_CODE (stripped_orig_op1) == STRING_CST
-		  && !integer_zerop (cp_fully_fold (op0))))
-	    warning_at (location, OPT_Waddress,
-			"comparison with string literal results in "
-			"unspecified behavior");
-	  else if (warn_array_compare
-		   && TREE_CODE (TREE_TYPE (orig_op0)) == ARRAY_TYPE
-		   && TREE_CODE (TREE_TYPE (orig_op1)) == ARRAY_TYPE)
-	    do_warn_array_compare (location, code, stripped_orig_op0,
-				   stripped_orig_op1);
-	}
+      {
+	tree stripped_orig_op0 = tree_strip_any_location_wrapper (orig_op0);
+	tree stripped_orig_op1 = tree_strip_any_location_wrapper (orig_op1);
+	if ((complain & tf_warning_or_error)
+	    && ((TREE_CODE (stripped_orig_op0) == STRING_CST
+		 && !integer_zerop (cp_fully_fold (op1)))
+		|| (TREE_CODE (stripped_orig_op1) == STRING_CST
+		    && !integer_zerop (cp_fully_fold (op0)))))
+	  warning_at (location, OPT_Waddress,
+		      "comparison with string literal results in "
+		      "unspecified behavior");
+	else if (TREE_CODE (TREE_TYPE (orig_op0)) == ARRAY_TYPE
+		 && TREE_CODE (TREE_TYPE (orig_op1)) == ARRAY_TYPE)
+	  {
+	    /* P2865R5 made array comparisons ill-formed in C++26.  */
+	    if (complain & tf_warning_or_error)
+	      do_warn_array_compare (location, code, stripped_orig_op0,
+				     stripped_orig_op1);
+	    else if (cxx_dialect >= cxx26)
+	      return error_mark_node;
+	  }
+      }
 
       build_type = boolean_type_node;
       if ((code0 == INTEGER_TYPE || code0 == REAL_TYPE
@@ -5991,9 +6019,9 @@ cp_build_binary_op (const op_location_t &location,
 	    return error_mark_node;
 
 	  if (TREE_SIDE_EFFECTS (op0))
-	    op0 = save_expr (op0);
+	    op0 = cp_save_expr (op0);
 	  if (TREE_SIDE_EFFECTS (op1))
-	    op1 = save_expr (op1);
+	    op1 = cp_save_expr (op1);
 
 	  pfn0 = pfn_from_ptrmemfunc (op0);
 	  pfn0 = cp_fully_fold (pfn0);
@@ -6111,14 +6139,17 @@ cp_build_binary_op (const op_location_t &location,
 			"comparison with string literal results "
 			"in unspecified behavior");
 	}
-      else if (warn_array_compare
-	       && TREE_CODE (TREE_TYPE (orig_op0)) == ARRAY_TYPE
+      else if (TREE_CODE (TREE_TYPE (orig_op0)) == ARRAY_TYPE
 	       && TREE_CODE (TREE_TYPE (orig_op1)) == ARRAY_TYPE
-	       && code != SPACESHIP_EXPR
-	       && (complain & tf_warning))
-	do_warn_array_compare (location, code,
-			       tree_strip_any_location_wrapper (orig_op0),
-			       tree_strip_any_location_wrapper (orig_op1));
+	       && code != SPACESHIP_EXPR)
+	{
+	  if (complain & tf_warning_or_error)
+	    do_warn_array_compare (location, code,
+				   tree_strip_any_location_wrapper (orig_op0),
+				   tree_strip_any_location_wrapper (orig_op1));
+	  else if (cxx_dialect >= cxx26)
+	    return error_mark_node;
+	}
 
       if (gnu_vector_type_p (type0) && gnu_vector_type_p (type1))
 	{
@@ -6231,8 +6262,8 @@ cp_build_binary_op (const op_location_t &location,
 	  && !processing_template_decl
 	  && sanitize_flags_p (SANITIZE_POINTER_COMPARE))
 	{
-	  op0 = save_expr (op0);
-	  op1 = save_expr (op1);
+	  op0 = cp_save_expr (op0);
+	  op1 = cp_save_expr (op1);
 
 	  tree tt = builtin_decl_explicit (BUILT_IN_ASAN_POINTER_COMPARE);
 	  instrument_expr = build_call_expr_loc (location, tt, 2, op0, op1);
@@ -6492,14 +6523,14 @@ cp_build_binary_op (const op_location_t &location,
 	    return error_mark_node;
 	  if (first_complex)
 	    {
-	      op0 = save_expr (op0);
+	      op0 = cp_save_expr (op0);
 	      real = cp_build_unary_op (REALPART_EXPR, op0, true, complain);
 	      imag = cp_build_unary_op (IMAGPART_EXPR, op0, true, complain);
 	      switch (code)
 		{
 		case MULT_EXPR:
 		case TRUNC_DIV_EXPR:
-		  op1 = save_expr (op1);
+		  op1 = cp_save_expr (op1);
 		  imag = build2 (resultcode, real_type, imag, op1);
 		  /* Fall through.  */
 		case PLUS_EXPR:
@@ -6512,13 +6543,13 @@ cp_build_binary_op (const op_location_t &location,
 	    }
 	  else
 	    {
-	      op1 = save_expr (op1);
+	      op1 = cp_save_expr (op1);
 	      real = cp_build_unary_op (REALPART_EXPR, op1, true, complain);
 	      imag = cp_build_unary_op (IMAGPART_EXPR, op1, true, complain);
 	      switch (code)
 		{
 		case MULT_EXPR:
-		  op0 = save_expr (op0);
+		  op0 = cp_save_expr (op0);
 		  imag = build2 (resultcode, real_type, op0, imag);
 		  /* Fall through.  */
 		case PLUS_EXPR:
@@ -7127,11 +7158,11 @@ build_address (tree t)
 /* Return a NOP_EXPR converting EXPR to TYPE.  */
 
 tree
-build_nop (tree type, tree expr)
+build_nop (tree type, tree expr MEM_STAT_DECL)
 {
   if (type == error_mark_node || error_operand_p (expr))
     return expr;
-  return build1_loc (EXPR_LOCATION (expr), NOP_EXPR, type, expr);
+  return build1_loc (EXPR_LOCATION (expr), NOP_EXPR, type, expr PASS_MEM_STAT);
 }
 
 /* Take the address of ARG, whatever that means under C++ semantics.
@@ -11238,6 +11269,8 @@ check_return_expr (tree retval, bool *no_warning, bool *dangling)
 		   "function returning %qT", valtype);
       /* Remember that this function did return.  */
       current_function_returns_value = 1;
+      /* But suppress NRV  .*/
+      current_function_return_value = error_mark_node;
       /* And signal caller that TREE_NO_WARNING should be set on the
 	 RETURN_EXPR to avoid control reaches end of non-void function
 	 warnings in tree-cfg.cc.  */
@@ -11421,7 +11454,7 @@ check_return_expr (tree retval, bool *no_warning, bool *dangling)
       bool converted = false;
       tree moved;
       /* Until C++23, this was only interesting for class type, but in C++23,
-	 we should do the below when we're converting rom/to a class/reference
+	 we should do the below when we're converting from/to a class/reference
 	 (a non-scalar type).  */
 	if ((cxx_dialect < cxx23
 	     ? CLASS_TYPE_P (functype)
@@ -11448,7 +11481,11 @@ check_return_expr (tree retval, bool *no_warning, bool *dangling)
 
       /* If the conversion failed, treat this just like `return;'.  */
       if (retval == error_mark_node)
-	return retval;
+	{
+	  /* And suppress NRV.  */
+	  current_function_return_value = error_mark_node;
+	  return retval;
+	}
       /* We can't initialize a register from a AGGR_INIT_EXPR.  */
       else if (! cfun->returns_struct
 	       && TREE_CODE (retval) == TARGET_EXPR

@@ -1,4 +1,4 @@
-// Copyright (C) 2020-2024 Free Software Foundation, Inc.
+// Copyright (C) 2020-2025 Free Software Foundation, Inc.
 
 // This file is part of GCC.
 
@@ -62,9 +62,9 @@ public:
 
     if (emit_error_flag)
       {
-	location_t ref_locus = mappings->lookup_location (type.get_ref ());
+	location_t ref_locus = mappings.lookup_location (type.get_ref ());
 	location_t base_locus
-	  = mappings->lookup_location (get_base ()->get_ref ());
+	  = mappings.lookup_location (get_base ()->get_ref ());
 	rich_location r (line_table, ref_locus);
 	r.add_range (base_locus);
 	rust_error_at (r, "expected [%s] got [%s]",
@@ -78,9 +78,9 @@ public:
     ok = false;
     if (emit_error_flag)
       {
-	location_t ref_locus = mappings->lookup_location (type.get_ref ());
+	location_t ref_locus = mappings.lookup_location (type.get_ref ());
 	location_t base_locus
-	  = mappings->lookup_location (get_base ()->get_ref ());
+	  = mappings.lookup_location (get_base ()->get_ref ());
 	rich_location r (line_table, ref_locus);
 	r.add_range (base_locus);
 	rust_error_at (r, "expected [%s] got [%s]",
@@ -94,9 +94,9 @@ public:
     ok = false;
     if (emit_error_flag)
       {
-	location_t ref_locus = mappings->lookup_location (type.get_ref ());
+	location_t ref_locus = mappings.lookup_location (type.get_ref ());
 	location_t base_locus
-	  = mappings->lookup_location (get_base ()->get_ref ());
+	  = mappings.lookup_location (get_base ()->get_ref ());
 	rich_location r (line_table, ref_locus);
 	r.add_range (base_locus);
 	rust_error_at (r, "expected [%s] got [%s]",
@@ -110,9 +110,9 @@ public:
     ok = false;
     if (emit_error_flag)
       {
-	location_t ref_locus = mappings->lookup_location (type.get_ref ());
+	location_t ref_locus = mappings.lookup_location (type.get_ref ());
 	location_t base_locus
-	  = mappings->lookup_location (get_base ()->get_ref ());
+	  = mappings.lookup_location (get_base ()->get_ref ());
 	rich_location r (line_table, ref_locus);
 	r.add_range (base_locus);
 	rust_error_at (r, "expected [%s] got [%s]",
@@ -126,9 +126,9 @@ public:
     ok = false;
     if (emit_error_flag)
       {
-	location_t ref_locus = mappings->lookup_location (type.get_ref ());
+	location_t ref_locus = mappings.lookup_location (type.get_ref ());
 	location_t base_locus
-	  = mappings->lookup_location (get_base ()->get_ref ());
+	  = mappings.lookup_location (get_base ()->get_ref ());
 	rich_location r (line_table, ref_locus);
 	r.add_range (base_locus);
 	rust_error_at (r, "expected [%s] got [%s]",
@@ -142,9 +142,9 @@ public:
     ok = false;
     if (emit_error_flag)
       {
-	location_t ref_locus = mappings->lookup_location (type.get_ref ());
+	location_t ref_locus = mappings.lookup_location (type.get_ref ());
 	location_t base_locus
-	  = mappings->lookup_location (get_base ()->get_ref ());
+	  = mappings.lookup_location (get_base ()->get_ref ());
 	rich_location r (line_table, ref_locus);
 	r.add_range (base_locus);
 	rust_error_at (r, "expected [%s] got [%s]",
@@ -158,9 +158,9 @@ public:
     ok = false;
     if (emit_error_flag)
       {
-	location_t ref_locus = mappings->lookup_location (type.get_ref ());
+	location_t ref_locus = mappings.lookup_location (type.get_ref ());
 	location_t base_locus
-	  = mappings->lookup_location (get_base ()->get_ref ());
+	  = mappings.lookup_location (get_base ()->get_ref ());
 	rich_location r (line_table, ref_locus);
 	r.add_range (base_locus);
 	rust_error_at (r, "expected [%s] got [%s]",
@@ -174,9 +174,9 @@ public:
     ok = false;
     if (emit_error_flag)
       {
-	location_t ref_locus = mappings->lookup_location (type.get_ref ());
+	location_t ref_locus = mappings.lookup_location (type.get_ref ());
 	location_t base_locus
-	  = mappings->lookup_location (get_base ()->get_ref ());
+	  = mappings.lookup_location (get_base ()->get_ref ());
 	rich_location r (line_table, ref_locus);
 	r.add_range (base_locus);
 	rust_error_at (r, "expected [%s] got [%s]",
@@ -190,9 +190,9 @@ public:
     ok = false;
     if (emit_error_flag)
       {
-	location_t ref_locus = mappings->lookup_location (type.get_ref ());
+	location_t ref_locus = mappings.lookup_location (type.get_ref ());
 	location_t base_locus
-	  = mappings->lookup_location (get_base ()->get_ref ());
+	  = mappings.lookup_location (get_base ()->get_ref ());
 	rich_location r (line_table, ref_locus);
 	r.add_range (base_locus);
 	rust_error_at (r, "expected [%s] got [%s]",
@@ -206,9 +206,9 @@ public:
     ok = false;
     if (emit_error_flag)
       {
-	location_t ref_locus = mappings->lookup_location (type.get_ref ());
+	location_t ref_locus = mappings.lookup_location (type.get_ref ());
 	location_t base_locus
-	  = mappings->lookup_location (get_base ()->get_ref ());
+	  = mappings.lookup_location (get_base ()->get_ref ());
 	rich_location r (line_table, ref_locus);
 	r.add_range (base_locus);
 	rust_error_at (r, "expected [%s] got [%s]",
@@ -222,9 +222,9 @@ public:
     ok = false;
     if (emit_error_flag)
       {
-	location_t ref_locus = mappings->lookup_location (type.get_ref ());
+	location_t ref_locus = mappings.lookup_location (type.get_ref ());
 	location_t base_locus
-	  = mappings->lookup_location (get_base ()->get_ref ());
+	  = mappings.lookup_location (get_base ()->get_ref ());
 	rich_location r (line_table, ref_locus);
 	r.add_range (base_locus);
 	rust_error_at (r, "expected [%s] got [%s]",
@@ -238,9 +238,9 @@ public:
     ok = false;
     if (emit_error_flag)
       {
-	location_t ref_locus = mappings->lookup_location (type.get_ref ());
+	location_t ref_locus = mappings.lookup_location (type.get_ref ());
 	location_t base_locus
-	  = mappings->lookup_location (get_base ()->get_ref ());
+	  = mappings.lookup_location (get_base ()->get_ref ());
 	rich_location r (line_table, ref_locus);
 	r.add_range (base_locus);
 	rust_error_at (r, "expected [%s] got [%s]",
@@ -254,9 +254,9 @@ public:
     ok = false;
     if (emit_error_flag)
       {
-	location_t ref_locus = mappings->lookup_location (type.get_ref ());
+	location_t ref_locus = mappings.lookup_location (type.get_ref ());
 	location_t base_locus
-	  = mappings->lookup_location (get_base ()->get_ref ());
+	  = mappings.lookup_location (get_base ()->get_ref ());
 	rich_location r (line_table, ref_locus);
 	r.add_range (base_locus);
 	rust_error_at (r, "expected [%s] got [%s]",
@@ -270,9 +270,9 @@ public:
     ok = false;
     if (emit_error_flag)
       {
-	location_t ref_locus = mappings->lookup_location (type.get_ref ());
+	location_t ref_locus = mappings.lookup_location (type.get_ref ());
 	location_t base_locus
-	  = mappings->lookup_location (get_base ()->get_ref ());
+	  = mappings.lookup_location (get_base ()->get_ref ());
 	rich_location r (line_table, ref_locus);
 	r.add_range (base_locus);
 	rust_error_at (r, "expected [%s] got [%s]",
@@ -286,9 +286,9 @@ public:
     ok = false;
     if (emit_error_flag)
       {
-	location_t ref_locus = mappings->lookup_location (type.get_ref ());
+	location_t ref_locus = mappings.lookup_location (type.get_ref ());
 	location_t base_locus
-	  = mappings->lookup_location (get_base ()->get_ref ());
+	  = mappings.lookup_location (get_base ()->get_ref ());
 	rich_location r (line_table, ref_locus);
 	r.add_range (base_locus);
 	rust_error_at (r, "expected [%s] got [%s]",
@@ -302,9 +302,9 @@ public:
     ok = false;
     if (emit_error_flag)
       {
-	location_t ref_locus = mappings->lookup_location (type.get_ref ());
+	location_t ref_locus = mappings.lookup_location (type.get_ref ());
 	location_t base_locus
-	  = mappings->lookup_location (get_base ()->get_ref ());
+	  = mappings.lookup_location (get_base ()->get_ref ());
 	rich_location r (line_table, ref_locus);
 	r.add_range (base_locus);
 	rust_error_at (r, "expected [%s] got [%s]",
@@ -318,9 +318,9 @@ public:
     ok = false;
     if (emit_error_flag)
       {
-	location_t ref_locus = mappings->lookup_location (type.get_ref ());
+	location_t ref_locus = mappings.lookup_location (type.get_ref ());
 	location_t base_locus
-	  = mappings->lookup_location (get_base ()->get_ref ());
+	  = mappings.lookup_location (get_base ()->get_ref ());
 	rich_location r (line_table, ref_locus);
 	r.add_range (base_locus);
 	rust_error_at (r, "expected [%s] got [%s]",
@@ -334,9 +334,9 @@ public:
     ok = false;
     if (emit_error_flag)
       {
-	location_t ref_locus = mappings->lookup_location (type.get_ref ());
+	location_t ref_locus = mappings.lookup_location (type.get_ref ());
 	location_t base_locus
-	  = mappings->lookup_location (get_base ()->get_ref ());
+	  = mappings.lookup_location (get_base ()->get_ref ());
 	rich_location r (line_table, ref_locus);
 	r.add_range (base_locus);
 	rust_error_at (r, "expected [%s] got [%s]",
@@ -350,9 +350,9 @@ public:
     ok = false;
     if (emit_error_flag)
       {
-	location_t ref_locus = mappings->lookup_location (type.get_ref ());
+	location_t ref_locus = mappings.lookup_location (type.get_ref ());
 	location_t base_locus
-	  = mappings->lookup_location (get_base ()->get_ref ());
+	  = mappings.lookup_location (get_base ()->get_ref ());
 	rich_location r (line_table, ref_locus);
 	r.add_range (base_locus);
 	rust_error_at (r, "expected [%s] got [%s]",
@@ -366,9 +366,9 @@ public:
     ok = false;
     if (emit_error_flag)
       {
-	location_t ref_locus = mappings->lookup_location (type.get_ref ());
+	location_t ref_locus = mappings.lookup_location (type.get_ref ());
 	location_t base_locus
-	  = mappings->lookup_location (get_base ()->get_ref ());
+	  = mappings.lookup_location (get_base ()->get_ref ());
 	rich_location r (line_table, ref_locus);
 	r.add_range (base_locus);
 	rust_error_at (r, "expected [%s] got [%s]",
@@ -388,9 +388,9 @@ public:
     ok = false;
     if (emit_error_flag)
       {
-	location_t ref_locus = mappings->lookup_location (type.get_ref ());
+	location_t ref_locus = mappings.lookup_location (type.get_ref ());
 	location_t base_locus
-	  = mappings->lookup_location (get_base ()->get_ref ());
+	  = mappings.lookup_location (get_base ()->get_ref ());
 	rich_location r (line_table, ref_locus);
 	r.add_range (base_locus);
 	rust_error_at (r, "expected [%s] got [%s]",
@@ -404,9 +404,9 @@ public:
     ok = false;
     if (emit_error_flag)
       {
-	location_t ref_locus = mappings->lookup_location (type.get_ref ());
+	location_t ref_locus = mappings.lookup_location (type.get_ref ());
 	location_t base_locus
-	  = mappings->lookup_location (get_base ()->get_ref ());
+	  = mappings.lookup_location (get_base ()->get_ref ());
 	rich_location r (line_table, ref_locus);
 	r.add_range (base_locus);
 	rust_error_at (r, "expected [%s] got [%s]",
@@ -420,9 +420,9 @@ public:
     ok = false;
     if (emit_error_flag)
       {
-	location_t ref_locus = mappings->lookup_location (type.get_ref ());
+	location_t ref_locus = mappings.lookup_location (type.get_ref ());
 	location_t base_locus
-	  = mappings->lookup_location (get_base ()->get_ref ());
+	  = mappings.lookup_location (get_base ()->get_ref ());
 	rich_location r (line_table, ref_locus);
 	r.add_range (base_locus);
 	rust_error_at (r, "expected [%s] got [%s]",
@@ -438,7 +438,7 @@ protected:
       emit_error_flag (emit_errors)
   {}
 
-  Analysis::Mappings *mappings;
+  Analysis::Mappings &mappings;
   Resolver::TypeCheckContext *context;
 
   bool ok;
@@ -735,8 +735,8 @@ public:
 
     for (size_t i = 0; i < base->num_params (); i++)
       {
-	auto a = base->param_at (i).second;
-	auto b = type.param_at (i).second;
+	auto a = base->param_at (i).get_type ();
+	auto b = type.param_at (i).get_type ();
 
 	if (!a->can_eq (b, emit_error_flag))
 	  {
@@ -831,7 +831,7 @@ public:
     for (size_t i = 0; i < base->num_params (); i++)
       {
 	auto this_param = base->get_param_type_at (i);
-	auto other_param = type.param_at (i).second;
+	auto other_param = type.param_at (i).get_type ();
 	if (!this_param->can_eq (other_param, emit_error_flag))
 	  {
 	    BaseCmp::visit (type);
@@ -1561,7 +1561,7 @@ public:
 	return;
       }
 
-    location_t ref_locus = mappings->lookup_location (type.get_ref ());
+    location_t ref_locus = mappings.lookup_location (type.get_ref ());
     ok = base->bounds_compatible (type, ref_locus, false);
   }
 

@@ -1,5 +1,5 @@
 /* Pass manager for Fortran front end.
-   Copyright (C) 2010-2024 Free Software Foundation, Inc.
+   Copyright (C) 2010-2025 Free Software Foundation, Inc.
    Contributed by Thomas König.
 
 This file is part of GCC.
@@ -18,7 +18,6 @@ You should have received a copy of the GNU General Public License
 along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
-#define INCLUDE_MEMORY
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
@@ -2553,7 +2552,7 @@ doloop_code (gfc_code **c, int *walk_subtrees ATTRIBUTE_UNUSED,
       break;
 
     case EXEC_INQUIRE:
-      if (co->ext.filepos->err)
+      if (co->ext.inquire->err)
 	seen_goto = true;
       break;
 
@@ -5133,7 +5132,7 @@ index_interchange (gfc_code **c, int *walk_subtrees ATTRIBUTE_UNUSED,
     return 0;
 
   n_iter = 0;
-  for (fa = co->ext.forall_iterator; fa; fa = fa->next)
+  for (fa = co->ext.concur.forall_iterator; fa; fa = fa->next)
     n_iter ++;
 
   /* Nothing to reorder. */
@@ -5143,7 +5142,7 @@ index_interchange (gfc_code **c, int *walk_subtrees ATTRIBUTE_UNUSED,
   ind = XALLOCAVEC (ind_type, n_iter + 1);
 
   i = 0;
-  for (fa = co->ext.forall_iterator; fa; fa = fa->next)
+  for (fa = co->ext.concur.forall_iterator; fa; fa = fa->next)
     {
       ind[i].sym = fa->var->symtree->n.sym;
       ind[i].fa = fa;
@@ -5159,7 +5158,7 @@ index_interchange (gfc_code **c, int *walk_subtrees ATTRIBUTE_UNUSED,
   qsort ((void *) ind, n_iter, sizeof (ind_type), loop_comp);
 
   /* Do the actual index interchange.  */
-  co->ext.forall_iterator = fa = ind[0].fa;
+  co->ext.concur.forall_iterator = fa = ind[0].fa;
   for (i=1; i<n_iter; i++)
     {
       fa->next = ind[i].fa;
@@ -5411,7 +5410,7 @@ gfc_code_walker (gfc_code **c, walk_code_fn_t codefn, walk_expr_fn_t exprfn,
 	    case EXEC_DO_CONCURRENT:
 	      {
 		gfc_forall_iterator *fa;
-		for (fa = co->ext.forall_iterator; fa; fa = fa->next)
+		for (fa = co->ext.concur.forall_iterator; fa; fa = fa->next)
 		  {
 		    WALK_SUBEXPR (fa->var);
 		    WALK_SUBEXPR (fa->start);
@@ -5631,6 +5630,8 @@ gfc_code_walker (gfc_code **c, walk_code_fn_t codefn, walk_expr_fn_t exprfn,
 		  WALK_SUBEXPR (co->ext.omp_clauses->num_tasks);
 		  WALK_SUBEXPR (co->ext.omp_clauses->priority);
 		  WALK_SUBEXPR (co->ext.omp_clauses->detach);
+		  WALK_SUBEXPR (co->ext.omp_clauses->novariants);
+		  WALK_SUBEXPR (co->ext.omp_clauses->nocontext);
 		  for (idx = 0; idx < ARRAY_SIZE (list_types); idx++)
 		    for (n = co->ext.omp_clauses->lists[list_types[idx]];
 			 n; n = n->next)
@@ -5703,6 +5704,9 @@ check_externals_procedure (gfc_symbol *sym, locus *loc,
   if (gsym->ns)
     gfc_find_symbol (sym->name, gsym->ns, 0, &def_sym);
 
+  if (gsym->bind_c && def_sym && def_sym->binding_label == NULL)
+    return 0;
+
   if (def_sym)
     {
       gfc_compare_actual_formal (&actual, def_sym->formal, 0, 0, 0, loc);
@@ -5723,6 +5727,7 @@ check_externals_procedure (gfc_symbol *sym, locus *loc,
   gcc_assert (new_sym);
   new_sym->attr = sym->attr;
   new_sym->attr.if_source = IFSRC_DECL;
+  new_sym->ts = sym->ts;
   gfc_current_ns = gsym->ns;
 
   gfc_get_formal_from_actual_arglist (new_sym, actual);
@@ -5794,11 +5799,16 @@ check_against_globals (gfc_symbol *sym)
   char buf  [200];
 
   if (sym->attr.if_source != IFSRC_IFBODY || sym->attr.flavor != FL_PROCEDURE
-      || sym->attr.generic || sym->error)
+      || sym->attr.generic || sym->error || sym->attr.abstract
+      || sym->attr.dummy)
     return;
 
   if (sym->binding_label)
     sym_name = sym->binding_label;
+  else if (sym->attr.use_rename
+	   && sym->ns->use_stmts->rename
+	   && sym->ns->use_stmts->rename->local_name[0] != '\0')
+    sym_name = sym->ns->use_stmts->rename->local_name;
   else
     sym_name = sym->name;
 

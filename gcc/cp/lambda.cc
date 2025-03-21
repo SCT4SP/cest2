@@ -3,7 +3,7 @@
    building RTL.  These routines are used both during actual parsing
    and during the instantiation of template functions.
 
-   Copyright (C) 1998-2024 Free Software Foundation, Inc.
+   Copyright (C) 1998-2025 Free Software Foundation, Inc.
 
    This file is part of GCC.
 
@@ -21,7 +21,6 @@ You should have received a copy of the GNU General Public License
 along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
-#define INCLUDE_MEMORY
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
@@ -33,6 +32,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "gimplify.h"
 #include "target.h"
 #include "decl.h"
+#include "flags.h"
 
 /* Constructor for a lambda expression.  */
 
@@ -295,6 +295,17 @@ is_normal_capture_proxy (tree decl)
 	  && DECL_CAPTURED_VARIABLE (decl));
 }
 
+/* If DECL is a normal capture proxy, return the variable it captures.
+   Otherwise, just return DECL.  */
+
+tree
+strip_normal_capture_proxy (tree decl)
+{
+  while (is_normal_capture_proxy (decl))
+    decl = DECL_CAPTURED_VARIABLE (decl);
+  return decl;
+}
+
 /* Returns true iff DECL is a capture proxy for a normal capture
    of a constant variable.  */
 
@@ -469,8 +480,7 @@ build_capture_proxy (tree member, tree init)
       STRIP_NOPS (init);
 
       gcc_assert (VAR_P (init) || TREE_CODE (init) == PARM_DECL);
-      while (is_normal_capture_proxy (init))
-	init = DECL_CAPTURED_VARIABLE (init);
+      init = strip_normal_capture_proxy (init);
       retrofit_lang_decl (var);
       DECL_CAPTURED_VARIABLE (var) = init;
     }
@@ -613,7 +623,7 @@ add_capture (tree lambda, tree id, tree orig_init, bool by_reference_p,
 	    return error_mark_node;
 	}
 
-      if (cxx_dialect < cxx20)
+      if (cxx_dialect < cxx20 && !explicit_init_p)
 	{
 	  auto_diagnostic_group d;
 	  tree stripped_init = tree_strip_any_location_wrapper (initializer);
@@ -786,6 +796,12 @@ lambda_expr_this_capture (tree lambda, int add_capture_p)
   tree result;
 
   tree this_capture = LAMBDA_EXPR_THIS_CAPTURE (lambda);
+  if (this_capture)
+    if (tree spec = retrieve_local_specialization (this_capture))
+      {
+	gcc_checking_assert (generic_lambda_fn_p (lambda_function (lambda)));
+	this_capture = spec;
+      }
 
   /* In unevaluated context this isn't an odr-use, so don't capture.  */
   if (cp_unevaluated_operand)
@@ -965,9 +981,8 @@ maybe_resolve_dummy (tree object, bool add_capture_p)
 /* When parsing a generic lambda containing an argument-dependent
    member function call we defer overload resolution to instantiation
    time.  But we have to know now whether to capture this or not.
-   Do that if FNS contains any non-static fns.
-   The std doesn't anticipate this case, but I expect this to be the
-   outcome of discussion.  */
+   Do that if FNS contains any non-static fns as per
+   [expr.prim.lambda.capture]/7.1.  */
 
 void
 maybe_generic_this_capture (tree object, tree fns)
@@ -986,7 +1001,7 @@ maybe_generic_this_capture (tree object, tree fns)
 	for (lkp_iterator iter (fns); iter; ++iter)
 	  if (((!id_expr && TREE_CODE (*iter) != USING_DECL)
 	       || TREE_CODE (*iter) == TEMPLATE_DECL)
-	      && DECL_IOBJ_MEMBER_FUNCTION_P (*iter))
+	      && DECL_OBJECT_MEMBER_FUNCTION_P (*iter))
 	    {
 	      /* Found a non-static member.  Capture this.  */
 	      lambda_expr_this_capture (lam, /*maybe*/-1);
@@ -1039,15 +1054,17 @@ nonlambda_method_basetype (void)
     }
 }
 
-/* Like current_scope, but looking through lambdas.  */
+/* Like current_scope, but looking through lambdas.  If ONLY_SKIP_CLOSURES_P,
+   only look through closure types.  */
 
 tree
-current_nonlambda_scope (void)
+current_nonlambda_scope (bool only_skip_closures_p/*=false*/)
 {
   tree scope = current_scope ();
   for (;;)
     {
-      if (TREE_CODE (scope) == FUNCTION_DECL
+      if (!only_skip_closures_p
+	  && TREE_CODE (scope) == FUNCTION_DECL
 	  && LAMBDA_FUNCTION_P (scope))
 	{
 	  scope = CP_TYPE_CONTEXT (DECL_CONTEXT (scope));
@@ -1541,13 +1558,43 @@ finish_lambda_scope (void)
 void
 record_lambda_scope (tree lambda)
 {
-  LAMBDA_EXPR_EXTRA_SCOPE (lambda) = lambda_scope.scope;
-  if (lambda_scope.scope)
+  tree closure = LAMBDA_EXPR_CLOSURE (lambda);
+  gcc_checking_assert (closure);
+
+  /* Before ABI v20, lambdas in static data member initializers did not
+     get a dedicated lambda scope.  */
+  tree scope = lambda_scope.scope;
+  if (is_static_data_member_initialized_in_class (scope))
     {
-      tree closure = LAMBDA_EXPR_CLOSURE (lambda);
-      gcc_checking_assert (closure);
-      maybe_key_decl (lambda_scope.scope, TYPE_NAME (closure));
+      if (!abi_version_at_least (20))
+	scope = NULL_TREE;
+      if (warn_abi && abi_version_crosses (20) && !processing_template_decl)
+	{
+	  if (abi_version_at_least (20))
+	    warning_at (location_of (closure), OPT_Wabi,
+			"the mangled name of %qT changed in "
+			"%<-fabi-version=20%> (GCC 15.1)", closure);
+	  else
+	    warning_at (location_of (closure), OPT_Wabi,
+			"the mangled name of %qT changes in "
+			"%<-fabi-version=20%> (GCC 15.1)", closure);
+	}
     }
+
+  /* An otherwise unattached class-scope lambda in a member template
+     should not have a mangling scope, as the mangling scope will not
+     correctly inherit on instantiation.  */
+  tree ctx = TYPE_CONTEXT (closure);
+  if (scope
+      && ctx
+      && CLASS_TYPE_P (ctx)
+      && ctx == TREE_TYPE (scope)
+      && current_template_depth > template_class_depth (ctx))
+    scope = NULL_TREE;
+
+  LAMBDA_EXPR_EXTRA_SCOPE (lambda) = scope;
+  if (scope)
+    maybe_key_decl (scope, TYPE_NAME (closure));
 }
 
 // Compare lambda template heads TMPL_A and TMPL_B, used for both

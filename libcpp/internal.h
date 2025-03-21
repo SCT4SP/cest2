@@ -1,5 +1,5 @@
 /* Part of CPP library.
-   Copyright (C) 1997-2024 Free Software Foundation, Inc.
+   Copyright (C) 1997-2025 Free Software Foundation, Inc.
 
 This program is free software; you can redistribute it and/or modify it
 under the terms of the GNU General Public License as published by the
@@ -85,6 +85,7 @@ struct dummy
   {
     double d;
     int *p;
+    location_t l;
   } u;
 };
 
@@ -468,6 +469,10 @@ struct cpp_reader
      one.  */
   bool about_to_expand_macro_p;
 
+  /* True if the preprocessor should diagnose CPP_DOT or CPP_COLON
+     tokens as the first ones coming from macro expansion.  */
+  bool diagnose_dot_colon_from_macro_p;
+
   /* Search paths for include files.  */
   struct cpp_dir *quote_include;	/* "" */
   struct cpp_dir *bracket_include;	/* <> */
@@ -762,6 +767,8 @@ extern _cpp_file *_cpp_find_file (cpp_reader *, const char *, cpp_dir *,
 				  int angle, _cpp_find_file_kind, location_t);
 extern bool _cpp_find_failed (_cpp_file *);
 extern void _cpp_mark_file_once_only (cpp_reader *, struct _cpp_file *);
+extern cpp_dir *search_path_head (cpp_reader *, const char *, int,
+				  include_type, bool = false);
 extern const char *_cpp_find_header_unit (cpp_reader *, const char *file,
 					  bool angle_p,  location_t);
 extern int _cpp_stack_embed (cpp_reader *, const char *, bool,
@@ -780,6 +787,7 @@ extern bool _cpp_save_file_entries (cpp_reader *pfile, FILE *f);
 extern bool _cpp_read_file_entries (cpp_reader *, FILE *);
 extern const char *_cpp_get_file_name (_cpp_file *);
 extern struct stat *_cpp_get_file_stat (_cpp_file *);
+extern struct cpp_dir *_cpp_get_file_dir (_cpp_file *);
 extern bool _cpp_has_header (cpp_reader *, const char *, int,
 			     enum include_type);
 

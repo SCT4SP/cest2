@@ -1,4 +1,4 @@
-// Copyright (C) 2020-2024 Free Software Foundation, Inc.
+// Copyright (C) 2020-2025 Free Software Foundation, Inc.
 
 // This file is part of GCC.
 
@@ -85,6 +85,7 @@ public:
   void visit (AST::UnsafeBlockExpr &expr) override;
   void visit (AST::PathInExpression &expr) override;
   void visit (AST::QualifiedPathInExpression &expr) override;
+  void visit (AST::BoxExpr &expr) override;
   void visit (AST::ReturnExpr &expr) override;
   void visit (AST::CallExpr &expr) override;
   void visit (AST::MethodCallExpr &expr) override;
@@ -121,6 +122,7 @@ public:
   void visit (AST::RangeFromToInclExpr &expr) override;
   void visit (AST::ClosureExprInner &expr) override;
   void visit (AST::ClosureExprInnerTyped &expr) override;
+  void visit (AST::InlineAsm &expr) override;
 
   // Extra visitor for FormatArgs nodes
   void visit (AST::FormatArgs &fmt) override;

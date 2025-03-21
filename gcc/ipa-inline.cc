@@ -1,5 +1,5 @@
 /* Inlining decision heuristics.
-   Copyright (C) 2003-2024 Free Software Foundation, Inc.
+   Copyright (C) 2003-2025 Free Software Foundation, Inc.
    Contributed by Jan Hubicka
 
 This file is part of GCC.
@@ -89,7 +89,6 @@ along with GCC; see the file COPYING3.  If not see
 	 This should almost always lead to reduction of code size by eliminating
 	 the need for offline copy of the function.  */
 
-#define INCLUDE_MEMORY
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
@@ -122,6 +121,8 @@ along with GCC; see the file COPYING3.  If not see
 #include "attribs.h"
 #include "asan.h"
 #include "ipa-strub.h"
+#include "ipa-modref-tree.h"
+#include "ipa-modref.h"
 
 /* Inliner uses greedy algorithm to inline calls in a priority order.
    Badness is used as the key in a Fibonacci heap which roughly corresponds
@@ -1599,7 +1600,7 @@ update_caller_keys (edge_heap_t *heap, struct cgraph_node *node,
   if ((!node->alias && !ipa_fn_summaries->get (node)->inlinable)
       || node->inlined_to)
     return;
-  if (!bitmap_set_bit (updated_nodes, node->get_uid ()))
+  if (!bitmap_set_bit (updated_nodes, node->get_summary_id ()))
     return;
 
   FOR_EACH_ALIAS (node, ref)
@@ -1665,7 +1666,7 @@ update_callee_keys (edge_heap_t *heap, struct cgraph_node *node,
 	    if (e->aux
 		&& !bitmap_bit_p (updated_nodes,
 		 		  e->callee->ultimate_alias_target
-				    (&avail, e->caller)->get_uid ()))
+				    (&avail, e->caller)->get_summary_id ()))
 	      update_edge_key (heap, e);
 	  }
 	/* We do not reset callee growth cache here.  Since we added a new call,
@@ -1677,7 +1678,7 @@ update_callee_keys (edge_heap_t *heap, struct cgraph_node *node,
 		 && avail >= AVAIL_AVAILABLE
 		 && ipa_fn_summaries->get (callee) != NULL
 		 && ipa_fn_summaries->get (callee)->inlinable
-		 && !bitmap_bit_p (updated_nodes, callee->get_uid ()))
+		 && !bitmap_bit_p (updated_nodes, callee->get_summary_id ()))
 	  {
 	    if (can_inline_edge_p (e, false)
 		&& want_inline_small_function_p (e, false)
@@ -1942,23 +1943,30 @@ heap_edge_removal_hook (struct cgraph_edge *e, void *data)
 bool
 speculation_useful_p (struct cgraph_edge *e, bool anticipate_inlining)
 {
-  /* If we have already decided to inline the edge, it seems useful.  */
-  if (!e->inline_failed)
+  /* If we have already decided to inline the edge, it seems useful.
+     Also if ipa-cp or other pass worked hard enough to produce a clone,
+     we already decided this is a good idea.  */
+  if (!e->inline_failed
+      || e->callee->clone_of)
     return true;
 
   enum availability avail;
   struct cgraph_node *target = e->callee->ultimate_alias_target (&avail,
-								 e->caller);
+								 e->callee);
 
   gcc_assert (e->speculative && !e->indirect_unknown_callee);
 
-  if (!e->maybe_hot_p ())
+  /* Even if calll statement is not hot, we can still have useful speculation
+     in cases where a lot of time is spent is callee.
+     Do not check maybe_hot_p.  */
+  if (!e->count.nonzero_p ())
     return false;
 
   /* See if IP optimizations found something potentially useful about the
-     function.  For now we look only for CONST/PURE flags.  Almost everything
-     else we propagate is useless.  */
-  if (avail >= AVAIL_AVAILABLE)
+     function.  Do this only if the call seems hot since this is about
+     optimizing the code surrounding call site rahter than improving
+     callee.  */
+  if (avail >= AVAIL_AVAILABLE && e->maybe_hot_p ())
     {
       int ecf_flags = flags_from_decl_or_type (target->decl);
       if (ecf_flags & ECF_CONST)
@@ -1973,12 +1981,18 @@ speculation_useful_p (struct cgraph_edge *e, bool anticipate_inlining)
 		->ecf_flags & ECF_PURE))
 	    return true;
         }
+      else if (get_modref_function_summary (target))
+	return true;
     }
   /* If we did not managed to inline the function nor redirect
      to an ipa-cp clone (that are seen by having local flag set),
      it is probably pointless to inline it unless hardware is missing
-     indirect call predictor.  */
-  if (!anticipate_inlining && !target->local)
+     indirect call predictor.
+
+     At this point we know we will not dispatch into faster version of
+     callee, so if call itself is not hot, we definitely can give up
+     speculating.  */
+  if (!anticipate_inlining && (!target->local || !e->maybe_hot_p ()))
     return false;
   /* For overwritable targets there is not much to do.  */
   if (!can_inline_edge_p (e, false)

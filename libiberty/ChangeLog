@@ -1,3 +1,36 @@
+2025-03-18  Jose E. Marchesi  <jose.marchesi@oracle.com>
+
+	* ldirname.c: New file.
+	* Makefile.in (CFILES): Add ldirname.c.
+	(REQUIRED_OFILES): Add ldirname.$(objext).
+	(./ldirname.$(objext)): New rule.
+	* makefile.vms (OBJS): Add ldirname.obj.
+	* configure.com (FILES): Add ldirname.
+
+2024-12-11  Matthieu Longo  <matthieu.longo@arm.com>
+
+	* configure: Regenerate.
+	* configure.ac: Fix autoupdate warnings.
+
+2024-12-11  Sangamesh Mallayya  <swamy.sangamesh@gmail.com>
+
+	* getopt.c: Remove _NO_PROTO block
+
+2024-11-19  Evgeny Karpov  <evgeny.karpov@microsoft.com>
+
+	* simple-object-coff.c: Add aarch64.
+
+2024-11-16  Andrew Pinski  <quic_apinski@quicinc.com>
+
+	* testsuite/test-demangle.c (get_line): Change K&R style
+	definition into ANSI C90 definitions.
+	(fail): Likewise.
+	(main): Likewise.
+
+2024-10-31  Mark Wielaard  <mark@klomp.org>
+
+	* cplus-dem.c: Change preceeded to preceded.
+
 2024-10-10  Simon Martin  <simon@nasilyan.com>
 
 	* cp-demangle.c (d_dump): Fix compilation when CP_DEMANGLE_DEBUG

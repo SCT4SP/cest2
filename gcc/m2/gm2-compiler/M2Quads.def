@@ -1,6 +1,6 @@
 (* M2Quads.def generates quadruples.
 
-Copyright (C) 2001-2024 Free Software Foundation, Inc.
+Copyright (C) 2001-2025 Free Software Foundation, Inc.
 Contributed by Gaius Mulley <gaius.mulley@southwales.ac.uk>.
 
 This file is part of GNU Modula-2.
@@ -202,6 +202,7 @@ TYPE
                    InitStartOp,
                    InlineOp,
                    KillLocalVarOp,
+                   LastForIteratorOp,
                    LineNumberOp,
                    LogicalAndOp,
                    LogicalDiffOp,
@@ -1187,7 +1188,7 @@ PROCEDURE BuildDoWhile ;
                    False exit is backpatched with q+1
 *)
 
-PROCEDURE BuildEndWhile ;
+PROCEDURE BuildEndWhile (reltokpos: INTEGER) ;
 
 
 (*

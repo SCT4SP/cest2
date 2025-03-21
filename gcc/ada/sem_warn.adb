@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---          Copyright (C) 1999-2024, Free Software Foundation, Inc.         --
+--          Copyright (C) 1999-2025, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -861,6 +861,13 @@ package body Sem_Warn is
       --  Return True if it is OK for an object of type T to be referenced
       --  without having been assigned a value in the source.
 
+      function Source_E1 return Boolean;
+      --  True if E1 is sufficiently "from source" to warrant a warning.
+      --  We are only interested in source entities. We also don't issue
+      --  warnings within instances, since the proper place for such
+      --  warnings is on the template when it is compiled. Expression
+      --  functions are a special case (see body).
+
       function Warnings_Off_E1 return Boolean;
       --  Return True if Warnings_Off is set for E1, or for its Etype (E1T),
       --  or for the base type of E1T.
@@ -1156,6 +1163,34 @@ package body Sem_Warn is
          end if;
       end Type_OK_For_No_Value_Assigned;
 
+      ---------------
+      -- Source_E1 --
+      ---------------
+
+      function Source_E1 return Boolean is
+      begin
+         if Instantiation_Location (Sloc (E1)) /= No_Location then
+            return False;
+         end if;
+
+         if Comes_From_Source (E1) then
+            return True;
+         end if;
+
+         --  In the special case of an expression function, which has been
+         --  turned into an E_Subprogram_Body, we want to warn about unmodified
+         --  [in] out parameters.
+
+         if Ekind (E) = E_Subprogram_Body
+           and then Comes_From_Source (E)
+           and then Ekind (E1) in E_In_Out_Parameter | E_Out_Parameter
+         then
+            return True;
+         end if;
+
+         return False;
+      end Source_E1;
+
       ---------------------
       -- Warnings_Off_E1 --
       ---------------------
@@ -1190,14 +1225,7 @@ package body Sem_Warn is
 
       E1 := First_Entity (E);
       while Present (E1) loop
-         --  We are only interested in source entities. We also don't issue
-         --  warnings within instances, since the proper place for such
-         --  warnings is on the template when it is compiled, and we don't
-         --  issue warnings for variables with names like Junk, Discard etc.
-
-         if Comes_From_Source (E1)
-           and then Instantiation_Location (Sloc (E1)) = No_Location
-         then
+         if Source_E1 then
             E1T := Etype (E1);
 
             --  We are interested in variables and out/in-out parameters, but
@@ -1228,6 +1256,10 @@ package body Sem_Warn is
                else
                   UR := Unset_Reference (E1);
                end if;
+
+               --  Protect again small adjustments of reference
+
+               UR := Unqual_Conv (UR);
 
                --  Special processing for access types
 
@@ -2583,13 +2615,16 @@ package body Sem_Warn is
 
                         if No (Ent) then
 
+                           --  Check entities in the extended system if
+                           --  specified.
+
+                           if Check_System_Aux (Lunit) then
+                              null;
+
                            --  If in spec, just set the flag
 
-                           if Unit = Spec_Unit then
+                           elsif Unit = Spec_Unit then
                               Set_No_Entities_Ref_In_Spec (Item);
-
-                           elsif Check_System_Aux (Lunit) then
-                              null;
 
                            --  Else the warning may be needed
 

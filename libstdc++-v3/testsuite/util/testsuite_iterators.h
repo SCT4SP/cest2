@@ -1,7 +1,7 @@
 // -*- C++ -*-
 // Iterator Wrappers for the C++ library testsuite.
 //
-// Copyright (C) 2004-2024 Free Software Foundation, Inc.
+// Copyright (C) 2004-2025 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -865,6 +865,17 @@ namespace __gnu_test
       }
 
       typename Iter<T>::ContainerType bounds;
+    };
+
+  // A move-only type meeting the minimum std::range requirements
+  template<typename T, template<typename> class Iter>
+    struct test_range_nocopy : test_range<T, Iter>
+    {
+      test_range_nocopy(T* first, T* last) : test_range<T, Iter>(first, last)
+      {}
+
+      test_range_nocopy(test_range_nocopy&&) = default;
+      test_range_nocopy& operator=(test_range_nocopy&&) = default;
     };
 
   template<typename T>

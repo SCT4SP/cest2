@@ -1,5 +1,5 @@
 /* Predictive commoning.
-   Copyright (C) 2005-2024 Free Software Foundation, Inc.
+   Copyright (C) 2005-2025 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -205,7 +205,6 @@ along with GCC; see the file COPYING3.  If not see
    i * i with ii_last + 2 * i + 1), to generalize strength reduction.  */
 
 #include "config.h"
-#define INCLUDE_MEMORY
 #include "system.h"
 #include "coretypes.h"
 #include "backend.h"
@@ -1808,7 +1807,8 @@ ref_at_iteration (data_reference_p dr, int iter,
      then.  But for some cases we can retain that to allow tree_could_trap_p
      to return false - see gcc.dg/tree-ssa/predcom-1.c  */
   tree addr, alias_ptr;
-  if (integer_zerop  (off))
+  if (integer_zerop  (off)
+      && TREE_CODE (DR_BASE_ADDRESS (dr)) != POINTER_PLUS_EXPR)
     {
       alias_ptr = fold_convert (reference_alias_ptr_type (ref), coff);
       addr = DR_BASE_ADDRESS (dr);

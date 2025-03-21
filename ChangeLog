@@ -1,3 +1,153 @@
+2025-03-17  Arthur Cohen  <arthur.cohen@embecosm.com>
+
+	* .gitignore: Add libgrust target folders to the ignore list.
+
+2025-03-14  Thomas Schwinge  <thomas@codesourcery.com>
+
+	PR target/92713
+	PR target/101544
+	* configure.ac [GCN, nvptx] (noconfigdirs): Don't add
+	'target-libstdc++-v3'.  Add 'target-libgrust'.
+	* configure: Regenerate.
+
+2025-03-13  Matthias Klose  <doko@ubuntu.com>
+
+	* config-ml.in (multi-do): Remove extra argument from subst macro.
+
+2025-03-12  Robert Dubner  <rdubner@symas.com>
+
+	* MAINTAINERS: Remove extraneous entries for "Robert Dubner"
+
+2025-03-11  Bob Dubner  <rdubner@symas.com>
+
+	* MAINTAINERS: Add myself.
+
+2025-03-11  Jakub Jelinek  <jakub@redhat.com>
+
+	PR cobol/119216
+	* configure.ac: Check for UNSUPPORTED set by libgcobol/configure.tgt
+	rather than LIBGCOBOL_SUPPORTED.
+	* configure: Regenerate.
+
+2025-03-11  Iain Sandoe  <iain@sandoe.co.uk>
+
+	* configure: Regenerate.
+	* configure.ac: Do not build COBOL on Darwin by default,
+	even for --enable-languages=all.
+
+2025-03-11  James K. Lowden  <jklowden@symas.com>
+
+	* Makefile.def: Add libgcobol module and cobol language.
+	* Makefile.in: Regenerate.
+	* configure.ac: Add libgcobol module and cobol language.
+	* configure: Regenerate.
+
+2025-03-05  Tomasz Kamiński  <tkaminsk@redhat.com>
+
+	* MAINTAINERS: Add myself.
+
+2025-02-28  Giuseppe D'Angelo  <giuseppe.dangelo@kdab.com>
+
+	* MAINTAINERS: Added myself as write after approval and DCO.
+
+2025-02-19  Thomas Schwinge  <tschwinge@baylibre.com>
+
+	* configure.ac (unsupported_languages) [GCN, nvptx]: Add 'ada'.
+	(noconfigdirs) [GCN, nvptx]: Add 'target-libobjc',
+	'target-libffi', 'target-libgo'.
+	* configure: Regenerate.
+
+2025-02-05  Jin Ma  <jinma@linux.alibaba.com>
+
+	* MAINTAINERS: Add myself.
+
+2025-01-21  Alfie Richards  <alfie.richards@arm.com>
+
+	* MAINTAINERS: Add myself to write after approval.
+
+2025-01-13  Martin Jambor  <mjambor@suse.cz>
+
+	* MAINTAINERS: Fix the name order of the Write After Approval section.
+
+2024-12-23  Mark Harmstone  <mark@harmstone.com>
+
+	* MAINTAINERS: Add myself to write after approval.
+
+2024-12-18  Prathamesh Kulkarni  <prathameshk@nvidia.com>
+
+	Revert:
+	2024-12-18  Prathamesh Kulkarni  <prathameshk@nvidia.com>
+		    Matthew Malcolmson  <mmalcolmson@nvidia.com>
+
+	PR driver/81358
+	* Makefile.def: Add dependencies so libatomic is built before target
+	libraries are configured.
+	* Makefile.tpl: Export TARGET_CONFIGDIRS.
+	* configure.ac: Add libatomic to bootstrap_target_libs.
+	* Makefile.in: Regenerate.
+	* configure: Regenerate.
+
+2024-12-18  Prathamesh Kulkarni  <prathameshk@nvidia.com>
+	    Matthew Malcolmson  <mmalcolmson@nvidia.com>
+
+	PR driver/81358
+	* Makefile.def: Add dependencies so libatomic is built before target
+	libraries are configured.
+	* Makefile.tpl: Export TARGET_CONFIGDIRS.
+	* configure.ac: Add libatomic to bootstrap_target_libs.
+	* Makefile.in: Regenerate.
+	* configure: Regenerate.
+
+2024-12-11  Matthieu Longo  <matthieu.longo@arm.com>
+
+	* MAINTAINERS: Add myself to write after approval.
+
+2024-12-02  Claudio Bantaloukas  <claudio.bantaloukas@arm.com>
+
+	* MAINTAINERS: Add myself to write after approval.
+
+2024-11-29  David Malcolm  <dmalcolm@redhat.com>
+
+	* configure.ac: Rename "libdiagnostics" to "libgdiagnostics".
+	* configure: Regenerate.
+
+2024-11-29  Yury Khrustalev  <yury.khrustalev@arm.com>
+
+	* MAINTAINERS: Add myself to write after approval.
+
+2024-11-25  Sandra Loosemore  <sloosemore@baylibre.com>
+
+	* MAINTAINERS: Remove references to nios2.
+	* configure.ac: Likewise.
+	* configure: Regenerated.
+
+2024-11-22  Sam James  <sam@gentoo.org>
+
+	* configure: Regenerate.
+	* configure.ac: Sync with Binutils.
+
+2024-11-22  Evgeny Karpov  <evgeny.karpov@microsoft.com>
+
+	* MAINTAINERS: Add myself to write after approval.
+
+2024-11-19  Florian Weimer  <fweimer@redhat.com>
+
+	* SECURITY.txt: Remove Debian.
+
+2024-11-18  David Malcolm  <dmalcolm@redhat.com>
+
+	* configure.ac (--enable-libdiagnostics): New.
+	* configure: Regenerate.
+
+2024-11-05  Nick Clifton  <nickc@redhat.com>
+
+	* configure.ac: Add sim to noconfigdirs for ARM targets.
+	* configure: Regenerate.
+
+2024-10-30  Soumya AR  <soumyaa@nvidia.com>
+
+	* MAINTAINERS: Add myself to write after approval and DCO.
+
 2024-10-28  Jason Merrill  <jason@redhat.com>
 
 	* configure.ac: Update requirement to C++14.

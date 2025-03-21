@@ -1,5 +1,5 @@
 /* Code for GIMPLE range related routines.
-   Copyright (C) 2019-2024 Free Software Foundation, Inc.
+   Copyright (C) 2019-2025 Free Software Foundation, Inc.
    Contributed by Andrew MacLeod <amacleod@redhat.com>
    and Aldy Hernandez <aldyh@redhat.com>.
 
@@ -19,7 +19,6 @@ You should have received a copy of the GNU General Public License
 along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
-#define INCLUDE_MEMORY
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
@@ -107,26 +106,6 @@ fur_source::register_relation (edge e ATTRIBUTE_UNUSED,
 			       tree op1 ATTRIBUTE_UNUSED,
 			       tree op2 ATTRIBUTE_UNUSED)
 {
-}
-
-// This version of fur_source will pick a range up off an edge.
-
-class fur_edge : public fur_source
-{
-public:
-  fur_edge (edge e, range_query *q = NULL);
-  virtual bool get_operand (vrange &r, tree expr) override;
-  virtual bool get_phi_operand (vrange &r, tree expr, edge e) override;
-private:
-  edge m_edge;
-};
-
-// Instantiate an edge based fur_source.
-
-inline
-fur_edge::fur_edge (edge e, range_query *q) : fur_source (q)
-{
-  m_edge = e;
 }
 
 // Get the value of EXPR on edge m_edge.

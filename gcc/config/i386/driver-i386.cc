@@ -1,5 +1,5 @@
 /* Subroutines for the gcc driver.
-   Copyright (C) 2006-2024 Free Software Foundation, Inc.
+   Copyright (C) 2006-2025 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -19,7 +19,6 @@ along with GCC; see the file COPYING3.  If not see
 
 #define IN_TARGET_CODE 1
 
-#define INCLUDE_MEMORY
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
@@ -581,6 +580,7 @@ const char *host_detect_local_cpu (int argc, const char **argv)
 	  processor = PROCESSOR_PENTIUM;
 	  break;
 	case 6:
+	case 19:
 	  processor = PROCESSOR_PENTIUMPRO;
 	  break;
 	case 15:
@@ -623,11 +623,14 @@ const char *host_detect_local_cpu (int argc, const char **argv)
 	{
 	  if (arch)
 	    {
-	      /* This is unknown family 0x6 CPU.  */
+	      /* This is unknown CPU.  */
 	      if (has_feature (FEATURE_AVX512F))
 		{
+		  /* Assume Diamond Rapids.  */
+		  if (has_feature (FEATURE_AVX10_2_512))
+		    cpu = "diamondrapids";
 		  /* Assume Granite Rapids D.  */
-		  if (has_feature (FEATURE_AMX_COMPLEX))
+		  else if (has_feature (FEATURE_AMX_COMPLEX))
 		    cpu = "graniterapids-d";
 		  /* Assume Granite Rapids.  */
 		  else if (has_feature (FEATURE_AMX_FP16))
@@ -907,9 +910,12 @@ const char *host_detect_local_cpu (int argc, const char **argv)
 				    isa_names_table[i].option, NULL);
 	      }
 	    /* Never push -mno-avx10.1-{256,512} under -march=native to
-	       avoid unnecessary warnings when building librarys.  */
+	       avoid unnecessary warnings when building libraries.
+	       Never push -mno-avx10.x-256 under -march=native since
+	       there are no such options.  */
 	    else if (isa_names_table[i].feature != FEATURE_AVX10_1_256
 		     && isa_names_table[i].feature != FEATURE_AVX10_1_512
+		     && isa_names_table[i].feature != FEATURE_AVX10_2_256
 		     && check_avx512_features (cpu_model, cpu_features2,
 					       isa_names_table[i].feature))
 	      options = concat (options, neg_option,

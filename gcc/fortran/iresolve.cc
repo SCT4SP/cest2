@@ -1,5 +1,5 @@
 /* Intrinsic function resolution.
-   Copyright (C) 2000-2024 Free Software Foundation, Inc.
+   Copyright (C) 2000-2025 Free Software Foundation, Inc.
    Contributed by Andy Vaught & Katherine Holcomb
 
 This file is part of GCC.
@@ -26,7 +26,6 @@ along with GCC; see the file COPYING3.  If not see
    code node is passed.  The result type and library subroutine name
    are generally set according to the function arguments.  */
 
-#define INCLUDE_MEMORY
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
@@ -2010,6 +2009,20 @@ gfc_resolve_mask (gfc_expr *f, gfc_expr *i ATTRIBUTE_UNUSED,
     f->value.function.name = gfc_get_string ("__maskl_i%d", f->ts.kind);
   else
     f->value.function.name = gfc_get_string ("__maskr_i%d", f->ts.kind);
+}
+
+void
+gfc_resolve_umasklr (gfc_expr *f, gfc_expr *i ATTRIBUTE_UNUSED,
+		  gfc_expr *kind)
+{
+  f->ts.type = BT_UNSIGNED;
+  f->ts.kind = kind ? mpz_get_si (kind->value.integer)
+		    : gfc_default_unsigned_kind;
+
+  if (f->value.function.isym->id == GFC_ISYM_UMASKL)
+    f->value.function.name = gfc_get_string ("__maskl_m%d", f->ts.kind);
+  else
+    f->value.function.name = gfc_get_string ("__maskr_m%d", f->ts.kind);
 }
 
 

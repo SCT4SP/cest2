@@ -1,5 +1,5 @@
 ; Machine description for AArch64 architecture.
-; Copyright (C) 2009-2024 Free Software Foundation, Inc.
+; Copyright (C) 2009-2025 Free Software Foundation, Inc.
 ; Contributed by ARM Ltd.
 ;
 ; This file is part of GCC.
@@ -25,7 +25,7 @@ HeaderInclude
 config/arm/aarch-common.h
 
 TargetVariable
-enum aarch64_processor selected_tune = aarch64_none
+enum aarch64_cpu selected_tune = aarch64_no_cpu
 
 TargetVariable
 enum aarch64_arch selected_arch = aarch64_no_arch
@@ -44,6 +44,9 @@ uint64_t aarch64_isa_flags_1 = 0
 
 TargetVariable
 unsigned aarch_enable_bti = 2
+
+TargetVariable
+unsigned aarch64_enable_gcs = 2
 
 TargetVariable
 enum aarch64_key_type aarch64_ra_sign_key = AARCH64_KEY_A
@@ -428,3 +431,7 @@ handling.  One means we try to form pairs involving one or more existing
 individual writeback accesses where possible.  A value of two means we
 also try to opportunistically form writeback opportunities by folding in
 trailing destructive updates of the base register used by a pair.
+
+Wexperimental-fmv-target
+Target Var(warn_experimental_fmv) Warning Init(1)
+Warn about usage of experimental Function Multi Versioning.

@@ -1,5 +1,5 @@
 /* Classes for modeling the state of memory.
-   Copyright (C) 2020-2024 Free Software Foundation, Inc.
+   Copyright (C) 2020-2025 Free Software Foundation, Inc.
    Contributed by David Malcolm <dmalcolm@redhat.com>.
 
 This file is part of GCC.
@@ -19,7 +19,6 @@ along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
 #include "config.h"
-#define INCLUDE_MEMORY
 #define INCLUDE_VECTOR
 #include "system.h"
 #include "coretypes.h"
@@ -56,6 +55,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "analyzer/analyzer-selftests.h"
 #include "stor-layout.h"
 #include "text-art/tree-widget.h"
+#include "make-unique.h"
 
 #if ENABLE_ANALYZER
 
@@ -231,10 +231,10 @@ bit_range::dump () const
    This is intended for debugging the analyzer rather
    than serialization.  */
 
-json::object *
+std::unique_ptr<json::object>
 bit_range::to_json () const
 {
-  json::object *obj = new json::object ();
+  auto obj = ::make_unique<json::object> ();
   obj->set ("start_bit_offset",
 	    bit_offset_to_json (m_start_bit_offset));
   obj->set ("size_in_bits",
@@ -505,10 +505,10 @@ byte_range::dump () const
    This is intended for debugging the analyzer rather
    than serialization.  */
 
-json::object *
+std::unique_ptr<json::object>
 byte_range::to_json () const
 {
-  json::object *obj = new json::object ();
+  auto obj = ::make_unique<json::object> ();
   obj->set ("start_byte_offset",
 	    byte_offset_to_json (m_start_byte_offset));
   obj->set ("size_in_bytes",
@@ -770,10 +770,10 @@ binding_map::dump (bool simple) const
    {KEY_DESC : SVALUE_DESC,
     ...for the various key/value pairs in this binding_map}.  */
 
-json::object *
+std::unique_ptr<json::object>
 binding_map::to_json () const
 {
-  json::object *map_obj = new json::object ();
+  auto map_obj = ::make_unique<json::object> ();
 
   auto_vec <const binding_key *> binding_keys;
   for (map_t::iterator iter = m_map.begin ();
@@ -903,6 +903,37 @@ get_subregion_within_ctor (const region *parent_reg, tree index,
     case FIELD_DECL:
       return mgr->get_field_region (parent_reg, index);
     }
+}
+
+/* Get the child region of PARENT_REG based upon (INDEX, VALUE) within a
+   CONSTRUCTOR.   */
+
+static const region *
+get_subregion_within_ctor_for_ctor_pair (const region *parent_reg,
+					 tree index,
+					 tree value,
+					 region_model_manager *mgr)
+{
+  if (TREE_CODE (index) == INTEGER_CST
+      && TREE_CODE (value) == RAW_DATA_CST)
+    {
+      /* Special-case; see tree.def's description of CONSTRUCTOR.
+	 We have RAW_DATA_LENGTH of bytes, starting at INDEX's start.  */
+      const region *start_reg
+	= get_subregion_within_ctor (parent_reg, index, mgr);
+      /* Build a bit range, relative to PARENT_REG.  */
+      region_offset start_offset = start_reg->get_offset (mgr);
+
+      if (!start_offset.concrete_p ())
+	return nullptr;
+      bit_offset_t start_bit_offset = start_offset.get_bit_offset ();
+      int length = RAW_DATA_LENGTH (value);
+      bit_range bits (start_bit_offset, length * BITS_PER_UNIT);
+
+      return mgr->get_bit_range (parent_reg, NULL_TREE, bits);
+    }
+
+  return get_subregion_within_ctor (parent_reg, index, mgr);
 }
 
 /* Get the svalue for VAL, a non-CONSTRUCTOR value within a CONSTRUCTOR.  */
@@ -1035,7 +1066,9 @@ binding_map::apply_ctor_pair_to_child_region (const region *parent_reg,
 					      tree index, tree val)
 {
   const region *child_reg
-    = get_subregion_within_ctor (parent_reg, index, mgr);
+    = get_subregion_within_ctor_for_ctor_pair (parent_reg, index, val, mgr);
+  if (!child_reg)
+    return false;
   if (TREE_CODE (val) == CONSTRUCTOR)
     return apply_ctor_to_region (child_reg, val, mgr);
   else
@@ -1419,10 +1452,10 @@ binding_cluster::validate () const
     "touched": true/false,
     "map" : object for the binding_map.  */
 
-json::object *
+std::unique_ptr<json::object>
 binding_cluster::to_json () const
 {
-  json::object *cluster_obj = new json::object ();
+  auto cluster_obj = ::make_unique<json::object> ();
 
   cluster_obj->set_bool ("escaped", m_escaped);
   cluster_obj->set_bool ("touched", m_touched);
@@ -2636,10 +2669,10 @@ store::validate () const
     ...for each parent region,
     "called_unknown_fn": true/false}.  */
 
-json::object *
+std::unique_ptr<json::object>
 store::to_json () const
 {
-  json::object *store_obj = new json::object ();
+  auto store_obj = ::make_unique<json::object> ();
 
   /* Sort into some deterministic order.  */
   auto_vec<const region *> base_regions;
@@ -2662,7 +2695,7 @@ store::to_json () const
     {
       gcc_assert (parent_reg);
 
-      json::object *clusters_in_parent_reg_obj = new json::object ();
+      auto clusters_in_parent_reg_obj = ::make_unique<json::object> ();
 
       const region *base_reg;
       unsigned j;
@@ -2678,7 +2711,8 @@ store::to_json () const
 					   cluster->to_json ());
 	}
       label_text parent_reg_desc = parent_reg->get_desc ();
-      store_obj->set (parent_reg_desc.get (), clusters_in_parent_reg_obj);
+      store_obj->set (parent_reg_desc.get (),
+		      std::move (clusters_in_parent_reg_obj));
     }
 
   store_obj->set_bool ("called_unknown_fn", m_called_unknown_fn);

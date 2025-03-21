@@ -1,6 +1,6 @@
 ; Options for the S/390 / zSeries port of the compiler.
 
-; Copyright (C) 2005-2024 Free Software Foundation, Inc.
+; Copyright (C) 2005-2025 Free Software Foundation, Inc.
 ;
 ; This file is part of GCC.
 ;
@@ -120,6 +120,9 @@ Enum(processor_type) String(arch14) Value(PROCESSOR_3931_Z16)
 
 EnumValue
 Enum(processor_type) String(z16) Value(PROCESSOR_3931_Z16)
+
+EnumValue
+Enum(processor_type) String(arch15) Value(PROCESSOR_ARCH15)
 
 EnumValue
 Enum(processor_type) String(native) Value(PROCESSOR_NATIVE) DriverOnly

@@ -1,5 +1,5 @@
 /* Loop unroll-and-jam.
-   Copyright (C) 2017-2024 Free Software Foundation, Inc.
+   Copyright (C) 2017-2025 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -18,7 +18,6 @@ along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
 #include "config.h"
-#define INCLUDE_MEMORY
 #include "system.h"
 #include "coretypes.h"
 #include "tree-pass.h"
@@ -280,13 +279,17 @@ unroll_jam_possible_p (class loop *outer, class loop *loop)
      body would be the after-iter value of the first body) if it's over
      an associative and commutative operation.  We wouldn't
      be able to handle unknown cycles.  */
+  bool inner_vdef = false;
   for (psi = gsi_start_phis (loop->header); !gsi_end_p (psi); gsi_next (&psi))
     {
       affine_iv iv;
       tree op = gimple_phi_result (psi.phi ());
 
       if (virtual_operand_p (op))
-	continue;
+	{
+	  inner_vdef = true;
+	  continue;
+	}
       if (!simple_iv (loop, loop, op, &iv, true))
 	return false;
       /* The inductions must be regular, loop invariant step and initial
@@ -301,6 +304,12 @@ unroll_jam_possible_p (class loop *outer, class loop *loop)
 	 for the fused loop would be the original next value of the first
 	 copy, _not_ the next value of the second body.  */
     }
+
+  /* When there's no inner loop virtual PHI IV we cannot handle the update
+     required to the inner loop if that doesn't already have one.  See
+     PR117113.  */
+  if (!inner_vdef && get_virtual_phi (outer->header))
+    return false;
 
   return true;
 }

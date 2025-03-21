@@ -1,4 +1,4 @@
-// Copyright (C) 2020-2024 Free Software Foundation, Inc.
+// Copyright (C) 2020-2025 Free Software Foundation, Inc.
 
 // This file is part of GCC.
 
@@ -26,7 +26,8 @@ namespace Rust {
    during the compile time. */
 tl::optional<AST::Fragment>
 MacroBuiltin::compile_error_handler (location_t invoc_locus,
-				     AST::MacroInvocData &invoc)
+				     AST::MacroInvocData &invoc,
+				     AST::InvocKind semicolon)
 {
   auto lit_expr
     = parse_single_string_literal (BuiltinMacro::CompileError,
@@ -87,7 +88,8 @@ MacroBuiltin::compile_error_handler (location_t invoc_locus,
 // Can we do that easily?
 tl::optional<AST::Fragment>
 MacroBuiltin::concat_handler (location_t invoc_locus,
-			      AST::MacroInvocData &invoc)
+			      AST::MacroInvocData &invoc,
+			      AST::InvocKind semicolon)
 {
   auto invoc_token_tree = invoc.get_delim_tok_tree ();
   MacroInvocLexer lex (invoc_token_tree.to_token_stream ());
@@ -115,7 +117,7 @@ MacroBuiltin::concat_handler (location_t invoc_locus,
   for (auto &expr : expanded_expr)
     {
       if (!expr->is_literal ()
-	  && expr->get_ast_kind () != AST::Kind::MACRO_INVOCATION)
+	  && expr->get_expr_kind () != AST::Expr::Kind::MacroInvocation)
 	{
 	  has_error = true;
 	  rust_error_at (expr->get_locus (), "expected a literal");
@@ -151,7 +153,8 @@ MacroBuiltin::concat_handler (location_t invoc_locus,
 /* Expand builtin macro env!(), which inspects an environment variable at
    compile time. */
 tl::optional<AST::Fragment>
-MacroBuiltin::env_handler (location_t invoc_locus, AST::MacroInvocData &invoc)
+MacroBuiltin::env_handler (location_t invoc_locus, AST::MacroInvocData &invoc,
+			   AST::InvocKind semicolon)
 {
   auto invoc_token_tree = invoc.get_delim_tok_tree ();
   MacroInvocLexer lex (invoc_token_tree.to_token_stream ());
@@ -224,7 +227,8 @@ MacroBuiltin::env_handler (location_t invoc_locus, AST::MacroInvocData &invoc)
 }
 
 tl::optional<AST::Fragment>
-MacroBuiltin::cfg_handler (location_t invoc_locus, AST::MacroInvocData &invoc)
+MacroBuiltin::cfg_handler (location_t invoc_locus, AST::MacroInvocData &invoc,
+			   AST::InvocKind semicolon)
 {
   // only parse if not already parsed
   if (!invoc.is_parsed ())
@@ -263,7 +267,8 @@ MacroBuiltin::cfg_handler (location_t invoc_locus, AST::MacroInvocData &invoc)
 
 tl::optional<AST::Fragment>
 MacroBuiltin::stringify_handler (location_t invoc_locus,
-				 AST::MacroInvocData &invoc)
+				 AST::MacroInvocData &invoc,
+				 AST::InvocKind semicolon)
 {
   std::string content;
   auto invoc_token_tree = invoc.get_delim_tok_tree ();

@@ -1,4 +1,4 @@
-// Copyright (C) 2020-2024 Free Software Foundation, Inc.
+// Copyright (C) 2020-2025 Free Software Foundation, Inc.
 
 // This file is part of GCC.
 
@@ -73,15 +73,13 @@ private:
   TypeCheckCallExpr (HIR::CallExpr &c, TyTy::VariantDef &variant,
 		     Resolver::TypeCheckContext *context)
     : resolved (new TyTy::ErrorType (c.get_mappings ().get_hirid ())), call (c),
-      variant (variant), context (context),
-      mappings (Analysis::Mappings::get ())
+      variant (variant), mappings (Analysis::Mappings::get ())
   {}
 
   BaseType *resolved;
   HIR::CallExpr &call;
   TyTy::VariantDef &variant;
-  Resolver::TypeCheckContext *context;
-  Analysis::Mappings *mappings;
+  Analysis::Mappings &mappings;
 };
 
 class Argument
@@ -131,7 +129,7 @@ protected:
   location_t receiver_locus;
   TyTy::BaseType *adjusted_self;
   Resolver::TypeCheckContext *context;
-  Analysis::Mappings *mappings;
+  Analysis::Mappings &mappings;
 };
 
 } // namespace TyTy

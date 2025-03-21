@@ -1,5 +1,5 @@
 /* LTO symbol table.
-   Copyright (C) 2009-2024 Free Software Foundation, Inc.
+   Copyright (C) 2009-2025 Free Software Foundation, Inc.
    Contributed by CodeSourcery, Inc.
 
 This file is part of GCC.
@@ -18,7 +18,6 @@ You should have received a copy of the GNU General Public License
 along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
-#define INCLUDE_MEMORY
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
@@ -1017,7 +1016,6 @@ lto_symtab_merge_symbols (void)
 		  || node->resolution == LDPR_RESOLVED_EXEC
 		  || node->resolution == LDPR_RESOLVED_DYN))
 	    {
-	      DECL_EXTERNAL (node->decl) = 1;
 	      /* If alias to local symbol was preempted by external definition,
 		 we know it is not pointing to the local symbol.  Remove it.  */
 	      if (node->alias
@@ -1043,6 +1041,7 @@ lto_symtab_merge_symbols (void)
 		      node->remove_all_references ();
 		    }
 		}
+	      DECL_EXTERNAL (node->decl) = 1;
 	    }
 
 	  if (!(cnode = dyn_cast <cgraph_node *> (node))

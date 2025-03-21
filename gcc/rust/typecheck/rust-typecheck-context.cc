@@ -1,4 +1,4 @@
-// Copyright (C) 2020-2024 Free Software Foundation, Inc.
+// Copyright (C) 2020-2025 Free Software Foundation, Inc.
 
 // This file is part of GCC.
 
@@ -71,6 +71,12 @@ TypeCheckContext::insert_builtin (HirId id, NodeId ref, TyTy::BaseType *type)
   node_id_refs[ref] = id;
   resolved[id] = type;
   builtins.push_back (std::unique_ptr<TyTy::BaseType> (type));
+}
+
+const std::vector<std::unique_ptr<TyTy::BaseType>> &
+TypeCheckContext::get_builtins () const
+{
+  return builtins;
 }
 
 void
@@ -169,6 +175,12 @@ TypeCheckContext::peek_context ()
 {
   rust_assert (!return_type_stack.empty ());
   return return_type_stack.back ().first;
+}
+
+StackedContexts<TypeCheckBlockContextItem> &
+TypeCheckContext::block_context ()
+{
+  return block_stack;
 }
 
 void
@@ -580,7 +592,7 @@ TypeCheckContext::regions_from_generic_args (const HIR::GenericArgs &args) const
 void
 TypeCheckContext::compute_inference_variables (bool error)
 {
-  auto mappings = Analysis::Mappings::get ();
+  auto &mappings = Analysis::Mappings::get ();
 
   // default inference variables if possible
   iterate ([&] (HirId id, TyTy::BaseType *ty) mutable -> bool {
@@ -591,14 +603,14 @@ TypeCheckContext::compute_inference_variables (bool error)
     TyTy::InferType *infer_var = static_cast<TyTy::InferType *> (ty);
     TyTy::BaseType *default_type;
 
-    rust_debug_loc (mappings->lookup_location (id),
+    rust_debug_loc (mappings.lookup_location (id),
 		    "trying to default infer-var: %s",
 		    infer_var->as_string ().c_str ());
     bool ok = infer_var->default_type (&default_type);
     if (!ok)
       {
 	if (error)
-	  rust_error_at (mappings->lookup_location (id), ErrorCode::E0282,
+	  rust_error_at (mappings.lookup_location (id), ErrorCode::E0282,
 			 "type annotations needed");
 	return true;
       }
@@ -609,7 +621,7 @@ TypeCheckContext::compute_inference_variables (bool error)
     rust_assert (result);
     rust_assert (result->get_kind () != TyTy::TypeKind::ERROR);
     result->set_ref (id);
-    insert_type (Analysis::NodeMapping (mappings->get_current_crate (), 0, id,
+    insert_type (Analysis::NodeMapping (mappings.get_current_crate (), 0, id,
 					UNKNOWN_LOCAL_DEFID),
 		 result);
 
@@ -640,9 +652,9 @@ TypeCheckContextItem::TypeCheckContextItem (HIR::Function *item)
   : type (ItemType::ITEM), item (item)
 {}
 
-TypeCheckContextItem::TypeCheckContextItem (HIR::ImplBlock *impl_block,
+TypeCheckContextItem::TypeCheckContextItem (HIR::ImplBlock &impl_block,
 					    HIR::Function *item)
-  : type (ItemType::IMPL_ITEM), item (impl_block, item)
+  : type (ItemType::IMPL_ITEM), item (&impl_block, item)
 {}
 
 TypeCheckContextItem::TypeCheckContextItem (HIR::TraitItemFunc *trait_item)
@@ -794,6 +806,44 @@ TypeCheckContextItem::get_defid () const
     }
 
   return UNKNOWN_DEFID;
+}
+
+// TypeCheckBlockContextItem
+
+TypeCheckBlockContextItem::Item::Item (HIR::ImplBlock *b) : block (b) {}
+
+TypeCheckBlockContextItem::Item::Item (HIR::Trait *t) : trait (t) {}
+
+TypeCheckBlockContextItem::TypeCheckBlockContextItem (HIR::ImplBlock *block)
+  : type (TypeCheckBlockContextItem::ItemType::IMPL_BLOCK), item (block)
+{}
+
+TypeCheckBlockContextItem::TypeCheckBlockContextItem (HIR::Trait *trait)
+  : type (TypeCheckBlockContextItem::ItemType::TRAIT), item (trait)
+{}
+
+bool
+TypeCheckBlockContextItem::is_impl_block () const
+{
+  return type == IMPL_BLOCK;
+}
+
+bool
+TypeCheckBlockContextItem::is_trait_block () const
+{
+  return type == TRAIT;
+}
+
+HIR::ImplBlock &
+TypeCheckBlockContextItem::get_impl_block ()
+{
+  return *(item.block);
+}
+
+HIR::Trait &
+TypeCheckBlockContextItem::get_trait ()
+{
+  return *(item.trait);
 }
 
 } // namespace Resolver
