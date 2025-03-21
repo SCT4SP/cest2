@@ -1,4 +1,4 @@
-// Copyright (C) 2020-2024 Free Software Foundation, Inc.
+// Copyright (C) 2020-2025 Free Software Foundation, Inc.
 
 // This file is part of GCC.
 
@@ -157,10 +157,10 @@ SubstitutionParamMapping::override_context ()
   if (!param->can_resolve ())
     return;
 
-  auto mappings = Analysis::Mappings::get ();
+  auto &mappings = Analysis::Mappings::get ();
   auto context = Resolver::TypeCheckContext::get ();
 
-  context->insert_type (Analysis::NodeMapping (mappings->get_current_crate (),
+  context->insert_type (Analysis::NodeMapping (mappings.get_current_crate (),
 					       UNKNOWN_NODEID,
 					       param->get_ref (),
 					       UNKNOWN_LOCAL_DEFID),
@@ -630,12 +630,10 @@ SubstitutionRef::get_mappings_from_generic_args (
 	  for (auto &binding : args.get_binding_args ())
 	    {
 	      BaseType *resolved
-		= Resolver::TypeCheckType::Resolve (binding.get_type ().get ());
+		= Resolver::TypeCheckType::Resolve (binding.get_type ());
 	      if (resolved == nullptr
 		  || resolved->get_kind () == TyTy::TypeKind::ERROR)
 		{
-		  rust_error_at (binding.get_locus (),
-				 "failed to resolve type arguments");
 		  return SubstitutionArgumentMappings::error ();
 		}
 
@@ -698,10 +696,9 @@ SubstitutionRef::get_mappings_from_generic_args (
   std::vector<SubstitutionArg> mappings = used_arguments.get_mappings ();
   for (auto &arg : args.get_type_args ())
     {
-      BaseType *resolved = Resolver::TypeCheckType::Resolve (arg.get ());
+      BaseType *resolved = Resolver::TypeCheckType::Resolve (*arg);
       if (resolved == nullptr || resolved->get_kind () == TyTy::TypeKind::ERROR)
 	{
-	  rust_error_at (args.get_locus (), "failed to resolve type arguments");
 	  return SubstitutionArgumentMappings::error ();
 	}
 
@@ -940,7 +937,7 @@ SubstitutionRef::monomorphize ()
 	  if (associated == nullptr && ambigious)
 	    {
 	      // go for the first one? or error out?
-	      auto &mappings = *Analysis::Mappings::get ();
+	      auto &mappings = Analysis::Mappings::get ();
 	      const auto &type_param = subst.get_generic_param ();
 	      const auto *trait_ref = bound.get ();
 

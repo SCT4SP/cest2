@@ -1,5 +1,5 @@
 /* General AST-related method implementations for Rust frontend.
-   Copyright (C) 2009-2024 Free Software Foundation, Inc.
+   Copyright (C) 2009-2025 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -20,6 +20,8 @@ along with GCC; see the file COPYING3.  If not see
 #include "rust-ast.h"
 #include "optional.h"
 #include "rust-builtin-ast-nodes.h"
+#include "rust-common.h"
+#include "rust-expr.h"
 #include "rust-system.h"
 #include "rust-ast-full.h"
 #include "rust-diagnostics.h"
@@ -270,8 +272,8 @@ Attribute::get_traits_to_derive ()
 		      case AST::MetaItem::ItemKind::Word: {
 			auto word = static_cast<AST::MetaWord *> (meta_item);
 			// Convert current word to path
-			current
-			  = make_unique<AST::MetaItemPath> (AST::MetaItemPath (
+			current = std::make_unique<AST::MetaItemPath> (
+			  AST::MetaItemPath (
 			    AST::SimplePath (word->get_ident ())));
 			auto path
 			  = static_cast<AST::MetaItemPath *> (current.get ());
@@ -309,7 +311,8 @@ Attribute::get_traits_to_derive ()
 
 // Copy constructor must deep copy attr_input as unique pointer
 Attribute::Attribute (Attribute const &other)
-  : path (other.path), locus (other.locus)
+  : path (other.path), locus (other.locus),
+    inner_attribute (other.inner_attribute)
 {
   // guard to protect from null pointer dereference
   if (other.attr_input != nullptr)
@@ -322,6 +325,7 @@ Attribute::operator= (Attribute const &other)
 {
   path = other.path;
   locus = other.locus;
+  inner_attribute = other.inner_attribute;
   // guard to protect from null pointer dereference
   if (other.attr_input != nullptr)
     attr_input = other.attr_input->clone_attr_input ();
@@ -1570,15 +1574,34 @@ BorrowExpr::as_string () const
 
   std::string str ("&");
 
-  if (double_borrow)
-    str += "&";
+  if (raw_borrow)
+    {
+      str += "raw ";
+      str += get_is_mut () ? "const " : "mut ";
+    }
+  else
+    {
+      if (double_borrow)
+	str += "&";
 
-  if (is_mut)
-    str += "mut ";
-
+      if (get_is_mut ())
+	str += "mut ";
+    }
   str += main_or_left_expr->as_string ();
 
   return str;
+}
+
+std::string
+BoxExpr::as_string () const
+{
+  return "box " + expr->as_string ();
+}
+
+void
+BoxExpr::accept_vis (ASTVisitor &vis)
+{
+  vis.visit (*this);
 }
 
 std::string
@@ -2387,11 +2410,11 @@ LifetimeParam::as_string () const
 {
   std::string str ("LifetimeParam: ");
 
-  str += "\n Outer attribute: ";
+  str += "\n Outer attribute:";
   if (!has_outer_attribute ())
     str += "none";
-  else
-    str += outer_attr.as_string ();
+  for (auto &attr : outer_attrs)
+    str += " " + attr.as_string ();
 
   str += "\n Lifetime: " + lifetime.as_string ();
 
@@ -2483,11 +2506,11 @@ TypeParam::as_string () const
 {
   std::string str ("TypeParam: ");
 
-  str += "\n Outer attribute: ";
+  str += "\n Outer attribute:";
   if (!has_outer_attribute ())
     str += "none";
-  else
-    str += outer_attr.as_string ();
+  for (auto &attr : outer_attrs)
+    str += " " + attr.as_string ();
 
   str += "\n Identifier: " + type_representation.as_string ();
 
@@ -2970,22 +2993,6 @@ ExternalStaticItem::as_string () const
 
   // add type on new line
   str += "\n Type: " + item_type->as_string ();
-
-  return str;
-}
-
-std::string
-NamedFunctionParam::as_string () const
-{
-  std::string str = append_attributes (outer_attrs, OUTER);
-
-  if (has_name ())
-    str += "\n" + name;
-
-  if (is_variadic ())
-    str += "...";
-  else
-    str += "\n Type: " + param_type->as_string ();
 
   return str;
 }
@@ -3485,6 +3492,7 @@ AttributeParser::parse_meta_item_inner ()
 	case STRING_LITERAL:
 	case BYTE_CHAR_LITERAL:
 	case BYTE_STRING_LITERAL:
+	case RAW_STRING_LITERAL:
 	case INT_LITERAL:
 	case FLOAT_LITERAL:
 	case TRUE_LITERAL:
@@ -3766,6 +3774,10 @@ AttributeParser::parse_literal ()
     case BYTE_STRING_LITERAL:
       skip_token ();
       return Literal (tok->as_string (), Literal::BYTE_STRING,
+		      tok->get_type_hint ());
+    case RAW_STRING_LITERAL:
+      skip_token ();
+      return Literal (tok->as_string (), Literal::RAW_STRING,
 		      tok->get_type_hint ());
     case INT_LITERAL:
       skip_token ();
@@ -4258,7 +4270,7 @@ BlockExpr::normalize_tail_expr ()
 
 	  if (!stmt.is_semicolon_followed ())
 	    {
-	      expr = std::move (stmt.take_expr ());
+	      expr = stmt.take_expr ();
 	      statements.pop_back ();
 	    }
 	}
@@ -4631,6 +4643,12 @@ AwaitExpr::accept_vis (ASTVisitor &vis)
 
 void
 AsyncBlockExpr::accept_vis (ASTVisitor &vis)
+{
+  vis.visit (*this);
+}
+
+void
+InlineAsm::accept_vis (ASTVisitor &vis)
 {
   vis.visit (*this);
 }

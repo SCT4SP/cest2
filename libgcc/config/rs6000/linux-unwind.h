@@ -1,5 +1,5 @@
 /* DWARF2 EH unwinding support for PowerPC and PowerPC64 Linux.
-   Copyright (C) 2004-2024 Free Software Foundation, Inc.
+   Copyright (C) 2004-2025 Free Software Foundation, Inc.
 
    This file is part of GCC.
 
@@ -395,7 +395,7 @@ ppc_backchain_fallback (struct _Unwind_Context *context, void *a)
   current = context->cfa;
 
   /* If the trace CFA is not the context CFA the backtrace is done.  */
-  if (arg == NULL || arg->cfa != current)
+  if (arg == NULL || arg->cfa != (_Unwind_Word) current)
 	return;
 
   /* Start with next address.  */

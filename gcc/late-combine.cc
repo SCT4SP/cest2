@@ -1,5 +1,5 @@
 // Late-stage instruction combination pass.
-// Copyright (C) 2023-2024 Free Software Foundation, Inc.
+// Copyright (C) 2023-2025 Free Software Foundation, Inc.
 //
 // This file is part of GCC.
 //
@@ -30,7 +30,6 @@
 
 #define INCLUDE_ALGORITHM
 #define INCLUDE_FUNCTIONAL
-#define INCLUDE_MEMORY
 #define INCLUDE_ARRAY
 #include "config.h"
 #include "system.h"
@@ -53,7 +52,7 @@ const pass_data pass_data_late_combine =
   RTL_PASS, // type
   "late_combine", // name
   OPTGROUP_NONE, // optinfo_flags
-  TV_NONE, // tv_id
+  TV_LATE_COMBINE, // tv_id
   0, // properties_required
   0, // properties_provided
   0, // properties_destroyed
@@ -553,8 +552,14 @@ late_combine::check_register_pressure (insn_info *insn, rtx set)
 	  // Make sure that the source operand's class is at least as
 	  // permissive as the destination operand's class.
 	  auto src_class = alternative_class (alt, i);
-	  if (!reg_class_subset_p (dest_class, src_class))
-	    return false;
+	  if (dest_class != src_class)
+	    {
+	      auto extra_dest_regs = (reg_class_contents[dest_class]
+				      & ~reg_class_contents[src_class]
+				      & ~fixed_reg_set);
+	      if (!hard_reg_set_empty_p (extra_dest_regs))
+		return false;
+	    }
 
 	  // Make sure that the source operand occupies no more hard
 	  // registers than the destination operand.  This mostly matters
@@ -731,6 +736,10 @@ late_combine::execute (function *fn)
   // Finalization.
   if (crtl->ssa->perform_pending_updates ())
     cleanup_cfg (0);
+
+  delete crtl->ssa;
+  crtl->ssa = nullptr;
+
   // Make the recognizer allow volatile MEMs again.
   init_recog ();
   free_dominance_info (CDI_DOMINATORS);

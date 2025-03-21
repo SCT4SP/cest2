@@ -310,10 +310,6 @@ private:
   AST::Lifetime lifetime_from_token (const_TokenPtr tok);
   std::unique_ptr<AST::ExternalTypeItem>
   parse_external_type_item (AST::Visibility vis, AST::AttrVec outer_attrs);
-  AST::NamedFunctionParam parse_named_function_param ();
-  template <typename EndTokenPred>
-  std::vector<AST::NamedFunctionParam>
-  parse_named_function_params (EndTokenPred is_end_token);
 
   std::unique_ptr<AST::TypeAlias> parse_type_alias (AST::Visibility vis,
 						    AST::AttrVec outer_attrs);
@@ -622,6 +618,9 @@ private:
 							= AST::AttrVec ());
   AST::ClosureParam parse_closure_param ();
 
+  std::unique_ptr<AST::BoxExpr> parse_box_expr (AST::AttrVec outer_attrs,
+						location_t pratt_parsed_loc
+						= UNKNOWN_LOCATION);
   // When given a pratt_parsed_loc, use it as the location of the
   // first token parsed in the expression (the parsing of that first
   // token should be skipped).

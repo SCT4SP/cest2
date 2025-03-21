@@ -1,5 +1,5 @@
 /* Data structure definitions for a generic GCC target.
-   Copyright (C) 2001-2024 Free Software Foundation, Inc.
+   Copyright (C) 2001-2025 Free Software Foundation, Inc.
 
    This program is free software; you can redistribute it and/or modify it
    under the terms of the GNU General Public License as published by the
@@ -165,6 +165,9 @@ class function_arg_info;
 /* This is defined in function-abi.h.  */
 class predefined_function_abi;
 
+/* This is defined in avoid-store-forwarding.h.  */
+struct store_fwd_info;
+
 /* These are defined in tree-vect-stmts.cc.  */
 extern tree stmt_vectype (class _stmt_vec_info *);
 extern bool stmt_in_inner_loop_p (class vec_info *, class _stmt_vec_info *);
@@ -279,6 +282,18 @@ enum poly_value_estimate_kind
   POLY_VALUE_MIN,
   POLY_VALUE_MAX,
   POLY_VALUE_LIKELY
+};
+
+enum class spill_cost_type
+{
+  SAVE,
+  RESTORE
+};
+
+enum class frame_cost_type
+{
+  ALLOCATION,
+  DEALLOCATION
 };
 
 typedef void (*emit_support_tinfos_callback) (tree);

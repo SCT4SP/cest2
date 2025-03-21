@@ -1,4 +1,4 @@
-/* Copyright (C) 2002-2024 Free Software Foundation, Inc.
+/* Copyright (C) 2002-2025 Free Software Foundation, Inc.
    Contributed by Andy Vaught
    Namelist output contributed by Paul Thomas
    F2003 I/O support contributed by Jerry DeLisle
@@ -177,7 +177,9 @@ write_utf8_char4 (st_parameter_dt *dtp, gfc_char4_t *source,
       break;
     }
 
-  /* Now process the remaining characters, one at a time.  */
+  /* Now process the remaining characters, one at a time. We need to
+     adjust the src_len if the user has specified a field width.  */
+  src_len = w_len > 0 ? w_len : src_len;
   for (j = k; j < src_len; j++)
     {
       c = source[j];
@@ -1392,6 +1394,10 @@ write_b (st_parameter_dt *dtp, const fnode *f, const char *source, int len)
     {
       n = extract_uint (source, len);
       p = btoa (n, itoa_buf, sizeof (itoa_buf));
+
+      /* Test for zero. Needed by write_boz.  */
+      if (n != 0)
+	n = 1;
       write_boz (dtp, f, p, n, len);
     }
 }

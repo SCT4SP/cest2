@@ -1,5 +1,5 @@
 /* Gimple range phi analysis.
-   Copyright (C) 2023-2024 Free Software Foundation, Inc.
+   Copyright (C) 2023-2025 Free Software Foundation, Inc.
    Contributed by Andrew MacLeod <amacleod@redhat.com>.
 
 This file is part of GCC.
@@ -18,7 +18,6 @@ You should have received a copy of the GNU General Public License
 along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
-#define INCLUDE_MEMORY
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
@@ -484,7 +483,7 @@ phi_analyzer::process_phi (gphi *phi)
 	    }
 	}
     }
-  // If this dpoesn;t form a group, all members are instead simple phis.
+  // If this doesn't form a group, all members are instead simple phis.
   if (!g)
     {
       bitmap_ior_into (m_simple, m_current);

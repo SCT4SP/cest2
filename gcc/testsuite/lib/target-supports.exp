@@ -1,4 +1,4 @@
-#   Copyright (C) 1999-2024 Free Software Foundation, Inc.
+#   Copyright (C) 1999-2025 Free Software Foundation, Inc.
 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -38,6 +38,7 @@
 # "// ObjC++" for ObjC++
 # "// Go" for Go
 # "// Rust" for Rust
+# "*> COBOL" for COBOL
 # and "(* Modula-2" for Modula-2
 # If the tool is ObjC/ObjC++ then we overide the extension to .m/.mm to
 # allow for ObjC/ObjC++ specific flags.
@@ -72,6 +73,7 @@ proc check_compile {basename type contents args} {
 	"*/\\* ObjC*" { set src ${basename}[pid].m }
 	"*// Go*" { set src ${basename}[pid].go }
 	"*// Rust*" { set src ${basename}[pid].rs }
+	"*\\*> COBOL*" { set src ${basename}[pid].cob }
 	"*(\\* Modula-2*" { set src ${basename}[pid].mod }
 	default {
 	    switch -- $tool {
@@ -652,15 +654,10 @@ proc check_effective_target_trampolines { } {
 proc check_effective_target_stack_size { } {
     # For nvptx target, stack size limits are relevant for execution only.
     if { [istarget nvptx-*-*] } {
-	# Find 'dg-do-what' in an outer frame.
-	set level 1
-	while true {
-	    upvar $level dg-do-what dg-do-what
-	    if [info exists dg-do-what] then break
-	    incr level
+	set dg-do-what [find-dg-do-what]
+	if { ![llength ${dg-do-what}] } {
+	    error "unexpected call stack"
 	}
-	verbose "check_effective_target_stack_size: found dg-do-what at level $level" 2
-
 	if { ![string equal [lindex ${dg-do-what} 0] run] } {
 	    return 0
 	}
@@ -740,7 +737,7 @@ proc check_profiling_available { test_what } {
     }
 
     if { $test_what == "-fauto-profile" } {
-	if { !([istarget i?86-*-linux*] || [istarget x86_64-*-linux*]) } {
+	if { !([check_effective_target_x86] && [istarget *-*-linux*]) } {
 	    verbose "autofdo only supported on linux"
 	    return 0
 	}
@@ -827,7 +824,6 @@ proc check_profiling_available { test_what } {
 	     || [istarget moxie-*-elf*]
 	     || [istarget msp430-*-*]
 	     || [istarget nds32*-*-elf]
-	     || [istarget nios2-*-elf]
 	     || [istarget nvptx-*-*]
 	     || [istarget powerpc-*-eabi*]
 	     || [istarget powerpc-*-elf]
@@ -1003,17 +999,44 @@ proc check_effective_target_untyped_assembly {} {
     return 1
 }
 
-# Return 1 if alloca is supported, 0 otherwise.
+# Return 1 if dynamic stack allocation is supported, 0 otherwise.
 
 proc check_effective_target_alloca {} {
     if { [istarget bpf-*-*] } {
       return 0
     }
     if { [istarget nvptx-*-*] } {
-	return [check_no_compiler_messages alloca assembly {
-	    void f (void*);
-	    void g (int n) { f (__builtin_alloca (n)); }
-	}]
+	# For nvptx, 'alloca' support depends on the configuration.  In case
+	# of PTX "native" stacks, for 'dg-do run', it additionally depends on
+	# runtime support.
+	if { ![check_effective_target_nvptx_softstack] } {
+	    # '-mno-soft-stack': PTX "native" stacks
+
+	    # Not supported unless '-mptx=7.3'+ and '-march=sm_52'+.
+	    if { !([check_nvptx_default_ptx_isa_version_at_least 7 3]
+		   && [check_nvptx_default_ptx_isa_target_architecture_at_least sm_52]) } {
+		return 0
+	    }
+
+	    set dg-do-what [find-dg-do-what]
+	    if { ![llength ${dg-do-what}] } {
+		# This happens if 'gcc-dg-prune' etc. get called outside of
+		# 'dg-test'.  For these purposes, assume that dynamic stack
+		# allocation is supported.
+		return 1
+	    }
+	    if { [string equal [lindex ${dg-do-what} 0] run] } {
+		# For 'dg-do run', it additionally depends on runtime support.
+		# (If not supported, we don't try to demote 'run' to 'link',
+		# but instead simply fail the effective-target 'alloca' check.)
+		return [check_effective_target_nvptx_runtime_alloca_ptx]
+	    } else {
+		return 1
+	    }
+	} else {
+	    # '-msoft-stack'
+	    return 1
+	}
     }
     return 1
 }
@@ -1826,6 +1849,20 @@ proc check_effective_target_fortran_integer_16 { } {
     }]
 }
 
+# Check if long double on the target defaults to the IBM extended format.
+
+proc check_effective_target_long_double_is_ibm128 { } {
+    if { ![istarget powerpc*-*-*] } {
+      return 0
+    }
+
+    return [check_no_compiler_messages long_double_is_ibm128 assembly {
+      #ifndef __LONG_DOUBLE_IBM128__
+      #error "__LONG_DOUBLE_IBM128__ not defined"
+      #endif
+    }]
+}
+
 # Return 1 if we can statically link libgfortran, 0 otherwise.
 #
 # When the target name changes, replace the cached result.
@@ -1903,6 +1940,26 @@ proc check_effective_target_riscv_a { } {
        #error "Not __riscv_a"
        #endif
     }]
+}
+
+# Return 1 if the ABI is either ILP32E or ILP64E, 0 otherwise.
+# Cache the result.
+
+proc check_effective_target_riscv_abi_e { } {
+    # If current ISA is E, then only E ABI is supported.
+    if { [check_no_compiler_messages riscv_abi_e assembly {
+	#ifndef __riscv_e
+	#error "Not __riscv_e"
+	#endif
+	}] } {
+	    return 1
+	}
+
+    # E ABI can be chosen by both E and I base ISA variants.
+    #
+    # TODO - check for I ISA and E ABI combination.
+
+    return 0
 }
 
 # Return 1 if the target arch supports the atomic LRSC extension, 0 otherwise.
@@ -2066,6 +2123,39 @@ proc check_effective_target_riscv_zvbb { } {
     }]
 }
 
+# Return 1 if the target arch supports the Zbc extension, 0 otherwise.
+# Cache the result.
+
+proc check_effective_target_riscv_zbc { } {
+    return [check_no_compiler_messages riscv_ext_zbc assembly {
+       #ifndef __riscv_zbc
+       #error "Not __riscv_zbc"
+       #endif
+    }]
+}
+
+# Return 1 if the target arch supports the Zbkb extension, 0 otherwise.
+# Cache the result.
+
+proc check_effective_target_riscv_zbkb { } {
+    return [check_no_compiler_messages riscv_ext_zbkb assembly {
+       #ifndef __riscv_zbkb
+       #error "Not __riscv_zbkb"
+       #endif
+    }]
+}
+
+# Return 1 if the target arch supports the Zbkc extension, 0 otherwise.
+# Cache the result.
+
+proc check_effective_target_riscv_zbkc { } {
+    return [check_no_compiler_messages riscv_ext_zbkc assembly {
+       #ifndef __riscv_zbkc
+       #error "Not __riscv_zbkc"
+       #endif
+    }]
+}
+
 # Return 1 if the target arch supports the XTheadVector extension, 0 otherwise.
 # Cache the result.
 
@@ -2154,6 +2244,77 @@ proc check_effective_target_riscv_zvfh_ok { } {
     return 0
 }
 
+# Return 1 if we can execute code when using dg-add-options riscv_zbc
+
+proc check_effective_target_riscv_zbc_ok { } {
+    # If the target already supports zbc without any added options,
+    # we may assume we can execute just fine.
+    if { [check_effective_target_riscv_zbc] } {
+	return 1
+    }
+
+    # check if we can execute zbc insns with the given hardware or
+    # simulator
+    set gcc_march [regsub {[[:alnum:]]*} [riscv_get_arch] &zbc]
+    if { [check_runtime ${gcc_march}_zbc_exec {
+	int main()
+	{
+	    asm ("clmul a0,a0,a1");
+	    asm ("clmulh a0,a0,a1");
+	    return 0;
+	} } "-march=${gcc_march}"] } {
+	    return 1
+	}
+    return 0
+}
+
+# Return 1 if we can execute code when using dg-add-options riscv_zbkb
+
+proc check_effective_target_riscv_zbkb_ok { } {
+    # If the target already supports zbkb without any added options,
+    # we may assume we can execute just fine.
+    if { [check_effective_target_riscv_zbkb] } {
+	return 1
+    }
+
+    # check if we can execute zbkb insns with the given hardware or
+    # simulator
+    set gcc_march [regsub {[[:alnum:]]*} [riscv_get_arch] &zbkb]
+    if { [check_runtime ${gcc_march}_zbkb_exec {
+	int main()
+	{
+	    asm ("brev8 a0,a0");
+	    return 0;
+	} } "-march=${gcc_march}"] } {
+	    return 1
+	}
+    return 0
+}
+
+# Return 1 if we can execute code when using dg-add-options riscv_zbkc
+
+proc check_effective_target_riscv_zbkc_ok { } {
+    # If the target already supports zbkc without any added options,
+    # we may assume we can execute just fine.
+    if { [check_effective_target_riscv_zbkc] } {
+	return 1
+    }
+
+    # check if we can execute zbkc insns with the given hardware or
+    # simulator
+    set gcc_march [regsub {[[:alnum:]]*} [riscv_get_arch] &zbkc]
+    if { [check_runtime ${gcc_march}_zbkc_exec {
+	int main()
+	{
+	    asm ("clmul a0,a0,a1");
+	    asm ("clmulh a0,a0,a1");
+	    return 0;
+	} } "-march=${gcc_march}"] } {
+	    return 1
+	}
+    return 0
+}
+
 # Return 1 if we can execute code when using dg-add-options riscv_zvbb
 
 proc check_effective_target_riscv_zvbb_ok { } {
@@ -2201,10 +2362,13 @@ proc check_effective_target_riscv_v_misalign_ok { } {
     return 0
 }
 
+# Deduce the string for the RISC-V architecture targeted by the compiler
+# under test.  Also take into account the global compiler flags passed
+# by testsuite.
 proc riscv_get_arch { } {
     set gcc_march ""
     # ??? do we neeed to add more extensions to the list below?
-    foreach ext { i m a f d q c b v zicsr zifencei zfh zba zbb zbc zbs zvbb zvfh ztso zaamo zalrsc zabha zacas } {
+    foreach ext { i e m a f d q c b v zicsr zifencei zfh zba zbb zbc zbkb zbkc zbs zvbb zvfh ztso zaamo zalrsc zabha zacas } {
 	if { [check_no_compiler_messages  riscv_ext_$ext assembly [string map [list DEF __riscv_$ext] {
 		#ifndef DEF
 		#error "Not DEF"
@@ -2447,17 +2611,23 @@ proc remove_options_for_riscv_zvbb { flags } {
     return [add_options_for_riscv_z_ext zvbb $flags]
 }
 
+# Return 1 if the target is ia32 or x86_64.
+
+proc check_effective_target_x86 { } {
+    if { ([istarget x86_64-*-*] || [istarget i?86-*-*]) } {
+	return 1
+    } else {
+        return 0
+    }
+}
+
 # Return 1 if the target OS supports running SSE executables, 0
 # otherwise.  Cache the result.
 
 proc check_sse_os_support_available { } {
     return [check_cached_effective_target sse_os_support_available {
 	# If this is not the right target then we can skip the test.
-	if { !([istarget i?86-*-*] || [istarget x86_64-*-*]) } {
-	    expr 0
-	} else {
-	    expr 1
-	}
+	expr [check_effective_target_x86]
     }]
 }
 
@@ -2467,7 +2637,7 @@ proc check_sse_os_support_available { } {
 proc check_avx_os_support_available { } {
     return [check_cached_effective_target avx_os_support_available {
 	# If this is not the right target then we can skip the test.
-	if { !([istarget i?86-*-*] || [istarget x86_64-*-*]) } {
+	if { ![check_effective_target_x86] } {
 	    expr 0
 	} else {
 	    # Check that OS has AVX and SSE saving enabled.
@@ -2490,7 +2660,7 @@ proc check_avx_os_support_available { } {
 proc check_avx512_os_support_available { } {
     return [check_cached_effective_target avx512_os_support_available {
 	# If this is not the right target then we can skip the test.
-	if { !([istarget i?86-*-*] || [istarget x86_64-*-*]) } {
+	if { ![check_effective_target_x86] } {
 	    expr 0
 	} else {
 	    # Check that OS has AVX512, AVX and SSE saving enabled.
@@ -2513,7 +2683,7 @@ proc check_avx512_os_support_available { } {
 proc check_sse_hw_available { } {
     return [check_cached_effective_target sse_hw_available {
 	# If this is not the right target then we can skip the test.
-	if { !([istarget i?86-*-*] || [istarget x86_64-*-*]) } {
+	if { ![check_effective_target_x86] } {
 	    expr 0
 	} else {
 	    check_runtime_nocache sse_hw_available {
@@ -2537,7 +2707,7 @@ proc check_sse_hw_available { } {
 proc check_sse2_hw_available { } {
     return [check_cached_effective_target sse2_hw_available {
 	# If this is not the right target then we can skip the test.
-	if { !([istarget i?86-*-*] || [istarget x86_64-*-*]) } {
+	if { ![check_effective_target_x86] } {
 	    expr 0
 	} else {
 	    check_runtime_nocache sse2_hw_available {
@@ -2561,7 +2731,7 @@ proc check_sse2_hw_available { } {
 proc check_sse4_hw_available { } {
     return [check_cached_effective_target sse4_hw_available {
 	# If this is not the right target then we can skip the test.
-	if { !([istarget i?86-*-*] || [istarget x86_64-*-*]) } {
+	if { ![check_effective_target_x86] } {
 	    expr 0
 	} else {
 	    check_runtime_nocache sse4_hw_available {
@@ -2585,7 +2755,7 @@ proc check_sse4_hw_available { } {
 proc check_avx_hw_available { } {
     return [check_cached_effective_target avx_hw_available {
 	# If this is not the right target then we can skip the test.
-	if { !([istarget i?86-*-*] || [istarget x86_64-*-*]) } {
+	if { ![check_effective_target_x86] } {
 	    expr 0
 	} else {
 	    check_runtime_nocache avx_hw_available {
@@ -2610,7 +2780,7 @@ proc check_avx_hw_available { } {
 proc check_avx2_hw_available { } {
     return [check_cached_effective_target avx2_hw_available {
 	# If this is not the right target then we can skip the test.
-	if { !([istarget x86_64-*-*] || [istarget i?86-*-*]) } {
+	if { ![check_effective_target_x86] } {
 	    expr 0
 	} else {
 	    check_runtime_nocache avx2_hw_available {
@@ -2643,7 +2813,7 @@ proc check_avx2_hw_available { } {
 proc check_avx512f_hw_available { } {
     return [check_cached_effective_target avx512f_hw_available {
 	# If this is not the right target then we can skip the test.
-	if { !([istarget x86_64-*-*] || [istarget i?86-*-*]) } {
+	if { ![check_effective_target_x86] } {
 	    expr 0
 	} else {
 	    check_runtime_nocache avx512f_hw_available {
@@ -2738,8 +2908,8 @@ proc check_effective_target_avx512f_runtime { } {
 
 # Return 1 if bmi2 instructions can be compiled.
 proc check_effective_target_bmi2 { } {
-    if { !([istarget i?86-*-*] || [istarget x86_64-*-*]) } {
-	return 0
+    if { ![check_effective_target_x86] } {
+        return 0
     }
     return [check_no_compiler_messages bmi2 object {
 	unsigned int
@@ -3981,8 +4151,8 @@ proc add_options_for_float16 { flags } {
     if { [istarget arm*-*-*] } {
 	return "$flags -mfp16-format=ieee"
     }
-    if { [istarget i?86-*-*] || [istarget x86_64-*-*] } {
-	return "$flags -msse2"
+    if { [check_effective_target_x86] } {
+	return "$flags -msse2 -mfpmath=sse"
     }
     return "$flags"
 }
@@ -4019,7 +4189,7 @@ proc check_effective_target___float128 { } {
 	return [check_ppc_float128_sw_available]
     }
     if { [istarget ia64-*-*]
-	 || [istarget i?86-*-*] || [istarget x86_64-*-*] } {
+	 || [check_effective_target_x86] } {
 	return 1
     }
     return 0
@@ -4056,7 +4226,7 @@ proc check_effective_target_bfloat16_runtime {} {
 }
 
 proc add_options_for_bfloat16 { flags } {
-    if { [istarget i?86-*-*] || [istarget x86_64-*-*] } {
+    if { [check_effective_target_x86] } {
 	return "$flags -msse2"
     }
     return "$flags"
@@ -4165,7 +4335,7 @@ proc check_effective_target_dfprt { } {
 
 proc check_effective_target_dfp_bid { } {
     if { [istarget aarch64*-*-*]
-	 || [istarget i?86-*-*] || [istarget x86_64-*-*]} {
+	 || [check_effective_target_x86]} {
 	return 1
     }
     return 0
@@ -4256,7 +4426,7 @@ proc check_effective_target_vect_cmdline_needed { } {
     return [check_cached_effective_target vect_cmdline_needed {
 	if { [istarget alpha*-*-*]
 	     || [istarget ia64-*-*]
-	     || (([istarget i?86-*-*] || [istarget x86_64-*-*])
+	     || ([check_effective_target_x86]
 		 && ![is-effective-target ia32])
 	     || ([istarget powerpc*-*-*]
 		 && [check_effective_target_powerpc_altivec])
@@ -4278,7 +4448,7 @@ proc check_effective_target_vect_cmdline_needed { } {
 proc check_effective_target_vect_int { } {
     return [check_cached_effective_target_indexed vect_int {
       expr {
-	 [istarget i?86-*-*] || [istarget x86_64-*-*]
+	 [check_effective_target_x86]
 	 || [istarget powerpc*-*-*]
 	 || [istarget amdgcn-*-*]
 	 || [istarget sparc*-*-*]
@@ -4325,6 +4495,7 @@ proc check_effective_target_vect_early_break { } {
 	|| [check_effective_target_sse4]
 	|| [istarget amdgcn-*-*]
 	|| [check_effective_target_riscv_v]
+	|| [check_effective_target_loongarch_sx]
 	}}]
 }
 
@@ -4341,6 +4512,7 @@ proc check_effective_target_vect_early_break_hw { } {
 	|| [check_sse4_hw_available]
 	|| [istarget amdgcn-*-*]
 	|| [check_effective_target_riscv_v_ok]
+	|| [check_effective_target_loongarch_sx_hw]
 	}}]
 }
 
@@ -4351,7 +4523,7 @@ proc add_options_for_vect_early_break { flags } {
 
     if { [check_effective_target_arm_v8_neon_ok] } {
 	global et_arm_v8_neon_flags
-	return "$flags $et_arm_v8_neon_flags -march=armv8-a"
+	return "$flags $et_arm_v8_neon_flags -mcpu=unset -march=armv8-a"
     }
 
     if { [check_effective_target_sse4] } {
@@ -4477,7 +4649,7 @@ proc check_effective_target_vect_complex_add_double { } {
 
 proc check_effective_target_vect_intfloat_cvt { } {
     return [check_cached_effective_target_indexed vect_intfloat_cvt {
-      expr { [istarget i?86-*-*] || [istarget x86_64-*-*]
+      expr { [check_effective_target_x86]
 	     || [istarget powerpc*-*-*]
 	     || [is-effective-target arm_neon]
 	     || ([istarget mips*-*-*]
@@ -4496,15 +4668,15 @@ proc check_effective_target_vect_intfloat_cvt { } {
 
 proc check_effective_target_vect_doubleint_cvt { } {
     return [check_cached_effective_target_indexed vect_doubleint_cvt {
-      expr { (([istarget i?86-*-*] || [istarget x86_64-*-*])
-	       && [check_no_compiler_messages vect_doubleint_cvt assembly {
+      expr { ([check_effective_target_x86]
+	      && [check_no_compiler_messages vect_doubleint_cvt assembly {
 		   #ifdef __tune_atom__
 		   # error No double vectorizer support.
 		   #endif
 	      }])
-	    || [istarget aarch64*-*-*]
-	    || ([istarget powerpc*-*-*] && [check_vsx_hw_available])
-	    || ([istarget mips*-*-*]
+	     || [istarget aarch64*-*-*]
+	     || ([istarget powerpc*-*-*] && [check_vsx_hw_available])
+	     || ([istarget mips*-*-*]
 		 && [et-is-effective-target mips_msa])
 	     || ([istarget s390*-*-*]
 		 && [check_effective_target_s390_vx])
@@ -4519,7 +4691,7 @@ proc check_effective_target_vect_doubleint_cvt { } {
 
 proc check_effective_target_vect_intdouble_cvt { } {
     return [check_cached_effective_target_indexed vect_intdouble_cvt {
-      expr { (([istarget i?86-*-*] || [istarget x86_64-*-*])
+      expr { ([check_effective_target_x86]
 	      && [check_no_compiler_messages vect_intdouble_cvt assembly {
 		  #ifdef __tune_atom__
 		  # error No double vectorizer support.
@@ -4556,7 +4728,7 @@ proc check_effective_target_int128 { } {
 
 proc check_effective_target_vect_uintfloat_cvt { } {
     return [check_cached_effective_target_indexed vect_uintfloat_cvt {
-      expr { [istarget i?86-*-*] || [istarget x86_64-*-*]
+      expr { [check_effective_target_x86]
 	     || [istarget powerpc*-*-*]
 	     || [istarget aarch64*-*-*]
 	     || [is-effective-target arm_neon]
@@ -4577,7 +4749,7 @@ proc check_effective_target_vect_uintfloat_cvt { } {
 
 proc check_effective_target_vect_floatint_cvt { } {
     return [check_cached_effective_target_indexed vect_floatint_cvt {
-      expr { [istarget i?86-*-*] || [istarget x86_64-*-*]
+      expr { [check_effective_target_x86]
 	     || [istarget powerpc*-*-*]
 	     || [is-effective-target arm_neon]
 	     || ([istarget mips*-*-*]
@@ -4640,7 +4812,7 @@ proc check_effective_target_vect_simd_clones { } {
     # specified arch will be chosen, but still we need to at least
     # be able to assemble avx512f.
     return [check_cached_effective_target_indexed vect_simd_clones {
-      expr { (([istarget i?86-*-*] || [istarget x86_64-*-*])
+      expr { ([check_effective_target_x86]
 	      && [check_effective_target_avx512f])
 	     || [istarget amdgcn-*-*]
 	     || [istarget aarch64*-*-*] }}]
@@ -4950,6 +5122,93 @@ proc add_options_for_arm_fp { flags } {
     return "$flags $et_arm_fp_flags"
 }
 
+# Some libc headers will only compile correctly if the correct ABI flags
+# are picked for the target environment.  Try to find an ABI setting
+# that works.  Glibc falls into this category.  This test is intended
+# to enable FP as far as possible, so does not try -mfloat-abi=soft.
+proc check_effective_target_arm_libc_fp_abi_ok_nocache { } {
+    global et_arm_libc_fp_abi_flags
+    set et_arm_libc_fp_abi_flags ""
+    if { [istarget arm*-*-*] } {
+	foreach flags {"-mfloat-abi=hard" "-mfloat-abi=softfp"} {
+	    if { [check_no_compiler_messages_nocache arm_libc_fp_abi_ok object {
+		#include <stdint.h>
+	    } "$flags"] } {
+		set et_arm_libc_fp_abi_flags $flags
+		return 1
+	    }
+	}
+    }
+    return 0
+}
+
+proc  check_effective_target_arm_libc_fp_abi_ok { } {
+    return [check_cached_effective_target arm_libc_fp_abi_ok \
+		check_effective_target_arm_libc_fp_abi_ok_nocache]
+}
+
+# Add flags that pick the right ABI for the supported libc headers on
+# this platform.
+proc add_options_for_arm_libc_fp_abi { flags } {
+    if { ! [check_effective_target_arm_libc_fp_abi_ok] } {
+	return "$flags"
+    }
+    global et_arm_libc_fp_abi_flags
+    return "$flags $et_arm_libc_fp_abi_flags"
+}
+
+# Try to find the minimal set of flags needed to make the header file
+# arm_neon.h compatible with this compilation.  This is complicated due
+# to the fact that this header doesn't work properly on m-profile cores
+# and also won't work correctly if the wrong floating-point ABI is used
+# on the platform (since arm_neon.h can include stdint.h, which on Linux
+# will pull in stub headers that aren't installed).
+# Note: This will not necessarily enable Neon instructions, just provide
+# something where the header will not cause errors.
+
+proc check_effective_target_arm_neon_h_ok_nocache { } {
+    # none-arm or thumb1 cannot support neon, so there's no point in
+    # looking further.
+    if { [istarget arm*-*-*]
+	 && [check_effective_target_arm_libc_fp_abi_ok]} {
+	global et_arm_neon_h_flags
+	set base_flags [add_options_for_arm_libc_fp_abi ""]
+	foreach flags {"" "-mfpu=auto" "-marm" "-marm -mfpu=auto" \
+			   "-mcpu=unset -march=armv7-a+fp -mfpu=auto" } {
+	    if { [check_no_compiler_messages_nocache arm_neon_h_ok assembly {
+		#if __ARM_ARCH < 5
+		#error architecture too low for FP
+		#endif
+		#if __ARM_ARCH < 7
+		#if !defined(__arm__) || (defined(__thumb__) && !defined(__thumb2__))
+		#error incompatible arch or mode
+		#endif
+		#endif
+		#if __ARM_ARCH_PROFILE == 'M'
+		#error incompatible profile
+		#endif
+	    } "$base_flags $flags" ] } {
+		set et_arm_neon_h_flags "$base_flags $flags"
+		return 1
+	    }
+	}
+    }
+    return 0
+}
+
+proc check_effective_target_arm_neon_h_ok { } {
+    return [check_cached_effective_target arm_neon_h_ok \
+		check_effective_target_arm_neon_h_ok_nocache]
+}
+
+proc add_options_for_arm_neon_h { flags } {
+    if { ! [check_effective_target_arm_neon_h_ok] } {
+	return "$flags"
+    }
+    global et_arm_neon_h_flags
+    return "$flags $et_arm_neon_h_flags"
+}
+
 # Return 1 if this is an ARM target defining __ARM_FP with
 # double-precision support. We may need -mfloat-abi=softfp or
 # equivalent options.  Some multilibs may be incompatible with these
@@ -5087,7 +5346,7 @@ proc add_options_for_arm_v8_neon { flags } {
 	return "$flags"
     }
     global et_arm_v8_neon_flags
-    return "$flags $et_arm_v8_neon_flags -march=armv8-a"
+    return "$flags $et_arm_v8_neon_flags -mcpu=unset -march=armv8-a"
 }
 
 # Add the options needed for ARMv8.1 Adv.SIMD.  Also adds the ARMv8 NEON
@@ -5161,7 +5420,7 @@ proc check_effective_target_arm_neon_ok_nocache { } {
     global et_arm_neon_flags
     set et_arm_neon_flags ""
     if { [check_effective_target_arm32] } {
-	foreach flags {"" "-mfloat-abi=softfp" "-mfpu=neon" "-mfpu=neon -mfloat-abi=softfp" "-mfpu=neon -mfloat-abi=softfp -march=armv7-a" "-mfloat-abi=hard" "-mfpu=neon -mfloat-abi=hard" "-mfpu=neon -mfloat-abi=hard -march=armv7-a"} {
+	foreach flags {"" "-mfloat-abi=softfp" "-mfpu=neon" "-mfpu=neon -mfloat-abi=softfp" "-mfpu=neon -mfloat-abi=softfp -mcpu=unset -march=armv7-a" "-mfloat-abi=hard" "-mfpu=neon -mfloat-abi=hard" "-mfpu=neon -mfloat-abi=hard -mcpu=unset -march=armv7-a"} {
 	    if { [check_no_compiler_messages_nocache arm_neon_ok object {
 		#include <arm_neon.h>
 		int dummy;
@@ -5198,7 +5457,7 @@ proc check_effective_target_arm_neon_ok { } {
 proc check_effective_target_arm_simd32_ok_nocache { } {
     global et_arm_simd32_flags
     set et_arm_simd32_flags ""
-    foreach flags {"" "-march=armv6" "-march=armv6 -mfloat-abi=softfp" "-march=armv6 -mfloat-abi=hard"} {
+    foreach flags {"" "-mcpu=unset -march=armv6" "-mcpu=unset -march=armv6 -mfloat-abi=softfp" "-mcpu=unset -march=armv6 -mfloat-abi=hard"} {
       if { [check_no_compiler_messages_nocache arm_simd32_ok object {
 	#include <arm_acle.h>
 	int dummy;
@@ -5236,7 +5495,7 @@ proc add_options_for_arm_simd32 { flags } {
 proc check_effective_target_arm_sat_ok_nocache { } {
     global et_arm_sat_flags
     set et_arm_sat_flags ""
-    foreach flags {"" "-march=armv6" "-march=armv6 -mfloat-abi=softfp" "-march=armv6 -mfloat-abi=hard -mfpu=vfp"} {
+    foreach flags {"" "-mcpu=unset -march=armv6" "-mcpu=unset -march=armv6 -mfloat-abi=softfp" "-mcpu=unset -march=armv6 -mfloat-abi=hard -mfpu=vfp"} {
       if { [check_no_compiler_messages_nocache et_arm_sat_flags object {
 	#include <arm_acle.h>
 	int dummy;
@@ -5276,7 +5535,7 @@ proc add_options_for_arm_sat { flags } {
 proc check_effective_target_arm_dsp_ok_nocache { } {
     global et_arm_dsp_flags
     set et_arm_dsp_flags ""
-    foreach flags {"" "-march=armv5te" "-march=armv5te -mfloat-abi=softfp" "-march=armv5te -mfloat-abi=hard"} {
+    foreach flags {"" "-mcpu=unset -march=armv5te" "-mcpu=unset -march=armv5te -mfloat-abi=softfp" "-mcpu=unset -march=armv5te -mfloat-abi=hard"} {
       if { [check_no_compiler_messages_nocache et_arm_dsp_ok object {
 	#include <arm_acle.h>
 	int dummy;
@@ -5339,7 +5598,7 @@ proc check_effective_target_arm_neon_ok_no_float_abi { } {
 
 proc check_effective_target_arm_crc_ok_nocache { } {
     global et_arm_crc_flags
-    set et_arm_crc_flags "-march=armv8-a+crc"
+    set et_arm_crc_flags "-mcpu=unset -march=armv8-a+crc"
     return [check_no_compiler_messages_nocache arm_crc_ok object {
 	#if !defined (__ARM_FEATURE_CRC32)
 	#error FOO
@@ -5550,7 +5809,7 @@ proc check_effective_target_arm_v8_neon_ok_nocache { } {
 		{
 		  __asm__ volatile ("vrintn.f32 q0, q0");
 		}
-	    } "$flags -march=armv8-a"] } {
+	    } "$flags -mcpu=unset -march=armv8-a"] } {
 		set et_arm_v8_neon_flags $flags
 		return 1
 	    }
@@ -5742,18 +6001,24 @@ foreach { armfunc armflag armdefs } {
 	v6m "-march=armv6-m -mthumb -mfloat-abi=soft" __ARM_ARCH_6M__
 	v7a "-march=armv7-a+fp" __ARM_ARCH_7A__
 	v7a_arm "-march=armv7-a+fp -marm" "__ARM_ARCH_7A__ && !__thumb__"
+	v7a_fp_hard "-march=armv7-a+fp -mfpu=auto -mfloat-abi=hard" __ARM_ARCH_7A__
 	v7a_neon "-march=armv7-a+simd -mfpu=auto -mfloat-abi=softfp" "__ARM_ARCH_7A__ && __ARM_NEON__"
+	v7a_neon_thumb "-march=armv7-a+simd -mfpu=auto -mfloat-abi=softfp -mthumb" "__ARM_ARCH_7A__ && __ARM_NEON__ && __thumb__"
 	v7r "-march=armv7-r+fp" __ARM_ARCH_7R__
 	v7m "-march=armv7-m -mthumb -mfloat-abi=soft" __ARM_ARCH_7M__
 	v7em "-march=armv7e-m+fp -mthumb" __ARM_ARCH_7EM__
+	v7em_hard "-march=armv7e-m+fp -mfpu=auto -mfloat-abi=hard -mthumb" __ARM_ARCH_7EM__
 	v7ve "-march=armv7ve+fp -marm"
 		"__ARM_ARCH_7A__ && __ARM_FEATURE_IDIV"
 	v7ve_neon "-march=armv7ve+simd -mfpu=auto -mfloat-abi=softfp"
 		  "__ARM_ARCH_7A__ && __ARM_FEATURE_IDIV && __ARM_NEON__"
 	v8a "-march=armv8-a+simd" __ARM_ARCH_8A__
 	v8a_hard "-march=armv8-a+simd -mfpu=auto -mfloat-abi=hard" __ARM_ARCH_8A__
+	v8a_crc_hard "-march=armv8-a+crc+simd -mfpu=auto -mfloat-abi=hard" "__ARM_ARCH_8A__ && __ARM_FEATURE_CRC32"
 	v8_1a "-march=armv8.1-a+simd" __ARM_ARCH_8A__
 	v8_2a "-march=armv8.2-a+simd" __ARM_ARCH_8A__
+	v8_2a_bf16 "-march=armv8.2-a+bf16 -mfpu=auto -mfloat-abi=softfp" __ARM_ARCH_8A__
+	v8_2a_bf16_hard "-march=armv8.2-a+bf16 -mfpu=auto -mfloat-abi=hard" __ARM_ARCH_8A__
 	v8r "-march=armv8-r+fp.sp" __ARM_ARCH_8R__
 	v8m_base "-march=armv8-m.base -mthumb -mfloat-abi=soft"
 		__ARM_ARCH_8M_BASE__
@@ -5808,11 +6073,24 @@ foreach { armfunc armflag armdefs } {
 #        /* { dg-add-options arm_cpu_xscale } */
 #	 /* { dg-require-effective-target arm_xscale_multilib } */
 
+# NOTE: -mcpu does not override -mtune, so to ensure the tuning is consistent 
+# for tests using these flags all entries should set -mcpu and -mtune explicitly
+
 # This table should only be used to set -mcpu= (and associated
 # flags).  See above for setting -march=.
 foreach { armfunc armflag armdefs } {
-	    xscale_arm "-mcpu=xscale -mfloat-abi=soft -marm" "__XSCALE__ && !__thumb__"
-	    cortex_a57 "-mcpu=cortex-a57" __ARM_ARCH_8A__
+	    xscale_arm "-mcpu=xscale -mtune=xscale -mfloat-abi=soft -marm" "__XSCALE__ && !__thumb__"
+	    cortex_a57 "-mcpu=cortex-a57 -mtune=cortex-a57" __ARM_ARCH_8A__
+	    cortex_m0 "-mcpu=cortex-m0 -mtune=cortex-m0 -mfloat-abi=soft -mthumb" "__ARM_ARCH_6M__ && __thumb__"
+	    cortex_m0_small "-mcpu=cortex-m0.small-multiply -mtune=cortex-m0.small-multiply -mfloat-abi=soft -mthumb" "__ARM_ARCH_6M__ && __thumb__"
+	    cortex_m0plus_small "-mcpu=cortex-m0plus.small-multiply -mtune=cortex-m0plus.small-multiply -mfloat-abi=soft -mthumb" "__ARM_ARCH_6M__ && __thumb__"
+	    cortex_m1_small "-mcpu=cortex-m1.small-multiply -mtune=cortex-m1.small-multiply -mfloat-abi=soft -mthumb" "__ARM_ARCH_6M__ && __thumb__"
+	    cortex_m3 "-mcpu=cortex-m3 -mtune=cortex-m3 -mfloat-abi=soft -mthumb" "__ARM_ARCH_7M__"
+	    cortex_m4 "-mcpu=cortex-m4 -mtune=cortex-m4 -mfpu=auto -mthumb" "__ARM_ARCH_7EM__"
+	    cortex_m4_hard "-mcpu=cortex-m4 -mtune=cortex-m4 -mfpu=auto -mfloat-abi=hard -mthumb" "__ARM_ARCH_7EM__"
+	    cortex_m7 "-mcpu=cortex-m7 -mtune=cortex-m7 -mfpu=auto -mthumb" "__ARM_ARCH_7EM__"
+	    cortex_m23 "-mcpu=cortex-m23 -mtune=cortex-m23 -mfloat-abi=soft -mthumb" "__ARM_ARCH_8M_BASE__  && __thumb__"
+	    cortex_m55 "-mcpu=cortex-m55 -mtune=cortex-m55 -mfpu=auto -mthumb" "__ARM_ARCH_8M_MAIN__  && __thumb__"
 	} {
     eval [string map [list FUNC $armfunc FLAG $armflag DEFS $armdefs ] {
 	proc check_effective_target_arm_cpu_FUNC_ok { } {
@@ -6079,7 +6357,7 @@ proc check_effective_target_arm_pacbti_hw {} {
 	  asm ("autg r12, lr, sp");
 	  asm ("bx lr");
 	}
-    } "-march=armv8.1-m.main+pacbti+fp -mbranch-protection=standard -mthumb -mfloat-abi=hard"]
+    } "-mcpu=unset -march=armv8.1-m.main+pacbti+fp -mbranch-protection=standard -mthumb -mfloat-abi=hard"]
 }
 
 # Return 1 if this compilation turns on string_ops_prefer_neon on.
@@ -6273,7 +6551,7 @@ proc check_effective_target_arm_v8_1m_mve_fp_ok_nocache { } {
 
     # Iterate through sets of options to find the compiler flags that
     # need to be added to the -march option.
-    foreach flags {"" "-mfloat-abi=softfp -mfpu=auto -march=armv8.1-m.main+mve.fp" "-mfloat-abi=hard -mfpu=auto -march=armv8.1-m.main+mve.fp"} {
+    foreach flags {"" "-mfloat-abi=softfp -mfpu=auto -mcpu=unset -march=armv8.1-m.main+mve.fp" "-mfloat-abi=hard -mfpu=auto -mcpu=unset -march=armv8.1-m.main+mve.fp"} {
 	if { [check_no_compiler_messages_nocache \
 		  arm_v8_1m_mve_fp_ok object {
 	    #include <arm_mve.h>
@@ -6322,7 +6600,7 @@ proc check_effective_target_arm_v8_1a_neon_ok_nocache { } {
     # since AArch64 only needs the -march setting.
     foreach flags {"" "-mfpu=neon-fp-armv8" "-mfloat-abi=softfp" \
 		       "-mfpu=neon-fp-armv8 -mfloat-abi=softfp"} {
-	foreach arches { "-march=armv8-a+rdma" "-march=armv8.1-a" } {
+	foreach arches { "-mcpu=unset -march=armv8-a+rdma" "-mcpu=unset -march=armv8.1-a" } {
 	    if { [check_no_compiler_messages_nocache arm_v8_1a_neon_ok object {
 		#if !defined (__ARM_FEATURE_QRDMX)
 		#error "__ARM_FEATURE_QRDMX not defined"
@@ -6363,8 +6641,8 @@ proc check_effective_target_arm_v8_2a_fp16_scalar_ok_nocache { } {
 	    #if !defined (__ARM_FEATURE_FP16_SCALAR_ARITHMETIC)
 	    #error "__ARM_FEATURE_FP16_SCALAR_ARITHMETIC not defined"
 	    #endif
-	} "$flags -march=armv8.2-a+fp16"] } {
-	    set et_arm_v8_2a_fp16_scalar_flags "$flags -march=armv8.2-a+fp16"
+	} "$flags -mcpu=unset -march=armv8.2-a+fp16"] } {
+	    set et_arm_v8_2a_fp16_scalar_flags "$flags -mcpu=unset -march=armv8.2-a+fp16"
 	    return 1
 	}
     }
@@ -6398,8 +6676,8 @@ proc check_effective_target_arm_v8_2a_fp16_neon_ok_nocache { } {
 	    #if !defined (__ARM_FEATURE_FP16_VECTOR_ARITHMETIC)
 	    #error "__ARM_FEATURE_FP16_VECTOR_ARITHMETIC not defined"
 	    #endif
-	} "$flags -march=armv8.2-a+fp16"] } {
-	    set et_arm_v8_2a_fp16_neon_flags "$flags -march=armv8.2-a+fp16"
+	} "$flags -mcpu=unset -march=armv8.2-a+fp16"] } {
+	    set et_arm_v8_2a_fp16_neon_flags "$flags -mcpu=unset -march=armv8.2-a+fp16"
 	    return 1
 	}
     }
@@ -6433,8 +6711,8 @@ proc check_effective_target_arm_v8_2a_dotprod_neon_ok_nocache { } {
 	    #if !defined (__ARM_FEATURE_DOTPROD)
 	    #error "__ARM_FEATURE_DOTPROD not defined"
 	    #endif
-	} "$flags -march=armv8.2-a+dotprod"] } {
-	    set et_arm_v8_2a_dotprod_neon_flags "$flags -march=armv8.2-a+dotprod"
+	} "$flags -mcpu=unset -march=armv8.2-a+dotprod"] } {
+	    set et_arm_v8_2a_dotprod_neon_flags "$flags -mcpu=unset -march=armv8.2-a+dotprod"
 	    return 1
 	}
     }
@@ -6456,7 +6734,7 @@ proc check_effective_target_arm_v8_1m_mve_ok_nocache { } {
 
     # Iterate through sets of options to find the compiler flags that
     # need to be added to the -march option.
-    foreach flags {"" "-mfloat-abi=softfp -mfpu=auto -march=armv8.1-m.main+mve" "-mfloat-abi=hard -mfpu=auto -march=armv8.1-m.main+mve"} {
+    foreach flags {"" "-mfloat-abi=softfp -mfpu=auto -mcpu=unset -march=armv8.1-m.main+mve" "-mfloat-abi=hard -mfpu=auto -mcpu=unset -march=armv8.1-m.main+mve"} {
 	if { [check_no_compiler_messages_nocache \
 		  arm_v8_1m_mve_ok object {
 	    #if !defined (__ARM_FEATURE_MVE)
@@ -6522,8 +6800,8 @@ proc check_effective_target_arm_v8_2a_i8mm_ok_nocache { } {
 	    #if !defined (__ARM_FEATURE_MATMUL_INT8)
 	    #error "__ARM_FEATURE_MATMUL_INT8 not defined"
 	    #endif
-	} "$flags -march=armv8.2-a+i8mm"] } {
-	    set et_arm_v8_2a_i8mm_flags "$flags -march=armv8.2-a+i8mm"
+	} "$flags -mcpu=unset -march=armv8.2-a+i8mm"] } {
+	    set et_arm_v8_2a_i8mm_flags "$flags -mcpu=unset -march=armv8.2-a+i8mm"
 	    return 1
 	}
     }
@@ -6567,8 +6845,8 @@ proc check_effective_target_arm_fp16fml_neon_ok_nocache { } {
 		{
 		  return vfmlal_high_f16 (r, a, b);
 		}
-	} "$flags -march=armv8.2-a+fp16fml"] } {
-	    set et_arm_fp16fml_neon_flags "$flags -march=armv8.2-a+fp16fml"
+	} "$flags -mcpu=unset -march=armv8.2-a+fp16fml"] } {
+	    set et_arm_fp16fml_neon_flags "$flags -mcpu=unset -march=armv8.2-a+fp16fml"
 	    return 1
 	}
     }
@@ -6606,8 +6884,8 @@ proc check_effective_target_arm_v8_2a_bf16_neon_ok_nocache { } {
 	    #if !defined (__ARM_FEATURE_BF16_VECTOR_ARITHMETIC)
 	    #error "__ARM_FEATURE_BF16_VECTOR_ARITHMETIC not defined"
 	    #endif
-	} "$flags -march=armv8.2-a+bf16"] } {
-	    set et_arm_v8_2a_bf16_neon_flags "$flags -march=armv8.2-a+bf16"
+	} "$flags -mcpu=unset -march=armv8.2-a+bf16"] } {
+	    set et_arm_v8_2a_bf16_neon_flags "$flags -mcpu=unset -march=armv8.2-a+bf16"
 	    return 1
 	}
     }
@@ -6674,8 +6952,8 @@ foreach { armfunc armflag armdef arminc } {
 		#endif
 		#include <arm_cde.h>
 		INC
-	    } "FLAG"] } {
-		    set et_FUNC_flags "FLAG"
+	    } "-mcpu=unset FLAG"] } {
+		    set et_FUNC_flags "-mcpu=unset FLAG"
 		    return 1
 	    }
 
@@ -7645,7 +7923,7 @@ proc check_effective_target_vect_shift { } {
     return [check_cached_effective_target_indexed vect_shift {
       expr {[istarget powerpc*-*-*]
 	     || [istarget ia64-*-*]
-	     || [istarget i?86-*-*] || [istarget x86_64-*-*]
+	     || [check_effective_target_x86]
 	     || [istarget aarch64*-*-*]
 	     || [is-effective-target arm_neon]
 	     || ([istarget mips*-*-*]
@@ -7664,7 +7942,7 @@ proc check_effective_target_vect_shift { } {
 
 proc check_effective_target_vect_var_shift { } {
     return [check_cached_effective_target_indexed vect_var_shift {
-      expr {(([istarget i?86-*-*] || [istarget x86_64-*-*])
+      expr {([check_effective_target_x86]
 	     && [check_avx2_available])
 	    || [istarget aarch64*-*-*]
 	    || ([istarget riscv*-*-*]
@@ -7675,7 +7953,7 @@ proc check_effective_target_vect_var_shift { } {
 }
 
 proc check_effective_target_whole_vector_shift { } {
-    if { [istarget i?86-*-*] || [istarget x86_64-*-*]
+    if { [check_effective_target_x86]
 	 || [istarget ia64-*-*]
 	 || [istarget aarch64*-*-*]
 	 || [istarget powerpc64*-*-*]
@@ -7716,7 +7994,7 @@ proc check_effective_target_vect_bswap { } {
 
 proc check_effective_target_vect_bool_cmp { } {
     return [check_cached_effective_target_indexed vect_bool_cmp {
-      expr { [istarget i?86-*-*] || [istarget x86_64-*-*]
+      expr { [check_effective_target_x86]
 	     || [istarget aarch64*-*-*]
 	     || [is-effective-target arm_neon]
 	     || ([istarget riscv*-*-*]
@@ -7731,7 +8009,7 @@ proc check_effective_target_vect_bool_cmp { } {
 proc check_effective_target_vect_char_add { } {
     return [check_cached_effective_target_indexed vect_char_add {
       expr {
-	 [istarget i?86-*-*] || [istarget x86_64-*-*]
+	 [check_effective_target_x86]
 	 || [istarget powerpc*-*-*]
 	 || [istarget amdgcn-*-*]
 	 || [istarget ia64-*-*]
@@ -7771,7 +8049,7 @@ proc check_effective_target_vect_shift_char { } {
 # This can change for different subtargets so do not cache the result.
 
 proc check_effective_target_vect_long { } {
-    if { [istarget i?86-*-*] || [istarget x86_64-*-*]
+    if { [check_effective_target_x86]
 	 || ([istarget powerpc*-*-*]
 	      && [check_effective_target_ilp32])
 	 || [is-effective-target arm_neon]
@@ -7802,7 +8080,7 @@ proc check_effective_target_vect_long { } {
 
 proc check_effective_target_vect_float { } {
     return [check_cached_effective_target_indexed vect_float {
-      expr { [istarget i?86-*-*] || [istarget x86_64-*-*]
+      expr { [check_effective_target_x86]
 	     || [istarget powerpc*-*-*]
 	     || [istarget mips-sde-elf]
 	     || [istarget mipsisa64*-*-*]
@@ -7834,8 +8112,8 @@ proc check_effective_target_vect_float_strict { } {
 
 proc check_effective_target_vect_double { } {
     return [check_cached_effective_target_indexed vect_double {
-	expr { (([istarget i?86-*-*] || [istarget x86_64-*-*])
-		 && [check_no_compiler_messages vect_double assembly {
+	expr { ([check_effective_target_x86]
+		&& [check_no_compiler_messages vect_double assembly {
 		  #ifdef __tune_atom__
 		  # error No double vectorizer support.
 		  #endif
@@ -7868,7 +8146,7 @@ proc check_effective_target_vect_double_cond_arith { } {
 
 proc check_effective_target_vect_long_long { } {
     return [check_cached_effective_target_indexed vect_long_long {
-      expr { [istarget i?86-*-*] || [istarget x86_64-*-*]
+      expr { [check_effective_target_x86]
 	     || ([istarget mips*-*-*]
 		 && [et-is-effective-target mips_msa])
 	     || ([istarget s390*-*-*]
@@ -7927,7 +8205,7 @@ proc check_effective_target_vect_perm { } {
       expr { [is-effective-target arm_neon]
 	     || [istarget aarch64*-*-*]
 	     || [istarget powerpc*-*-*]
-	     || [istarget i?86-*-*] || [istarget x86_64-*-*]
+	     || [check_effective_target_x86]
 	     || ([istarget mips*-*-*]
 		 && ([et-is-effective-target mpaired_single]
 		     || [et-is-effective-target mips_msa]))
@@ -8057,7 +8335,7 @@ proc check_effective_target_vect_perm_short { } {
 	     || ([istarget aarch64*-*-*]
 		 && [is-effective-target aarch64_little_endian])
 	     || [istarget powerpc*-*-*]
-	     || (([istarget i?86-*-*] || [istarget x86_64-*-*])
+	     || ([check_effective_target_x86]
 		 && [check_ssse3_available])
 	     || ([istarget mips*-*-*]
 		  && [et-is-effective-target mips_msa])
@@ -8085,7 +8363,7 @@ proc check_effective_target_vect_perm3_short { } {
 
 proc check_effective_target_xorsign { } {
     return [check_cached_effective_target_indexed xorsign {
-      expr { [istarget i?86-*-*] || [istarget x86_64-*-*]
+      expr { [check_effective_target_x86]
 	     || [istarget aarch64*-*-*] || [istarget arm*-*-*] }}]
 }
 
@@ -8097,8 +8375,8 @@ proc check_effective_target_xorsign { } {
 proc check_effective_target_ifn_copysign { } {
     return [check_cached_effective_target_indexed ifn_copysign {
       expr {
-	 (([istarget i?86-*-*] || [istarget x86_64-*-*])
-	   && [is-effective-target sse])
+	 ([check_effective_target_x86]
+	  && [is-effective-target sse])
 	 || ([istarget loongarch*-*-*]
 	     && [check_effective_target_hard_float])
 	 || [istarget powerpc*-*-*]
@@ -8209,7 +8487,7 @@ proc check_effective_target_vect_widen_mult_hi_to_si { } {
 		 || [istarget ia64-*-*]
 		 || ([istarget aarch64*-*-*]
 		     && ![check_effective_target_aarch64_sve])
-		 || [istarget i?86-*-*] || [istarget x86_64-*-*]
+		 || [check_effective_target_x86]
 		 || [is-effective-target arm_neon]
 		 || ([istarget s390*-*-*]
 		     && [check_effective_target_s390_vx]))
@@ -8242,7 +8520,7 @@ proc check_effective_target_vect_widen_mult_hi_to_si_pattern { } {
       expr { [istarget powerpc*-*-*]
 	     || [istarget ia64-*-*]
 	     || [istarget loongarch*-*-*]
-	     || [istarget i?86-*-*] || [istarget x86_64-*-*]
+	     || [check_effective_target_x86]
 	     || ([is-effective-target arm_neon]
 		 && [check_effective_target_arm_little_endian])
 	     || ([istarget s390*-*-*]
@@ -8258,7 +8536,7 @@ proc check_effective_target_vect_widen_mult_hi_to_si_pattern { } {
 proc check_effective_target_vect_widen_mult_si_to_di_pattern { } {
     return [check_cached_effective_target_indexed vect_widen_mult_si_to_di_pattern {
       expr { [istarget ia64-*-*]
-	     || [istarget i?86-*-*] || [istarget x86_64-*-*]
+	     || [check_effective_target_x86]
 	     || [istarget loongarch*-*-*]
 	     || ([istarget s390*-*-*]
 		 && [check_effective_target_s390_vx]) }}]
@@ -8333,7 +8611,7 @@ proc check_effective_target_vect_sdot_hi { } {
     return [check_cached_effective_target_indexed vect_sdot_hi {
       expr { [istarget powerpc*-*-*]
 	     || [istarget ia64-*-*]
-	     || [istarget i?86-*-*] || [istarget x86_64-*-*]
+	     || [check_effective_target_x86]
 	     || ([istarget mips*-*-*]
 		 && [et-is-effective-target mips_msa])
 	     || ([istarget riscv*-*-*]
@@ -8365,8 +8643,7 @@ proc check_effective_target_vect_udot_hi { } {
 
 proc check_effective_target_vect_usad_char { } {
     return [check_cached_effective_target_indexed vect_usad_char {
-      expr { [istarget i?86-*-*]
-	      || [istarget x86_64-*-*]
+      expr { [check_effective_target_x86]
 	      || ([istarget aarch64*-*-*]
 		  && ![check_effective_target_aarch64_sve])
 	      || ([istarget powerpc*-*-*]
@@ -8415,7 +8692,7 @@ proc check_effective_target_vect_sdiv_pow2_si {} {
 proc check_effective_target_vect_pack_trunc { } {
     return [check_cached_effective_target_indexed vect_pack_trunc {
       expr { [istarget powerpc*-*-*]
-	     || [istarget i?86-*-*] || [istarget x86_64-*-*]
+	     || [check_effective_target_x86]
 	     || [istarget aarch64*-*-*]
 	     || ([istarget arm*-*-*] && [check_effective_target_arm_neon_ok]
 		 && [check_effective_target_arm_little_endian])
@@ -8438,7 +8715,7 @@ proc check_effective_target_vect_pack_trunc { } {
 proc check_effective_target_vect_unpack { } {
     return [check_cached_effective_target_indexed vect_unpack {
       expr { [istarget powerpc*-*-*]
-	     || [istarget i?86-*-*] || [istarget x86_64-*-*]
+	     || [check_effective_target_x86]
 	     || [istarget ia64-*-*]
 	     || [istarget aarch64*-*-*]
 	     || ([istarget mips*-*-*]
@@ -8486,7 +8763,7 @@ proc check_effective_target_vect_no_align { } {
 
 proc check_effective_target_vect_hw_misalign { } {
     return [check_cached_effective_target_indexed vect_hw_misalign {
-	if { [istarget i?86-*-*] || [istarget x86_64-*-*]
+	if { [check_effective_target_x86]
 	     || ([istarget powerpc*-*-*] && [check_p8vector_hw_available])
 	     || [istarget aarch64*-*-*]
 	     || ([istarget mips*-*-*] && [et-is-effective-target mips_msa])
@@ -8515,7 +8792,7 @@ proc check_effective_target_vect_hw_misalign { } {
 
 proc check_effective_target_vect_aligned_arrays { } {
     set et_vect_aligned_arrays 0
-    if { (([istarget i?86-*-*] || [istarget x86_64-*-*])
+    if { ([check_effective_target_x86]
 	  && !([is-effective-target ia32]
 	       || ([check_avx_available] && ![check_prefer_avx128]))) } {
 	set et_vect_aligned_arrays 1
@@ -9127,7 +9404,7 @@ proc check_effective_target_vect_condition { } {
       expr { [istarget aarch64*-*-*]
 	     || [istarget powerpc*-*-*]
 	     || [istarget ia64-*-*]
-	     || [istarget i?86-*-*] || [istarget x86_64-*-*]
+	     || [check_effective_target_x86]
 	     || ([istarget mips*-*-*]
 		 && [et-is-effective-target mips_msa])
 	     || ([istarget arm*-*-*]
@@ -9146,7 +9423,7 @@ proc check_effective_target_vect_condition { } {
 
 proc check_effective_target_vect_cond_mixed { } {
     return [check_cached_effective_target_indexed vect_cond_mixed {
-      expr { [istarget i?86-*-*] || [istarget x86_64-*-*]
+      expr { [check_effective_target_x86]
 	     || [istarget aarch64*-*-*]
 	     || [istarget powerpc*-*-*]
 	     || ([istarget arm*-*-*]
@@ -9168,7 +9445,7 @@ proc check_effective_target_vect_char_mult { } {
     return [check_cached_effective_target_indexed vect_char_mult {
       expr { [istarget aarch64*-*-*]
 	     || [istarget ia64-*-*]
-	     || [istarget i?86-*-*] || [istarget x86_64-*-*]
+	     || [check_effective_target_x86]
 	     || [check_effective_target_arm32]
 	     || [check_effective_target_powerpc_altivec]
 	     || ([istarget mips*-*-*]
@@ -9187,7 +9464,7 @@ proc check_effective_target_vect_char_mult { } {
 proc check_effective_target_vect_short_mult { } {
     return [check_cached_effective_target_indexed vect_short_mult {
       expr { [istarget ia64-*-*]
-	     || [istarget i?86-*-*] || [istarget x86_64-*-*]
+	     || [check_effective_target_x86]
 	     || [istarget powerpc*-*-*]
 	     || [istarget aarch64*-*-*]
 	     || [check_effective_target_arm32]
@@ -9208,7 +9485,7 @@ proc check_effective_target_vect_short_mult { } {
 proc check_effective_target_vect_int_mult { } {
     return [check_cached_effective_target_indexed vect_int_mult {
       expr { [istarget powerpc*-*-*]
-	     || [istarget i?86-*-*] || [istarget x86_64-*-*]
+	     || [check_effective_target_x86]
 	     || [istarget ia64-*-*]
 	     || [istarget aarch64*-*-*]
 	     || ([istarget mips*-*-*]
@@ -9229,7 +9506,7 @@ proc check_effective_target_vect_int_mult { } {
 # This can change for different subtargets so do not cache the result.
 
 proc check_effective_target_vect_long_mult { } {
-    if { [istarget i?86-*-*] || [istarget x86_64-*-*]
+    if { [check_effective_target_x86]
 	 || ([istarget powerpc*-*-*]
 	      && ([check_effective_target_ilp32]
 		  || ([check_effective_target_powerpc_vsx_ok]
@@ -9262,7 +9539,7 @@ proc check_effective_target_vect_extract_even_odd { } {
       expr { [istarget aarch64*-*-*]
 	     || [istarget powerpc*-*-*]
 	     || [is-effective-target arm_neon]
-	     || [istarget i?86-*-*] || [istarget x86_64-*-*]
+	     || [check_effective_target_x86]
 	     || [istarget ia64-*-*]
 	     || ([istarget mips*-*-*]
 		 && ([et-is-effective-target mips_msa]
@@ -9282,7 +9559,7 @@ proc check_effective_target_vect_interleave { } {
       expr { [istarget aarch64*-*-*]
 	     || [istarget powerpc*-*-*]
 	     || [is-effective-target arm_neon]
-	     || [istarget i?86-*-*] || [istarget x86_64-*-*]
+	     || [check_effective_target_x86]
 	     || [istarget ia64-*-*]
 	     || ([istarget mips*-*-*]
 		 && ([et-is-effective-target mpaired_single]
@@ -9334,7 +9611,7 @@ proc available_vector_sizes { } {
     } elseif { [istarget arm*-*-*]
 		&& [check_effective_target_arm_neon_ok] } {
 	lappend result 128 64
-    } elseif { [istarget i?86-*-*] || [istarget x86_64-*-*] } {
+    } elseif { [check_effective_target_x86] } {
 	if { [check_avx_available] && ![check_prefer_avx128] } {
 	    lappend result 256
 	}
@@ -9412,7 +9689,7 @@ proc check_effective_target_vect32 { } {
 
 proc check_effective_target_vect_call_copysignf { } {
     return [check_cached_effective_target_indexed vect_call_copysignf {
-      expr { [istarget i?86-*-*] || [istarget x86_64-*-*]
+      expr { [check_effective_target_x86]
 	     || [istarget powerpc*-*-*]
 	     || [istarget aarch64*-*-*]
 	     || [istarget amdgcn-*-*]
@@ -9426,7 +9703,7 @@ proc check_effective_target_vect_call_copysignf { } {
 
 proc check_effective_target_sqrt_insn { } {
     return [check_cached_effective_target sqrt_insn {
-      expr { [istarget i?86-*-*] || [istarget x86_64-*-*]
+      expr { [check_effective_target_x86]
 	     || [check_effective_target_powerpc_sqrt]
 	     || [istarget aarch64*-*-*]
 	     || ([istarget arm*-*-*] && [check_effective_target_arm_vfp_ok])
@@ -9452,7 +9729,7 @@ proc add_options_for_sqrt_insn { flags } {
 proc check_effective_target_vect_call_sqrtf { } {
     return [check_cached_effective_target_indexed vect_call_sqrtf {
       expr { [istarget aarch64*-*-*]
-	     || [istarget i?86-*-*] || [istarget x86_64-*-*]
+	     || [check_effective_target_x86]
 	     || ([istarget powerpc*-*-*] && [check_vsx_hw_available])
 	     || ([istarget s390*-*-*]
 		 && [check_effective_target_s390_vx])
@@ -9467,7 +9744,7 @@ proc check_effective_target_vect_call_sqrtf { } {
 
 proc check_effective_target_vect_call_lrint { } {
     set et_vect_call_lrint 0
-    if { (([istarget i?86-*-*] || [istarget x86_64-*-*])
+    if { ([check_effective_target_x86]
 	  && [check_effective_target_ilp32])
 	 || [istarget amdgcn-*-*]
 	 || [istarget loongarch*-*-*] } {
@@ -9483,8 +9760,7 @@ proc check_effective_target_vect_call_lrint { } {
 proc check_effective_target_vect_call_btrunc { } {
     return [check_cached_effective_target_indexed vect_call_btrunc {
       expr { [istarget aarch64*-*-*]
-	     || [istarget amdgcn-*-*]
-	     || [istarget loongarch*-*-*] }}]
+	     || [istarget amdgcn-*-*] }}]
 }
 
 # Return 1 if the target supports vector btruncf calls.
@@ -9492,8 +9768,7 @@ proc check_effective_target_vect_call_btrunc { } {
 proc check_effective_target_vect_call_btruncf { } {
     return [check_cached_effective_target_indexed vect_call_btruncf {
       expr { [istarget aarch64*-*-*]
-	     || [istarget amdgcn-*-*]
-	     || [istarget loongarch*-*-*] }}]
+	     || [istarget amdgcn-*-*] }}]
 }
 
 # Return 1 if the target supports vector ceil calls.
@@ -9501,8 +9776,7 @@ proc check_effective_target_vect_call_btruncf { } {
 proc check_effective_target_vect_call_ceil { } {
     return [check_cached_effective_target_indexed vect_call_ceil {
       expr { [istarget aarch64*-*-*]
-	     || [istarget amdgcn-*-*]
-	     || [istarget loongarch*-*-*] }}]
+	     || [istarget amdgcn-*-*] }}]
 }
 
 # Return 1 if the target supports vector ceilf calls.
@@ -9510,8 +9784,7 @@ proc check_effective_target_vect_call_ceil { } {
 proc check_effective_target_vect_call_ceilf { } {
     return [check_cached_effective_target_indexed vect_call_ceilf {
       expr { [istarget aarch64*-*-*]
-	     || [istarget amdgcn-*-*]
-	     || [istarget loongarch*-*-*] }}]
+	     || [istarget amdgcn-*-*] }}]
 }
 
 # Return 1 if the target supports vector floor calls.
@@ -9519,8 +9792,7 @@ proc check_effective_target_vect_call_ceilf { } {
 proc check_effective_target_vect_call_floor { } {
     return [check_cached_effective_target_indexed vect_call_floor {
       expr { [istarget aarch64*-*-*]
-	     || [istarget amdgcn-*-*]
-	     || [istarget loongarch*-*-*] }}]
+	     || [istarget amdgcn-*-*] }}]
 }
 
 # Return 1 if the target supports vector floorf calls.
@@ -9528,24 +9800,21 @@ proc check_effective_target_vect_call_floor { } {
 proc check_effective_target_vect_call_floorf { } {
     return [check_cached_effective_target_indexed vect_call_floorf {
       expr { [istarget aarch64*-*-*]
-	     || [istarget amdgcn-*-*]
-	     || [istarget loongarch*-*-*] }}]
+	     || [istarget amdgcn-*-*] }}]
 }
 
 # Return 1 if the target supports vector lceil calls.
 
 proc check_effective_target_vect_call_lceil { } {
     return [check_cached_effective_target_indexed vect_call_lceil {
-      expr { [istarget aarch64*-*-*]
-	     || [istarget loongarch*-*-*] }}]
+      expr { [istarget aarch64*-*-*] }}]
 }
 
 # Return 1 if the target supports vector lfloor calls.
 
 proc check_effective_target_vect_call_lfloor { } {
     return [check_cached_effective_target_indexed vect_call_lfloor {
-      expr { [istarget aarch64*-*-*]
-	     || [istarget loongarch*-*-*] }}]
+      expr { [istarget aarch64*-*-*] }}]
 }
 
 # Return 1 if the target supports vector nearbyint calls.
@@ -9583,7 +9852,7 @@ proc check_effective_target_vect_logical_reduc { } {
 		   || [istarget amdgcn-*-*]
 		   || [check_effective_target_riscv_v]
 		   || [check_effective_target_loongarch_sx]
-		   || [istarget i?86-*-*] || [istarget x86_64-*-*]}]
+		   || [check_effective_target_x86]}]
 }
 
 # Return 1 if the target supports the fold_extract_last optab.
@@ -9624,7 +9893,7 @@ proc check_effective_target_sync_int_128_runtime { } {
 # Note: 32bit s390 targets require -mzarch in dg-options.
 
 proc check_effective_target_sync_long_long { } {
-    if { [istarget i?86-*-*] || [istarget x86_64-*-*]
+    if { [check_effective_target_x86]
 	 || [istarget aarch64*-*-*]
 	 || [istarget arm*-*-*]
 	 || [istarget alpha*-*-*]
@@ -9742,7 +10011,7 @@ proc check_effective_target_ctzll { } {
 # Note: 32bit x86 targets require -march=pentium in dg-options.
 
 proc check_effective_target_sync_long_long_runtime { } {
-    if { (([istarget x86_64-*-*] || [istarget i?86-*-*])
+    if { ([check_effective_target_x86]
 	  && [check_cached_effective_target sync_long_long_available {
 	      check_runtime_nocache sync_long_long_available {
 		  #include "cpuid.h"
@@ -9791,7 +10060,7 @@ proc check_effective_target_bswap { } {
     return [check_cached_effective_target bswap {
       expr { [istarget aarch64*-*-*]
 	     || [istarget alpha*-*-*]
-	     || [istarget i?86-*-*] || [istarget x86_64-*-*]
+	     || [check_effective_target_x86]
 	     || [istarget m68k-*-*]
 	     || [istarget powerpc*-*-*]
 	     || [istarget rs6000-*-*]
@@ -9819,7 +10088,7 @@ proc check_effective_target_sync_int_long { } {
 # load-reserved/store-conditional instructions.
     return [check_cached_effective_target sync_int_long {
       expr { [istarget ia64-*-*]
-	     || [istarget i?86-*-*] || [istarget x86_64-*-*]
+	     || [check_effective_target_x86]
 	     || [istarget aarch64*-*-*]
 	     || [istarget alpha*-*-*]
 	     || [istarget arm*-*-linux-*]
@@ -9856,7 +10125,7 @@ proc check_effective_target_sync_char_short { } {
     return [check_cached_effective_target sync_char_short {
       expr { [istarget aarch64*-*-*]
 	     || [istarget ia64-*-*]
-	     || [istarget i?86-*-*] || [istarget x86_64-*-*]
+	     || [check_effective_target_x86]
 	     || [istarget alpha*-*-*]
 	     || [istarget arm*-*-linux-*]
 	     || [istarget arm*-*-uclinuxfdpiceabi]
@@ -9869,6 +10138,9 @@ proc check_effective_target_sync_char_short { } {
 	     || ([istarget sparc*-*-*] && [check_effective_target_sparc_v9])
 	     || ([istarget arc*-*-*] && [check_effective_target_arc_atomic])
 	     || [istarget loongarch*-*-*]
+	     || ([istarget riscv*-*-*]
+		 && ([check_effective_target_riscv_zalrsc]
+		     || [check_effective_target_riscv_zabha]))
 	     || [check_effective_target_mips_llsc] }}]
 }
 
@@ -10450,7 +10722,7 @@ proc check_effective_target_4byte_wchar_t { } {
 
 proc check_effective_target_automatic_stack_alignment  { } {
     # Ordinarily x86 supports automatic stack alignment ...
-    if { [istarget i?86*-*-*] || [istarget x86_64-*-*] } then {
+    if { [check_effective_target_x86] } then {
 	if { [istarget *-*-mingw*] || [istarget *-*-cygwin*] } {
 	    # ... except Win64 SEH doesn't.  Succeed for Win32 though.
 	    return [check_effective_target_ilp32];
@@ -10572,7 +10844,7 @@ proc check_effective_target_avx512f { } {
 # Return 1 if avx instructions can be compiled.
 
 proc check_effective_target_avx { } {
-    if { !([istarget i?86-*-*] || [istarget x86_64-*-*]) } {
+    if { ![check_effective_target_x86] } {
 	return 0
     }
     return [check_no_compiler_messages avx object {
@@ -10746,19 +11018,19 @@ proc check_effective_target_apxf { } {
     } "-mapxf" ]
 }
 
-# Return 1 if avx10.2 instructions can be compiled.
-proc check_effective_target_avx10_2 { } {
-    return [check_no_compiler_messages avx10.2 object {
+# Return 1 if avx10.2-256 instructions can be compiled.
+proc check_effective_target_avx10_2_256 { } {
+    return [check_no_compiler_messages avx10.2-256 object {
 	void
 	foo ()
 	{
 	  __asm__ volatile ("vdpphps\t%ymm4, %ymm5, %ymm6");
 	  __asm__ volatile ("vcvthf82ph\t%xmm5, %ymm6");
-	  __asm__ volatile ("vaddnepbf16\t%ymm4, %ymm5, %ymm6");
+	  __asm__ volatile ("vaddbf16\t%ymm4, %ymm5, %ymm6");
 	  __asm__ volatile ("vcvtph2ibs\t%ymm5, %ymm6");
 	  __asm__ volatile ("vminmaxpd\t$123, %ymm4, %ymm5, %ymm6");
 	}
-    } "-mavx10.2" ]
+    } "" ]
 }
 
 # Return 1 if avx10.2-512 instructions can be compiled.
@@ -10769,11 +11041,11 @@ proc check_effective_target_avx10_2_512 { } {
 	{
 	  __asm__ volatile ("vdpphps\t%zmm4, %zmm5, %zmm6");
 	  __asm__ volatile ("vcvthf82ph\t%ymm5, %zmm6");
-	  __asm__ volatile ("vaddnepbf16\t%zmm4, %zmm5, %zmm6");
+	  __asm__ volatile ("vaddbf16\t%zmm4, %zmm5, %zmm6");
 	  __asm__ volatile ("vcvtph2ibs\t%zmm5, %zmm6");
 	  __asm__ volatile ("vminmaxpd\t$123, %zmm4, %zmm5, %zmm6");
 	}
-    } "-mavx10.2-512" ]
+    } "" ]
 }
 
 # Return 1 if amx-avx512 instructions can be compiled.
@@ -11169,7 +11441,7 @@ proc check_effective_target_avx512bw { } {
 
 # Return 1 if -Wa,-march=+noavx512bw is supported.
 proc check_effective_target_assembler_march_noavx512bw {} {
-    if { [istarget i?86*-*-*] || [istarget x86_64*-*-*] } {
+    if { [check_effective_target_x86] } {
 	return [check_no_compiler_messages assembler_march_noavx512bw object {
 	    void foo (void) {}
 	} "-mno-avx512bw -Wa,-march=+noavx512bw"]
@@ -11925,7 +12197,7 @@ proc check_vect_support_and_set_flags { } {
 	    }
 	    set dg-do-what-default compile
 	}
-    } elseif { [istarget i?86-*-*] || [istarget x86_64-*-*] } {
+    } elseif { [check_effective_target_x86] } {
 	lappend DEFAULT_VECTCFLAGS "-msse2"
 	if { [check_effective_target_sse2_runtime] } {
 	    set dg-do-what-default run
@@ -12009,12 +12281,16 @@ proc check_vect_support_and_set_flags { } {
 	    if [check_effective_target_riscv_v_misalign_ok] {
 		lappend DEFAULT_VECTCFLAGS "-mno-vector-strict-align"
 	    }
-	} else {
+	} elseif [check_effective_target_riscv_v_ok] {
 	    foreach item [add_options_for_riscv_v ""] {
 		lappend DEFAULT_VECTCFLAGS $item
 	    }
 	    set dg-do-what-default compile
-	}
+	} else {
+	    # Current architecture cannot support vectors (e.g. the
+	    # dependent D extension is missing).
+	    return 0
+        }
     } elseif [istarget loongarch*-*-*] {
       # Set the default vectorization option to "-mlsx" due to the problem
       # of non-aligned memory access when using 256-bit vectorization.
@@ -12086,7 +12362,10 @@ proc check_effective_target_aarch64_tiny { } {
 
 foreach { aarch64_ext } { "fp" "simd" "crypto" "crc" "lse" "dotprod" "sve"
 			  "i8mm" "f32mm" "f64mm" "bf16" "sb" "sve2" "ls64"
-			  "sme" "sme-i16i64" "sme2" } {
+			  "lut" "sme" "sme-i16i64" "sme2" "sve-b16b16"
+			  "sme-b16b16" "sme-f16f16" "sme2p1" "fp8" "fp8fma"
+			  "ssve-fp8fma" "fp8dot2" "ssve-fp8dot2" "fp8dot4"
+			  "ssve-fp8dot4"} {
     eval [string map [list FUNC $aarch64_ext] {
 	proc check_effective_target_aarch64_asm_FUNC_ok { } {
 	  if { [istarget aarch64*-*-*] } {
@@ -12098,6 +12377,16 @@ foreach { aarch64_ext } { "fp" "simd" "crypto" "crc" "lse" "dotprod" "sve"
 	  }
 	}
     }]
+}
+
+proc check_effective_target_aarch64_asm_sve2p1_ok { } {
+    if { [istarget aarch64*-*-*] } {
+	return [check_no_compiler_messages aarch64_sve2p1_assembler object {
+	    __asm__ (".arch_extension sve2p1; ld1w {z0.q},p7/z,[x0]");
+	} "-march=armv8-a+sve2p1"]
+    } else {
+	return 0
+    }
 }
 
 proc check_effective_target_aarch64_small { } {
@@ -12314,32 +12603,32 @@ proc check_effective_target_fenv_exceptions_long_double {} {
     } [add_options_for_ieee "-std=gnu99"]]
 }
 
-# Return 1 if -fexceptions is supported.
+# Check whether the target supports exception handling.
+# Note that this is orthogonal to effective-target 'exceptions_enabled'.
 
 proc check_effective_target_exceptions {} {
-    if { [istarget amdgcn*-*-*] } {
+    if { [istarget amdgcn*-*-*]
+	 || [istarget bpf-*-*]
+	 || [istarget nvptx-*-*] } {
 	return 0
     }
     return 1
 }
 
-# Used to check if the testing configuration supports exceptions.
-# Returns 0 if exceptions are unsupported or disabled (e.g. by passing
-# -fno-exceptions). Returns 1 if exceptions are enabled.
+# Check whether the testing configuration has exception handling enabled.
+# Returns 0 if exception handling is disabled (e.g. by passing
+# -fno-exceptions). Returns 1 if exception handling is enabled.
+# Note that this is orthogonal to effective-target 'exceptions'.
+
 proc check_effective_target_exceptions_enabled {} {
     return [check_cached_effective_target exceptions_enabled {
-	if { [check_effective_target_exceptions] } {
-	    return [check_no_compiler_messages exceptions_enabled assembly {
-		// C++
-		void foo (void)
-		{
-		    throw 1;
-		}
-	    }]
-	} else {
-	    # If exceptions aren't supported, then they're not enabled.
-	    return 0
-	}
+	return [check_no_compiler_messages exceptions_enabled assembly {
+	    // C++
+	    void foo (void)
+	    {
+		throw 1;
+	    }
+	}]
     }]
 }
 
@@ -12370,7 +12659,7 @@ proc check_effective_target_branch_cost {} {
 	 || [istarget csky*-*-*]
 	 || [istarget epiphany*-*-*]
 	 || [istarget frv*-*-*]
-	 || [istarget i?86-*-*] || [istarget x86_64-*-*]
+	 || [check_effective_target_x86]
 	 || [istarget loongarch*-*-*]
 	 || [istarget mips*-*-*]
 	 || [istarget s390*-*-*]
@@ -12427,7 +12716,7 @@ proc check_effective_target_pie_copyreloc { } {
     global tool
     global GCC_UNDER_TEST
 
-    if { !([istarget i?86-*-*] || [istarget x86_64-*-*]) } {
+    if { ![check_effective_target_x86] } {
 	return 0
     }
 
@@ -12474,7 +12763,7 @@ proc check_effective_target_code_6_gottpoff_reloc { } {
     global tool
     global GCC_UNDER_TEST
 
-    if { !([istarget i?86-*-*] || [istarget x86_64-*-*]) } {
+    if { ![check_effective_target_x86] } {
 	return 0
     }
 
@@ -12522,7 +12811,7 @@ proc check_effective_target_got32x_reloc { } {
     global tool
     global GCC_UNDER_TEST
 
-    if { !([istarget i?86-*-*] || [istarget x86_64-*-*]) } {
+    if { ![check_effective_target_x86] } {
 	return 0
     }
 
@@ -12570,7 +12859,7 @@ proc check_effective_target_tls_get_addr_via_got { } {
     global tool
     global GCC_UNDER_TEST
 
-    if { !([istarget i?86-*-*] || [istarget x86_64-*-*]) } {
+    if { ![check_effective_target_x86] } {
 	return 0
     }
 
@@ -12728,6 +13017,22 @@ proc check_effective_target_s390_vxe2 { } {
     } "-march=arch13 -mzarch" ]
 }
 
+# Same as above but for the arch15 vector enhancement facility. Test
+# is performed with the vector divide instruction.
+proc check_effective_target_s390_vxe3 { } {
+    if ![istarget s390*-*-*] then {
+	return 0;
+    }
+
+    return [check_runtime s390_check_vxe3 {
+	int main (void)
+	{
+	    asm ("vd %%v24, %%v26, %%v28, 2, 0" : : : "v24", "v26", "v28");
+	    return 0;
+	}
+    } "-march=arch15 -mzarch" ]
+}
+
 # Same as above but for the arch14 NNPA facility.
 proc check_effective_target_s390_nnpa { } {
     if ![istarget s390*-*-*] then {
@@ -12762,7 +13067,7 @@ proc check_effective_target_divmod { } {
     #TODO: Add checks for all targets that have either hardware divmod insn
     # or define libfunc for divmod.
     if { [istarget arm*-*-*]
-	 || [istarget i?86-*-*] || [istarget x86_64-*-*]
+	 || [check_effective_target_x86]
 	 || [istarget amdgcn-*-*] } {
 	return 1
     }
@@ -12918,7 +13223,7 @@ proc check_effective_target_autoincdec { } {
 #
 proc check_effective_target_supports_stack_clash_protection { } {
 
-    if { [istarget x86_64-*-*] || [istarget i?86-*-*]
+    if { [check_effective_target_x86] 
 	  || [istarget powerpc*-*-*] || [istarget rs6000*-*-*]
 	  || [istarget aarch64*-**] || [istarget s390*-*-*]
 	  || [istarget loongarch64*-**] || [istarget riscv64*-**] } {
@@ -12931,7 +13236,7 @@ proc check_effective_target_supports_stack_clash_protection { } {
 # Note we ignore cases where we apply tail call optimization here.
 proc check_effective_target_frame_pointer_for_non_leaf { } {
   # Solaris/x86 defaults to -fno-omit-frame-pointer.
-  if { [istarget i?86-*-solaris*] || [istarget x86_64-*-solaris*] } {
+  if { [check_effective_target_x86] && [istarget *-*-solaris*] } {
     return 1
   }
 
@@ -12942,7 +13247,7 @@ proc check_effective_target_frame_pointer_for_non_leaf { } {
 # most trivial type.
 proc check_effective_target_tail_call { } {
     return [check_no_messages_and_pattern tail_call ",SIBCALL" rtl-expand {
-	__attribute__((__noipa__)) void foo (void) { }
+	__attribute__((__noipa__)) void foo (void);
 	__attribute__((__noipa__)) void bar (void) { foo(); }
     } {-O2 -fdump-rtl-expand-all}] ;# The "SIBCALL" note requires a detailed dump.
 }
@@ -12952,7 +13257,7 @@ proc check_effective_target_tail_call { } {
 # is supported at -O0.
 proc check_effective_target_musttail { } {
     return [check_no_messages_and_pattern musttail ",SIBCALL" rtl-expand {
-	__attribute__((__noipa__)) void foo (void) { }
+	__attribute__((__noipa__)) void foo (void);
 	__attribute__((__noipa__)) void bar (void) { [[gnu::musttail]] return foo(); }
     } {-fdump-rtl-expand-all}] ;# The "SIBCALL" note requires a detailed dump.
 }
@@ -12983,7 +13288,7 @@ proc check_effective_target_caller_implicit_probes { } {
 
   # On x86/x86_64 the call instruction itself pushes the return
   # address onto the stack.  That is an implicit probe of *sp.
-  if { [istarget x86_64-*-*] || [istarget i?86-*-*] } {
+  if { [check_effective_target_x86] } {
 	return 1
   }
 
@@ -13026,7 +13331,7 @@ proc check_effective_target_caller_implicit_probes { } {
 # stack allocations and make it difficult to elimination loops or residual
 # allocations for dynamic stack allocations
 proc check_effective_target_callee_realigns_stack { } {
-  if { [istarget x86_64-*-*] || [istarget i?86-*-*] } {
+  if { [check_effective_target_x86] } {
 	return 1
   }
   return 0
@@ -13034,7 +13339,7 @@ proc check_effective_target_callee_realigns_stack { } {
 
 # Return 1 if CET instructions can be compiled.
 proc check_effective_target_cet { } {
-    if { !([istarget i?86-*-*] || [istarget x86_64-*-*]) } {
+    if { ![check_effective_target_x86] } {
 	return 0
     }
     return [check_no_compiler_messages cet object {
@@ -13079,8 +13384,8 @@ proc check_effective_target_arm_v8_3a_complex_neon_ok_nocache { } {
 	    #if !defined (__ARM_FEATURE_COMPLEX)
 	    #error "__ARM_FEATURE_COMPLEX not defined"
 	    #endif
-	} "$flags -march=armv8.3-a"] } {
-	    set et_arm_v8_3a_complex_neon_flags "$flags -march=armv8.3-a"
+	} "$flags -mcpu=unset -march=armv8.3-a"] } {
+	    set et_arm_v8_3a_complex_neon_flags "$flags -mcpu=unset -march=armv8.3-a"
 	    return 1;
 	}
     }
@@ -13121,9 +13426,9 @@ proc check_effective_target_arm_v8_3a_fp16_complex_neon_ok_nocache { } {
 	    #if !defined (__ARM_FEATURE_COMPLEX)
 	    #error "__ARM_FEATURE_COMPLEX not defined"
 	    #endif
-	} "$flags -march=armv8.3-a+fp16"] } {
+	} "$flags -mcpu=unset -march=armv8.3-a+fp16"] } {
 	    set et_arm_v8_3a_fp16_complex_neon_flags \
-			"$flags -march=armv8.3-a+fp16"
+			"$flags -mcpu=unset -march=armv8.3-a+fp16"
 	    return 1;
 	}
     }
@@ -13209,7 +13514,7 @@ proc check_effective_target_arm_v8_1_lob_ok { } {
 		  asm goto ("le lr, %l0" : : : "lr" : loop);
 		  return i != 10;
 		}
-	} "-mcpu=unset -march=armv8.1-m.main -mthumb" ]
+	} "-mcpu=unset -mcpu=unset -march=armv8.1-m.main -mthumb" ]
     }
 }
 
@@ -13288,8 +13593,8 @@ proc check_effective_target_llvm_binutils { } {
 # Return 1 if the compiler supports '-mfentry'.
 
 proc check_effective_target_mfentry { } {
-    if { !([istarget i?86-*-*] || [istarget x86_64-*-*]) } {
-	return 0
+    if { ![check_effective_target_x86] } {
+        return 0
     }
     return [check_no_compiler_messages mfentry object {
 		void foo (void) { }
@@ -13541,7 +13846,7 @@ proc check_effective_target_powerpc_as_p10_htm { } {
 
 proc check_effective_target_lra { } {
     # Start with heavily used targets which are known to always use LRA.
-    if { [istarget i?86-*-*] || [istarget x86_64-*-*]
+    if { [check_effective_target_x86]
 	 || [istarget aarch64*-*-*] || [istarget arm*-*-*]
 	 || [istarget powerpc*-*-*] || [istarget riscv*-*-*] } {
 	return 1
@@ -13847,10 +14152,9 @@ proc dg-require-python-h { args } {
 # Return 1 if the target supports heap-trampoline, 0 otherwise.
 proc check_effective_target_heap_trampoline {} {
     if { [istarget aarch64*-*-linux*]
-	 || [istarget i?86-*-darwin*]
-	 || [istarget x86_64-*-darwin*]
-	 || [istarget i?86-*-linux*]
-	 || [istarget x86_64-*-linux*] } {
+	 || ([check_effective_target_x86]
+	     && ([istarget *-*-darwin*]
+		 || [istarget *-*-linux*])) } {
 	return 1
     }
     return 0
@@ -13899,6 +14203,45 @@ proc check_effective_target_nvptx_default_ptx_isa_version_at_least_6_0 { } {
     return [check_nvptx_default_ptx_isa_version_at_least 6 0]
 }
 
+# Return 1 if nvptx code by default compiles for at least the specified PTX ISA
+# target architecture.
+
+proc check_nvptx_default_ptx_isa_target_architecture_at_least { ta } {
+    set name nvptx_default_ptx_isa_target_architecture_at_least_${ta}
+
+    if [regexp {^sm_(\d+)$} $ta dummy ptx_sm] {
+	set ptx_sm "${ptx_sm}0"
+    } else {
+	error "check_nvptx_default_ptx_isa_target_architecture_at_least: illegal argument: $ta"
+    }
+
+    set supported_p \
+	[concat \
+	     "(__PTX_SM__ >= $ptx_sm)"]
+
+    set src \
+	[list \
+	     "#if $supported_p" \
+	     "#else" \
+	     "#error unsupported" \
+	     "#endif"]
+    set src [join $src "\n"]
+    
+    set res [check_no_compiler_messages $name assembly $src ""]
+
+    return $res
+}
+
+# Return 1 if nvptx '-msoft-stack' is enabled.
+
+proc check_effective_target_nvptx_softstack { } {
+    return [check_no_compiler_messages nvptx_softstack assembly {
+	#if !defined(__nvptx_softstack__)
+	#error !__nvptx_softstack__
+	#endif
+    }]
+}
+
 # Return 1 if nvptx code with PTX ISA version major.minor or higher can be run.
 
 proc check_nvptx_runtime_ptx_isa_version_at_least { major minor } {
@@ -13921,11 +14264,40 @@ proc check_nvptx_runtime_ptx_isa_version_at_least { major minor } {
     return $res
 }
 
+# Return 1 if nvptx code with the specified PTX ISA target architecture or
+# higher can be run.
+
+proc check_nvptx_runtime_ptx_isa_target_architecture_at_least { ta } {
+    set name nvptx_runtime_ptx_isa_target_architecture_${ta}
+
+    set default \
+	[check_nvptx_default_ptx_isa_target_architecture_at_least ${ta}]
+
+    if { $default } {
+	set flag ""
+    } else {
+	set flag "-march=$ta -mptx=_"
+    }
+
+    set res [check_runtime $name {
+	int main (void) { return 0; }
+    } $flag]
+
+    return $res
+}
+
 # Return 1 if the nvptx runtime environment supports the PTX ISA directive
 # '.alias'.
 
 proc check_effective_target_nvptx_runtime_alias_ptx { } {
     return [check_nvptx_runtime_ptx_isa_version_at_least 6 3]
+}
+
+# Return 1 if the nvptx runtime environment supports PTX 'alloca'.
+
+proc check_effective_target_nvptx_runtime_alloca_ptx { } {
+    return [expr { [check_nvptx_runtime_ptx_isa_version_at_least 7 3]
+		   && [check_nvptx_runtime_ptx_isa_target_architecture_at_least sm_52] }]
 }
 
 # Add options to enable nvptx using the PTX ISA directive '.alias'.
@@ -13938,4 +14310,57 @@ proc add_options_for_nvptx_alias_ptx { flags } {
     }
 
     return $flags
+}
+
+# Add options to enable nvptx using PTX 'alloca'.
+
+proc add_options_for_nvptx_alloca_ptx { flags } {
+    # We don't add '-mno-soft-stack' here; the users should take care of that
+    # explicitly.
+
+    if { ![check_nvptx_default_ptx_isa_version_at_least 7 3] } {
+	append flags " -mptx=7.3"
+    }
+
+    if { ![check_nvptx_default_ptx_isa_target_architecture_at_least sm_52] } {
+	append flags " -march=sm_52"
+    }
+
+    return $flags
+}
+
+# Return true if alarm is supported on the target.
+
+proc check_effective_target_alarm { } {
+    if { ![check_effective_target_signal] } {
+	return 0
+    }
+
+    return [check_no_compiler_messages alarm executable {
+	#include <signal.h>
+	#include <stdlib.h>
+	#include <unistd.h>
+	void do_exit(int i) { exit (0); }
+	int main (void) { 
+	  struct sigaction s;
+	  sigemptyset (&s.sa_mask);
+	  s.sa_handler = exit;
+	  s.sa_flags = 0;
+	  sigaction (SIGALRM, &s, NULL);
+	  alarm (1);
+
+	  /* Infinite loop to simulate work...  */
+	  while (1);
+	  abort ();
+	}
+    }]
+}
+
+# Return true if a speculation barrier is defined on the target.
+proc check_effective_target_speculation_barrier_defined { } {
+    return [check_no_compiler_messages speculation_barrier_defined assembly {
+	    int main (int argc, char **argv) {
+		return __builtin_speculation_safe_value (argc);
+	    }
+	}]
 }

@@ -1,5 +1,5 @@
 /* Target code for NVPTX.
-   Copyright (C) 2014-2024 Free Software Foundation, Inc.
+   Copyright (C) 2014-2025 Free Software Foundation, Inc.
    Contributed by Bernd Schmidt <bernds@codesourcery.com>
 
    This file is part of GCC.
@@ -20,7 +20,6 @@
 
 #define IN_TARGET_CODE 1
 
-#define INCLUDE_MEMORY
 #include "config.h"
 #include <sstream>
 #include "system.h"
@@ -213,9 +212,12 @@ first_ptx_version_supporting_sm (enum ptx_isa sm)
   switch (sm)
     {
     case PTX_ISA_SM30:
-      return PTX_VERSION_3_0;
+      return /* PTX_VERSION_3_0 not defined */ PTX_VERSION_3_1;
     case PTX_ISA_SM35:
       return PTX_VERSION_3_1;
+    case PTX_ISA_SM37:
+    case PTX_ISA_SM52:
+      return PTX_VERSION_4_1;
     case PTX_ISA_SM53:
       return PTX_VERSION_4_2;
     case PTX_ISA_SM70:
@@ -224,6 +226,8 @@ first_ptx_version_supporting_sm (enum ptx_isa sm)
       return PTX_VERSION_6_3;
     case PTX_ISA_SM80:
       return PTX_VERSION_7_0;
+    case PTX_ISA_SM89:
+      return PTX_VERSION_7_8;
     default:
       gcc_unreachable ();
     }
@@ -237,12 +241,13 @@ default_ptx_version_option (void)
   /* Pick a version that supports the sm.  */
   enum ptx_version res = first;
 
-  /* Pick at least 3.1.  This has been the smallest version historically.  */
-  res = MAX (res, PTX_VERSION_3_1);
-
   /* Pick at least 6.0, to enable using bar.warp.sync to have a way to force
      warp convergence.  */
   res = MAX (res, PTX_VERSION_6_0);
+
+  /* For sm_52+, pick at least 7.3, to enable PTX 'alloca'.  */
+  if (ptx_isa_option >= PTX_ISA_SM52)
+    res = MAX (res, PTX_VERSION_7_3);
 
   /* Verify that we pick a version that supports the sm.  */
   gcc_assert (first <= res);
@@ -254,10 +259,10 @@ ptx_version_to_string (enum ptx_version v)
 {
   switch (v)
     {
-    case PTX_VERSION_3_0:
-      return "3.0";
     case PTX_VERSION_3_1:
       return "3.1";
+    case PTX_VERSION_4_1:
+      return "4.1";
     case PTX_VERSION_4_2:
       return "4.2";
     case PTX_VERSION_6_0:
@@ -266,6 +271,10 @@ ptx_version_to_string (enum ptx_version v)
       return "6.3";
     case PTX_VERSION_7_0:
       return "7.0";
+    case PTX_VERSION_7_3:
+      return "7.3";
+    case PTX_VERSION_7_8:
+      return "7.8";
     default:
       gcc_unreachable ();
     }
@@ -276,10 +285,10 @@ ptx_version_to_number (enum ptx_version v, bool major_p)
 {
   switch (v)
     {
-    case PTX_VERSION_3_0:
-      return major_p ? 3 : 0;
     case PTX_VERSION_3_1:
       return major_p ? 3 : 1;
+    case PTX_VERSION_4_1:
+      return major_p ? 4 : 1;
     case PTX_VERSION_4_2:
       return major_p ? 4 : 2;
     case PTX_VERSION_6_0:
@@ -288,6 +297,10 @@ ptx_version_to_number (enum ptx_version v, bool major_p)
       return major_p ? 6 : 3;
     case PTX_VERSION_7_0:
       return major_p ? 7 : 0;
+    case PTX_VERSION_7_3:
+      return major_p ? 7 : 3;
+    case PTX_VERSION_7_8:
+      return major_p ? 7 : 8;
     default:
       gcc_unreachable ();
     }
@@ -1207,7 +1220,7 @@ nvptx_record_libfunc (rtx callee, rtx retval, rtx pat)
    is prototyped, record it now.  Otherwise record it as needed at end
    of compilation, when we might have more information about it.  */
 
-void
+static void
 nvptx_record_needed_fndecl (tree decl)
 {
   if (TYPE_ARG_TYPES (TREE_TYPE (decl)) == NULL_TREE)
@@ -1745,6 +1758,27 @@ nvptx_output_set_softstack (unsigned src_regno)
     }
   return "";
 }
+
+/* Output a fake PTX 'alloca'.  */
+
+const char *
+nvptx_output_fake_ptx_alloca (void)
+{
+#define FAKE_PTX_ALLOCA_NAME "__GCC_nvptx__PTX_alloca_not_supported"
+  static tree decl;
+  if (!decl)
+    {
+      tree alloca_type = TREE_TYPE (builtin_decl_explicit (BUILT_IN_ALLOCA));
+      decl = build_decl (UNKNOWN_LOCATION, FUNCTION_DECL,
+			 get_identifier (FAKE_PTX_ALLOCA_NAME), alloca_type);
+      DECL_EXTERNAL (decl) = 1;
+      TREE_PUBLIC (decl) = 1;
+      nvptx_record_needed_fndecl (decl);
+    }
+  return "\tcall\t(%0), " FAKE_PTX_ALLOCA_NAME ", (%1);";
+#undef FAKE_PTX_ALLOCA_NAME
+}
+
 /* Output a return instruction.  Also copy the return value to its outgoing
    location.  */
 
@@ -1784,7 +1818,7 @@ nvptx_function_ok_for_sibcall (tree, tree)
 static rtx
 nvptx_get_drap_rtx (void)
 {
-  if (TARGET_SOFT_STACK && stack_realign_drap)
+  if (stack_realign_drap)
     return arg_pointer_rtx;
   return NULL_RTX;
 }
@@ -2242,6 +2276,7 @@ static struct
 					out.  */
   unsigned size;  /* Fragment size to accumulate.  */
   unsigned offset;  /* Offset within current fragment.  */
+  bool active; /* Whether this machinery is active.  */
   bool started;   /* Whether we've output any initializer.  */
 } init_frag;
 
@@ -2252,6 +2287,8 @@ static struct
 static void
 output_init_frag (rtx sym)
 {
+  gcc_checking_assert (init_frag.active);
+
   fprintf (asm_out_file, init_frag.started ? ", " : " = { ");
   unsigned HOST_WIDE_INT val = init_frag.val;
 
@@ -2283,6 +2320,8 @@ output_init_frag (rtx sym)
 static void
 nvptx_assemble_value (unsigned HOST_WIDE_INT val, unsigned size)
 {
+  gcc_checking_assert (init_frag.active);
+
   bool negative_p
     = val & (HOST_WIDE_INT_1U << (HOST_BITS_PER_WIDE_INT - 1));
 
@@ -2315,6 +2354,15 @@ nvptx_assemble_value (unsigned HOST_WIDE_INT val, unsigned size)
 static bool
 nvptx_assemble_integer (rtx x, unsigned int size, int ARG_UNUSED (aligned_p))
 {
+  if (in_section == exception_section)
+    {
+      gcc_checking_assert (!init_frag.active);
+      /* Just use the default machinery; it's not getting used, anyway.  */
+      return default_assemble_integer (x, size, aligned_p);
+    }
+
+  gcc_checking_assert (init_frag.active);
+
   HOST_WIDE_INT val = 0;
 
   switch (GET_CODE (x))
@@ -2357,6 +2405,17 @@ nvptx_assemble_integer (rtx x, unsigned int size, int ARG_UNUSED (aligned_p))
 void
 nvptx_output_skip (FILE *, unsigned HOST_WIDE_INT size)
 {
+  gcc_checking_assert (in_section == data_section
+		       || in_section == text_section);
+
+  if (!init_frag.active)
+    /* We're in the 'data_section' or 'text_section', outside of an
+       initializer context ('init_frag').  There's nothing to do here:
+       in PTX, there's no concept of an assembler's "location counter",
+       "current address", "dot symbol" ('.') that might need padding or
+       aligning.  */
+    return;
+
   /* Finish the current fragment, if it's started.  */
   if (init_frag.offset)
     {
@@ -2378,6 +2437,12 @@ nvptx_output_skip (FILE *, unsigned HOST_WIDE_INT size)
       if (size)
 	nvptx_assemble_value (0, size);
     }
+  else
+    /* Otherwise, we don't have to do anything: this skip terminates the
+       initializer; we skip either the full ('!init_frag.started' case) or the
+       remainder ('init_frag.started' case) of the initializer (that is, either
+       no or incomplete initializer).  */
+    gcc_checking_assert (size == init_frag.remaining * init_frag.size);
 }
 
 /* Output a string STR with length SIZE.  As in nvptx_output_skip we
@@ -2427,6 +2492,8 @@ nvptx_assemble_decl_begin (FILE *file, const char *name, const char *section,
 			   const_tree type, HOST_WIDE_INT size, unsigned align,
 			   bool undefined = false)
 {
+  gcc_checking_assert (!init_frag.active);
+
   bool atype = (TREE_CODE (type) == ARRAY_TYPE)
     && (TYPE_DOMAIN (type) == NULL_TREE);
 
@@ -2453,6 +2520,8 @@ nvptx_assemble_decl_begin (FILE *file, const char *name, const char *section,
 
   elt_size |= GET_MODE_SIZE (elt_mode);
   elt_size &= -elt_size; /* Extract LSB set.  */
+
+  init_frag.active = true;
 
   init_frag.size = elt_size;
   /* Avoid undefined shift behavior by using '2'.  */
@@ -2485,10 +2554,14 @@ nvptx_assemble_decl_begin (FILE *file, const char *name, const char *section,
 static void
 nvptx_assemble_decl_end (void)
 {
+  gcc_checking_assert (init_frag.active);
+
   if (init_frag.offset)
     /* This can happen with a packed struct with trailing array member.  */
     nvptx_assemble_value (0, init_frag.size - init_frag.offset);
   fprintf (asm_out_file, init_frag.started ? " };\n" : ";\n");
+
+  init_frag.active = false;
 }
 
 /* Output an uninitialized common or file-scope variable.  */
@@ -5946,6 +6019,55 @@ nvptx_record_offload_symbol (tree decl)
     }
 }
 
+/* Fake "sections support", just for 'exception_section'.  */
+
+static void
+nvptx_output_section_asm_op (const char *directive)
+{
+  static char prev_section = '?';
+
+  gcc_checking_assert (directive[1] == '\0');
+  const char new_section = directive[0];
+  gcc_checking_assert (new_section != prev_section);
+  switch (new_section)
+    {
+    case 'T':
+    case 'D':
+      if (prev_section == 'E')
+	/* We're leaving the 'exception_section'.  End the comment block.  */
+	fprintf (asm_out_file, "\tEND '.gcc_except_table' */\n");
+      break;
+    case 'E':
+      /* We're entering the 'exception_section'.  Put into a comment block
+	 whatever GCC decides to emit.  We assume:
+           - No nested comment blocks.
+           - Going to leave 'exception_section' before end of file.
+	 Should any of these ever get violated, this will result in PTX-level
+	 syntax errors.  */
+      fprintf (asm_out_file, "\t/* BEGIN '.gcc_except_table'\n");
+      break;
+    default:
+      gcc_unreachable ();
+    }
+  prev_section = new_section;
+}
+
+static void
+nvptx_asm_init_sections (void)
+{
+  /* Like '#define TEXT_SECTION_ASM_OP ""', just with different 'callback'.  */
+  text_section = get_unnamed_section (SECTION_CODE,
+				      nvptx_output_section_asm_op, "T");
+  /* Like '#define DATA_SECTION_ASM_OP ""', just with different 'callback'.  */
+  data_section = get_unnamed_section (SECTION_WRITE,
+				      nvptx_output_section_asm_op, "D");
+  /* In order to later be able to recognize the 'exception_section', we set it
+     up here, instead of letting 'gcc/except.cc:switch_to_exception_section'
+     pick the 'data_section'.  */
+  exception_section = get_unnamed_section (0,
+					   nvptx_output_section_asm_op, "E");
+}
+
 /* Implement TARGET_ASM_FILE_START.  Write the kinds of things ptxas expects
    at the start of a file.  */
 
@@ -7700,6 +7822,8 @@ nvptx_asm_output_def_from_decls (FILE *stream, tree name,
 #undef TARGET_END_CALL_ARGS
 #define TARGET_END_CALL_ARGS nvptx_end_call_args
 
+#undef TARGET_ASM_INIT_SECTIONS
+#define TARGET_ASM_INIT_SECTIONS nvptx_asm_init_sections
 #undef TARGET_ASM_FILE_START
 #define TARGET_ASM_FILE_START nvptx_file_start
 #undef TARGET_ASM_FILE_END
@@ -7815,6 +7939,9 @@ nvptx_asm_output_def_from_decls (FILE *stream, tree name,
 
 #undef TARGET_HAVE_STRUB_SUPPORT_FOR
 #define TARGET_HAVE_STRUB_SUPPORT_FOR hook_bool_tree_false
+
+#undef TARGET_DOCUMENTATION_NAME
+#define TARGET_DOCUMENTATION_NAME "Nvidia PTX"
 
 struct gcc_target targetm = TARGET_INITIALIZER;
 

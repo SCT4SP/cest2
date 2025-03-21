@@ -23,6 +23,7 @@
 #include "rust-diagnostics.h"
 #include "rust-location.h"
 #include "rust-constexpr.h"
+#include "rust-session-manager.h"
 #include "rust-tree.h"
 #include "tree-core.h"
 #include "rust-gcc.h"
@@ -194,6 +195,17 @@ expect_handler (bool likely)
   };
 }
 
+static tree
+try_handler_inner (Context *ctx, TyTy::FnType *fntype, bool is_new_api);
+
+const static std::function<tree (Context *, TyTy::FnType *)>
+try_handler (bool is_new_api)
+{
+  return [is_new_api] (Context *ctx, TyTy::FnType *fntype) {
+    return try_handler_inner (ctx, fntype, is_new_api);
+  };
+}
+
 inline tree
 sorry_handler (Context *ctx, TyTy::FnType *fntype)
 {
@@ -241,6 +253,8 @@ static const std::map<std::string,
     {"likely", expect_handler (true)},
     {"unlikely", expect_handler (false)},
     {"assume", assume_handler},
+    {"try", try_handler (false)},
+    {"catch_unwind", try_handler (true)},
 };
 
 Intrinsics::Intrinsics (Context *ctx) : ctx (ctx) {}
@@ -269,9 +283,9 @@ Intrinsics::compile (TyTy::FnType *fntype)
   if (it != generic_intrinsics.end ())
     return it->second (ctx, fntype);
 
-  location_t locus = ctx->get_mappings ()->lookup_location (fntype->get_ref ());
+  location_t locus = ctx->get_mappings ().lookup_location (fntype->get_ref ());
   rust_error_at (locus, ErrorCode::E0093,
-		 "unrecognized intrinsic function: %<%s%>",
+		 "unrecognized intrinsic function: %qs",
 		 fntype->get_identifier ().c_str ());
 
   return error_mark_node;
@@ -315,11 +329,11 @@ compile_fn_params (Context *ctx, TyTy::FnType *fntype, tree fndecl,
 {
   for (auto &parm : fntype->get_params ())
     {
-      auto &referenced_param = parm.first;
-      auto &param_tyty = parm.second;
+      auto &referenced_param = parm.get_pattern ();
+      auto param_tyty = parm.get_type ();
       auto compiled_param_type = TyTyResolveCompile::compile (ctx, param_tyty);
 
-      location_t param_locus = referenced_param->get_locus ();
+      location_t param_locus = referenced_param.get_locus ();
       Bvariable *compiled_param_var
 	= CompileFnParam::compile (ctx, fndecl, referenced_param,
 				   compiled_param_type, param_locus);
@@ -496,9 +510,10 @@ transmute_handler (Context *ctx, TyTy::FnType *fntype)
       rust_error_at (fntype->get_locus (),
 		     "cannot transmute between types of different sizes, or "
 		     "dependently-sized types");
-      rust_inform (fntype->get_ident ().locus, "source type: %qs (%lu bits)",
-		   fntype->get_params ().at (0).second->as_string ().c_str (),
-		   (unsigned long) source_size);
+      rust_inform (
+	fntype->get_ident ().locus, "source type: %qs (%lu bits)",
+	fntype->get_params ().at (0).get_type ()->as_string ().c_str (),
+	(unsigned long) source_size);
       rust_inform (fntype->get_ident ().locus, "target type: %qs (%lu bits)",
 		   fntype->get_return_type ()->as_string ().c_str (),
 		   (unsigned long) target_size);
@@ -1226,7 +1241,7 @@ assume_handler (Context *ctx, TyTy::FnType *fntype)
   // TODO: make sure this is actually helping the compiler optimize
 
   rust_assert (fntype->get_params ().size () == 1);
-  rust_assert (fntype->param_at (0).second->get_kind ()
+  rust_assert (fntype->param_at (0).get_type ()->get_kind ()
 	       == TyTy::TypeKind::BOOL);
 
   tree lookup = NULL_TREE;
@@ -1260,6 +1275,101 @@ assume_handler (Context *ctx, TyTy::FnType *fntype)
   ctx->add_statement (assume_expr);
   // BUILTIN size_of FN BODY END
 
+  finalize_intrinsic_block (ctx, fndecl);
+
+  return fndecl;
+}
+
+static tree
+try_handler_inner (Context *ctx, TyTy::FnType *fntype, bool is_new_api)
+{
+  rust_assert (fntype->get_params ().size () == 3);
+
+  tree lookup = NULL_TREE;
+  if (check_for_cached_intrinsic (ctx, fntype, &lookup))
+    return lookup;
+  auto fndecl = compile_intrinsic_function (ctx, fntype);
+
+  enter_intrinsic_block (ctx, fndecl);
+
+  // The following tricks are needed to make sure the try-catch blocks are not
+  // optimized away
+  TREE_READONLY (fndecl) = 0;
+  DECL_DISREGARD_INLINE_LIMITS (fndecl) = 1;
+  DECL_ATTRIBUTES (fndecl) = tree_cons (get_identifier ("always_inline"),
+					NULL_TREE, DECL_ATTRIBUTES (fndecl));
+
+  // BUILTIN try_handler FN BODY BEGIN
+  // setup the params
+  std::vector<Bvariable *> param_vars;
+  compile_fn_params (ctx, fntype, fndecl, &param_vars);
+  if (!Backend::function_set_parameters (fndecl, param_vars))
+    return error_mark_node;
+  tree enclosing_scope = NULL_TREE;
+
+  bool panic_is_abort = Session::get_instance ().options.get_panic_strategy ()
+			== CompileOptions::PanicStrategy::Abort;
+  tree try_fn = Backend::var_expression (param_vars[0], UNDEF_LOCATION);
+  tree user_data = Backend::var_expression (param_vars[1], UNDEF_LOCATION);
+  tree catch_fn = Backend::var_expression (param_vars[2], UNDEF_LOCATION);
+  tree normal_return_stmt = NULL_TREE;
+  tree error_return_stmt = NULL_TREE;
+  tree try_call = Backend::call_expression (try_fn, {user_data}, nullptr,
+					    BUILTINS_LOCATION);
+  tree catch_call = NULL_TREE;
+  tree try_block = Backend::block (fndecl, enclosing_scope, {}, UNDEF_LOCATION,
+				   UNDEF_LOCATION);
+
+  if (is_new_api)
+    {
+      auto ret_type = TyTyResolveCompile::get_unit_type ();
+      auto ret_expr = Backend::constructor_expression (ret_type, false, {}, -1,
+						       UNDEF_LOCATION);
+      normal_return_stmt
+	= Backend::return_statement (fndecl, ret_expr, BUILTINS_LOCATION);
+      error_return_stmt
+	= Backend::return_statement (fndecl, ret_expr, BUILTINS_LOCATION);
+    }
+  else
+    {
+      normal_return_stmt = Backend::return_statement (fndecl, integer_zero_node,
+						      BUILTINS_LOCATION);
+      error_return_stmt = Backend::return_statement (fndecl, integer_one_node,
+						     BUILTINS_LOCATION);
+    }
+  Backend::block_add_statements (try_block,
+				 std::vector<tree>{try_call,
+						   normal_return_stmt});
+  if (panic_is_abort)
+    {
+      // skip building the try-catch construct
+      ctx->add_statement (try_block);
+      finalize_intrinsic_block (ctx, fndecl);
+      return fndecl;
+    }
+
+  tree eh_pointer
+    = build_call_expr (builtin_decl_explicit (BUILT_IN_EH_POINTER), 1,
+		       integer_zero_node);
+  catch_call = Backend::call_expression (catch_fn, {user_data, eh_pointer},
+					 NULL_TREE, BUILTINS_LOCATION);
+
+  tree catch_block = Backend::block (fndecl, enclosing_scope, {},
+				     UNDEF_LOCATION, UNDEF_LOCATION);
+  Backend::block_add_statements (catch_block,
+				 std::vector<tree>{catch_call,
+						   error_return_stmt});
+  // emulate what cc1plus is doing for C++ try-catch
+  tree inner_eh_construct
+    = Backend::exception_handler_statement (catch_call, NULL_TREE,
+					    error_return_stmt,
+					    BUILTINS_LOCATION);
+  // TODO(liushuyu): eh_personality needs to be implemented as a runtime thing
+  auto eh_construct
+    = Backend::exception_handler_statement (try_block, inner_eh_construct,
+					    NULL_TREE, BUILTINS_LOCATION);
+  ctx->add_statement (eh_construct);
+  // BUILTIN try_handler FN BODY END
   finalize_intrinsic_block (ctx, fndecl);
 
   return fndecl;

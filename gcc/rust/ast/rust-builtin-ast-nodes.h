@@ -1,4 +1,4 @@
-// Copyright (C) 2024 Free Software Foundation, Inc.
+// Copyright (C) 2024-2025 Free Software Foundation, Inc.
 
 // This file is part of GCC.
 
@@ -201,6 +201,8 @@ public:
   const Fmt::Pieces &get_template () const { return template_pieces; }
   const FormatArguments &get_arguments () const { return arguments; }
   virtual location_t get_locus () const override;
+
+  Expr::Kind get_expr_kind () const override { return Expr::Kind::FormatArgs; }
 
 private:
   location_t loc;

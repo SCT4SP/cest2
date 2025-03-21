@@ -1,4 +1,4 @@
-// Copyright (C) 2020-2024 Free Software Foundation, Inc.
+// Copyright (C) 2020-2025 Free Software Foundation, Inc.
 
 // This file is part of GCC.
 
@@ -22,6 +22,7 @@
 #include "optional.h"
 #include "rust-forever-stack.h"
 #include "rust-hir-map.h"
+#include "rust-rib.h"
 
 namespace Rust {
 namespace Resolver2_0 {
@@ -174,6 +175,9 @@ public:
   tl::expected<NodeId, DuplicateNameError>
   insert_shadowable (Identifier name, NodeId id, Namespace ns);
 
+  tl::expected<NodeId, DuplicateNameError>
+  insert_globbed (Identifier name, NodeId id, Namespace ns);
+
   /**
    * Run a lambda in a "scoped" context, meaning that a new `Rib` will be pushed
    * before executing the lambda and then popped. This is useful for all kinds
@@ -181,8 +185,8 @@ public:
    * function. This variant of the function enters a new scope in *all*
    * namespaces, while the second variant enters a scope in *one* namespace.
    *
-   * @param rib New `Rib` to create when entering this scope. A function `Rib`,
-   *        or an item `Rib`... etc
+   * @param rib_kind New `Rib` to create when entering this scope. A function
+   *        `Rib`, or an item `Rib`... etc
    * @param scope_id node ID of the scope we are entering, e.g the block's
    *        `NodeId`.
    * @param lambda Function to run within that scope
@@ -192,9 +196,10 @@ public:
    */
   // FIXME: Do we want to handle something in particular for expected within the
   // scoped lambda?
-  void scoped (Rib rib, NodeId scope_id, std::function<void (void)> lambda,
+  void scoped (Rib::Kind rib_kind, NodeId scope_id,
+	       std::function<void (void)> lambda,
 	       tl::optional<Identifier> path = {});
-  void scoped (Rib rib, Namespace ns, NodeId scope_id,
+  void scoped (Rib::Kind rib_kind, Namespace ns, NodeId scope_id,
 	       std::function<void (void)> lambda,
 	       tl::optional<Identifier> path = {});
 
@@ -209,7 +214,7 @@ public:
   // TODO: Use newtype pattern for Usage and Definition
   void map_usage (Usage usage, Definition definition);
 
-  tl::optional<NodeId> lookup (NodeId usage);
+  tl::optional<NodeId> lookup (NodeId usage) const;
 
 private:
   /* Map of "usage" nodes which have been resolved to a "definition" node */

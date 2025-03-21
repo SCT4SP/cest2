@@ -1,4 +1,4 @@
-// Copyright (C) 2020-2024 Free Software Foundation, Inc.
+// Copyright (C) 2020-2025 Free Software Foundation, Inc.
 
 // This file is part of GCC.
 
@@ -29,6 +29,15 @@
 namespace Rust {
 namespace Analysis {
 
+bool
+Attributes::is_known (const std::string &attribute_path)
+{
+  const auto &lookup
+    = BuiltinAttributeMappings::get ()->lookup_builtin (attribute_path);
+
+  return !lookup.is_error ();
+}
+
 using Attrs = Values::Attributes;
 
 // https://doc.rust-lang.org/stable/nightly-rustc/src/rustc_feature/builtin_attrs.rs.html#248
@@ -37,6 +46,7 @@ static const BuiltinAttrDefinition __definitions[]
      {Attrs::COLD, CODE_GENERATION},
      {Attrs::CFG, EXPANSION},
      {Attrs::CFG_ATTR, EXPANSION},
+     {Attrs::DERIVE_ATTR, EXPANSION},
      {Attrs::DEPRECATED, STATIC_ANALYSIS},
      {Attrs::ALLOW, STATIC_ANALYSIS},
      {Attrs::ALLOW_INTERNAL_UNSTABLE, STATIC_ANALYSIS},
@@ -61,7 +71,11 @@ static const BuiltinAttrDefinition __definitions[]
      {Attrs::RUSTC_DEPRECATED, STATIC_ANALYSIS},
      {Attrs::RUSTC_INHERIT_OVERFLOW_CHECKS, CODE_GENERATION},
      {Attrs::STABLE, STATIC_ANALYSIS},
-     {Attrs::UNSTABLE, STATIC_ANALYSIS}};
+     {Attrs::UNSTABLE, STATIC_ANALYSIS},
+     // assuming we keep these for static analysis
+     {Attrs::RUSTC_CONST_STABLE, STATIC_ANALYSIS},
+     {Attrs::RUSTC_CONST_UNSTABLE, STATIC_ANALYSIS},
+     {Attrs::PRELUDE_IMPORT, NAME_RESOLUTION}};
 
 BuiltinAttributeMappings *
 BuiltinAttributeMappings::get ()
@@ -653,7 +667,7 @@ AttributeChecker::visit (AST::Function &fun)
 	  if (!attribute.has_attr_input ())
 	    {
 	      rust_error_at (attribute.get_locus (),
-			     "malformed %<%s%> attribute input", name);
+			     "malformed %qs attribute input", name);
 	      rust_inform (
 		attribute.get_locus (),
 		"must be of the form: %<#[proc_macro_derive(TraitName, "

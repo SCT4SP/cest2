@@ -1,5 +1,5 @@
 /* Routines for manipulation of expression nodes.
-   Copyright (C) 2000-2024 Free Software Foundation, Inc.
+   Copyright (C) 2000-2025 Free Software Foundation, Inc.
    Contributed by Andy Vaught
 
 This file is part of GCC.
@@ -18,7 +18,6 @@ You should have received a copy of the GNU General Public License
 along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
-#define INCLUDE_MEMORY
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
@@ -467,6 +466,7 @@ free_expr0 (gfc_expr *e)
       switch (e->ts.type)
 	{
 	case BT_INTEGER:
+	case BT_UNSIGNED:
 	  mpz_clear (e->value.integer);
 	  break;
 
@@ -629,6 +629,8 @@ gfc_free_ref_list (gfc_ref *p)
 	      gfc_free_expr (p->u.ar.stride[i]);
 	    }
 
+	  gfc_free_expr (p->u.ar.stat);
+	  gfc_free_expr (p->u.ar.team);
 	  break;
 
 	case REF_SUBSTRING:
@@ -977,6 +979,14 @@ gfc_type_convert_binary (gfc_expr *e, int wconversion)
       if (op1->ts.kind == op2->ts.kind)
 	{
 	  /* No type conversions.  */
+	  e->ts = op1->ts;
+	  goto done;
+	}
+
+      /* Unsigned exponentiation is special, we need the type of the first
+	 argument here because of modulo arithmetic.  */
+      if (op1->ts.type == BT_UNSIGNED && e->value.op.op == INTRINSIC_POWER)
+	{
 	  e->ts = op1->ts;
 	  goto done;
 	}
@@ -1614,7 +1624,7 @@ find_array_section (gfc_expr *expr, gfc_ref *ref)
 	  /* Zero-sized arrays have no shape and no elements, stop early.  */
 	  if (!begin->shape)
 	    {
-	      mpz_init_set_ui (nelts, 0);
+	      mpz_set_ui (nelts, 0);
 	      break;
 	    }
 
@@ -1715,7 +1725,7 @@ find_array_section (gfc_expr *expr, gfc_ref *ref)
      constructor.  */
   for (idx = 0; idx < (int) mpz_get_si (nelts); idx++)
     {
-      mpz_init_set_ui (ptr, 0);
+      mpz_set_ui (ptr, 0);
 
       incr_ctr = true;
       for (d = 0; d < rank; d++)
@@ -1834,6 +1844,7 @@ find_inquiry_ref (gfc_expr *p, gfc_expr **newp)
 {
   gfc_ref *ref;
   gfc_ref *inquiry = NULL;
+  gfc_ref *inquiry_head;
   gfc_expr *tmp;
 
   tmp = gfc_copy_expr (p);
@@ -1859,6 +1870,7 @@ find_inquiry_ref (gfc_expr *p, gfc_expr **newp)
       return false;
     }
 
+  inquiry_head = inquiry;
   gfc_resolve_expr (tmp);
 
   /* Leave these to the backend since the type and kind is not confirmed until
@@ -1931,7 +1943,7 @@ find_inquiry_ref (gfc_expr *p, gfc_expr **newp)
 		    mpc_imagref (tmp->value.complex), GFC_RND_MODE);
 	  break;
 	}
-      // TODO: Fix leaking expr tmp, when simplify is done twice.
+
       if (inquiry->next)
 	gfc_replace_expr (tmp, *newp);
     }
@@ -1945,10 +1957,12 @@ find_inquiry_ref (gfc_expr *p, gfc_expr **newp)
     }
 
   gfc_free_expr (tmp);
+  gfc_free_ref_list (inquiry_head);
   return true;
 
 cleanup:
   gfc_free_expr (tmp);
+  gfc_free_ref_list (inquiry_head);
   return false;
 }
 
@@ -4361,16 +4375,24 @@ gfc_check_pointer_assign (gfc_expr *lvalue, gfc_expr *rvalue,
 
       /* If this can be determined, check that the target must be at least as
 	 large as the pointer assigned to it is.  */
-      if (gfc_array_size (lvalue, &lsize)
-	  && gfc_array_size (rvalue, &rsize)
-	  && mpz_cmp (rsize, lsize) < 0)
+      bool got_lsize = gfc_array_size (lvalue, &lsize);
+      bool got_rsize = got_lsize && gfc_array_size (rvalue, &rsize);
+      bool too_small = got_rsize && mpz_cmp (rsize, lsize) < 0;
+
+      if (too_small)
 	{
 	  gfc_error ("Rank remapping target is smaller than size of the"
 		     " pointer (%ld < %ld) at %L",
 		     mpz_get_si (rsize), mpz_get_si (lsize),
 		     &lvalue->where);
+	  mpz_clear (lsize);
+	  mpz_clear (rsize);
 	  return false;
 	}
+      if (got_lsize)
+	mpz_clear (lsize);
+      if (got_rsize)
+	mpz_clear (rsize);
 
       /* An assumed rank target is an experimental F202y feature.  */
       if (rvalue->rank == -1 && !(gfc_option.allow_std & GFC_STD_F202Y))
@@ -5006,28 +5028,44 @@ is_non_empty_structure_constructor (gfc_expr * e)
 bool
 gfc_has_default_initializer (gfc_symbol *der)
 {
+  static hash_set<gfc_symbol *> seen_derived_types;
   gfc_component *c;
+  /* The rewrite to a result variable and breaks is only needed, because
+     there is no scope_guard in C++ yet.  */
+  bool result = false;
 
   gcc_assert (gfc_fl_struct (der->attr.flavor));
+  seen_derived_types.add (der);
   for (c = der->components; c; c = c->next)
-    if (gfc_bt_struct (c->ts.type))
+    if (gfc_bt_struct (c->ts.type)
+	&& !seen_derived_types.contains (c->ts.u.derived))
       {
-        if (!c->attr.pointer && !c->attr.proc_pointer
-	     && !(c->attr.allocatable && der == c->ts.u.derived)
-	     && ((c->initializer
-		  && is_non_empty_structure_constructor (c->initializer))
-		 || gfc_has_default_initializer (c->ts.u.derived)))
-	  return true;
+	if (!c->attr.pointer && !c->attr.proc_pointer
+	    && !(c->attr.allocatable && der == c->ts.u.derived)
+	    && ((c->initializer
+		 && is_non_empty_structure_constructor (c->initializer))
+		|| gfc_has_default_initializer (c->ts.u.derived)))
+	  {
+	    result = true;
+	    break;
+	  }
 	if (c->attr.pointer && c->initializer)
-	  return true;
+	  {
+	    result = true;
+	    break;
+	  }
       }
     else
       {
-        if (c->initializer)
-	  return true;
+	if (c->initializer)
+	  {
+	    result = true;
+	    break;
+	  }
       }
 
-  return false;
+  seen_derived_types.remove (der);
+  return result;
 }
 
 
@@ -5450,11 +5488,14 @@ gfc_traverse_expr (gfc_expr *expr, gfc_symbol *sym,
   if ((*func) (expr, sym, &f))
     return true;
 
-  if (expr->ts.type == BT_CHARACTER
-	&& expr->ts.u.cl
-	&& expr->ts.u.cl->length
-	&& expr->ts.u.cl->length->expr_type != EXPR_CONSTANT
-	&& gfc_traverse_expr (expr->ts.u.cl->length, sym, func, f))
+  /* Descend into length type parameter of character expressions only for
+     non-negative f.  */
+  if (f >= 0
+      && expr->ts.type == BT_CHARACTER
+      && expr->ts.u.cl
+      && expr->ts.u.cl->length
+      && expr->ts.u.cl->length->expr_type != EXPR_CONSTANT
+      && gfc_traverse_expr (expr->ts.u.cl->length, sym, func, f))
     return true;
 
   switch (expr->expr_type)
@@ -5534,13 +5575,14 @@ gfc_traverse_expr (gfc_expr *expr, gfc_symbol *sym,
 	  break;
 
 	case REF_COMPONENT:
-	  if (ref->u.c.component->ts.type == BT_CHARACTER
-		&& ref->u.c.component->ts.u.cl
-		&& ref->u.c.component->ts.u.cl->length
-		&& ref->u.c.component->ts.u.cl->length->expr_type
-		     != EXPR_CONSTANT
-		&& gfc_traverse_expr (ref->u.c.component->ts.u.cl->length,
-				      sym, func, f))
+	  if (f >= 0
+	      && ref->u.c.component->ts.type == BT_CHARACTER
+	      && ref->u.c.component->ts.u.cl
+	      && ref->u.c.component->ts.u.cl->length
+	      && ref->u.c.component->ts.u.cl->length->expr_type
+	      != EXPR_CONSTANT
+	      && gfc_traverse_expr (ref->u.c.component->ts.u.cl->length,
+				    sym, func, f))
 	    return true;
 
 	  if (ref->u.c.component->as)
@@ -5804,18 +5846,20 @@ gfc_ref_this_image (gfc_ref *ref)
 }
 
 gfc_expr *
-gfc_find_team_co (gfc_expr *e)
+gfc_find_team_co (gfc_expr *e, enum gfc_array_ref_team_type req_team_type)
 {
   gfc_ref *ref;
 
   for (ref = e->ref; ref; ref = ref->next)
-    if (ref->type == REF_ARRAY && ref->u.ar.codimen > 0)
+    if (ref->type == REF_ARRAY && ref->u.ar.codimen > 0
+	&& ref->u.ar.team_type == req_team_type)
       return ref->u.ar.team;
 
-  if (e->value.function.actual->expr)
+  if (e->expr_type == EXPR_FUNCTION && e->value.function.actual->expr)
     for (ref = e->value.function.actual->expr->ref; ref;
 	 ref = ref->next)
-      if (ref->type == REF_ARRAY && ref->u.ar.codimen > 0)
+      if (ref->type == REF_ARRAY && ref->u.ar.codimen > 0
+	  && ref->u.ar.team_type == req_team_type)
 	return ref->u.ar.team;
 
   return NULL;
@@ -6272,6 +6316,33 @@ gfc_build_intrinsic_call (gfc_namespace *ns, gfc_isym_id id, const char* name,
 }
 
 
+/* Check if a symbol referenced in a submodule is declared in the ancestor
+   module and not accessed by use-association, and that the submodule is a
+   descendant.  */
+
+static bool
+sym_is_from_ancestor (gfc_symbol *sym)
+{
+  const char dot[2] = ".";
+  /* Symbols take the form module.submodule_ or module.name_. */
+  char ancestor_module[2 * GFC_MAX_SYMBOL_LEN + 2];
+  char *ancestor;
+
+  if (sym == NULL
+      || sym->attr.use_assoc
+      || !sym->attr.used_in_submodule
+      || !sym->module
+      || !sym->ns->proc_name
+      || !sym->ns->proc_name->name)
+    return false;
+
+  memset (ancestor_module, '\0', sizeof (ancestor_module));
+  strcpy (ancestor_module, sym->ns->proc_name->name);
+  ancestor = strtok (ancestor_module, dot);
+  return strcmp (ancestor, sym->module) == 0;
+}
+
+
 /* Check if an expression may appear in a variable definition context
    (F2008, 16.6.7) or pointer association context (F2008, 16.6.8).
    This is called from the various places when resolving
@@ -6450,21 +6521,24 @@ gfc_check_vardef_context (gfc_expr* e, bool pointer, bool alloc_obj,
     }
 
   /* PROTECTED and use-associated.  */
-  if (sym->attr.is_protected && sym->attr.use_assoc && check_intentin)
+  if (sym->attr.is_protected
+      && (sym->attr.use_assoc
+	  || (sym->attr.used_in_submodule && !sym_is_from_ancestor (sym)))
+      && check_intentin)
     {
       if (pointer && is_pointer)
 	{
 	  if (context)
-	    gfc_error ("Variable %qs is PROTECTED and cannot appear in a"
-		       " pointer association context (%s) at %L",
+	    gfc_error ("Variable %qs is PROTECTED and cannot appear in a "
+		       "pointer association context (%s) at %L",
 		       sym->name, context, &e->where);
 	  return false;
 	}
       if (!pointer && !is_pointer)
 	{
 	  if (context)
-	    gfc_error ("Variable %qs is PROTECTED and cannot appear in a"
-		       " variable definition context (%s) at %L",
+	    gfc_error ("Variable %qs is PROTECTED and cannot appear in a "
+		       "variable definition context (%s) at %L",
 		       sym->name, context, &e->where);
 	  return false;
 	}

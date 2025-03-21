@@ -1,5 +1,5 @@
 /* Cost model implementation for RISC-V 'V' Extension for GNU compiler.
-   Copyright (C) 2023-2024 Free Software Foundation, Inc.
+   Copyright (C) 2023-2025 Free Software Foundation, Inc.
    Contributed by Juzhe Zhong (juzhe.zhong@rivai.ai), RiVAI Technologies Ltd.
 
 This file is part of GCC.
@@ -20,7 +20,6 @@ along with GCC; see the file COPYING3.  If not see
 
 #define IN_TARGET_CODE 1
 
-#define INCLUDE_MEMORY
 #define INCLUDE_STRING
 #include "config.h"
 #include "system.h"
@@ -217,6 +216,35 @@ compute_local_program_points (
 		    dump_printf_loc (MSG_NOTE, vect_location,
 				     "program point %d: %G", info.point,
 				     gsi_stmt (si));
+		}
+
+	      /* If the statement is part of a pattern, also add the other
+		 pattern statements.  */
+	      gimple_seq pattern_def_seq;
+	      if (STMT_VINFO_IN_PATTERN_P (stmt_info)
+		  && (pattern_def_seq = STMT_VINFO_PATTERN_DEF_SEQ (stmt_info)))
+		{
+		  gimple_stmt_iterator si2;
+
+		  for (si2 = gsi_start (pattern_def_seq);
+		       !gsi_end_p (si2);
+		       gsi_next (&si2))
+		    {
+		      stmt_vec_info pattern_def_stmt_info
+			= vinfo->lookup_stmt (gsi_stmt (si2));
+		      if (STMT_VINFO_RELEVANT_P (pattern_def_stmt_info)
+			  || STMT_VINFO_LIVE_P (pattern_def_stmt_info))
+			{
+			  stmt_point info = {point, gsi_stmt (si2),
+			      pattern_def_stmt_info};
+			  program_points.safe_push (info);
+			  point++;
+			  if (dump_enabled_p ())
+			    dump_printf_loc (MSG_NOTE, vect_location,
+					     "program point %d: %G",
+					     info.point, gsi_stmt (si2));
+			}
+		    }
 		}
 	    }
 	  program_points_per_bb.put (bb, program_points);

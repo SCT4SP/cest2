@@ -1,4 +1,4 @@
-// Copyright (C) 2024 Free Software Foundation, Inc.
+// Copyright (C) 2024-2025 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -31,9 +31,9 @@ test ()
   int t0 = std::ilogb(T(4.0));
   VERIFY( t0 == 2 );
   int t1 = std::ilogb(lim::infinity());
-  VERIFY( t1 == INT_MAX );
+  VERIFY( t1 == std::numeric_limits<int>::max() );
   int t2 = std::ilogb(-lim::infinity());
-  VERIFY( t2 == INT_MAX );
+  VERIFY( t2 == std::numeric_limits<int>::max() );
 }
 
 int

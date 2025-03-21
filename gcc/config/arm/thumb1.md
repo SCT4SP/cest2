@@ -1,5 +1,5 @@
 ;; ARM Thumb-1 Machine Description
-;; Copyright (C) 2007-2024 Free Software Foundation, Inc.
+;; Copyright (C) 2007-2025 Free Software Foundation, Inc.
 ;;
 ;; This file is part of GCC.
 ;;
@@ -1146,8 +1146,8 @@
       switch (get_attr_length (insn))
 	{
 	case 4:  return "b%d0\t%l2";
-	case 6:  return "b%D0\t.LCB%=;b\t%l2\t%@long jump\n.LCB%=:";
-	case 8:  return "b%D0\t.LCB%=;bl\t%l2\t%@far jump\n.LCB%=:";
+	case 6:  return "b%D0\t.LCB%=\;b\t%l2\t%@long jump\n.LCB%=:";
+	case 8:  return "b%D0\t.LCB%=\;bl\t%l2\t%@far jump\n.LCB%=:";
 	default: gcc_unreachable ();
 	}
     }
@@ -1808,6 +1808,34 @@
   "cmp\\t%3, %4\;adcs\\t%0, %1, %2"
   [(set_attr "length" "4")
    (set_attr "type" "multiple")]
+)
+
+;; Re-split an LEU/GEU sequence if combine tries to oversimplify a 3-plus
+;; insn sequence.  Beware of the early-clobber of operand0
+(define_split
+ [(set (match_operand:SI 0 "s_register_operand")
+       (leu:SI (match_operand:SI 1 "s_register_operand")
+	       (match_operand:SI 2 "s_register_operand")))]
+ "TARGET_THUMB1
+  && !reg_overlap_mentioned_p (operands[0], operands[1])
+  && !reg_overlap_mentioned_p (operands[0], operands[2])"
+ [(set (match_dup 0) (const_int 0))
+  (set (match_dup 0) (plus:SI (plus:SI (match_dup 0) (match_dup 0))
+			      (geu:SI (match_dup 2) (match_dup 1))))]
+ {}
+)
+
+(define_split
+ [(set (match_operand:SI 0 "s_register_operand")
+       (geu:SI (match_operand:SI 1 "s_register_operand")
+	       (match_operand:SI 2 "thumb1_cmp_operand")))]
+ "TARGET_THUMB1
+  && !reg_overlap_mentioned_p (operands[0], operands[1])
+  && !reg_overlap_mentioned_p (operands[0], operands[2])"
+ [(set (match_dup 0) (const_int 0))
+  (set (match_dup 0) (plus:SI (plus:SI (match_dup 0) (match_dup 0))
+			      (geu:SI (match_dup 1) (match_dup 2))))]
+ {}
 )
 
 

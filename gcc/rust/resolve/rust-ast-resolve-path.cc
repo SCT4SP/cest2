@@ -1,4 +1,4 @@
-// Copyright (C) 2020-2024 Free Software Foundation, Inc.
+// Copyright (C) 2020-2025 Free Software Foundation, Inc.
 
 // This file is part of GCC.
 
@@ -63,7 +63,7 @@ ResolvePath::resolve_path (AST::PathInExpression &expr)
       if (in_middle_of_path && segment.is_lower_self_seg ())
 	{
 	  rust_error_at (segment.get_locus (), ErrorCode::E0433,
-			 "failed to resolve: %<%s%> in paths can only be used "
+			 "failed to resolve: %qs in paths can only be used "
 			 "in start position",
 			 segment.as_string ().c_str ());
 	  return UNKNOWN_NODEID;
@@ -165,8 +165,8 @@ ResolvePath::resolve_path (AST::PathInExpression &expr)
 	  && previous_resolved_node_id == module_scope_id)
 	{
 	  tl::optional<CanonicalPath &> resolved_child
-	    = mappings->lookup_module_child (module_scope_id,
-					     ident_seg.as_string ());
+	    = mappings.lookup_module_child (module_scope_id,
+					    ident_seg.as_string ());
 	  if (resolved_child.has_value ())
 	    {
 	      NodeId resolved_node = resolved_child->get_node_id ();
@@ -187,7 +187,7 @@ ResolvePath::resolve_path (AST::PathInExpression &expr)
 	      else
 		{
 		  rust_error_at (segment.get_locus (),
-				 "Cannot find path %<%s%> in this scope",
+				 "Cannot find path %qs in this scope",
 				 segment.as_string ().c_str ());
 		  return UNKNOWN_NODEID;
 		}
@@ -197,8 +197,8 @@ ResolvePath::resolve_path (AST::PathInExpression &expr)
       bool did_resolve_segment = resolved_node_id != UNKNOWN_NODEID;
       if (did_resolve_segment)
 	{
-	  if (mappings->node_is_module (resolved_node_id)
-	      || mappings->node_is_crate (resolved_node_id))
+	  if (mappings.node_is_module (resolved_node_id)
+	      || mappings.node_is_crate (resolved_node_id))
 	    {
 	      module_scope_id = resolved_node_id;
 	    }
@@ -207,7 +207,7 @@ ResolvePath::resolve_path (AST::PathInExpression &expr)
       else if (is_first_segment)
 	{
 	  rust_error_at (segment.get_locus (), ErrorCode::E0433,
-			 "Cannot find path %<%s%> in this scope",
+			 "Cannot find path %qs in this scope",
 			 segment.as_string ().c_str ());
 	  return UNKNOWN_NODEID;
 	}
@@ -304,8 +304,8 @@ ResolvePath::resolve_path (AST::SimplePath &expr)
 	}
 
       tl::optional<CanonicalPath &> resolved_child
-	= mappings->lookup_module_child (module_scope_id,
-					 segment.get_segment_name ());
+	= mappings.lookup_module_child (module_scope_id,
+					segment.get_segment_name ());
       if (resolved_child.has_value ())
 	{
 	  NodeId resolved_node = resolved_child->get_node_id ();
@@ -326,7 +326,7 @@ ResolvePath::resolve_path (AST::SimplePath &expr)
 	  else
 	    {
 	      rust_error_at (segment.get_locus (),
-			     "Cannot find path %<%s%> in this scope",
+			     "Cannot find path %qs in this scope",
 			     segment.as_string ().c_str ());
 	      return UNKNOWN_NODEID;
 	    }
@@ -374,12 +374,12 @@ ResolvePath::resolve_path (AST::SimplePath &expr)
       if (resolved_node_id == UNKNOWN_NODEID)
 	{
 	  rust_error_at (segment.get_locus (),
-			 "cannot find simple path segment %<%s%> in this scope",
+			 "cannot find simple path segment %qs in this scope",
 			 segment.as_string ().c_str ());
 	  return UNKNOWN_NODEID;
 	}
 
-      if (mappings->node_is_module (resolved_node_id))
+      if (mappings.node_is_module (resolved_node_id))
 	{
 	  module_scope_id = resolved_node_id;
 	}

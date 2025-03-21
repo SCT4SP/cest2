@@ -1,5 +1,5 @@
 /* Assign reload pseudos.
-   Copyright (C) 2010-2024 Free Software Foundation, Inc.
+   Copyright (C) 2010-2025 Free Software Foundation, Inc.
    Contributed by Vladimir Makarov <vmakarov@redhat.com>.
 
 This file is part of GCC.
@@ -629,13 +629,12 @@ find_hard_regno_for_1 (int regno, int *cost, int try_only_hard_regno,
 	hard_regno = ira_class_hard_regs[rclass][i];
       if (! overlaps_hard_reg_set_p (conflict_set,
 				     PSEUDO_REGNO_MODE (regno), hard_regno)
-	  && targetm.hard_regno_mode_ok (hard_regno,
-					 PSEUDO_REGNO_MODE (regno))
+	  && targetm.hard_regno_mode_ok (hard_regno, PSEUDO_REGNO_MODE (regno))
 	  /* We cannot use prohibited_class_mode_regs for all classes
 	     because it is not defined for all classes.  */
 	  && (ira_allocno_class_translate[rclass] != rclass
 	      || ! TEST_HARD_REG_BIT (ira_prohibited_class_mode_regs
-				      [rclass][PSEUDO_REGNO_MODE (regno)],
+				      [rclass][biggest_mode],
 				      hard_regno))
 	  && ! TEST_HARD_REG_BIT (impossible_start_hard_regs, hard_regno)
 	  && (nregs_diff == 0
@@ -1362,14 +1361,7 @@ find_all_spills_for (int regno)
 	    {
 	      if (live_pseudos_reg_renumber[r2->regno] >= 0
 		  && ! sparseset_bit_p (live_range_hard_reg_pseudos, r2->regno)
-		  && rclass_intersect_p[regno_allocno_class_array[r2->regno]]
-		  && ((int) r2->regno < lra_constraint_new_regno_start
-		      || bitmap_bit_p (&lra_inheritance_pseudos, r2->regno)
-		      || bitmap_bit_p (&lra_split_regs, r2->regno)
-		      || bitmap_bit_p (&lra_optional_reload_pseudos, r2->regno)
-		      /* There is no sense to consider another reload
-			 pseudo if it has the same class.  */
-		      || regno_allocno_class_array[r2->regno] != rclass))
+		  && rclass_intersect_p[regno_allocno_class_array[r2->regno]])
 		sparseset_set_bit (live_range_hard_reg_pseudos, r2->regno);
 	    }
 	}
@@ -1771,12 +1763,13 @@ find_reload_regno_insns (int regno, rtx_insn * &start, rtx_insn * &finish)
   return true;
 }
 
-/* Process reload pseudos which did not get a hard reg, split a hard
-   reg live range in live range of a reload pseudo, and then return
-   TRUE.  If we did not split a hard reg live range, report an error,
-   and return FALSE.  */
+/* Process reload pseudos which did not get a hard reg, split a hard reg live
+   range in live range of a reload pseudo, and then return TRUE.  Otherwise,
+   return FALSE.  When FAIL_P is TRUE and if we did not split a hard reg live
+   range for failed reload pseudos, report an error and modify related asm
+   insns.  */
 bool
-lra_split_hard_reg_for (void)
+lra_split_hard_reg_for (bool fail_p)
 {
   int i, regno;
   rtx_insn *insn, *first, *last;
@@ -1851,23 +1844,25 @@ lra_split_hard_reg_for (void)
       regno = u;
       bitmap_ior_into (&failed_reload_insns,
 		       &lra_reg_info[regno].insn_bitmap);
-      lra_setup_reg_renumber
-	(regno, ira_class_hard_regs[lra_get_allocno_class (regno)][0], false);
+      if (fail_p)
+	lra_setup_reg_renumber
+	  (regno, ira_class_hard_regs[lra_get_allocno_class (regno)][0], false);
     }
-  EXECUTE_IF_SET_IN_BITMAP (&failed_reload_insns, 0, u, bi)
-    {
-      insn = lra_insn_recog_data[u]->insn;
-      if (asm_noperands (PATTERN (insn)) >= 0)
-	{
-	  asm_p = true;
-	  lra_asm_insn_error (insn);
-	}
-      else if (!asm_p)
-	{
-	  error ("unable to find a register to spill");
-	  fatal_insn ("this is the insn:", insn);
-	}
-    }
+  if (fail_p)
+    EXECUTE_IF_SET_IN_BITMAP (&failed_reload_insns, 0, u, bi)
+      {
+	insn = lra_insn_recog_data[u]->insn;
+	if (asm_noperands (PATTERN (insn)) >= 0)
+	  {
+	    asm_p = true;
+	    lra_asm_insn_error (insn);
+	  }
+	else if (!asm_p)
+	  {
+	    error ("unable to find a register to spill");
+	    fatal_insn ("this is the insn:", insn);
+	  }
+      }
   bitmap_clear (&failed_reload_pseudos);
   bitmap_clear (&failed_reload_insns);
   return false;

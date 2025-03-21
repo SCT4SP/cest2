@@ -1,5 +1,5 @@
 /* Classes for saving, deduplicating, and emitting analyzer diagnostics.
-   Copyright (C) 2019-2024 Free Software Foundation, Inc.
+   Copyright (C) 2019-2025 Free Software Foundation, Inc.
    Contributed by David Malcolm <dmalcolm@redhat.com>.
 
 This file is part of GCC.
@@ -19,7 +19,6 @@ along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
 #include "config.h"
-#define INCLUDE_MEMORY
 #define INCLUDE_VECTOR
 #include "system.h"
 #include "coretypes.h"
@@ -1033,12 +1032,36 @@ saved_diagnostic::maybe_add_sarif_properties (sarif_object &result_obj) const
     props.set_string (PROPERTY_PREFIX "sm", m_sm->get_name ());
   props.set_integer (PROPERTY_PREFIX "enode", m_enode->m_index);
   props.set_integer (PROPERTY_PREFIX "snode", m_snode->m_index);
+  if (m_stmt)
+    {
+      pretty_printer pp;
+      pp_gimple_stmt_1 (&pp, m_stmt, 0, (dump_flags_t)0);
+      props.set_string (PROPERTY_PREFIX "stmt", pp_formatted_text (&pp));
+    }
+  if (m_var)
+    props.set (PROPERTY_PREFIX "var", tree_to_json (m_var));
   if (m_sval)
     props.set (PROPERTY_PREFIX "sval", m_sval->to_json ());
   if (m_state)
     props.set (PROPERTY_PREFIX "state", m_state->to_json ());
-  if (m_best_epath)
+  // TODO: m_best_epath
   props.set_integer (PROPERTY_PREFIX "idx", m_idx);
+  if (m_duplicates.length () > 0)
+    {
+      auto duplicates_arr = ::make_unique<json::array> ();
+      for (auto iter : m_duplicates)
+	{
+	  auto sd_obj = ::make_unique<sarif_object> ();
+	  iter->maybe_add_sarif_properties (*sd_obj);
+	  duplicates_arr->append (std::move (sd_obj));
+	}
+      props.set<json::array> (PROPERTY_PREFIX "duplicates",
+			      std::move (duplicates_arr));
+    }
+#undef PROPERTY_PREFIX
+
+#define PROPERTY_PREFIX "gcc/analyzer/pending_diagnostic/"
+  props.set_string (PROPERTY_PREFIX "kind", m_d->get_kind ());
 #undef PROPERTY_PREFIX
 
   /* Potentially add pending_diagnostic-specific properties.  */
@@ -2833,7 +2856,8 @@ diagnostic_manager::prune_interproc_events (checker_path *path) const
 	      if (get_logger ())
 		{
 		  label_text desc
-		    (path->get_checker_event (idx)->get_desc ());
+		    (path->get_checker_event (idx)->get_desc
+		       (*global_dc->get_reference_printer ()));
 		  log ("filtering events %i-%i:"
 		       " irrelevant call/entry/return: %s",
 		       idx, idx + 2, desc.get ());
@@ -2855,7 +2879,8 @@ diagnostic_manager::prune_interproc_events (checker_path *path) const
 	      if (get_logger ())
 		{
 		  label_text desc
-		    (path->get_checker_event (idx)->get_desc ());
+		    (path->get_checker_event (idx)->get_desc
+		     (*global_dc->get_reference_printer ()));
 		  log ("filtering events %i-%i:"
 		       " irrelevant call/return: %s",
 		       idx, idx + 1, desc.get ());
@@ -2952,7 +2977,8 @@ diagnostic_manager::prune_system_headers (checker_path *path) const
 	      {
 		if (get_logger ())
 		  {
-		    label_text desc (event->get_desc ());
+		    label_text desc
+		      (event->get_desc (*global_dc->get_reference_printer ()));
 		    log ("filtering event %i:"
 			 "system header entry event: %s",
 			 idx, desc.get ());

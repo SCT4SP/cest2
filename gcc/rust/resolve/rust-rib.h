@@ -1,4 +1,4 @@
-// Copyright (C) 2020-2024 Free Software Foundation, Inc.
+// Copyright (C) 2020-2025 Free Software Foundation, Inc.
 
 // This file is part of GCC.
 
@@ -113,9 +113,16 @@ public:
   public:
     static Definition NonShadowable (NodeId id);
     static Definition Shadowable (NodeId id);
+    static Definition Globbed (NodeId id);
 
-    std::vector<NodeId> ids;
-    bool shadowable;
+    // checked shadowable -> non_shadowable -> globbed
+    // we have shadowable *and* globbed in order to control
+    // resolution priority
+    // we *could* use a single vector with 2 indices here
+    // but it's probably not worth it for now
+    std::vector<NodeId> ids_shadowable;
+    std::vector<NodeId> ids_non_shadowable;
+    std::vector<NodeId> ids_globbed;
 
     Definition () = default;
 
@@ -124,16 +131,31 @@ public:
 
     bool is_ambiguous () const;
 
-    NodeId get_node_id ()
+    NodeId get_node_id () const
     {
+      if (!ids_shadowable.empty ())
+	return ids_shadowable.back ();
+
       rust_assert (!is_ambiguous ());
-      return ids[0];
+
+      if (!ids_non_shadowable.empty ())
+	return ids_non_shadowable.back ();
+
+      rust_assert (!ids_globbed.empty ());
+      return ids_globbed.back ();
     }
 
     std::string to_string () const;
 
   private:
-    Definition (NodeId id, bool shadowable);
+    enum class Mode
+    {
+      SHADOWABLE,
+      NON_SHADOWABLE,
+      GLOBBED
+    };
+
+    Definition (NodeId id, Mode mode);
   };
 
   enum class Kind

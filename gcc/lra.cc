@@ -1,5 +1,5 @@
 /* LRA (local register allocator) driver and LRA utilities.
-   Copyright (C) 2010-2024 Free Software Foundation, Inc.
+   Copyright (C) 2010-2025 Free Software Foundation, Inc.
    Contributed by Vladimir Makarov <vmakarov@redhat.com>.
 
 This file is part of GCC.
@@ -549,7 +549,7 @@ lra_asm_insn_error (rtx_insn *insn)
   if (JUMP_P (insn))
     {
       ira_nullify_asm_goto (insn);
-      lra_update_insn_regno_info (insn);
+      lra_invalidate_insn_data (insn);
     }
   else
     {
@@ -1730,6 +1730,12 @@ lra_rtx_hash (rtx x)
     case CONST_INT:
       return val + UINTVAL (x);
 
+    case SUBREG:
+      val += lra_rtx_hash (SUBREG_REG (x));
+      for (int i = 0; i < NUM_POLY_INT_COEFFS; ++i)
+	val += SUBREG_BYTE (x).coeffs[i];
+      return val;
+
     default:
       break;
     }
@@ -1747,6 +1753,10 @@ lra_rtx_hash (rtx x)
 	case 'n':
 	case 'i':
 	  val += XINT (x, i);
+	  break;
+
+	case 'L':
+	  val += XLOC (x, i);
 	  break;
 
 	case 'V':
@@ -2476,6 +2486,7 @@ lra (FILE *f, int verbose)
 	    lra_clear_live_ranges ();
 	  bool fails_p;
 	  lra_hard_reg_split_p = false;
+	  int split_fails_num = 0;
 	  do
 	    {
 	      /* We need live ranges for lra_assign -- so build them.
@@ -2489,7 +2500,7 @@ lra (FILE *f, int verbose)
 		 coalescing.  If inheritance pseudos were spilled, the
 		 memory-memory moves involving them will be removed by
 		 pass undoing inheritance.  */
-	      if (lra_simple_p)
+	      if (lra_simple_p || lra_hard_reg_split_p)
 		lra_assign (fails_p);
 	      else
 		{
@@ -2518,8 +2529,15 @@ lra (FILE *f, int verbose)
 		  if (live_p)
 		    lra_clear_live_ranges ();
 		  live_p = false;
-		  if (! lra_split_hard_reg_for ())
-		    break;
+		  /* See a comment for LRA_MAX_FAILED_SPLITS definition.  */
+		  bool last_failed_split_p
+		    = split_fails_num > LRA_MAX_FAILED_SPLITS;
+		  if (! lra_split_hard_reg_for (last_failed_split_p))
+		    {
+		      if (last_failed_split_p)
+			break;
+		      split_fails_num++;
+		    }
 		  lra_hard_reg_split_p = true;
 		}
 	    }
@@ -2551,8 +2569,11 @@ lra (FILE *f, int verbose)
 	 rematerialize them first.  */
       if (lra_remat ())
 	{
-	  /* We need full live info -- see the comment above.  */
-	  lra_create_live_ranges (lra_reg_spill_p, true);
+	  /* We need full live info -- see the comment above.  We also might
+	     need live info if we have a pseudo assigned to hard frame pointer
+	     reg and will need FP for usual purposes.  */
+	  lra_create_live_ranges (lra_reg_spill_p || lra_fp_pseudo_p (),
+				  true);
 	  live_p = true;
 	  if (! lra_need_for_spills_p ())
 	    {

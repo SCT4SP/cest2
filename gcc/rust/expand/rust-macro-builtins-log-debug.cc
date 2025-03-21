@@ -1,4 +1,4 @@
-// Copyright (C) 2020-2024 Free Software Foundation, Inc.
+// Copyright (C) 2020-2025 Free Software Foundation, Inc.
 
 // This file is part of GCC.
 
@@ -16,13 +16,15 @@
 // along with GCC; see the file COPYING3.  If not see
 // <http://www.gnu.org/licenses/>.
 
+#include "rust-ast-fragment.h"
 #include "rust-macro-builtins.h"
 #include "rust-macro-builtins-helpers.h"
 
 namespace Rust {
 tl::optional<AST::Fragment>
 MacroBuiltin::assert_handler (location_t invoc_locus,
-			      AST::MacroInvocData &invoc)
+			      AST::MacroInvocData &invoc,
+			      AST::InvocKind semicolon)
 {
   rust_debug ("assert!() called");
 

@@ -1,5 +1,5 @@
 /* Subroutines common to both C and C++ pretty-printers.
-   Copyright (C) 2002-2024 Free Software Foundation, Inc.
+   Copyright (C) 2002-2025 Free Software Foundation, Inc.
    Contributed by Gabriel Dos Reis <gdr@integrable-solutions.net>
 
 This file is part of GCC.
@@ -18,7 +18,6 @@ You should have received a copy of the GNU General Public License
 along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
-#define INCLUDE_MEMORY
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
@@ -754,7 +753,8 @@ c_pretty_printer::storage_class_specifier (tree t)
     pp_c_ws_string (this, "typedef");
   else if (DECL_P (t))
     {
-      if (DECL_REGISTER (t))
+      if ((TREE_CODE (t) == PARM_DECL || VAR_P (t))
+	  && DECL_REGISTER (t))
 	pp_c_ws_string (this, "register");
       else if (TREE_STATIC (t) && VAR_P (t))
 	pp_c_ws_string (this, "static");
@@ -1159,6 +1159,8 @@ pp_c_floating_constant (c_pretty_printer *pp, tree r)
     pp_string (pp, "dd");
   else if (TREE_TYPE (r) == dfloat32_type_node)
     pp_string (pp, "df");
+  else if (TREE_TYPE (r) == dfloat64x_type_node)
+    pp_string (pp, "d64x");
   else if (TREE_TYPE (r) != double_type_node)
     for (int i = 0; i < NUM_FLOATN_NX_TYPES; i++)
       if (TREE_TYPE (r) == FLOATN_NX_TYPE_NODE (i))
@@ -1396,29 +1398,7 @@ c_pretty_printer::primary_expression (tree e)
 
     case SSA_NAME:
       if (SSA_NAME_VAR (e))
-	{
-	  tree var = SSA_NAME_VAR (e);
-	  if (tree id = SSA_NAME_IDENTIFIER (e))
-	    {
-	      const char *name = IDENTIFIER_POINTER (id);
-	      const char *dot;
-	      if (DECL_ARTIFICIAL (var) && (dot = strchr (name, '.')))
-		{
-		  /* Print the name without the . suffix (such as in VLAs).
-		     Use pp_c_identifier so that it can be converted into
-		     the appropriate encoding.  */
-		  size_t size = dot - name;
-		  char *ident = XALLOCAVEC (char, size + 1);
-		  memcpy (ident, name, size);
-		  ident[size] = '\0';
-		  pp_c_identifier (this, ident);
-		}
-	      else
-		primary_expression (var);
-	    }
-	  else
-	    primary_expression (var);
-	}
+	primary_expression (SSA_NAME_VAR (e));
       else if (gimple_assign_single_p (SSA_NAME_DEF_STMT (e)))
 	{
 	  /* Print only the right side of the GIMPLE assignment.  */
@@ -2878,6 +2858,9 @@ c_pretty_printer::statement (tree t)
     {
 
     case SWITCH_STMT:
+      if (dump_flags != TDF_NONE)
+	internal_error ("dump flags not handled here");
+
       pp_c_ws_string (this, "switch");
       pp_space (this);
       pp_c_left_paren (this);
@@ -2895,6 +2878,9 @@ c_pretty_printer::statement (tree t)
 	    for ( expression(opt) ; expression(opt) ; expression(opt) ) statement
 	    for ( declaration expression(opt) ; expression(opt) ) statement  */
     case WHILE_STMT:
+      if (dump_flags != TDF_NONE)
+	internal_error ("dump flags not handled here");
+
       pp_c_ws_string (this, "while");
       pp_space (this);
       pp_c_left_paren (this);
@@ -2907,6 +2893,9 @@ c_pretty_printer::statement (tree t)
       break;
 
     case DO_STMT:
+      if (dump_flags != TDF_NONE)
+	internal_error ("dump flags not handled here");
+
       pp_c_ws_string (this, "do");
       pp_newline_and_indent (this, 3);
       statement (DO_BODY (t));
@@ -2921,6 +2910,9 @@ c_pretty_printer::statement (tree t)
       break;
 
     case FOR_STMT:
+      if (dump_flags != TDF_NONE)
+	internal_error ("dump flags not handled here");
+
       pp_c_ws_string (this, "for");
       pp_space (this);
       pp_c_left_paren (this);
@@ -2949,6 +2941,9 @@ c_pretty_printer::statement (tree t)
 	    continue ;
 	    return expression(opt) ;  */
     case BREAK_STMT:
+      if (dump_flags != TDF_NONE)
+	internal_error ("dump flags not handled here");
+
       pp_string (this, "break");
       if (BREAK_NAME (t))
 	{
@@ -2960,6 +2955,9 @@ c_pretty_printer::statement (tree t)
       break;
 
     case CONTINUE_STMT:
+      if (dump_flags != TDF_NONE)
+	internal_error ("dump flags not handled here");
+
       pp_string (this, "continue");
       if (CONTINUE_NAME (t))
 	{
@@ -2973,15 +2971,16 @@ c_pretty_printer::statement (tree t)
     default:
       if (pp_needs_newline (this))
 	pp_newline_and_indent (this, 0);
-      dump_generic_node (this, t, pp_indentation (this), TDF_NONE, true);
+      dump_generic_node (this, t, pp_indentation (this), dump_flags, true);
     }
 }
 
 
 /* Initialize the PRETTY-PRINTER for handling C codes.  */
 
-c_pretty_printer::c_pretty_printer ()
+c_pretty_printer::c_pretty_printer (dump_flags_t dump_flags)
   : pretty_printer (),
+    dump_flags (dump_flags),
     offset_list (),
     flags ()
 {
@@ -3001,9 +3000,9 @@ c_pretty_printer::clone () const
 /* Print the tree T in full, on file FILE.  */
 
 void
-print_c_tree (FILE *file, tree t)
+print_c_tree (FILE *file, tree t, dump_flags_t dump_flags)
 {
-  c_pretty_printer pp;
+  c_pretty_printer pp (dump_flags);
 
   pp_needs_newline (&pp) = true;
   pp.set_output_stream (file);
@@ -3016,7 +3015,7 @@ print_c_tree (FILE *file, tree t)
 DEBUG_FUNCTION void
 debug_c_tree (tree t)
 {
-  print_c_tree (stderr, t);
+  print_c_tree (stderr, t, TDF_NONE);
   fputc ('\n', stderr);
 }
 
@@ -3031,7 +3030,20 @@ pp_c_tree_decl_identifier (c_pretty_printer *pp, tree t)
   gcc_assert (DECL_P (t));
 
   if (DECL_NAME (t))
-    name = IDENTIFIER_POINTER (DECL_NAME (t));
+    {
+      const char *dot;
+      name = IDENTIFIER_POINTER (DECL_NAME (t));
+      if (DECL_ARTIFICIAL (t) && (dot = strchr (name, '.')))
+	{
+	  /* Print the name without the . suffix (such as in VLAs and
+	     callee-copied parameters).  */
+	  size_t size = dot - name;
+	  char *ident = XALLOCAVEC (char, size + 1);
+	  memcpy (ident, name, size);
+	  ident[size] = '\0';
+	  name = ident;
+	}
+    }
   else
     {
       static char xname[8];

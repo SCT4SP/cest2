@@ -1,4 +1,4 @@
-// Copyright (C) 2020-2024 Free Software Foundation, Inc.
+// Copyright (C) 2020-2025 Free Software Foundation, Inc.
 
 // This file is part of GCC.
 
@@ -24,7 +24,7 @@ namespace Rust {
 namespace Resolver2_0 {
 
 NameResolutionContext::NameResolutionContext ()
-  : mappings (*Analysis::Mappings::get ())
+  : mappings (Analysis::Mappings::get ())
 {}
 
 tl::expected<NodeId, DuplicateNameError>
@@ -64,6 +64,24 @@ NameResolutionContext::insert_shadowable (Identifier name, NodeId id,
     }
 }
 
+tl::expected<NodeId, DuplicateNameError>
+NameResolutionContext::insert_globbed (Identifier name, NodeId id, Namespace ns)
+{
+  switch (ns)
+    {
+    case Namespace::Values:
+      return values.insert_globbed (name, id);
+    case Namespace::Types:
+      return types.insert_globbed (name, id);
+    case Namespace::Macros:
+      return macros.insert_globbed (name, id);
+    case Namespace::Labels:
+    default:
+      // return labels.insert (name, id);
+      rust_unreachable ();
+    }
+}
+
 void
 NameResolutionContext::map_usage (Usage usage, Definition definition)
 {
@@ -74,7 +92,7 @@ NameResolutionContext::map_usage (Usage usage, Definition definition)
 }
 
 tl::optional<NodeId>
-NameResolutionContext::lookup (NodeId usage)
+NameResolutionContext::lookup (NodeId usage) const
 {
   auto it = resolved_nodes.find (Usage (usage));
 
@@ -85,13 +103,13 @@ NameResolutionContext::lookup (NodeId usage)
 }
 
 void
-NameResolutionContext::scoped (Rib rib, NodeId id,
+NameResolutionContext::scoped (Rib::Kind rib_kind, NodeId id,
 			       std::function<void (void)> lambda,
 			       tl::optional<Identifier> path)
 {
-  values.push (rib, id, path);
-  types.push (rib, id, path);
-  macros.push (rib, id, path);
+  values.push (rib_kind, id, path);
+  types.push (rib_kind, id, path);
+  macros.push (rib_kind, id, path);
   // labels.push (rib, id);
 
   lambda ();
@@ -103,17 +121,18 @@ NameResolutionContext::scoped (Rib rib, NodeId id,
 }
 
 void
-NameResolutionContext::scoped (Rib rib, Namespace ns, NodeId scope_id,
+NameResolutionContext::scoped (Rib::Kind rib_kind, Namespace ns,
+			       NodeId scope_id,
 			       std::function<void (void)> lambda,
 			       tl::optional<Identifier> path)
 {
   switch (ns)
     {
     case Namespace::Values:
-      values.push (rib, scope_id, path);
+      values.push (rib_kind, scope_id, path);
       break;
     case Namespace::Types:
-      types.push (rib, scope_id, path);
+      types.push (rib_kind, scope_id, path);
       break;
     case Namespace::Labels:
     case Namespace::Macros:

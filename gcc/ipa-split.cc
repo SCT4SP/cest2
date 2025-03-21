@@ -1,5 +1,5 @@
 /* Function splitting pass
-   Copyright (C) 2010-2024 Free Software Foundation, Inc.
+   Copyright (C) 2010-2025 Free Software Foundation, Inc.
    Contributed by Jan Hubicka  <jh@suse.cz>
 
 This file is part of GCC.
@@ -74,7 +74,6 @@ along with GCC; see the file COPYING3.  If not see
    7) There is nothing preventing us from producing multiple parts of single function
       when needed or splitting also the parts.  */
 
-#define INCLUDE_MEMORY
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
@@ -1474,6 +1473,8 @@ split_function (basic_block return_bb, class split_point *split_point,
 	args_to_pass[i] = arg;
       }
   call = gimple_build_call_vec (node->decl, args_to_pass);
+  if (cur_node->get_fun ()->has_musttail && !add_tsan_func_exit)
+    gimple_call_set_must_tail (call, true);
   gimple_set_block (call, DECL_INITIAL (current_function_decl));
   args_to_pass.release ();
 

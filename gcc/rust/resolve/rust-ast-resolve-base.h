@@ -1,4 +1,4 @@
-// Copyright (C) 2020-2024 Free Software Foundation, Inc.
+// Copyright (C) 2020-2025 Free Software Foundation, Inc.
 
 // This file is part of GCC.
 
@@ -89,6 +89,7 @@ public:
   void visit (AST::RangeFullExpr &);
   void visit (AST::RangeFromToInclExpr &);
   void visit (AST::RangeToInclExpr &);
+  void visit (AST::BoxExpr &);
   void visit (AST::ReturnExpr &);
   void visit (AST::UnsafeBlockExpr &);
   void visit (AST::LoopExpr &);
@@ -103,6 +104,7 @@ public:
   void visit (AST::MatchExpr &);
   void visit (AST::AwaitExpr &);
   void visit (AST::AsyncBlockExpr &);
+  void visit (AST::InlineAsm &);
 
   void visit (AST::TypeParam &);
 
@@ -212,7 +214,7 @@ protected:
   bool resolve_visibility (const AST::Visibility &vis);
 
   Resolver *resolver;
-  Analysis::Mappings *mappings;
+  Analysis::Mappings &mappings;
   NodeId resolved_node;
 };
 

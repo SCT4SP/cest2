@@ -1,5 +1,5 @@
 /* Default target hook functions.
-   Copyright (C) 2003-2024 Free Software Foundation, Inc.
+   Copyright (C) 2003-2025 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -47,7 +47,6 @@ along with GCC; see the file COPYING3.  If not see
    comment can thus be removed at that point.  */
 
 #include "config.h"
-#define INCLUDE_MEMORY
 #include "system.h"
 #include "coretypes.h"
 #include "target.h"
@@ -96,6 +95,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree-vectorizer.h"
 #include "options.h"
 #include "case-cfn-macros.h"
+#include "avoid-store-forwarding.h"
 
 bool
 default_legitimate_address_p (machine_mode mode ATTRIBUTE_UNUSED,
@@ -1305,6 +1305,14 @@ default_ira_change_pseudo_allocno_class (int regno ATTRIBUTE_UNUSED,
   return cl;
 }
 
+int
+default_ira_callee_saved_register_cost_scale (int)
+{
+  return (optimize_size
+	  ? 1
+	  : REG_FREQ_FROM_BB (ENTRY_BLOCK_PTR_FOR_FN (cfun)));
+}
+
 extern bool
 default_lra_p (void)
 {
@@ -2075,6 +2083,33 @@ default_register_move_cost (machine_mode mode ATTRIBUTE_UNUSED,
 #endif
 }
 
+/* The default implementation of TARGET_CALLEE_SAVE_COST.  */
+
+int
+default_callee_save_cost (spill_cost_type spill_type, unsigned int,
+			  machine_mode, unsigned int, int mem_cost,
+			  const HARD_REG_SET &callee_saved_regs,
+			  bool existing_spills_p)
+{
+  if (!existing_spills_p)
+    {
+      auto frame_type = (spill_type == spill_cost_type::SAVE
+			 ? frame_cost_type::ALLOCATION
+			 : frame_cost_type::DEALLOCATION);
+      mem_cost += targetm.frame_allocation_cost (frame_type,
+						 callee_saved_regs);
+    }
+  return mem_cost;
+}
+
+/* The default implementation of TARGET_FRAME_ALLOCATION_COST.  */
+
+int
+default_frame_allocation_cost (frame_cost_type, const HARD_REG_SET &)
+{
+  return 0;
+}
+
 /* The default implementation of TARGET_SLOW_UNALIGNED_ACCESS.  */
 
 bool
@@ -2279,6 +2314,32 @@ default_class_max_nregs (reg_class_t rclass ATTRIBUTE_UNUSED,
   unsigned int size = GET_MODE_SIZE (mode).to_constant ();
   return (size + UNITS_PER_WORD - 1) / UNITS_PER_WORD;
 #endif
+}
+
+/* The default implementation of TARGET_AVOID_STORE_FORWARDING_P.  */
+
+bool
+default_avoid_store_forwarding_p (vec<store_fwd_info>, rtx, int total_cost,
+				  bool)
+{
+  /* Use a simple cost heurstic base on param_store_forwarding_max_distance.
+     In general the distance should be somewhat correlated to the store
+     forwarding penalty; if the penalty is large then it is justified to
+     increase the window size.  Use this to reject sequences that are clearly
+     unprofitable.
+     Skip the cost check if param_store_forwarding_max_distance is 0.  */
+  int max_cost = COSTS_N_INSNS (param_store_forwarding_max_distance / 2);
+  const bool unlimited_cost = (param_store_forwarding_max_distance == 0);
+  if (!unlimited_cost && total_cost > max_cost && max_cost)
+    {
+      if (dump_file)
+	fprintf (dump_file, "Not transformed due to cost: %d > %d.\n",
+		 total_cost, max_cost);
+
+      return false;
+    }
+
+  return true;
 }
 
 /* Determine the debugging unwind mechanism for the target.  */

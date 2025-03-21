@@ -1,4 +1,4 @@
-// Copyright (C) 2020-2024 Free Software Foundation, Inc.
+// Copyright (C) 2020-2025 Free Software Foundation, Inc.
 
 // This file is part of GCC.
 
@@ -137,6 +137,7 @@ public:
   virtual void visit (AST::RangeFullExpr &expr);
   virtual void visit (AST::RangeFromToInclExpr &expr);
   virtual void visit (AST::RangeToInclExpr &expr);
+  virtual void visit (AST::BoxExpr &expr);
   virtual void visit (AST::ReturnExpr &expr);
   virtual void visit (AST::UnsafeBlockExpr &expr);
   virtual void visit (AST::LoopExpr &expr);
@@ -147,6 +148,7 @@ public:
   virtual void visit (AST::IfExprConseqElse &expr);
   virtual void visit (AST::IfLetExpr &expr);
   virtual void visit (AST::IfLetExprConseqElse &expr);
+  virtual void visit (AST::InlineAsm &expr);
   //  virtual void visit(MatchCase& match_case);
   // virtual void visit (AST::MatchCaseBlockExpr &match_case);
   // virtual void visit (AST::MatchCaseExpr &match_case);
@@ -261,7 +263,7 @@ protected:
       attr_mappings (Analysis::BuiltinAttributeMappings::get ())
   {}
 
-  Analysis::Mappings *mappings;
+  Analysis::Mappings &mappings;
   Analysis::BuiltinAttributeMappings *attr_mappings;
 
   HIR::Lifetime lower_lifetime (AST::Lifetime &lifetime,

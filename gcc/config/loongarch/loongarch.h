@@ -1,5 +1,5 @@
 /* Definitions of target machine for GNU compiler.  LoongArch version.
-   Copyright (C) 2021-2024 Free Software Foundation, Inc.
+   Copyright (C) 2021-2025 Free Software Foundation, Inc.
    Contributed by Loongson Ltd.
    Based on MIPS and RISC-V target for GNU compiler.
 
@@ -25,6 +25,8 @@ along with GCC; see the file COPYING3.  If not see
 #include "config/loongarch/loongarch-evolution.h"
 
 #define SWITCHABLE_TARGET 1
+
+#define REGISTER_TARGET_PRAGMAS() loongarch_register_pragmas ()
 
 #define TARGET_SUPPORTS_WIDE_INT 1
 
@@ -939,6 +941,38 @@ typedef struct {
   { "s6",	29 + GP_REG_FIRST },					\
   { "s7",	30 + GP_REG_FIRST },					\
   { "s8",	31 + GP_REG_FIRST },					\
+  { "fa0",	 0 + FP_REG_FIRST },					\
+  { "fa1",	 1 + FP_REG_FIRST },					\
+  { "fa2",	 2 + FP_REG_FIRST },					\
+  { "fa3",	 3 + FP_REG_FIRST },					\
+  { "fa4",	 4 + FP_REG_FIRST },					\
+  { "fa5",	 5 + FP_REG_FIRST },					\
+  { "fa6",	 6 + FP_REG_FIRST },					\
+  { "fa7",	 7 + FP_REG_FIRST },					\
+  { "ft0",	 8 + FP_REG_FIRST },					\
+  { "ft1",	 9 + FP_REG_FIRST },					\
+  { "ft2",	10 + FP_REG_FIRST },					\
+  { "ft3",	11 + FP_REG_FIRST },					\
+  { "ft4",	12 + FP_REG_FIRST },					\
+  { "ft5",	13 + FP_REG_FIRST },					\
+  { "ft6",	14 + FP_REG_FIRST },					\
+  { "ft7",	15 + FP_REG_FIRST },					\
+  { "ft8",	16 + FP_REG_FIRST },					\
+  { "ft9",	17 + FP_REG_FIRST },					\
+  { "ft10",	18 + FP_REG_FIRST },					\
+  { "ft11",	19 + FP_REG_FIRST },					\
+  { "ft12",	20 + FP_REG_FIRST },					\
+  { "ft13",	21 + FP_REG_FIRST },					\
+  { "ft14",	22 + FP_REG_FIRST },					\
+  { "ft15",	23 + FP_REG_FIRST },					\
+  { "fs0",	24 + FP_REG_FIRST },					\
+  { "fs1",	25 + FP_REG_FIRST },					\
+  { "fs2",	26 + FP_REG_FIRST },					\
+  { "fs3",	27 + FP_REG_FIRST },					\
+  { "fs4",	28 + FP_REG_FIRST },					\
+  { "fs5",	29 + FP_REG_FIRST },					\
+  { "fs6",	30 + FP_REG_FIRST },					\
+  { "fs7",	31 + FP_REG_FIRST },					\
   { "v0",	 4 + GP_REG_FIRST },					\
   { "v1",	 5 + GP_REG_FIRST },					\
   { "vr0",	 0 + FP_REG_FIRST },					\

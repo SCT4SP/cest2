@@ -1,3 +1,41 @@
+2025-03-18  Jose E. Marchesi  <jose.marchesi@oracle.com>
+
+	* libiberty.h (ldirname): New function declaration.
+	(dos_ldirname): Likewise.
+	(unix_ldirname): Likewise.
+
+2025-02-11  Roger Sayle  <roger@nextmovesoftware.com>
+
+	* dwarf2.def (DW_CFA_AARCH64_negate_ra_state_with_pc): Define.
+
+2025-01-08  Jakub Jelinek  <jakub@redhat.com>
+
+	* dwarf2.h (enum dwarf_source_language): Fix comment pasto.
+	(enum dwarf_source_language_name): New type.
+	* dwarf2.def (DW_AT_language_name, DW_AT_language_version): New
+	DWARF 6 codes.
+
+2024-12-29  John David Anglin  <danglin@gcc.gnu.org>
+
+	* libiberty.h (mkstemps): Declare
+
+2024-11-23  Jakub Jelinek  <jakub@redhat.com>
+
+	* dwarf2.h (enum dwarf_source_language): Add DW_LANG_Fortran23
+	enumerator.
+
+2024-11-22  Tobias Burnus  <tburnus@baylibre.com>
+
+	* gomp-constants.h (GOMP_INTEROP_IFR_NONE): Rename ...
+	(GOMP_INTEROP_IFR_UNKNOWN): ... to this. And change value.
+	(GOMP_INTEROP_IFR_SEPARATOR): Likewise.
+
+2024-11-21  Jakub Jelinek  <jakub@redhat.com>
+
+	* dwarf2.h (enum dwarf_source_language): Add comment where
+	the post DWARF 5 additions start.  Refresh list from
+	https://dwarfstd.org/languages.html.
+
 2024-10-31  Mark Wielaard  <mark@klomp.org>
 
 	* safe-ctype.h: Change accidently to accidentally.

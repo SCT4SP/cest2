@@ -1,4 +1,4 @@
-// Copyright (C) 2020-2024 Free Software Foundation, Inc.
+// Copyright (C) 2020-2025 Free Software Foundation, Inc.
 
 // This file is part of GCC.
 
@@ -62,7 +62,6 @@ const BiMap<std::string, BuiltinMacro> MacroBuiltin::builtins = {{
   {"concat_idents", BuiltinMacro::ConcatIdents},
   {"module_path", BuiltinMacro::ModulePath},
   {"asm", BuiltinMacro::Asm},
-  {"llvm_asm", BuiltinMacro::LlvmAsm},
   {"global_asm", BuiltinMacro::GlobalAsm},
   {"log_syntax", BuiltinMacro::LogSyntax},
   {"trace_macros", BuiltinMacro::TraceMacros},
@@ -88,8 +87,18 @@ const BiMap<std::string, BuiltinMacro> MacroBuiltin::builtins = {{
 AST::MacroTranscriberFunc
 format_args_maker (AST::FormatArgs::Newline nl)
 {
-  return [nl] (location_t loc, AST::MacroInvocData &invoc) {
-    return MacroBuiltin::format_args_handler (loc, invoc, nl);
+  return [nl] (location_t loc, AST::MacroInvocData &invoc,
+	       AST::InvocKind semicolon) {
+    return MacroBuiltin::format_args_handler (loc, invoc, semicolon, nl);
+  };
+}
+
+AST::MacroTranscriberFunc
+inline_asm_maker (AST::AsmKind global_asm)
+{
+  return [global_asm] (location_t loc, AST::MacroInvocData &invoc,
+		       AST::InvocKind semicolon) {
+    return MacroBuiltin::asm_handler (loc, invoc, semicolon, global_asm);
   };
 }
 
@@ -109,13 +118,12 @@ std::unordered_map<std::string, AST::MacroTranscriberFunc>
     {"include", MacroBuiltin::include_handler},
     {"format_args", format_args_maker (AST::FormatArgs::Newline::No)},
     {"format_args_nl", format_args_maker (AST::FormatArgs::Newline::Yes)},
+    {"asm", inline_asm_maker (AST::AsmKind::Inline)},
+    {"global_asm", inline_asm_maker (AST::AsmKind::Global)},
     /* Unimplemented macro builtins */
     {"option_env", MacroBuiltin::sorry},
     {"concat_idents", MacroBuiltin::sorry},
     {"module_path", MacroBuiltin::sorry},
-    {"asm", MacroBuiltin::sorry},
-    {"llvm_asm", MacroBuiltin::sorry},
-    {"global_asm", MacroBuiltin::sorry},
     {"log_syntax", MacroBuiltin::sorry},
     {"trace_macros", MacroBuiltin::sorry},
     {"test", MacroBuiltin::sorry},
@@ -123,6 +131,8 @@ std::unordered_map<std::string, AST::MacroTranscriberFunc>
     {"test_case", MacroBuiltin::sorry},
     {"global_allocator", MacroBuiltin::sorry},
     {"cfg_accessible", MacroBuiltin::sorry},
+    {"rustc_const_stable", MacroBuiltin::sorry},
+    {"rustc_const_unstable", MacroBuiltin::sorry},
     /* Derive builtins do not need a real transcriber, but still need one. It
        should however never be called since builtin derive macros get expanded
        differently, and benefit from knowing on what kind of items they are
@@ -151,7 +161,8 @@ builtin_macro_from_string (const std::string &identifier)
 }
 
 tl::optional<AST::Fragment>
-MacroBuiltin::sorry (location_t invoc_locus, AST::MacroInvocData &invoc)
+MacroBuiltin::sorry (location_t invoc_locus, AST::MacroInvocData &invoc,
+		     AST::InvocKind semicolon)
 {
   rust_sorry_at (invoc_locus, "unimplemented builtin macro: %qs",
 		 invoc.get_path ().as_string ().c_str ());
@@ -161,7 +172,8 @@ MacroBuiltin::sorry (location_t invoc_locus, AST::MacroInvocData &invoc)
 
 tl::optional<AST::Fragment>
 MacroBuiltin::proc_macro_builtin (location_t invoc_locus,
-				  AST::MacroInvocData &invoc)
+				  AST::MacroInvocData &invoc,
+				  AST::InvocKind semicolon)
 {
   rust_error_at (invoc_locus, "cannot invoke derive macro: %qs",
 		 invoc.get_path ().as_string ().c_str ());

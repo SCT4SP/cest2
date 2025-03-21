@@ -1,7 +1,7 @@
 /* Declarations of core diagnostic functionality for code that does
    not need to deal with diagnostic contexts or diagnostic info
-   structures.
-   Copyright (C) 1998-2024 Free Software Foundation, Inc.
+   structures.  These functions implicitly use global_dc.
+   Copyright (C) 1998-2025 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -39,13 +39,25 @@ typedef enum
   DK_ANY,
 } diagnostic_t;
 
-/* RAII-style class for grouping related diagnostics.  */
+/* RAII-style class for grouping related diagnostics within global_dc.  */
 
 class auto_diagnostic_group
 {
  public:
   auto_diagnostic_group ();
   ~auto_diagnostic_group ();
+};
+
+/* RAII-style class for nesting hierarchical diagnostics within global_dc.
+   Any diagnostics emitted within the lifetime of this object
+   will be treated as one level of nesting deeper than diagnostics
+   emitted outside the lifetime of the object.  */
+
+class auto_diagnostic_nesting_level
+{
+ public:
+  auto_diagnostic_nesting_level ();
+  ~auto_diagnostic_nesting_level ();
 };
 
 /* Forward decl.  */
@@ -75,6 +87,9 @@ struct diagnostic_option_id
 extern const char *progname;
 
 extern const char *trim_filename (const char *);
+
+/* Various functions for emitting diagnostics follow.
+   All of these implicitly use global_dc.  */
 
 /* If we haven't already defined a front-end-specific diagnostics
    style, use the generic one.  */

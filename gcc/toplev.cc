@@ -1,5 +1,5 @@
 /* Top level of GCC compilers (cc1, cc1plus, etc.)
-   Copyright (C) 1987-2024 Free Software Foundation, Inc.
+   Copyright (C) 1987-2025 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -23,7 +23,6 @@ along with GCC; see the file COPYING3.  If not see
    Error messages and low-level interface to malloc also handled here.  */
 
 #include "config.h"
-#define INCLUDE_MEMORY
 #include "system.h"
 #include "coretypes.h"
 #include "backend.h"
@@ -1100,7 +1099,7 @@ general_init (const char *argv0, bool init_signals, unique_argv original_argv)
 							lang_mask,
 							&global_options),
      lang_mask);
-  global_dc->set_urlifier (make_gcc_urlifier (lang_mask));
+  global_dc->push_owned_urlifier (make_gcc_urlifier (lang_mask));
 
   if (init_signals)
     {
@@ -1137,7 +1136,7 @@ general_init (const char *argv0, bool init_signals, unique_argv original_argv)
   linemap_init (line_table, BUILTINS_LOCATION);
   line_table->m_reallocator = realloc_for_line_map;
   line_table->m_round_alloc_size = ggc_round_alloc_size;
-  line_table->default_range_bits = 5;
+  line_table->default_range_bits = line_map_suggested_range_bits;
   init_ttree ();
 
   /* Initialize register usage now so switches may override.  */
@@ -1301,7 +1300,7 @@ process_options ()
       flag_section_anchors = 0;
     }
 
-  if (flag_short_enums == 2)
+  if (!OPTION_SET_P (flag_short_enums))
     flag_short_enums = targetm.default_short_enums ();
 
   /* Set aux_base_name if not already set.  */
@@ -1694,7 +1693,8 @@ process_options ()
 
   if ((flag_sanitize & SANITIZE_USER_ADDRESS)
       && ((targetm.asan_shadow_offset == NULL)
-	  || (targetm.asan_shadow_offset () == 0)))
+	  || ((targetm.asan_shadow_offset () == 0)
+	      && !targetm.asan_dynamic_shadow_offset_p ())))
     {
       warning_at (UNKNOWN_LOCATION, 0,
 		  "%<-fsanitize=address%> not supported for this target");
@@ -1764,9 +1764,6 @@ process_options ()
   if (flag_checking >= 2)
     hash_table_sanitize_eq_limit
       = param_hash_table_verification_limit;
-
-  if (flag_large_source_files)
-    line_table->default_range_bits = 0;
 
   diagnose_options (&global_options, &global_options_set, UNKNOWN_LOCATION);
 
@@ -2335,6 +2332,9 @@ toplev::main (int argc, char **argv)
 		  save_decoded_options, save_decoded_options_count,
 		  UNKNOWN_LOCATION, global_dc,
 		  targetm.target_option.override);
+
+  global_dc->get_file_cache ().tune (param_file_cache_files,
+				     param_file_cache_lines);
 
   handle_common_deferred_options ();
 

@@ -22,22 +22,6 @@ fn is_id_continue(c: char) -> bool {
     unicode_xid::UnicodeXID::is_xid_continue(c)
 }
 
-// Workaround for Ubuntu 18.04. The default Rust package is 1.65 (and unlikely to change I assume?), but the
-// generic format parser library uses `is_some_and` which was introduced in 1.70. So this is a reimplementation,
-// directly taken from the standard library sources
-trait IsSomeAnd<T> {
-    fn is_some_and(self, f: impl FnOnce(T) -> bool) -> bool;
-}
-
-impl<T> IsSomeAnd<T> for Option<T> {
-    fn is_some_and(self, f: impl FnOnce(T) -> bool) -> bool {
-        match self {
-            None => false,
-            Some(x) => f(x),
-        }
-    }
-}
-
 // use rustc_lexer::unescape;
 pub use Alignment::*;
 pub use Count::*;
@@ -505,7 +489,7 @@ impl<'a> Parser<'a> {
             }
 
             pos = peek_pos;
-            description = format!("expected `'}}'`, found `{maybe:?}`");
+            description = format!("expected `'}}'`, found `{:?}`", maybe);
         } else {
             description = "expected `'}'` but string was terminated".to_owned();
             // point at closing `"`
@@ -690,12 +674,16 @@ impl<'a> Parser<'a> {
 
         // fill character
         if let Some(&(idx, c)) = self.cur.peek() {
-            if let Some((_, '>' | '<' | '^')) = self.cur.clone().nth(1) {
-                spec.fill = Some(c);
-                spec.fill_span = Some(self.span(idx, idx + 1));
-                self.cur.next();
+            match self.cur.clone().nth(1) {
+                Some((_, '>')) | Some((_, '<')) | Some((_, '^')) => {
+                    spec.fill = Some(c);
+                    spec.fill_span = Some(self.span(idx, idx + 1));
+                    self.cur.next();
+                }
+                _ => {}
             }
         }
+
         // Alignment
         if self.consume('<') {
             spec.align = AlignLeft;
@@ -908,7 +896,11 @@ impl<'a> Parser<'a> {
             );
         }
 
-        found.then_some(cur)
+        if found {
+            Some(cur)
+        } else {
+            None
+        }
     }
 
     fn suggest_format(&mut self) {
@@ -991,8 +983,9 @@ fn find_width_map_from_snippet(
     // If we only trimmed it off the input, `format!("\n")` would cause a mismatch as here we they actually match up.
     // Alternatively, we could just count the trailing newlines and only trim one from the input if they don't match up.
     let input_no_nl = input.trim_end_matches('\n');
-    let Some(unescaped) = unescape_string(snippet) else {
-        return InputStringKind::NotALiteral;
+    let unescaped = match unescape_string(snippet) {
+        Some(u) => u,
+        None => return InputStringKind::NotALiteral,
     };
 
     let unescaped_no_nl = unescaped.trim_end_matches('\n');
@@ -1023,7 +1016,13 @@ fn find_width_map_from_snippet(
 
                 width_mappings.push(InnerWidthMapping::new(pos, width, 0));
             }
-            ('\\', Some((_, 'n' | 't' | 'r' | '0' | '\\' | '\'' | '\"'))) => {
+            ('\\', Some((_, 'n')))
+            | ('\\', Some((_, 't')))
+            | ('\\', Some((_, 'r')))
+            | ('\\', Some((_, '0')))
+            | ('\\', Some((_, '\\')))
+            | ('\\', Some((_, '\'')))
+            | ('\\', Some((_, '\"'))) => {
                 width_mappings.push(InnerWidthMapping::new(pos, 2, 1));
                 let _ = s.next();
             }
@@ -1049,7 +1048,7 @@ fn find_width_map_from_snippet(
                             .as_str()
                             .get(..digits_len)
                             .and_then(|digits| u32::from_str_radix(digits, 16).ok())
-                            .and_then(char::from_u32)
+                            .and_then(std::char::from_u32)
                             .map_or(1, char::len_utf8);
 
                         // Skip the digits, for chars that encode to more than 1 utf-8 byte
@@ -1105,7 +1104,11 @@ fn unescape_string(string: &str) -> Option<string::String> {
     let buf = string::String::from(string);
     let ok = true;
 
-    ok.then_some(buf)
+    if ok {
+        Some(buf)
+    } else {
+        None
+    }
 }
 
 // Assert a reasonable size for `Piece`

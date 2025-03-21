@@ -1,4 +1,4 @@
-// Copyright (C) 2020-2024 Free Software Foundation, Inc.
+// Copyright (C) 2020-2025 Free Software Foundation, Inc.
 
 // This file is part of GCC.
 
@@ -330,7 +330,8 @@ PatternDeclaration::check_bindings_consistency (
 	      if (!ident_is_outer_bound && !missing_bindings.count (ident))
 		missing_bindings.insert ({ident, inner_info});
 
-	      else if (outer_bindings_map[ident] != inner_info
+	      else if (outer_bindings_map.count (ident)
+		       && outer_bindings_map[ident] != inner_info
 		       && !inconsistent_bindings.count (ident))
 		inconsistent_bindings.insert ({ident, inner_info});
 	    }

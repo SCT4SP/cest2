@@ -1,5 +1,5 @@
 /* Concrete classes for implementing diagnostic paths.
-   Copyright (C) 2019-2024 Free Software Foundation, Inc.
+   Copyright (C) 2019-2025 Free Software Foundation, Inc.
    Contributed by David Malcolm <dmalcolm@redhat.com>
 
 This file is part of GCC.
@@ -20,7 +20,6 @@ along with GCC; see the file COPYING3.  If not see
 
 
 #include "config.h"
-#define INCLUDE_MEMORY
 #define INCLUDE_VECTOR
 #include "system.h"
 #include "coretypes.h"
@@ -42,15 +41,6 @@ simple_diagnostic_path::simple_diagnostic_path (pretty_printer *event_pp)
   add_thread ("main");
 }
 
-/* Implementation of diagnostic_path::num_events vfunc for
-   simple_diagnostic_path: simply get the number of events in the vec.  */
-
-unsigned
-simple_diagnostic_path::num_events () const
-{
-  return m_events.length ();
-}
-
 /* Implementation of diagnostic_path::get_event vfunc for
    simple_diagnostic_path: simply return the event in the vec.  */
 
@@ -58,12 +48,6 @@ const diagnostic_event &
 simple_diagnostic_path::get_event (int idx) const
 {
   return *m_events[idx];
-}
-
-unsigned
-simple_diagnostic_path::num_threads () const
-{
-  return m_threads.length ();
 }
 
 const diagnostic_thread &
@@ -215,8 +199,10 @@ test_intraprocedural_path (pretty_printer *event_pp)
   ASSERT_EQ (path.num_events (), 2);
   ASSERT_EQ (path.num_threads (), 1);
   ASSERT_FALSE (path.interprocedural_p ());
-  ASSERT_STREQ (path.get_event (0).get_desc ().get (), "first `free'");
-  ASSERT_STREQ (path.get_event (1).get_desc ().get (), "double `free'");
+  ASSERT_STREQ (path.get_event (0).get_desc (*event_pp).get (),
+		"first `free'");
+  ASSERT_STREQ (path.get_event (1).get_desc (*event_pp).get (),
+		"double `free'");
 }
 
 /* Run all of the selftests within this file.  */

@@ -1,5 +1,5 @@
 /* Various declarations for language-independent diagnostics subroutines.
-   Copyright (C) 2000-2024 Free Software Foundation, Inc.
+   Copyright (C) 2000-2025 Free Software Foundation, Inc.
    Contributed by Gabriel Dos Reis <gdr@codesourcery.com>
 
 This file is part of GCC.
@@ -20,14 +20,6 @@ along with GCC; see the file COPYING3.  If not see
 
 #ifndef GCC_DIAGNOSTIC_H
 #define GCC_DIAGNOSTIC_H
-
-/* This header uses std::unique_ptr, but <memory> can't be directly
-   included due to issues with macros.  Hence it must be included from
-   system.h by defining INCLUDE_MEMORY in any source file using it.  */
-
-#ifndef INCLUDE_MEMORY
-# error "You must define INCLUDE_MEMORY before including system.h to use diagnostic.h"
-#endif
 
 #include "unique-argv.h"
 #include "rich-location.h"
@@ -410,6 +402,8 @@ class diagnostic_source_print_policy
 {
 public:
   diagnostic_source_print_policy (const diagnostic_context &);
+  diagnostic_source_print_policy (const diagnostic_context &,
+				  const diagnostic_source_printing_options &);
 
   void
   print (pretty_printer &pp,
@@ -475,8 +469,39 @@ struct diagnostic_counters
   int m_count_for_kind[DK_LAST_DIAGNOSTIC_KIND];
 };
 
-/* This data structure bundles altogether any information relevant to
-   the context of a diagnostic message.  */
+/* This class encapsulates the state of the diagnostics subsystem
+   as a whole (either directly, or via owned objects of other classes, to
+   avoid global variables).
+
+   It has responsibility for:
+   - being a central place for clients to report diagnostics
+   - reporting those diagnostics to zero or more output sinks
+     (e.g. text vs SARIF)
+   - providing a "dump" member function for a debug dump of the state of
+     the diagnostics subsytem
+   - direct vs buffered diagnostics (see class diagnostic_buffer)
+   - tracking the original argv of the program (for SARIF output)
+   - crash-handling
+
+   It delegates responsibility to various other classes:
+   - the various output sinks (instances of diagnostic_output_format
+     subclasses)
+   - formatting of messages (class pretty_printer)
+   - an optional urlifier to inject URLs into formatted messages
+   - counting the number of diagnostics reported of each kind
+     (class diagnostic_counters)
+   - calling out to a diagnostic_option_manager to determine if
+     a particular warning is enabled or disabled
+   - tracking pragmas that enable/disable warnings in a range of
+     source code
+   - a cache for use when quoting the user's source code (class file_cache)
+   - a text_art::theme
+   - an edit_context for generating patches from fix-it hints
+   - diagnostic_client_data_hooks for metadata.
+
+   Try to avoid adding new responsibilities to this class itself, to avoid
+   the "blob" anti-pattern.  */
+
 class diagnostic_context
 {
 public:
@@ -526,6 +551,9 @@ public:
   void begin_group ();
   void end_group ();
 
+  void push_nesting_level ();
+  void pop_nesting_level ();
+
   bool warning_enabled_at (location_t loc, diagnostic_option_id option_id);
 
   bool option_unspecified_p (diagnostic_option_id option_id) const
@@ -570,6 +598,7 @@ public:
   }
 
   void maybe_show_locus (const rich_location &richloc,
+			 const diagnostic_source_printing_options &opts,
 			 diagnostic_t diagnostic_kind,
 			 pretty_printer &pp,
 			 diagnostic_source_effect_info *effect_info);
@@ -580,7 +609,11 @@ public:
   void set_output_format (std::unique_ptr<diagnostic_output_format> output_format);
   void set_text_art_charset (enum diagnostic_text_art_charset charset);
   void set_client_data_hooks (std::unique_ptr<diagnostic_client_data_hooks> hooks);
-  void set_urlifier (std::unique_ptr<urlifier>);
+
+  void push_owned_urlifier (std::unique_ptr<urlifier>);
+  void push_borrowed_urlifier (const urlifier &);
+  void pop_urlifier ();
+
   void create_edit_context ();
   void set_warning_as_error_requested (bool val)
   {
@@ -637,7 +670,9 @@ public:
   {
     return m_client_data_hooks;
   }
-  urlifier *get_urlifier () const { return m_urlifier; }
+
+  const urlifier *get_urlifier () const;
+
   text_art::theme *get_diagram_theme () const { return m_diagrams.m_theme; }
 
   int &diagnostic_count (diagnostic_t kind)
@@ -692,6 +727,13 @@ public:
 			  const char *, const char *, va_list *,
 			  diagnostic_t) ATTRIBUTE_GCC_DIAG(7,0);
 
+  int get_diagnostic_nesting_level () const
+  {
+    return m_diagnostic_groups.m_diagnostic_nesting_level;
+  }
+
+  char *build_indent_prefix () const;
+
   int
   pch_save (FILE *f)
   {
@@ -725,6 +767,8 @@ public:
 
   void
   add_sink (std::unique_ptr<diagnostic_output_format>);
+
+  void remove_all_output_sinks ();
 
   bool supports_fnotice_on_stderr_p () const;
 
@@ -848,11 +892,16 @@ private:
   diagnostic_option_manager *m_option_mgr;
   unsigned m_lang_mask;
 
-  /* An optional hook for adding URLs to quoted text strings in
+  /* A stack of optional hooks for adding URLs to quoted text strings in
      diagnostics.  Only used for the main diagnostic message.
-     Owned by the context; this would be a std::unique_ptr if
-     diagnostic_context had a proper ctor.  */
-  urlifier *m_urlifier;
+     Typically a single one owner by the context, but can be temporarily
+     overridden by a borrowed urlifier (e.g. on-stack).  */
+  struct urlifier_stack_node
+  {
+    urlifier *m_urlifier;
+    bool m_owned;
+  };
+  auto_vec<urlifier_stack_node> *m_urlifier_stack;
 
 public:
   /* Auxiliary data for client.  */
@@ -902,7 +951,10 @@ private:
   /* Fields relating to diagnostic groups.  */
   struct {
     /* How many diagnostic_group instances are currently alive.  */
-    int m_nesting_depth;
+    int m_group_nesting_depth;
+
+    /* How many nesting levels have been pushed within this group.  */
+    int m_diagnostic_nesting_level;
 
     /* How many diagnostics have been emitted since the bottommost
        diagnostic_group was pushed.  */
@@ -1055,6 +1107,7 @@ diagnostic_finish (diagnostic_context *context)
 
 inline void
 diagnostic_show_locus (diagnostic_context *context,
+		       const diagnostic_source_printing_options &opts,
 		       rich_location *richloc,
 		       diagnostic_t diagnostic_kind,
 		       pretty_printer *pp,
@@ -1063,7 +1116,7 @@ diagnostic_show_locus (diagnostic_context *context,
   gcc_assert (context);
   gcc_assert (richloc);
   gcc_assert (pp);
-  context->maybe_show_locus (*richloc, diagnostic_kind, *pp, effect_info);
+  context->maybe_show_locus (*richloc, opts, diagnostic_kind, *pp, effect_info);
 }
 
 /* Because we read source files a second time after the frontend did it the

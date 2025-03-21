@@ -1,6 +1,6 @@
 /* Basic IPA utilities for type inheritance graph construction and
    devirtualization.
-   Copyright (C) 2013-2024 Free Software Foundation, Inc.
+   Copyright (C) 2013-2025 Free Software Foundation, Inc.
    Contributed by Jan Hubicka
 
 This file is part of GCC.
@@ -105,7 +105,6 @@ along with GCC; see the file COPYING3.  If not see
   pass_ipa_devirt performs simple speculative devirtualization.
 */
 
-#define INCLUDE_MEMORY
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
@@ -1260,11 +1259,19 @@ odr_types_equivalent_p (tree t1, tree t2, bool warn, bool *warned,
       || TREE_CODE (t1) == OFFSET_TYPE
       || POINTER_TYPE_P (t1))
     {
-      if (TYPE_PRECISION (t1) != TYPE_PRECISION (t2))
+      if (!VECTOR_TYPE_P (t1) && TYPE_PRECISION (t1) != TYPE_PRECISION (t2))
 	{
 	  warn_odr (t1, t2, NULL, NULL, warn, warned,
 		    G_("a type with different precision is defined "
 		       "in another translation unit"));
+	  return false;
+	}
+      if (VECTOR_TYPE_P (t1)
+	  && maybe_ne (TYPE_VECTOR_SUBPARTS (t1), TYPE_VECTOR_SUBPARTS (t2)))
+	{
+	  warn_odr (t1, t2, NULL, NULL, warn, warned,
+		    G_("a vector type with different number of elements "
+		       "is defined in another translation unit"));
 	  return false;
 	}
       if (TYPE_UNSIGNED (t1) != TYPE_UNSIGNED (t2))
@@ -4132,7 +4139,7 @@ ipa_odr_summary_write (void)
       odr_enum_map = NULL;
     }
 
-  produce_asm (ob, NULL);
+  produce_asm (ob);
   destroy_output_block (ob);
 }
 

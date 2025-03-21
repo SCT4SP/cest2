@@ -1,5 +1,5 @@
 /* Change pseudos by memory.
-   Copyright (C) 2010-2024 Free Software Foundation, Inc.
+   Copyright (C) 2010-2025 Free Software Foundation, Inc.
    Contributed by Vladimir Makarov <vmakarov@redhat.com>.
 
 This file is part of GCC.
@@ -386,7 +386,17 @@ assign_stack_slot_num_and_sort_pseudos (int *pseudo_regnos, int n)
 		&& ! (lra_intersected_live_ranges_p
 		      (slots[j].live_ranges,
 		       lra_reg_info[regno].live_ranges)))
-	      break;
+	      {
+		/* A slot without allocated memory can be shared.  */
+		if (slots[j].mem == NULL_RTX)
+		  break;
+
+		/* A slot with allocated memory can be shared only with equal
+		   or smaller register with equal or smaller alignment.  */
+		if (slots[j].align >= spill_slot_alignment (mode)
+		    && known_ge (slots[j].size, GET_MODE_SIZE (mode)))
+		  break;
+	      }
 	}
       if (j >= slots_num)
 	{
@@ -537,6 +547,11 @@ spill_pseudos (void)
 		      break;
 		    }
 		}
+	      if (GET_CODE (PATTERN (insn)) == CLOBBER)
+		/* This is a CLOBBER insn with pseudo spilled to memory.
+		   Mark it for removing it later together with LRA temporary
+		   CLOBBER insns.  */
+		LRA_TEMP_CLOBBER_P (PATTERN (insn)) = 1;
 	      if (lra_dump_file != NULL)
 		fprintf (lra_dump_file,
 			 "Changing spilled pseudos to memory in insn #%u\n",
@@ -589,8 +604,9 @@ lra_need_for_scratch_reg_p (void)
 bool
 lra_need_for_spills_p (void)
 {
-  int i; max_regno = max_reg_num ();
+  int i;
 
+  max_regno = max_reg_num ();
   for (i = FIRST_PSEUDO_REGISTER; i < max_regno; i++)
     if (lra_reg_info[i].nrefs != 0 && lra_get_regno_hard_regno (i) < 0
 	&& ! ira_former_scratch_p (i))
@@ -650,8 +666,7 @@ lra_spill (void)
       for (i = 0; i < slots_num; i++)
 	{
 	  fprintf (lra_dump_file, "  Slot %d regnos (width = ", i);
-	  print_dec (GET_MODE_SIZE (GET_MODE (slots[i].mem)),
-		     lra_dump_file, SIGNED);
+	  print_dec (slots[i].size, lra_dump_file, SIGNED);
 	  fprintf (lra_dump_file, "):");
 	  for (curr_regno = slots[i].regno;;
 	       curr_regno = pseudo_slots[curr_regno].next - pseudo_slots)

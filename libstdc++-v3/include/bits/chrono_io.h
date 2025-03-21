@@ -887,27 +887,60 @@ namespace __format
 
       template<typename _Tp, typename _FormatContext>
 	typename _FormatContext::iterator
-	_M_c(const _Tp& __tt, typename _FormatContext::iterator __out,
+	_M_c(const _Tp& __t, typename _FormatContext::iterator __out,
 	     _FormatContext& __ctx, bool __mod = false) const
 	{
 	  // %c  Locale's date and time representation.
 	  // %Ec Locale's alternate date and time representation.
 
-	  basic_string<_CharT> __fmt;
-	  auto __t = _S_floor_seconds(__tt);
-	  locale __loc = _M_locale(__ctx);
-	  const auto& __tp = use_facet<__timepunct<_CharT>>(__loc);
-	  const _CharT* __formats[2];
-	  __tp._M_date_time_formats(__formats);
-	  if (*__formats[__mod]) [[likely]]
+	  using namespace chrono;
+	  using ::std::chrono::__detail::__utc_leap_second;
+	  using ::std::chrono::__detail::__local_time_fmt;
+
+	  struct tm __tm{};
+
+	  // Some locales use %Z in their %c format but we don't want strftime
+	  // to use the system's local time zone (from /etc/localtime or $TZ)
+	  // as the output for %Z. Setting tm_isdst to -1 says there is no
+	  // time zone info available for the time in __tm.
+	  __tm.tm_isdst = -1;
+
+#ifdef _GLIBCXX_HAVE_STRUCT_TM_TM_ZONE
+	  // POSIX.1-2024 adds tm.tm_zone which will be used for %Z.
+	  if constexpr (__is_time_point_v<_Tp>)
 	    {
-	      __fmt = _GLIBCXX_WIDEN("{:L}");
-	      __fmt.insert(3u, __formats[__mod]);
+	      // One of sys_time, utc_time, or local_time.
+	      if constexpr (!is_same_v<typename _Tp::clock, local_t>)
+		__tm.tm_zone = "UTC";
+	    }
+	  else if constexpr (__is_specialization_of<_Tp, __local_time_fmt>)
+	    {
+	      // local-time-format-t is used to provide time zone info for
+	      // one of zoned_time, tai_time, gps_time, or local_time.
+	      if (__t._M_abbrev)
+		__tm.tm_zone = __t._M_abbrev->c_str();
 	    }
 	  else
-	    __fmt = _GLIBCXX_WIDEN("{:L%a %b %e %T %Y}");
-	  return std::vformat_to(std::move(__out), __loc, __fmt,
-				 std::make_format_args<_FormatContext>(__t));
+	    __tm.tm_zone = "UTC";
+#endif
+
+	  auto __d = _S_days(__t); // Either sys_days or local_days.
+	  using _TDays = decltype(__d);
+	  const year_month_day __ymd(__d);
+	  const auto __y = __ymd.year();
+	  const auto __hms = _S_hms(__t);
+
+	  __tm.tm_year = (int)__y - 1900;
+	  __tm.tm_yday = (__d - _TDays(__y/January/1)).count();
+	  __tm.tm_mon = (unsigned)__ymd.month() - 1;
+	  __tm.tm_mday = (unsigned)__ymd.day();
+	  __tm.tm_wday = weekday(__d).c_encoding();
+	  __tm.tm_hour = __hms.hours().count();
+	  __tm.tm_min = __hms.minutes().count();
+	  __tm.tm_sec = __hms.seconds().count();
+
+	  return _M_locale_fmt(std::move(__out), _M_locale(__ctx), __tm, 'c',
+			       __mod ? 'E' : '\0');
 	}
 
       template<typename _Tp, typename _FormatContext>
@@ -1697,6 +1730,7 @@ namespace __format
 		      char __fmt, char __mod) const
 	{
 	  basic_ostringstream<_CharT> __os;
+	  __os.imbue(__loc);
 	  const auto& __tp = use_facet<time_put<_CharT>>(__loc);
 	  __tp.put(__os, __os, _S_space, &__tm, __fmt, __mod);
 	  if (__os)
@@ -3115,6 +3149,10 @@ namespace __detail
 
 namespace __detail
 {
+  // _GLIBCXX_RESOLVE_LIB_DEFECTS
+  // 3956. chrono::parse uses from_stream as a customization point
+  void from_stream() = delete;
+
   template<typename _Parsable, typename _CharT,
 	   typename _Traits = std::char_traits<_CharT>,
 	   typename... _OptArgs>

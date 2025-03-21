@@ -1,4 +1,4 @@
-// Copyright (C) 2021-2024 Free Software Foundation, Inc.
+// Copyright (C) 2021-2025 Free Software Foundation, Inc.
 
 // This file is part of GCC.
 
@@ -20,6 +20,10 @@
 #include "rust-hir-type-check-expr.h"
 #include "rust-substitution-mapper.h"
 #include "rust-type-util.h"
+#include "rust-immutable-name-resolution-context.h"
+
+// used for flag_name_resolution_2_0
+#include "options.h"
 
 namespace Rust {
 namespace Resolver {
@@ -65,7 +69,7 @@ ResolveTraitItemToRef::visit (HIR::TraitItemFunc &fn)
 {
   // create trait-item-ref
   location_t locus = fn.get_locus ();
-  bool is_optional = fn.has_block_defined ();
+  bool is_optional = fn.has_definition ();
   std::string identifier = fn.get_decl ().get_function_name ().as_string ();
 
   resolved = TraitItemReference (identifier, is_optional,
@@ -110,25 +114,48 @@ TraitResolver::resolve_path_to_trait (const HIR::TypePath &path,
 				      HIR::Trait **resolved) const
 {
   NodeId ref;
-  if (!resolver->lookup_resolved_type (path.get_mappings ().get_nodeid (),
-				       &ref))
+  bool ok;
+  if (flag_name_resolution_2_0)
+    {
+      auto &nr_ctx
+	= Resolver2_0::ImmutableNameResolutionContext::get ().resolver ();
+
+      auto ref_opt = nr_ctx.lookup (path.get_mappings ().get_nodeid ());
+
+      if ((ok = ref_opt.has_value ()))
+	ref = *ref_opt;
+    }
+  else
+    {
+      ok = resolver->lookup_resolved_type (path.get_mappings ().get_nodeid (),
+					   &ref);
+    }
+
+  if (!ok)
     {
       rust_error_at (path.get_locus (), "Failed to resolve path to node-id");
       return false;
     }
 
-  HirId hir_node = UNKNOWN_HIRID;
-  if (!mappings->lookup_node_to_hir (ref, &hir_node))
+  auto hid = mappings.lookup_node_to_hir (ref);
+  if (!hid)
     {
       rust_error_at (path.get_locus (), "Failed to resolve path to hir-id");
       return false;
     }
 
-  HIR::Item *resolved_item = mappings->lookup_hir_item (hir_node);
-  rust_assert (resolved_item != nullptr);
-  rust_assert (resolved_item->get_item_kind () == HIR::Item::ItemKind::Trait);
-  *resolved = static_cast<HIR::Trait *> (resolved_item);
+  auto resolved_item = mappings.lookup_hir_item (hid.value ());
+  rust_assert (resolved_item.has_value ());
+  if (resolved_item.value ()->get_item_kind () != HIR::Item::ItemKind::Trait)
+    {
+      rich_location r (line_table, path.get_locus ());
+      r.add_fixit_replace ("not a trait");
+      rust_error_at (r, ErrorCode::E0404, "Expected a trait found %qs",
+		     path.as_simple_path ().as_string ().c_str ());
+      return false;
+    }
 
+  *resolved = static_cast<HIR::Trait *> (*resolved_item);
   return true;
 }
 
@@ -189,8 +216,7 @@ TraitResolver::resolve_trait (HIR::Trait *trait_reference)
 	    // The one exception is the implicit Self type of a trait
 	    bool apply_sized = !is_self;
 	    auto param_type
-	      = TypeResolveGenericParam::Resolve (generic_param.get (),
-						  apply_sized);
+	      = TypeResolveGenericParam::Resolve (*generic_param, apply_sized);
 	    context->insert_type (generic_param->get_mappings (), param_type);
 	    substitutions.push_back (
 	      TyTy::SubstitutionParamMapping (typaram, param_type));
@@ -241,7 +267,7 @@ TraitResolver::resolve_trait (HIR::Trait *trait_reference)
 
 	      auto predicate = get_predicate_from_bound (
 		b->get_path (),
-		nullptr /*this will setup a PLACEHOLDER for self*/);
+		tl::nullopt /*this will setup a PLACEHOLDER for self*/);
 	      if (predicate.is_error ())
 		return &TraitReference::error_node ();
 
@@ -252,6 +278,7 @@ TraitResolver::resolve_trait (HIR::Trait *trait_reference)
     }
   self->inherit_bounds (specified_bounds);
 
+  context->block_context ().enter (TypeCheckBlockContextItem (trait_reference));
   std::vector<TraitItemReference> item_refs;
   for (auto &item : trait_reference->get_trait_items ())
     {
@@ -281,6 +308,7 @@ TraitResolver::resolve_trait (HIR::Trait *trait_reference)
   // resolve the blocks of functions etc because it can end up in a recursive
   // loop of trying to resolve traits as required by the types
   tref->on_resolved ();
+  context->block_context ().exit ();
 
   return tref;
 }
@@ -357,11 +385,11 @@ TraitItemReference::resolve_item (HIR::TraitItemFunc &func)
   auto expected_ret_tyty = resolved_fn_type->get_return_type ();
   context->push_return_type (TypeCheckContextItem (&func), expected_ret_tyty);
 
-  auto block_expr_ty = TypeCheckExpr::Resolve (func.get_block_expr ().get ());
+  auto block_expr_ty = TypeCheckExpr::Resolve (func.get_block_expr ());
 
   location_t fn_return_locus
     = func.get_decl ().has_return_type ()
-	? func.get_decl ().get_return_type ()->get_locus ()
+	? func.get_decl ().get_return_type ().get_locus ()
 	: func.get_locus ();
 
   coercion_site (func.get_mappings ().get_hirid (),
@@ -662,13 +690,19 @@ AssociatedImplTrait::reset_associated_types ()
   trait->clear_associated_types ();
 }
 
+location_t
+AssociatedImplTrait::get_locus () const
+{
+  return impl->get_locus ();
+}
+
 Analysis::NodeMapping
 TraitItemReference::get_parent_trait_mappings () const
 {
-  auto mappings = Analysis::Mappings::get ();
+  auto &mappings = Analysis::Mappings::get ();
 
   HIR::Trait *trait
-    = mappings->lookup_trait_item_mapping (get_mappings ().get_hirid ());
+    = mappings.lookup_trait_item_mapping (get_mappings ().get_hirid ());
   rust_assert (trait != nullptr);
 
   return trait->get_mappings ();

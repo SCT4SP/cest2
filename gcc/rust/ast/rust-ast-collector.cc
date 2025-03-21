@@ -1,4 +1,4 @@
-// Copyright (C) 2020-2024 Free Software Foundation, Inc.
+// Copyright (C) 2020-2025 Free Software Foundation, Inc.
 
 // This file is part of GCC.
 
@@ -18,8 +18,11 @@
 #include "rust-ast-collector.h"
 #include "rust-ast.h"
 #include "rust-diagnostics.h"
+#include "rust-expr.h"
 #include "rust-item.h"
 #include "rust-keyword-values.h"
+#include "rust-system.h"
+#include "rust-token.h"
 
 namespace Rust {
 namespace AST {
@@ -248,29 +251,6 @@ TokenCollector::visit (Visibility &vis)
 }
 
 void
-TokenCollector::visit (NamedFunctionParam &param)
-{
-  auto name = param.get_name ();
-  if (!param.is_variadic ())
-    {
-      push (
-	Rust::Token::make_identifier (param.get_locus (), std::move (name)));
-      push (Rust::Token::make (COLON, UNDEF_LOCATION));
-      visit (param.get_type ());
-    }
-  else
-    {
-      if (name != "")
-	{
-	  push (Rust::Token::make_identifier (param.get_locus (),
-					      std::move (name)));
-	  push (Rust::Token::make (COLON, UNDEF_LOCATION));
-	}
-      push (Rust::Token::make (ELLIPSIS, UNDEF_LOCATION));
-    }
-}
-
-void
 TokenCollector::visit (std::vector<std::unique_ptr<GenericParam>> &params)
 {
   push (Rust::Token::make (LEFT_ANGLE, UNDEF_LOCATION));
@@ -396,6 +376,9 @@ TokenCollector::visit (Token &tok)
     case BYTE_STRING_LITERAL:
       push (Rust::Token::make_byte_string (tok.get_locus (), std::move (data)));
       break;
+    case RAW_STRING_LITERAL:
+      push (Rust::Token::make_raw_string (tok.get_locus (), std::move (data)));
+      break;
     case INNER_DOC_COMMENT:
       push (Rust::Token::make_inner_doc_comment (tok.get_locus (),
 						 std::move (data)));
@@ -475,6 +458,7 @@ TokenCollector::visit (LifetimeParam &lifetime_param)
 
   // TODO what to do with outer attr? They are not mentioned in the reference.
 
+  visit_items_as_lines (lifetime_param.get_outer_attrs ());
   auto lifetime = lifetime_param.get_lifetime ();
   visit (lifetime);
 
@@ -494,6 +478,7 @@ TokenCollector::visit (ConstGenericParam &param)
   // Syntax:
   // const IDENTIFIER : Type ( = Block | IDENTIFIER | -?LITERAL )?
 
+  visit_items_as_lines (param.get_outer_attrs ());
   push (Rust::Token::make (CONST, param.get_locus ()));
   auto id = param.get_name ().as_string ();
   push (Rust::Token::make_identifier (UNDEF_LOCATION, std::move (id)));
@@ -558,10 +543,14 @@ TokenCollector::visit (TypePathSegment &segment)
 {
   // Syntax:
   //    PathIdentSegment
-  auto ident_segment = segment.get_ident_segment ();
-  auto id = ident_segment.as_string ();
-  push (
-    Rust::Token::make_identifier (ident_segment.get_locus (), std::move (id)));
+
+  auto locus = segment.is_lang_item ()
+		 ? segment.get_locus ()
+		 : segment.get_ident_segment ().get_locus ();
+  auto segment_string = segment.is_lang_item ()
+			  ? LangItem::PrettyString (segment.get_lang_item ())
+			  : segment.get_ident_segment ().as_string ();
+  push (Rust::Token::make_identifier (locus, std::move (segment_string)));
 }
 
 void
@@ -573,10 +562,13 @@ TokenCollector::visit (TypePathSegmentGeneric &segment)
   //    `<` `>`
   //    | `<` ( GenericArg `,` )* GenericArg `,`? `>`
 
-  auto ident_segment = segment.get_ident_segment ();
-  auto id = ident_segment.as_string ();
-  push (
-    Rust::Token::make_identifier (ident_segment.get_locus (), std::move (id)));
+  auto locus = segment.is_lang_item ()
+		 ? segment.get_locus ()
+		 : segment.get_ident_segment ().get_locus ();
+  auto segment_string = segment.is_lang_item ()
+			  ? LangItem::PrettyString (segment.get_lang_item ())
+			  : segment.get_ident_segment ().as_string ();
+  push (Rust::Token::make_identifier (locus, std::move (segment_string)));
 
   if (segment.get_separating_scope_resolution ())
     push (Rust::Token::make (SCOPE_RESOLUTION, UNDEF_LOCATION));
@@ -690,19 +682,19 @@ TokenCollector::visit (TypePath &path)
 void
 TokenCollector::visit (PathIdentSegment &segment)
 {
-  if (segment.is_super_segment ())
+  if (segment.is_super_path_seg ())
     {
       push (Rust::Token::make (SUPER, segment.get_locus ()));
     }
-  else if (segment.is_crate_segment ())
+  else if (segment.is_crate_path_seg ())
     {
       push (Rust::Token::make (CRATE, segment.get_locus ()));
     }
-  else if (segment.is_lower_self ())
+  else if (segment.is_lower_self_seg ())
     {
       push (Rust::Token::make (SELF, segment.get_locus ()));
     }
-  else if (segment.is_big_self ())
+  else if (segment.is_big_self_seg ())
     {
       push (Rust::Token::make (SELF_ALIAS, segment.get_locus ()));
     }
@@ -773,6 +765,9 @@ TokenCollector::visit (Literal &lit, location_t locus)
     case Literal::LitType::BYTE_STRING:
       push (Rust::Token::make_byte_string (locus, std::move (value)));
       break;
+    case Literal::LitType::RAW_STRING:
+      push (Rust::Token::make_raw_string (locus, std::move (value)));
+      break;
     case Literal::LitType::INT:
       push (
 	Rust::Token::make_int (locus, std::move (value), lit.get_type_hint ()));
@@ -840,8 +835,21 @@ TokenCollector::visit (BorrowExpr &expr)
   push (Rust::Token::make (AMP, expr.get_locus ()));
   if (expr.get_is_double_borrow ())
     push (Rust::Token::make (AMP, UNDEF_LOCATION));
-  if (expr.get_is_mut ())
-    push (Rust::Token::make (MUT, UNDEF_LOCATION));
+
+  if (expr.is_raw_borrow ())
+    {
+      push (Rust::Token::make_identifier (expr.get_locus (),
+					  Values::WeakKeywords::RAW));
+      if (expr.get_is_mut ())
+	push (Rust::Token::make (MUT, UNDEF_LOCATION));
+      else
+	push (Rust::Token::make (CONST, UNDEF_LOCATION));
+    }
+  else
+    {
+      if (expr.get_is_mut ())
+	push (Rust::Token::make (MUT, UNDEF_LOCATION));
+    }
 
   visit (expr.get_borrowed_expr ());
 }
@@ -1096,8 +1104,7 @@ TokenCollector::visit (StructExprStruct &expr)
 void
 TokenCollector::visit (StructExprFieldIdentifier &expr)
 {
-  // TODO: Add attributes
-  // visit_items_as_lines (expr.get_attrs ());
+  visit_items_as_lines (expr.get_outer_attrs ());
   auto id = expr.get_field_name ().as_string ();
   push (Rust::Token::make_identifier (expr.get_locus (), std::move (id)));
 }
@@ -1105,8 +1112,7 @@ TokenCollector::visit (StructExprFieldIdentifier &expr)
 void
 TokenCollector::visit (StructExprFieldIdentifierValue &expr)
 {
-  // TODO: Add attributes
-  // visit_items_as_lines (expr.get_attrs ());
+  visit_items_as_lines (expr.get_outer_attrs ());
   auto id = expr.get_field_name ();
   push (Rust::Token::make_identifier (expr.get_locus (), std::move (id)));
   push (Rust::Token::make (COLON, UNDEF_LOCATION));
@@ -1116,8 +1122,7 @@ TokenCollector::visit (StructExprFieldIdentifierValue &expr)
 void
 TokenCollector::visit (StructExprFieldIndexValue &expr)
 {
-  // TODO: Add attributes
-  // visit_items_as_lines (expr.get_attrs ());
+  visit_items_as_lines (expr.get_outer_attrs ());
   push (Rust::Token::make_int (expr.get_locus (),
 			       std::to_string (expr.get_index ())));
   push (Rust::Token::make (COLON, UNDEF_LOCATION));
@@ -1316,6 +1321,13 @@ TokenCollector::visit (RangeToInclExpr &expr)
 }
 
 void
+TokenCollector::visit (BoxExpr &expr)
+{
+  push (Rust::Token::make (BOX, expr.get_locus ()));
+  visit (expr.get_boxed_expr ());
+}
+
+void
 TokenCollector::visit (ReturnExpr &expr)
 {
   push (Rust::Token::make (RETURN_KW, expr.get_locus ()));
@@ -1491,6 +1503,10 @@ TokenCollector::visit (AsyncBlockExpr &expr)
   visit (expr.get_block_expr ());
 }
 
+void
+TokenCollector::visit (InlineAsm &expr)
+{}
+
 // rust-item.h
 
 void
@@ -1501,6 +1517,7 @@ TokenCollector::visit (TypeParam &param)
   // TypeParamBounds :
   //    TypeParamBound ( + TypeParamBound )* +?
 
+  visit_items_as_lines (param.get_outer_attrs ());
   auto id = param.get_type_representation ().as_string ();
   push (Rust::Token::make_identifier (param.get_locus (), std::move (id)));
   if (param.has_type_param_bounds ())
@@ -2453,10 +2470,7 @@ TokenCollector::visit (StructPattern &pattern)
 void
 TokenCollector::visit (TupleStructItemsNoRange &pattern)
 {
-  for (auto &pat : pattern.get_patterns ())
-    {
-      visit (pat);
-    }
+  visit_items_joined_by_separator (pattern.get_patterns ());
 }
 
 void

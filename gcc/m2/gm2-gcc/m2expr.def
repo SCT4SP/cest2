@@ -1,6 +1,6 @@
 (* m2expr.def definition module for m2expr.cc.
 
-Copyright (C) 2011-2024 Free Software Foundation, Inc.
+Copyright (C) 2011-2025 Free Software Foundation, Inc.
 Contributed by Gaius Mulley <gaius.mulley@southwales.ac.uk>.
 
 This file is part of GNU Modula-2.
@@ -743,6 +743,15 @@ PROCEDURE OverflowZType (location: location_t;
 *)
 
 PROCEDURE BuildCondIfExpression (condition, type, left, right: tree) : tree ;
+
+
+(*
+   BuildSystemTBitSize - return the minimum number of bits to represent type.
+                         This function is called when evaluating
+                         SYSTEM.TBITSIZE.
+*)
+
+PROCEDURE BuildSystemTBitSize (location: location_t; type: tree) : tree ;
 
 
 END m2expr.

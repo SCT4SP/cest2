@@ -689,12 +689,6 @@
 #endif
 
 
-/* Define if your assembler supports %gotoff relocation syntax. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_AS_NIOS2_GOTOFF_RELOCATION
-#endif
-
-
 /* Define if your assembler supports the -no-mul-bug-abort option. */
 #ifndef USED_FOR_TARGET
 #undef HAVE_AS_NO_MUL_BUG_ABORT_OPTION
@@ -854,6 +848,12 @@
 /* Define to 1 if you have the `atoq' function. */
 #ifndef USED_FOR_TARGET
 #undef HAVE_ATOQ
+#endif
+
+
+/* Define to 1 if the host/build supports __attribute__((alias(...))). */
+#ifndef USED_FOR_TARGET
+#undef HAVE_ATTRIBUTE_ALIAS
 #endif
 
 
@@ -1170,6 +1170,13 @@
 #endif
 
 
+/* Define to 1 if we found a declaration for 'mkstemps', otherwise define to
+   0. */
+#ifndef USED_FOR_TARGET
+#undef HAVE_DECL_MKSTEMPS
+#endif
+
+
 /* Define to 1 if we found a declaration for 'putchar_unlocked', otherwise
    define to 0. */
 #ifndef USED_FOR_TARGET
@@ -1465,6 +1472,12 @@
 /* Define 0/1 if your assembler supports .cfi_sections. */
 #undef HAVE_GAS_CFI_SECTIONS_DIRECTIVE
 
+/* Define if your assembler supports .cv_ucomp. */
+#ifndef USED_FOR_TARGET
+#undef HAVE_GAS_CV_UCOMP
+#endif
+
+
 /* Define if your assembler supports the .loc discriminator sub-directive. */
 #ifndef USED_FOR_TARGET
 #undef HAVE_GAS_DISCRIMINATOR
@@ -1608,6 +1621,12 @@
 /* Define to 1 if you have the `gettimeofday' function. */
 #ifndef USED_FOR_TARGET
 #undef HAVE_GETTIMEOFDAY
+#endif
+
+
+/* Define to 1 if you have the `get_current_dir_name' function. */
+#ifndef USED_FOR_TARGET
+#undef HAVE_GET_CURRENT_DIR_NAME
 #endif
 
 
@@ -1763,12 +1782,6 @@
 /* Define if your linker supports --demangle option. */
 #ifndef USED_FOR_TARGET
 #undef HAVE_LD_DEMANGLE
-#endif
-
-
-/* Define 0/1 if your linker supports CIE v3 in .eh_frame. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_LD_EH_FRAME_CIEV3
 #endif
 
 
@@ -1962,6 +1975,18 @@
 /* Define if read-only mmap of a plain file works. */
 #ifndef USED_FOR_TARGET
 #undef HAVE_MMAP_FILE
+#endif
+
+
+/* Define to 1 if you have the `msync' function. */
+#ifndef USED_FOR_TARGET
+#undef HAVE_MSYNC
+#endif
+
+
+/* Define to 1 if you have the `munmap' function. */
+#ifndef USED_FOR_TARGET
+#undef HAVE_MUNMAP
 #endif
 
 
@@ -2310,6 +2335,12 @@
 /* Define to 1 if ld64 supports '-export_dynamic'. */
 #ifndef USED_FOR_TARGET
 #undef LD64_HAS_EXPORT_DYNAMIC
+#endif
+
+
+/* Define to 1 if ld64 supports '-macos_version_min'. */
+#ifndef USED_FOR_TARGET
+#undef LD64_HAS_MACOS_VERSION_MIN
 #endif
 
 

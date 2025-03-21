@@ -1,4 +1,4 @@
-// Copyright (C) 2020-2024 Free Software Foundation, Inc.
+// Copyright (C) 2020-2025 Free Software Foundation, Inc.
 
 // This file is part of GCC.
 
@@ -20,6 +20,7 @@
 #include "rust-ast-resolve-expr.h"
 #include "rust-ast-resolve-path.h"
 #include "rust-item.h"
+#include "rust-path.h"
 
 namespace Rust {
 namespace Resolver {
@@ -267,6 +268,10 @@ ResolverBase::visit (AST::RangeToInclExpr &)
 {}
 
 void
+ResolverBase::visit (AST::BoxExpr &)
+{}
+
+void
 ResolverBase::visit (AST::ReturnExpr &)
 {}
 
@@ -316,6 +321,10 @@ ResolverBase::visit (AST::AwaitExpr &)
 
 void
 ResolverBase::visit (AST::AsyncBlockExpr &)
+{}
+
+void
+ResolverBase::visit (AST::InlineAsm &)
 {}
 
 void

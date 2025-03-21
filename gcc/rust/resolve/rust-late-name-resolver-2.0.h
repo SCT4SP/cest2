@@ -1,4 +1,4 @@
-// Copyright (C) 2020-2024 Free Software Foundation, Inc.
+// Copyright (C) 2020-2025 Free Software Foundation, Inc.
 
 // This file is part of GCC.
 
@@ -41,13 +41,19 @@ public:
   // TODO: Do we need this?
   // void visit (AST::Method &) override;
   void visit (AST::IdentifierPattern &) override;
+  void visit (AST::SelfParam &) override;
 
   // resolutions
   void visit (AST::IdentifierExpr &) override;
   void visit (AST::PathInExpression &) override;
   void visit (AST::TypePath &) override;
+  void visit (AST::Trait &) override;
+  void visit (AST::StructExprStruct &) override;
   void visit (AST::StructExprStructBase &) override;
   void visit (AST::StructExprStructFields &) override;
+  void visit (AST::StructStruct &) override;
+  void visit (AST::GenericArgs &) override;
+  void visit (AST::GenericArg &);
 
 private:
   /* Setup Rust's builtin types (u8, i32, !...) in the resolver */

@@ -1,6 +1,5 @@
 /* { dg-do run } */
 /* { dg-options "-O2 -Wno-stringop-overread" } */
-/* { dg-require-effective-target alloca } */
 /* { dg-additional-options "-DSKIP_STRNDUP" { target { ! strndup } } } */
 
 #include "builtin-object-size-common.h"
@@ -619,7 +618,7 @@ test10 (void)
 	  if (__builtin_object_size (p - 3, 2) != sizeof (buf) - i + 3)
 	    FAIL ();
 #else
-	  if (__builtin_object_size (p - 3, 2) != 0)
+	  if (__builtin_object_size (p - 3, 2) != 3)
 	    FAIL ();
 #endif
 	  break;

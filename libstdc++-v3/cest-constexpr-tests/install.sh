@@ -14,7 +14,7 @@ make -C x86_64-pc-linux-gnu/libstdc++-v3/include prefix="$INSTALL_DIR" install-d
 # c++config.h will be installed by the make commands above; but will not
 # include the 2 crucial _GLIBCXX_CEST_ ... macros. So add them using sed:
 CPPCONFIG="$(find "$INSTALL_DIR" -type f -name c++config.h 2>/dev/null)"
-sed -i -e 's/#ifndef _GLIBCXX17_INLINE/\/\/ Defined if extra constexpr support is present.\n#define _GLIBCXX_CEST_VERSION 1\n\n#if _GLIBCXX_CEST_VERSION\n# ifndef _GLIBCXX_CEST_CONSTEXPR\n#  define _GLIBCXX_CEST_CONSTEXPR _GLIBCXX23_CONSTEXPR\n# endif\n#endif\n\n#ifndef _GLIBCXX17_INLINE/' "$CPPCONFIG"
+sed -i -e 's/#ifndef _GLIBCXX17_INLINE/\/\/ Defined if extra constexpr support is present.\n#define _GLIBCXX_CEST_VERSION 1\n\n#if _GLIBCXX_CEST_VERSION\n# ifndef _GLIBCXX_CEST_CONSTEXPR\n#  define _GLIBCXX_CEST_CONSTEXPR _GLIBCXX26_CONSTEXPR\n# endif\n#endif\n\n#ifndef _GLIBCXX17_INLINE/' "$CPPCONFIG"
 
 ##### The sed command adds the following two lines before _GLIBCXX17_INLINE
 
@@ -23,6 +23,6 @@ sed -i -e 's/#ifndef _GLIBCXX17_INLINE/\/\/ Defined if extra constexpr support i
 
 #if _GLIBCXX_CEST_VERSION
 # ifndef _GLIBCXX_CEST_CONSTEXPR
-#  define _GLIBCXX_CEST_CONSTEXPR _GLIBCXX23_CONSTEXPR
+#  define _GLIBCXX_CEST_CONSTEXPR _GLIBCXX26_CONSTEXPR
 # endif
 #endif

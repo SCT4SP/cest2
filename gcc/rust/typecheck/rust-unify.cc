@@ -1,4 +1,4 @@
-// Copyright (C) 2020-2024 Free Software Foundation, Inc.
+// Copyright (C) 2020-2025 Free Software Foundation, Inc.
 
 // This file is part of GCC.
 
@@ -17,7 +17,6 @@
 // <http://www.gnu.org/licenses/>.
 
 #include "rust-unify.h"
-#include "rust-tyty.h"
 
 namespace Rust {
 namespace Resolver {
@@ -28,7 +27,7 @@ UnifyRules::UnifyRules (TyTy::TyWithLocation lhs, TyTy::TyWithLocation rhs,
 			std::vector<InferenceSite> &infers)
   : lhs (lhs), rhs (rhs), locus (locus), commit_flag (commit_flag),
     emit_error (emit_error), infer_flag (infer), commits (commits),
-    infers (infers), mappings (*Analysis::Mappings::get ()),
+    infers (infers), mappings (Analysis::Mappings::get ()),
     context (*TypeCheckContext::get ())
 {}
 
@@ -70,7 +69,7 @@ UnifyRules::commit (TyTy::BaseType *base, TyTy::BaseType *other,
 		    TyTy::BaseType *resolved)
 {
   TypeCheckContext &context = *TypeCheckContext::get ();
-  Analysis::Mappings &mappings = *Analysis::Mappings::get ();
+  Analysis::Mappings &mappings = Analysis::Mappings::get ();
 
   TyTy::BaseType *b = base->destructure ();
   TyTy::BaseType *o = other->destructure ();
@@ -135,7 +134,7 @@ UnifyRules::emit_abi_mismatch (const TyTy::FnType &expected,
   rich_location r (line_table, locus);
   r.add_range (lhs.get_locus ());
   r.add_range (rhs.get_locus ());
-  rust_error_at (r, "mistached abi %<%s%> got %<%s%>",
+  rust_error_at (r, "mistached abi %qs got %qs",
 		 get_string_from_abi (expected.get_abi ()).c_str (),
 		 get_string_from_abi (got.get_abi ()).c_str ());
 }
@@ -237,15 +236,6 @@ UnifyRules::go ()
 	  ltype = i;
 	}
     }
-
-  // The never type should always get coerced to the type it's being matched
-  // against, so in that case, ltype. This avoids doing the same check in all
-  // the `expect_*` functions.
-  // However, this does not work if we have an annoying ltype - like INFER.
-  // TODO: Is ltype == Infer the only special case here? What about projections?
-  // references?
-  if (rtype->get_kind () == TyTy::NEVER && ltype->get_kind () != TyTy::INFER)
-    return ltype->clone ();
 
   switch (ltype->get_kind ())
     {
@@ -929,8 +919,8 @@ UnifyRules::expect_fndef (TyTy::FnType *ltype, TyTy::BaseType *rtype)
 
 	for (size_t i = 0; i < ltype->num_params (); i++)
 	  {
-	    auto a = ltype->param_at (i).second;
-	    auto b = type.param_at (i).second;
+	    auto a = ltype->param_at (i).get_type ();
+	    auto b = type.param_at (i).get_type ();
 
 	    auto unified_param
 	      = UnifyRules::Resolve (TyTy::TyWithLocation (a),
@@ -1069,7 +1059,7 @@ UnifyRules::expect_fnptr (TyTy::FnPtr *ltype, TyTy::BaseType *rtype)
 	for (size_t i = 0; i < ltype->num_params (); i++)
 	  {
 	    auto this_param = ltype->get_param_type_at (i);
-	    auto other_param = type.param_at (i).second;
+	    auto other_param = type.param_at (i).get_type ();
 
 	    auto unified_param
 	      = UnifyRules::Resolve (TyTy::TyWithLocation (this_param),

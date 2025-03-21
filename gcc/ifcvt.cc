@@ -1,5 +1,5 @@
 /* If-conversion support.
-   Copyright (C) 2000-2024 Free Software Foundation, Inc.
+   Copyright (C) 2000-2025 Free Software Foundation, Inc.
 
    This file is part of GCC.
 
@@ -166,6 +166,13 @@ cheap_bb_rtx_cost_p (const_basic_block bb,
     {
       if (NONJUMP_INSN_P (insn))
 	{
+	  /* Inline-asm's cost is not very estimatable.
+	     It could be a costly instruction but the
+	     estimate would be the same as a non costly
+	     instruction.  */
+	  if (asm_noperands (PATTERN (insn)) >= 0)
+	    return false;
+
 	  int cost = insn_cost (insn, speed) * REG_BR_PROB_BASE;
 	  if (cost == 0)
 	    return false;

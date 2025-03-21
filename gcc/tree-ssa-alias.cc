@@ -1,5 +1,5 @@
 /* Alias analysis for trees.
-   Copyright (C) 2004-2024 Free Software Foundation, Inc.
+   Copyright (C) 2004-2025 Free Software Foundation, Inc.
    Contributed by Diego Novillo <dnovillo@redhat.com>
 
 This file is part of GCC.
@@ -18,7 +18,6 @@ You should have received a copy of the GNU General Public License
 along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
-#define INCLUDE_MEMORY
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
@@ -4356,12 +4355,13 @@ ao_compare::compare_ao_refs (ao_ref *ref1, ao_ref *ref2,
 	c1 = p1, nskipped1 = i;
       i++;
     }
+  i = 0;
   for (tree p2 = ref2->ref; handled_component_p (p2); p2 = TREE_OPERAND (p2, 0))
     {
       if (component_ref_to_zero_sized_trailing_array_p (p2))
 	end_struct_ref2 = p2;
       if (ends_tbaa_access_path_p (p2))
-	c2 = p2, nskipped1 = i;
+	c2 = p2, nskipped2 = i;
       i++;
     }
 

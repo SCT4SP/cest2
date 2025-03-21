@@ -1,5 +1,5 @@
 /* Common block and equivalence list handling
-   Copyright (C) 2000-2024 Free Software Foundation, Inc.
+   Copyright (C) 2000-2025 Free Software Foundation, Inc.
    Contributed by Canqun Yang <canqun@nudt.edu.cn>
 
 This file is part of GCC.
@@ -94,7 +94,6 @@ along with GCC; see the file COPYING3.  If not see
 
 #include "config.h"
 #define INCLUDE_MAP
-#define INCLUDE_MEMORY
 #include "system.h"
 #include "coretypes.h"
 #include "tm.h"
@@ -1219,7 +1218,7 @@ translate_common (gfc_common_head *common, gfc_symbol *var_list)
   align = 1;
   saw_equiv = false;
 
-  if (var_list->attr.omp_allocate)
+  if (var_list && var_list->attr.omp_allocate)
     gfc_error ("Sorry, !$OMP allocate for COMMON block variable %qs at %L "
 	       "not supported", common->name, &common->where);
 

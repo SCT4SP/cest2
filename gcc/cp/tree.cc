@@ -1,5 +1,5 @@
 /* Language-dependent node constructors for parse phase of GNU compiler.
-   Copyright (C) 1987-2024 Free Software Foundation, Inc.
+   Copyright (C) 1987-2025 Free Software Foundation, Inc.
    Hacked by Michael Tiemann (tiemann@cygnus.com)
 
 This file is part of GCC.
@@ -18,7 +18,6 @@ You should have received a copy of the GNU General Public License
 along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
-#define INCLUDE_MEMORY
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
@@ -192,6 +191,8 @@ lvalue_kind (const_tree ref)
       return op1_lvalue_kind;
 
     case STRING_CST:
+      return clk_ordinary | clk_mergeable;
+
     case COMPOUND_LITERAL_EXPR:
       return clk_ordinary;
 
@@ -211,6 +212,10 @@ lvalue_kind (const_tree ref)
 	  && DECL_LANG_SPECIFIC (ref)
 	  && DECL_IN_AGGR_P (ref))
 	return clk_none;
+
+      if (TREE_CODE (ref) == CONST_DECL || DECL_MERGEABLE (ref))
+	return clk_ordinary | clk_mergeable;
+
       /* FALLTHRU */
     case INDIRECT_REF:
     case ARROW_EXPR:
@@ -406,6 +411,17 @@ bool
 bitfield_p (const_tree ref)
 {
   return (lvalue_kind (ref) & clk_bitfield);
+}
+
+/* True if REF is a glvalue with a unique address, excluding mergeable glvalues
+   such as string constants.  */
+
+bool
+non_mergeable_glvalue_p (const_tree ref)
+{
+  auto kind = lvalue_kind (ref);
+  return (kind != clk_none
+	  && !(kind & (clk_class|clk_mergeable)));
 }
 
 /* C++-specific version of stabilize_reference.  */
@@ -953,6 +969,24 @@ get_target_expr (tree init, tsubst_flags_t complain /* = tf_warning_or_error */)
     }
 }
 
+/* Like get_target_expr, but for an internal detail like a cleanup flag or loop
+   iterator.  These variables should not be extended by extend_all_temps.
+
+   This function can also be used for an ephemeral copy of a scalar value such
+   as the pointer to the allocated memory in build_new_1.
+
+   This function should not be used for objects that are part of the abstract
+   C++ semantics such as in stabilize_expr.  */
+
+tree
+get_internal_target_expr (tree init)
+{
+  init = convert_bitfield_to_declared_type (init);
+  tree t = force_target_expr (TREE_TYPE (init), init, tf_warning_or_error);
+  TARGET_EXPR_INTERNAL_P (t) = true;
+  return t;
+}
+
 /* If EXPR is a bitfield reference, convert it to the declared type of
    the bitfield, and return the resulting expression.  Otherwise,
    return EXPR itself.  */
@@ -1208,7 +1242,7 @@ build_cplus_array_type (tree elt_type, tree index_type, int dependent)
 /* Return an ARRAY_TYPE with element type ELT and length N.  */
 
 tree
-build_array_of_n_type (tree elt, int n)
+build_array_of_n_type (tree elt, unsigned HOST_WIDE_INT n)
 {
   return build_cplus_array_type (elt, build_index_type (size_int (n - 1)));
 }
@@ -1567,7 +1601,7 @@ apply_identity_attributes (tree result, tree attribs, bool *remove_attributes)
 
 /* Builds a qualified variant of T that is either not a typedef variant
    (the default behavior) or not a typedef variant of a user-facing type
-   (if FLAGS contains STF_USER_FACING).  If T is not a type, then this
+   (if FLAGS contains STF_USER_VISIBLE).  If T is not a type, then this
    just dispatches to strip_typedefs_expr.
 
    E.g. consider the following declarations:
@@ -1612,6 +1646,11 @@ strip_typedefs (tree t, bool *remove_attributes /* = NULL */,
     {
       if ((flags & STF_USER_VISIBLE)
 	  && !user_facing_original_type_p (t))
+	return t;
+
+      if ((flags & STF_KEEP_INJ_CLASS_NAME)
+	  && CLASS_TYPE_P (t)
+	  && DECL_SELF_REFERENCE_P (TYPE_NAME (t)))
 	return t;
 
       if (dependent_opaque_alias_p (t))
@@ -4042,6 +4081,39 @@ cp_tree_equal (tree t1, tree t2)
 			      TARGET_EXPR_INITIAL (t2));
       }
 
+    case AGGR_INIT_EXPR:
+      {
+	int n = aggr_init_expr_nargs (t1);
+	if (n != aggr_init_expr_nargs (t2))
+	  return false;
+
+	if (!cp_tree_equal (AGGR_INIT_EXPR_FN (t1),
+			    AGGR_INIT_EXPR_FN (t2)))
+	  return false;
+
+	tree o1 = AGGR_INIT_EXPR_SLOT (t1);
+	tree o2 = AGGR_INIT_EXPR_SLOT (t2);
+
+	/* Similarly to TARGET_EXPRs, if the VAR_DECL is unallocated we're
+	   going to unify the initialization, so treat it as equivalent
+	   to anything.  */
+	if (VAR_P (o1) && DECL_NAME (o1) == NULL_TREE
+	    && !DECL_RTL_SET_P (o1))
+	  /*Nop*/;
+	else if (VAR_P (o2) && DECL_NAME (o2) == NULL_TREE
+		 && !DECL_RTL_SET_P (o2))
+	  /*Nop*/;
+	else if (!cp_tree_equal (o1, o2))
+	  return false;
+
+	for (int i = 0; i < n; ++i)
+	  if (!cp_tree_equal (AGGR_INIT_EXPR_ARG (t1, i),
+			      AGGR_INIT_EXPR_ARG (t2, i)))
+	    return false;
+
+	return true;
+      }
+
     case PARM_DECL:
       /* For comparing uses of parameters in late-specified return types
 	 with an out-of-class definition of the function, but can also come
@@ -4242,6 +4314,15 @@ cp_tree_equal (tree t1, tree t2)
 	return false;
       if (!comp_template_args (PACK_EXPANSION_EXTRA_ARGS (t1),
 			       PACK_EXPANSION_EXTRA_ARGS (t2)))
+	return false;
+      return true;
+
+    case PACK_INDEX_EXPR:
+      if (!cp_tree_equal (PACK_INDEX_PACK (t1),
+			  PACK_INDEX_PACK (t2)))
+	return false;
+      if (!cp_tree_equal (PACK_INDEX_INDEX (t1),
+			  PACK_INDEX_INDEX (t2)))
 	return false;
       return true;
 
@@ -5073,6 +5154,75 @@ handle_likeliness_attribute (tree *node, tree name, tree args,
     return error_mark_node;
 }
 
+/* The C++11 alignment specifier.  It mostly maps to GNU aligned attribute,
+   but we need to do some extra pedantic checking.  */
+
+static tree
+handle_alignas_attribute (tree *node, tree name, tree args, int flags,
+			  bool *no_add_attrs)
+{
+  tree t = *node;
+  tree ret = handle_aligned_attribute (node, name, args, flags, no_add_attrs);
+  if (pedantic)
+    {
+      if (TREE_CODE (*node) == FUNCTION_DECL)
+	pedwarn (input_location, OPT_Wattributes,
+		 "%<alignas%> on function declaration");
+      else if (TREE_CODE (*node) == ENUMERAL_TYPE)
+	pedwarn (input_location, OPT_Wattributes,
+		 "%<alignas%> on enumerated type");
+      else if (TYPE_P (*node) && t != *node)
+	pedwarn (input_location, OPT_Wattributes,
+		 "%<alignas%> on a type other than class");
+      else if (TREE_CODE (*node) == FIELD_DECL && DECL_C_BIT_FIELD (*node))
+	pedwarn (input_location, OPT_Wattributes, "%<alignas%> on bit-field");
+      else if (TREE_CODE (t) == TYPE_DECL)
+	pedwarn (input_location, OPT_Wattributes,
+		 "%<alignas%> on a type alias");
+    }
+  return ret;
+}
+
+/* The C++14 [[deprecated]] attribute mostly maps to the GNU deprecated
+   attribute.  */
+
+static tree
+handle_std_deprecated_attribute (tree *node, tree name, tree args, int flags,
+				 bool *no_add_attrs)
+{
+  tree t = *node;
+  tree ret = handle_deprecated_attribute (node, name, args, flags,
+					  no_add_attrs);
+  if (TYPE_P (*node) && t != *node)
+    pedwarn (input_location, OPT_Wattributes,
+	     "%qE on a type other than class or enumeration definition", name);
+  else if (TREE_CODE (*node) == FIELD_DECL && DECL_UNNAMED_BIT_FIELD (*node))
+    pedwarn (input_location, OPT_Wattributes, "%qE on unnamed bit-field",
+	     name);
+  return ret;
+}
+
+/* The C++17 [[maybe_unused]] attribute mostly maps to the GNU unused
+   attribute.  */
+
+static tree
+handle_maybe_unused_attribute (tree *node, tree name, tree args, int flags,
+			       bool *no_add_attrs)
+{
+  tree t = *node;
+  tree ret = handle_unused_attribute (node, name, args, flags, no_add_attrs);
+  if (TYPE_P (*node) && t != *node)
+    pedwarn (input_location, OPT_Wattributes,
+	     "%qE on a type other than class or enumeration definition", name);
+  else if (TREE_CODE (*node) == FIELD_DECL && DECL_UNNAMED_BIT_FIELD (*node))
+    pedwarn (input_location, OPT_Wattributes, "%qE on unnamed bit-field",
+	     name);
+  else if (TREE_CODE (*node) == LABEL_DECL && DECL_NAME (*node) == NULL_TREE)
+    pedwarn (input_location, OPT_Wattributes,
+	     "%qE on %<case%> or %<default%> label", name);
+  return ret;
+}
+
 /* Table of valid C++ attributes.  */
 static const attribute_spec cxx_gnu_attributes[] =
 {
@@ -5096,8 +5246,10 @@ static const attribute_spec std_attributes[] =
 {
   /* { name, min_len, max_len, decl_req, type_req, fn_type_req,
        affects_type_identity, handler, exclude } */
+  { "deprecated", 0, 1, false, false, false, false,
+    handle_std_deprecated_attribute, NULL },
   { "maybe_unused", 0, 0, false, false, false, false,
-    handle_unused_attribute, NULL },
+    handle_maybe_unused_attribute, NULL },
   { "nodiscard", 0, 1, false, false, false, false,
     handle_nodiscard_attribute, NULL },
   { "no_unique_address", 0, 0, true, false, false, false,
@@ -5119,6 +5271,18 @@ static const attribute_spec std_attributes[] =
 const scoped_attribute_specs std_attribute_table =
 {
   nullptr, { std_attributes }
+};
+
+/* Table of internal attributes.  */
+static const attribute_spec internal_attributes[] =
+{
+  { "aligned", 0, 1, false, false, false, false,
+    handle_alignas_attribute, attr_aligned_exclusions }
+};
+
+const scoped_attribute_specs internal_attribute_table =
+{
+  "internal ", { internal_attributes }
 };
 
 /* Handle an "init_priority" attribute; arguments as in
@@ -5189,7 +5353,8 @@ handle_init_priority_attribute (tree* node,
       && !in_system_header_at (input_location))
     {
       warning
-	(0, "requested %<init_priority%> %i is reserved for internal use",
+	(OPT_Wprio_ctor_dtor,
+	 "requested %<init_priority%> %i is reserved for internal use",
 	 pri);
     }
 
@@ -5585,6 +5750,13 @@ cp_walk_subtrees (tree *tp, int *walk_subtrees_p, walk_tree_fn func,
       *walk_subtrees_p = 0;
       break;
 
+    case PACK_INDEX_TYPE:
+    case PACK_INDEX_EXPR:
+      WALK_SUBTREE (PACK_INDEX_PACK (t));
+      WALK_SUBTREE (PACK_INDEX_INDEX (t));
+      *walk_subtrees_p = 0;
+      break;
+
     case CAST_EXPR:
     case REINTERPRET_CAST_EXPR:
     case STATIC_CAST_EXPR:
@@ -5657,6 +5829,7 @@ cp_walk_subtrees (tree *tp, int *walk_subtrees_p, walk_tree_fn func,
 		  && !TREE_STATIC (TREE_OPERAND (t, 0)))))
 	{
 	  tree decl = TREE_OPERAND (t, 0);
+	  WALK_SUBTREE (TREE_TYPE (decl));
 	  WALK_SUBTREE (DECL_INITIAL (decl));
 	  WALK_SUBTREE (DECL_SIZE (decl));
 	  WALK_SUBTREE (DECL_SIZE_UNIT (decl));
@@ -5705,6 +5878,12 @@ cp_walk_subtrees (tree *tp, int *walk_subtrees_p, walk_tree_fn func,
     case STATIC_ASSERT:
       WALK_SUBTREE (STATIC_ASSERT_CONDITION (t));
       WALK_SUBTREE (STATIC_ASSERT_MESSAGE (t));
+      break;
+
+    case INTEGER_TYPE:
+      /* Removed from walk_type_fields in r119481.  */
+      WALK_SUBTREE (TYPE_MIN_VALUE (t));
+      WALK_SUBTREE (TYPE_MAX_VALUE (t));
       break;
 
     default:
@@ -5846,14 +6025,16 @@ decl_linkage (tree decl)
      linkage first, and then transform that into a concrete
      implementation.  */
 
-  /* An explicit type alias has no linkage.  */
+  /* An explicit type alias has no linkage.  Nor do the built-in declarations
+     of 'int' and such.  */
   if (TREE_CODE (decl) == TYPE_DECL
-      && !DECL_IMPLICIT_TYPEDEF_P (decl)
-      && !DECL_SELF_REFERENCE_P (decl))
+      && !DECL_IMPLICIT_TYPEDEF_P (decl))
     {
       /* But this could be a typedef name for linkage purposes, in which
 	 case we're interested in the linkage of the main decl.  */
-      if (decl == TYPE_NAME (TYPE_MAIN_VARIANT (TREE_TYPE (decl))))
+      if (decl == TYPE_NAME (TYPE_MAIN_VARIANT (TREE_TYPE (decl)))
+	  /* Likewise for the injected-class-name.  */
+	  || DECL_SELF_REFERENCE_P (decl))
 	decl = TYPE_MAIN_DECL (TREE_TYPE (decl));
       else
 	return lk_none;
@@ -5865,6 +6046,8 @@ decl_linkage (tree decl)
     {
       if (TREE_CODE (decl) == TYPE_DECL && !TYPE_ANON_P (TREE_TYPE (decl)))
 	/* This entity has a typedef name for linkage purposes.  */;
+      else if (DECL_DECOMPOSITION_P (decl) && DECL_DECOMP_IS_BASE (decl))
+	/* Namespace-scope structured bindings can have linkage.  */;
       else if (TREE_CODE (decl) == NAMESPACE_DECL && cxx_dialect >= cxx11)
 	/* An anonymous namespace has internal linkage since C++11.  */
 	return lk_internal;
@@ -6348,11 +6531,11 @@ test_lvalue_kind ()
   tree string_lit = build_string (4, "foo");
   TREE_TYPE (string_lit) = char_array_type_node;
   string_lit = fix_string_type (string_lit);
-  ASSERT_EQ (clk_ordinary, lvalue_kind (string_lit));
+  ASSERT_EQ (clk_ordinary|clk_mergeable, lvalue_kind (string_lit));
 
   tree wrapped_string_lit = maybe_wrap_with_location (string_lit, loc);
   ASSERT_TRUE (location_wrapper_p (wrapped_string_lit));
-  ASSERT_EQ (clk_ordinary, lvalue_kind (wrapped_string_lit));
+  ASSERT_EQ (clk_ordinary|clk_mergeable, lvalue_kind (wrapped_string_lit));
 
   tree parm = build_decl (UNKNOWN_LOCATION, PARM_DECL,
 			  get_identifier ("some_parm"),

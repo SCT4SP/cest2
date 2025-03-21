@@ -1,4 +1,4 @@
-#  Copyright (C) 2003-2024 Free Software Foundation, Inc.
+#  Copyright (C) 2003-2025 Free Software Foundation, Inc.
 #  Contributed by Kelley Cook, June 2004.
 #  Original code from Neil Booth, May 2003.
 #
@@ -1482,6 +1482,11 @@ checked_options["arm_fp16_format"]++
 for (i = 0; i < n_opts; i++) {
 	name = var_name(flags[i]);
 	if (name == "")
+		continue;
+
+	# We do not want to compare warning-related options, since they
+	# might have been modified by a #pragma GCC diagnostic.
+	if (flag_set_p("Warning", flags[i]))
 		continue;
 
 	if (name in checked_options)

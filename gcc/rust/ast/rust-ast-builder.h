@@ -1,4 +1,4 @@
-// Copyright (C) 2020-2024 Free Software Foundation, Inc.
+// Copyright (C) 2020-2025 Free Software Foundation, Inc.
 
 // This file is part of GCC.
 
@@ -20,9 +20,35 @@
 #define AST_BUILDER_H
 
 #include "rust-ast-full.h"
+#include "rust-expr.h"
+#include "rust-ast.h"
+#include "rust-item.h"
 
 namespace Rust {
 namespace AST {
+
+template <typename T>
+std::vector<std::unique_ptr<T>>
+vec (std::unique_ptr<T> &&t)
+{
+  auto v = std::vector<std::unique_ptr<T>> ();
+
+  v.emplace_back (std::move (t));
+
+  return v;
+}
+
+template <typename T>
+std::vector<std::unique_ptr<T>>
+vec (std::unique_ptr<T> &&t1, std::unique_ptr<T> &&t2)
+{
+  auto v = std::vector<std::unique_ptr<T>> ();
+
+  v.emplace_back (std::move (t1));
+  v.emplace_back (std::move (t2));
+
+  return v;
+}
 
 // TODO: Use this builder when expanding regular macros
 /* Builder class with helper methods to create AST nodes. This builder is
@@ -38,6 +64,8 @@ public:
 
   /* Create an identifier expression (`variable`) */
   std::unique_ptr<Expr> identifier (std::string name) const;
+  std::unique_ptr<Pattern> identifier_pattern (std::string name,
+					       bool mut = false) const;
 
   /* Create a tuple index expression (`receiver.0`) */
   std::unique_ptr<Expr> tuple_idx (std::string receiver, int idx) const;
@@ -53,6 +81,9 @@ public:
   std::unique_ptr<Expr> block (std::vector<std::unique_ptr<Stmt>> &&stmts,
 			       std::unique_ptr<Expr> &&tail_expr
 			       = nullptr) const;
+  std::unique_ptr<Expr> block (std::unique_ptr<Stmt> &&stmt,
+			       std::unique_ptr<Expr> &&tail_expr
+			       = nullptr) const;
 
   /* Create a let binding with an optional type and initializer (`let <name> :
    * <type> = <init>`) */
@@ -66,6 +97,8 @@ public:
    */
   std::unique_ptr<Expr> call (std::unique_ptr<Expr> &&path,
 			      std::vector<std::unique_ptr<Expr>> &&args) const;
+  std::unique_ptr<Expr> call (std::unique_ptr<Expr> &&path,
+			      std::unique_ptr<Expr> &&arg) const;
 
   /**
    * Create an array expression (`[member0, member1, member2]`)
@@ -81,10 +114,27 @@ public:
 
   /* And similarly for type path segments */
   std::unique_ptr<TypePathSegment> type_path_segment (std::string seg) const;
+  std::unique_ptr<TypePathSegment>
+  type_path_segment (LangItem::Kind lang_item) const;
+
+  std::unique_ptr<TypePathSegment>
+  type_path_segment_generic (std::string seg, GenericArgs args) const;
+  std::unique_ptr<TypePathSegment>
+  type_path_segment_generic (LangItem::Kind lang_item, GenericArgs args) const;
 
   /* Create a Type from a single string - the most basic kind of type in our AST
    */
   std::unique_ptr<Type> single_type_path (std::string type) const;
+  std::unique_ptr<Type> single_type_path (LangItem::Kind lang_item) const;
+
+  std::unique_ptr<Type> single_generic_type_path (std::string type,
+						  GenericArgs args) const;
+  std::unique_ptr<Type> single_generic_type_path (LangItem::Kind lang_item,
+						  GenericArgs args) const;
+
+  TypePath type_path (std::unique_ptr<TypePathSegment> &&segment) const;
+  TypePath type_path (std::string type) const;
+  TypePath type_path (LangItem::Kind lang_item) const;
 
   /**
    * Create a path in expression from multiple segments (`Clone::clone`). You
@@ -94,14 +144,30 @@ public:
   PathInExpression
   path_in_expression (std::vector<std::string> &&segments) const;
 
+  /**
+   * Create a path in expression from a lang item.
+   */
+  PathInExpression path_in_expression (LangItem::Kind lang_item) const;
+
+  /* Create a new struct */
+  std::unique_ptr<Stmt>
+  struct_struct (std::string struct_name,
+		 std::vector<std::unique_ptr<GenericParam>> &&generics,
+		 std::vector<StructField> &&fields);
+
   /* Create a struct expression for unit structs (`S`) */
   std::unique_ptr<Expr> struct_expr_struct (std::string struct_name) const;
 
   /**
    * Create an expression for struct instantiation with fields (`S { a, b: c }`)
+   * Tuple expressions are call expressions and can thus be constructed with
+   * `call`
    */
   std::unique_ptr<Expr>
   struct_expr (std::string struct_name,
+	       std::vector<std::unique_ptr<StructExprField>> &&fields) const;
+  std::unique_ptr<Expr>
+  struct_expr (PathInExpression struct_name,
 	       std::vector<std::unique_ptr<StructExprField>> &&fields) const;
 
   /* Create a field expression for struct instantiation (`field_name: value`) */
@@ -115,6 +181,30 @@ public:
 
   /* Create a wildcard pattern (`_`) */
   std::unique_ptr<Pattern> wildcard () const;
+
+  /* Create a lang item path usable as a general path */
+  std::unique_ptr<Path> lang_item_path (LangItem::Kind) const;
+
+  /* Create match expressions and their components */
+  std::unique_ptr<Expr> match (std::unique_ptr<Expr> &&scrutinee,
+			       std::vector<MatchCase> &&cases);
+  MatchArm match_arm (std::unique_ptr<Pattern> &&pattern);
+  MatchCase match_case (std::unique_ptr<Pattern> &&pattern,
+			std::unique_ptr<Expr> &&expr);
+
+  /* Create a loop expression */
+  std::unique_ptr<Expr> loop (std::vector<std::unique_ptr<Stmt>> &&stmts);
+
+  static std::unique_ptr<Type> new_type (Type &type);
+
+  static std::unique_ptr<GenericParam>
+  new_lifetime_param (LifetimeParam &param);
+
+  static std::unique_ptr<GenericParam> new_type_param (TypeParam &param);
+
+  static Lifetime new_lifetime (const Lifetime &lifetime);
+
+  static GenericArgs new_generic_args (GenericArgs &args);
 
 private:
   /**

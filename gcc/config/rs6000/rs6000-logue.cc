@@ -1,6 +1,6 @@
 /* Subroutines used to generate function prologues and epilogues
    on IBM RS/6000.
-   Copyright (C) 1991-2024 Free Software Foundation, Inc.
+   Copyright (C) 1991-2025 Free Software Foundation, Inc.
 
    This file is part of GCC.
 
@@ -918,7 +918,7 @@ rs6000_stack_info (void)
   else if (DEFAULT_ABI == ABI_V4)
     info->push_p = non_fixed_size != 0;
 
-  else if (frame_pointer_needed)
+  else if (frame_pointer_needed || cfun->machine->asm_redzone_clobber_seen)
     info->push_p = 1;
 
   else
@@ -4005,8 +4005,8 @@ rs6000_output_function_prologue (FILE *file)
 
       unsigned short patch_area_size = crtl->patch_area_size;
       unsigned short patch_area_entry = crtl->patch_area_entry;
-      /* Need to emit the patching area.  */
-      if (patch_area_size > 0)
+      /* Emit non-split patching area now.  */
+      if (!TARGET_SPLIT_PATCH_NOPS && patch_area_size > 0)
 	{
 	  cfun->machine->global_entry_emitted = true;
 	  /* As ELFv2 ABI shows, the allowable bytes between the global
@@ -4027,7 +4027,6 @@ rs6000_output_function_prologue (FILE *file)
 		       patch_area_entry);
 	      rs6000_print_patchable_function_entry (file, patch_area_entry,
 						     true);
-	      patch_area_size -= patch_area_entry;
 	    }
 	}
 
@@ -4037,9 +4036,13 @@ rs6000_output_function_prologue (FILE *file)
       assemble_name (file, name);
       fputs ("\n", file);
       /* Emit the nops after local entry.  */
-      if (patch_area_size > 0)
-	rs6000_print_patchable_function_entry (file, patch_area_size,
-					       patch_area_entry == 0);
+      if (patch_area_size > patch_area_entry)
+	{
+	  patch_area_size -= patch_area_entry;
+	  cfun->machine->stop_patch_area_print = false;
+	  rs6000_print_patchable_function_entry (file, patch_area_size,
+						 patch_area_entry == 0);
+	}
     }
 
   else if (rs6000_pcrel_p ())

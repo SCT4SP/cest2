@@ -1,4 +1,4 @@
-/* Copyright (C) 1988-2024 Free Software Foundation, Inc.
+/* Copyright (C) 1988-2025 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -18,7 +18,6 @@ along with GCC; see the file COPYING3.  If not see
 
 #define IN_TARGET_CODE 1
 
-#define INCLUDE_MEMORY
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
@@ -2531,6 +2530,10 @@ ix86_expand_branch (enum rtx_code code, rtx op0, rtx op1, rtx label)
       emit_jump_insn (gen_rtx_SET (pc_rtx, tmp));
       return;
 
+    case E_BFmode:
+      gcc_assert (TARGET_AVX10_2_256 && !flag_trapping_math);
+      goto simple;
+
     case E_DImode:
       if (TARGET_64BIT)
 	goto simple;
@@ -2797,9 +2800,9 @@ ix86_prepare_fp_compare_args (enum rtx_code code, rtx *pop0, rtx *pop1)
   bool unordered_compare = ix86_unordered_fp_compare (code);
   rtx op0 = *pop0, op1 = *pop1;
   machine_mode op_mode = GET_MODE (op0);
-  bool is_sse = SSE_FLOAT_MODE_SSEMATH_OR_HF_P (op_mode);
+  bool is_sse = SSE_FLOAT_MODE_SSEMATH_OR_HFBF_P (op_mode);
 
-  if (op_mode == BFmode)
+  if (op_mode == BFmode && (!TARGET_AVX10_2_256 || flag_trapping_math))
     {
       rtx op = gen_lowpart (HImode, op0);
       if (CONST_INT_P (op))
@@ -2918,10 +2921,14 @@ ix86_expand_fp_compare (enum rtx_code code, rtx op0, rtx op1)
     {
     case IX86_FPCMP_COMI:
       tmp = gen_rtx_COMPARE (CCFPmode, op0, op1);
-      if (TARGET_AVX10_2_256 && (code == EQ || code == NE))
-	tmp = gen_rtx_UNSPEC (CCFPmode, gen_rtvec (1, tmp), UNSPEC_OPTCOMX);
-      if (unordered_compare)
-	tmp = gen_rtx_UNSPEC (CCFPmode, gen_rtvec (1, tmp), UNSPEC_NOTRAP);
+      /* We only have vcomisbf16, No vcomubf16 nor vcomxbf16 */
+      if (GET_MODE (op0) != E_BFmode)
+	{
+	  if (TARGET_AVX10_2_256 && (code == EQ || code == NE))
+	    tmp = gen_rtx_UNSPEC (CCFPmode, gen_rtvec (1, tmp), UNSPEC_OPTCOMX);
+	  if (unordered_compare)
+	    tmp = gen_rtx_UNSPEC (CCFPmode, gen_rtvec (1, tmp), UNSPEC_NOTRAP);
+	}
       cmp_mode = CCFPmode;
       emit_insn (gen_rtx_SET (gen_rtx_REG (CCFPmode, FLAGS_REG), tmp));
       break;
@@ -4636,7 +4643,7 @@ ix86_expand_fp_movcc (rtx operands[])
       && !ix86_fp_comparison_operator (operands[1], VOIDmode))
     return false;
 
-  if (SSE_FLOAT_MODE_SSEMATH_OR_HF_P (mode))
+  if (SSE_FLOAT_MODE_SSEMATH_OR_HFBF_P (mode))
     {
       machine_mode cmode;
 
@@ -10218,13 +10225,15 @@ ix86_expand_call (rtx retval, rtx fnaddr, rtx callarg1,
     fnaddr = gen_rtx_MEM (QImode, construct_plt_address (XEXP (fnaddr, 0)));
   /* Since x32 GOT slot is 64 bit with zero upper 32 bits, indirect
      branch via x32 GOT slot is OK.  */
-  else if (!(TARGET_X32
-	     && MEM_P (fnaddr)
-	     && GET_CODE (XEXP (fnaddr, 0)) == ZERO_EXTEND
-	     && GOT_memory_operand (XEXP (XEXP (fnaddr, 0), 0), Pmode))
-	   && (sibcall
-	       ? !sibcall_insn_operand (XEXP (fnaddr, 0), word_mode)
-	       : !call_insn_operand (XEXP (fnaddr, 0), word_mode)))
+  else if (TARGET_X32
+      && MEM_P (fnaddr)
+      && GET_CODE (XEXP (fnaddr, 0)) == ZERO_EXTEND
+      && GOT_memory_operand (XEXP (XEXP (fnaddr, 0), 0), Pmode)
+      && !TARGET_INDIRECT_BRANCH_REGISTER)
+    ;
+  else if (sibcall
+	   ? !sibcall_insn_operand (XEXP (fnaddr, 0), word_mode)
+	   : !call_insn_operand (XEXP (fnaddr, 0), word_mode))
     {
       fnaddr = convert_to_mode (word_mode, XEXP (fnaddr, 0), 1);
       fnaddr = gen_rtx_MEM (QImode, copy_to_mode_reg (word_mode, fnaddr));
@@ -11774,6 +11783,11 @@ ix86_expand_args_builtin (const struct builtin_description *d,
     case V8HF_FTYPE_V16QI_V8HF_UQI:
     case V16HF_FTYPE_V16QI_V16HF_UHI:
     case V32HF_FTYPE_V32QI_V32HF_USI:
+    case V16SI_FTYPE_V16SF_V16SI_UHI:
+    case V32HI_FTYPE_V32HF_V32HI_USI:
+    case V8DI_FTYPE_V8SF_V8DI_UQI:
+    case V8DI_FTYPE_V8DF_V8DI_UQI:
+    case V8SI_FTYPE_V8DF_V8SI_UQI:
       nargs = 3;
       break;
     case V32QI_FTYPE_V32QI_V32QI_INT:
@@ -14056,6 +14070,9 @@ ix86_expand_builtin (tree exp, rtx target, rtx subtarget,
       op1 = expand_normal (arg1);
       op2 = expand_normal (arg2);
 
+      if (GET_MODE (op1) != Pmode)
+	op1 = convert_to_mode (Pmode, op1, 1);
+
       if (!address_operand (op2, VOIDmode))
 	{
 	  op2 = convert_memory_address (Pmode, op2);
@@ -14091,6 +14108,9 @@ ix86_expand_builtin (tree exp, rtx target, rtx subtarget,
       emit_label (ok_label);
       emit_insn (gen_rtx_SET (target, pat));
 
+      if (GET_MODE (op0) != Pmode)
+	op0 = convert_to_mode (Pmode, op0, 1);
+
       for (i = 0; i < 8; i++)
 	{
 	  op = gen_rtx_MEM (V2DImode,
@@ -14114,6 +14134,9 @@ ix86_expand_builtin (tree exp, rtx target, rtx subtarget,
 
 	if (!REG_P (op0))
 	  op0 = copy_to_mode_reg (SImode, op0);
+
+	if (GET_MODE (op2) != Pmode)
+	  op2 = convert_to_mode (Pmode, op2, 1);
 
 	op = gen_rtx_REG (V2DImode, GET_SSE_REGNO (0));
 	emit_move_insn (op, op1);
@@ -14151,6 +14174,9 @@ ix86_expand_builtin (tree exp, rtx target, rtx subtarget,
 
 	if (!REG_P (op0))
 	  op0 = copy_to_mode_reg (SImode, op0);
+
+	if (GET_MODE (op3) != Pmode)
+	  op3 = convert_to_mode (Pmode, op3, 1);
 
 	/* Force to use xmm0, xmm1 for keylow, keyhi*/
 	op = gen_rtx_REG (V2DImode, GET_SSE_REGNO (0));
@@ -14194,9 +14220,16 @@ ix86_expand_builtin (tree exp, rtx target, rtx subtarget,
 	    return const0_rtx;
 	  }
 
+	if (!IN_RANGE (INTVAL (op1), 0, 2))
+	  {
+	    warning (0, "invalid second argument to"
+		     " %<__builtin_ia32_prefetch%>; using zero");
+	    op1 = const0_rtx;
+	  }
+
 	if (INTVAL (op3) == 1)
 	  {
-	    if (INTVAL (op2) < 2 || INTVAL (op2) > 3)
+	    if (!IN_RANGE (INTVAL (op2), 2, 3))
 	      {
 		error ("invalid third argument");
 		return const0_rtx;
@@ -14216,20 +14249,26 @@ ix86_expand_builtin (tree exp, rtx target, rtx subtarget,
 	  }
 	else
 	  {
+	    if (INTVAL (op3) != 0)
+	      warning (0, "invalid forth argument to"
+			  " %<__builtin_ia32_prefetch%>; using zero");
+
 	    if (!address_operand (op0, VOIDmode))
 	      {
 		op0 = convert_memory_address (Pmode, op0);
 		op0 = copy_addr_to_reg (op0);
 	      }
 
-	    if (INTVAL (op2) < 0 || INTVAL (op2) > 3)
+	    if (!IN_RANGE (INTVAL (op2), 0, 3))
 	      {
 		warning (0, "invalid third argument to %<__builtin_ia32_prefetch%>; using zero");
 		op2 = const0_rtx;
 	      }
 
-	    if (TARGET_3DNOW || TARGET_PREFETCH_SSE
-		|| TARGET_PRFCHW)
+	    if (TARGET_3DNOW
+		|| TARGET_PREFETCH_SSE
+		|| TARGET_PRFCHW
+		|| TARGET_MOVRS)
 	      emit_insn (gen_prefetch (op0, op1, op2));
 	    else if (!MEM_P (op0) && side_effects_p (op0))
 	      /* Don't do anything with direct references to volatile memory,
@@ -15913,12 +15952,12 @@ rdseed_step:
 	  case IX86_BUILTIN_RDPID:
 	    return ix86_expand_special_args_builtin (bdesc_args + i, exp,
 						     target);
-	  case IX86_BUILTIN_VCOMSBF16EQ:
-	  case IX86_BUILTIN_VCOMSBF16NE:
-	  case IX86_BUILTIN_VCOMSBF16GT:
-	  case IX86_BUILTIN_VCOMSBF16GE:
-	  case IX86_BUILTIN_VCOMSBF16LT:
-	  case IX86_BUILTIN_VCOMSBF16LE:
+	  case IX86_BUILTIN_VCOMISBF16EQ:
+	  case IX86_BUILTIN_VCOMISBF16NE:
+	  case IX86_BUILTIN_VCOMISBF16GT:
+	  case IX86_BUILTIN_VCOMISBF16GE:
+	  case IX86_BUILTIN_VCOMISBF16LT:
+	  case IX86_BUILTIN_VCOMISBF16LE:
 	    return ix86_expand_sse_comi (bdesc_args + i, exp, target, false);
 	  case IX86_BUILTIN_FABSQ:
 	  case IX86_BUILTIN_COPYSIGNQ:
@@ -23072,6 +23111,53 @@ expand_vec_perm_vpshufb2_vpermq_even_odd (struct expand_vec_perm_d *d)
   return true;
 }
 
+/* A subroutine of ix86_expand_vec_perm_const_1. Try to implement a
+   permutation (which is a bland) with and, andnot and or when pshufb is not available.
+
+   It handles case:
+   __builtin_shufflevector (v1, v2, 0, 9, 2, 11, 4, 13, 6, 15);
+   __builtin_shufflevector (v1, v2, 8, 1, 2, 11, 4, 13, 6, 15);
+
+   An element[i] must be chosen between op0[i] and op1[i] to satisfy the
+   requirement.
+ */
+
+static bool
+expand_vec_perm_pand_pandn_por (struct expand_vec_perm_d *d)
+{
+  rtx rperm[16], vperm;
+  unsigned int i, nelt = d->nelt;
+
+  if (!TARGET_SSE2
+      || d->one_operand_p
+      || (d->vmode != V16QImode && d->vmode != V8HImode))
+    return false;
+
+  if (d->perm[0] != 0)
+    return false;
+
+  /* The dest[i] must select an element between op0[i] and op1[i].  */
+  for (i = 1; i < nelt; i++)
+    if ((d->perm[i] % nelt) != i)
+      return false;
+
+  if (d->testing_p)
+     return true;
+
+  /* Generates a blend mask for the operators AND and ANDNOT.  */
+  machine_mode inner_mode = GET_MODE_INNER (d->vmode);
+  for (i = 0; i < nelt; i++)
+    rperm[i] = (d->perm[i] <  nelt) ? CONSTM1_RTX (inner_mode)
+      : CONST0_RTX (inner_mode);
+
+  vperm = gen_rtx_CONST_VECTOR (d->vmode, gen_rtvec_v (nelt, rperm));
+  vperm = force_reg (d->vmode, vperm);
+
+  ix86_expand_sse_movcc (d->target, vperm, d->op0, d->op1);
+
+  return true;
+}
+
 /* Implement permutation with pslldq + psrldq + por when pshufb is not
    available.  */
 static bool
@@ -23805,7 +23891,7 @@ expand_vec_perm_broadcast_1 (struct expand_vec_perm_d *d)
       if (d->testing_p)
 	return true;
 
-      rtx (*gen_interleave) (machine_mode, int, rtx, rtx, rtx);
+      rtx (*gen_interleave) (machine_mode, rtx, rtx, rtx);
       if (elt >= nelt2)
 	{
 	  gen_interleave = gen_vec_interleave_high;
@@ -23816,7 +23902,7 @@ expand_vec_perm_broadcast_1 (struct expand_vec_perm_d *d)
       nelt2 /= 2;
 
       dest = gen_reg_rtx (vmode);
-      emit_insn (gen_interleave (vmode, 1, dest, op0, op0));
+      emit_insn (gen_interleave (vmode, dest, op0, op0));
 
       vmode = V4SImode;
       op0 = gen_lowpart (vmode, dest);
@@ -24129,6 +24215,9 @@ ix86_expand_vec_perm_const_1 (struct expand_vec_perm_d *d)
     return true;
 
   if (expand_vec_perm_psrlw_psllw_por (d))
+    return true;
+
+  if (expand_vec_perm_pand_pandn_por (d))
     return true;
 
   /* Try sequences of four instructions.  */
@@ -24782,11 +24871,9 @@ ix86_expand_vecop_qihi2 (enum rtx_code code, rtx dest, rtx op1, rtx op2)
      generic permutation to merge the data back into the right place.  This
      permutation results in VPERMQ, which is slow, so better fall back to
      ix86_expand_vecop_qihi.  */
-  if (!TARGET_AVX512BW)
-    return false;
-
-  if ((qimode == V16QImode && !TARGET_AVX2)
-      || (qimode == V32QImode && (!TARGET_AVX512BW || !TARGET_EVEX512))
+  if (!TARGET_AVX512BW
+      || (qimode == V16QImode && !TARGET_AVX512VL)
+      || (qimode == V32QImode && !TARGET_EVEX512)
       /* There are no V64HImode instructions.  */
       || qimode == V64QImode)
      return false;
@@ -24801,8 +24888,7 @@ ix86_expand_vecop_qihi2 (enum rtx_code code, rtx dest, rtx op1, rtx op2)
     {
     case E_V16QImode:
       himode = V16HImode;
-      if (TARGET_AVX512VL && TARGET_AVX512BW)
-	gen_truncate = gen_truncv16hiv16qi2;
+      gen_truncate = gen_truncv16hiv16qi2;
       break;
     case E_V32QImode:
       himode = V32HImode;
@@ -24844,33 +24930,7 @@ ix86_expand_vecop_qihi2 (enum rtx_code code, rtx dest, rtx op1, rtx op2)
     hdest = expand_simple_binop (himode, code, hop1, hop2,
 				 NULL_RTX, 1, OPTAB_DIRECT);
 
-  if (gen_truncate)
-    emit_insn (gen_truncate (dest, hdest));
-  else
-    {
-      struct expand_vec_perm_d d;
-      rtx wqdest = gen_reg_rtx (wqimode);
-      rtx wqres = gen_lowpart (wqimode, hdest);
-      bool ok;
-      int i;
-
-      /* Merge the data back into the right place.  */
-      d.target = wqdest;
-      d.op0 = d.op1 = wqres;
-      d.vmode = wqimode;
-      d.nelt = GET_MODE_NUNITS (wqimode);
-      d.one_operand_p = false;
-      d.testing_p = false;
-
-      for (i = 0; i < d.nelt; ++i)
-	d.perm[i] = i * 2;
-
-      ok = ix86_expand_vec_perm_const_1 (&d);
-      gcc_assert (ok);
-
-      emit_move_insn (dest, gen_lowpart (qimode, wqdest));
-    }
-
+  emit_insn (gen_truncate (dest, hdest));
   return true;
 }
 
@@ -26822,5 +26882,82 @@ ix86_expand_trunc_with_avx2_noavx512f (rtx output, rtx input, machine_mode cvt_m
   gcc_assert (ok);
   emit_move_insn (output, gen_lowpart (out_mode, d.target));
 }
+
+/* Implement truncv8sfv8bf2 with vector permutation.  */
+void
+ix86_expand_vector_sf2bf_with_vec_perm (rtx dest, rtx src)
+{
+  machine_mode vperm_mode, src_mode = GET_MODE (src);
+  switch (src_mode)
+    {
+    case V16SFmode:
+      vperm_mode = V32BFmode;
+      break;
+    case V8SFmode:
+      vperm_mode = V16BFmode;
+      break;
+    case V4SFmode:
+      vperm_mode = V8BFmode;
+      break;
+    default:
+      gcc_unreachable ();
+    }
+
+  int nelt = GET_MODE_NUNITS (vperm_mode);
+  vec_perm_builder sel (nelt, nelt, 1);
+  sel.quick_grow (nelt);
+  for (int i = 0; i != nelt; i++)
+    sel[i] = (2 * i + 1) % nelt;
+  vec_perm_indices indices (sel, 1, nelt);
+
+  rtx target = gen_reg_rtx (vperm_mode);
+  rtx op0 = lowpart_subreg (vperm_mode,
+			    force_reg (src_mode, src),
+			    src_mode);
+  bool ok = targetm.vectorize.vec_perm_const (vperm_mode, vperm_mode,
+					      target, op0, op0, indices);
+  gcc_assert (ok);
+  emit_move_insn (dest, lowpart_subreg (GET_MODE (dest), target, vperm_mode));
+}
+
+/* Implement extendv8bf2v8sf2 with vector permutation.  */
+void
+ix86_expand_vector_bf2sf_with_vec_perm (rtx dest, rtx src)
+{
+  machine_mode vperm_mode, src_mode = GET_MODE (src);
+  switch (src_mode)
+    {
+    case V16BFmode:
+      vperm_mode = V32BFmode;
+      break;
+    case V8BFmode:
+      vperm_mode = V16BFmode;
+      break;
+    case V4BFmode:
+      vperm_mode = V8BFmode;
+      break;
+    default:
+      gcc_unreachable ();
+    }
+
+  int nelt = GET_MODE_NUNITS (vperm_mode);
+  vec_perm_builder sel (nelt, nelt, 1);
+  sel.quick_grow (nelt);
+  for (int i = 0, k = 0, j = nelt; i != nelt; i++)
+    sel[i] = i & 1 ? j++ : k++;
+
+  vec_perm_indices indices (sel, 2, nelt);
+
+  rtx target = gen_reg_rtx (vperm_mode);
+  rtx op1 = lowpart_subreg (vperm_mode,
+			    force_reg (src_mode, src),
+			    src_mode);
+  rtx op0 = CONST0_RTX (vperm_mode);
+  bool ok = targetm.vectorize.vec_perm_const (vperm_mode, vperm_mode,
+					      target, op0, op1, indices);
+  gcc_assert (ok);
+  emit_move_insn (dest, lowpart_subreg (GET_MODE (dest), target, vperm_mode));
+}
+
 
 #include "gt-i386-expand.h"

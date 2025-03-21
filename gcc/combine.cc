@@ -1,5 +1,5 @@
 /* Optimize by combining instructions for GNU compiler.
-   Copyright (C) 1987-2024 Free Software Foundation, Inc.
+   Copyright (C) 1987-2025 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -454,7 +454,7 @@ static bool merge_outer_ops (enum rtx_code *, HOST_WIDE_INT *, enum rtx_code,
 static rtx simplify_shift_const_1 (enum rtx_code, machine_mode, rtx, int);
 static rtx simplify_shift_const (rtx, enum rtx_code, machine_mode, rtx,
 				 int);
-static int recog_for_combine (rtx *, rtx_insn *, rtx *);
+static int recog_for_combine (rtx *, rtx_insn *, rtx *, unsigned = 0, unsigned = 0);
 static rtx gen_lowpart_for_combine (machine_mode, rtx);
 static enum rtx_code simplify_compare_const (enum rtx_code, machine_mode,
 					     rtx *, rtx *);
@@ -515,18 +515,22 @@ target_canonicalize_comparison (enum rtx_code *code, rtx *op0, rtx *op1,
 
 /* Try to split PATTERN found in INSN.  This returns NULL_RTX if
    PATTERN cannot be split.  Otherwise, it returns an insn sequence.
+   Updates OLD_NREGS with the max number of regs before the split
+   and NEW_NREGS after the split.
    This is a wrapper around split_insns which ensures that the
    reg_stat vector is made larger if the splitter creates a new
    register.  */
 
 static rtx_insn *
-combine_split_insns (rtx pattern, rtx_insn *insn)
+combine_split_insns (rtx pattern, rtx_insn *insn,
+		     unsigned int *old_nregs,
+		     unsigned int *new_regs)
 {
   rtx_insn *ret;
   unsigned int nregs;
-
+  *old_nregs = max_reg_num ();
   ret = split_insns (pattern, insn);
-  nregs = max_reg_num ();
+  *new_regs = nregs = max_reg_num ();
   if (nregs > reg_stat.length ())
     reg_stat.safe_grow_cleared (nregs, true);
   return ret;
@@ -3566,12 +3570,13 @@ try_combine (rtx_insn *i3, rtx_insn *i2, rtx_insn *i1, rtx_insn *i0,
     {
       rtx parallel, *split;
       rtx_insn *m_split_insn;
+      unsigned int old_nregs, new_nregs;
 
       /* See if the MD file can split NEWPAT.  If it can't, see if letting it
 	 use I2DEST as a scratch register will help.  In the latter case,
 	 convert I2DEST to the mode of the source of NEWPAT if we can.  */
 
-      m_split_insn = combine_split_insns (newpat, i3);
+      m_split_insn = combine_split_insns (newpat, i3, &old_nregs, &new_nregs);
 
       /* We can only use I2DEST as a scratch reg if it doesn't overlap any
 	 inputs of NEWPAT.  */
@@ -3599,7 +3604,7 @@ try_combine (rtx_insn *i3, rtx_insn *i2, rtx_insn *i1, rtx_insn *i0,
 				       gen_rtvec (2, newpat,
 						  gen_rtx_CLOBBER (VOIDmode,
 								   i2dest)));
-	  m_split_insn = combine_split_insns (parallel, i3);
+	  m_split_insn = combine_split_insns (parallel, i3, &old_nregs, &new_nregs);
 
 	  /* If that didn't work, try changing the mode of I2DEST if
 	     we can.  */
@@ -3624,7 +3629,7 @@ try_combine (rtx_insn *i3, rtx_insn *i2, rtx_insn *i1, rtx_insn *i0,
 			   gen_rtvec (2, newpat,
 				      gen_rtx_CLOBBER (VOIDmode,
 						       ni2dest))));
-	      m_split_insn = combine_split_insns (parallel, i3);
+	      m_split_insn = combine_split_insns (parallel, i3, &old_nregs, &new_nregs);
 
 	      if (m_split_insn == 0
 		  && REGNO (i2dest) >= FIRST_PSEUDO_REGISTER)
@@ -3647,13 +3652,14 @@ try_combine (rtx_insn *i3, rtx_insn *i2, rtx_insn *i1, rtx_insn *i0,
       if (m_split_insn == 0 && newpat_vec_with_clobbers)
 	{
 	  parallel = gen_rtx_PARALLEL (VOIDmode, newpat_vec_with_clobbers);
-	  m_split_insn = combine_split_insns (parallel, i3);
+	  m_split_insn = combine_split_insns (parallel, i3, &old_nregs, &new_nregs);
 	}
 
       if (m_split_insn && NEXT_INSN (m_split_insn) == NULL_RTX)
 	{
 	  rtx m_split_pat = PATTERN (m_split_insn);
-	  insn_code_number = recog_for_combine (&m_split_pat, i3, &new_i3_notes);
+	  insn_code_number = recog_for_combine (&m_split_pat, i3, &new_i3_notes,
+						old_nregs, new_nregs);
 	  if (insn_code_number >= 0)
 	    newpat = m_split_pat;
 	}
@@ -3678,7 +3684,8 @@ try_combine (rtx_insn *i3, rtx_insn *i2, rtx_insn *i1, rtx_insn *i0,
 	      && (next_nonnote_nondebug_insn (i2) == i3
 		  || ! reg_used_between_p (SET_DEST (i2set), i2, i3)))
 	    insn_code_number = recog_for_combine (&newi3pat, i3,
-						  &new_i3_notes);
+						  &new_i3_notes,
+						  old_nregs, new_nregs);
 	  if (insn_code_number >= 0)
 	    newpat = newi3pat;
 
@@ -3904,6 +3911,9 @@ try_combine (rtx_insn *i3, rtx_insn *i2, rtx_insn *i1, rtx_insn *i0,
      copy.  This saves at least one insn, more if register allocation can
      eliminate the copy.
 
+     We cannot do this if the involved modes have more than one elements,
+     like for vector or complex modes.
+
      We cannot do this if the destination of the first assignment is a
      condition code register.  We eliminate this case by making sure
      the SET_DEST and SET_SRC have the same mode.
@@ -3919,6 +3929,8 @@ try_combine (rtx_insn *i3, rtx_insn *i2, rtx_insn *i1, rtx_insn *i0,
 	   && GET_CODE (SET_SRC (XVECEXP (newpat, 0, 0))) == SIGN_EXTEND
 	   && (GET_MODE (SET_DEST (XVECEXP (newpat, 0, 0)))
 	       == GET_MODE (SET_SRC (XVECEXP (newpat, 0, 0))))
+	   && ! VECTOR_MODE_P (GET_MODE (SET_DEST (XVECEXP (newpat, 0, 0))))
+	   && ! COMPLEX_MODE_P (GET_MODE (SET_DEST (XVECEXP (newpat, 0, 0))))
 	   && GET_CODE (XVECEXP (newpat, 0, 1)) == SET
 	   && rtx_equal_p (SET_SRC (XVECEXP (newpat, 0, 1)),
 			   XEXP (SET_SRC (XVECEXP (newpat, 0, 0)), 0))
@@ -4910,8 +4922,9 @@ find_split_point (rtx *loc, rtx_insn *insn, bool set_src)
 					    MEM_ADDR_SPACE (x)))
 	{
 	  rtx reg = regno_reg_rtx[FIRST_PSEUDO_REGISTER];
+	  unsigned int old_nregs, new_nregs;
 	  rtx_insn *seq = combine_split_insns (gen_rtx_SET (reg, XEXP (x, 0)),
-					       subst_insn);
+					       subst_insn, &old_nregs, &new_nregs);
 
 	  /* This should have produced two insns, each of which sets our
 	     placeholder.  If the source of the second is a valid address,
@@ -7624,7 +7637,7 @@ make_extraction (machine_mode mode, rtx inner, HOST_WIDE_INT pos,
 	 least significant (LEN - C) bits of X, giving an rtx
 	 whose mode is MODE, then multiply it by 2^C.  */
       const HOST_WIDE_INT shift_amt = exact_log2 (INTVAL (XEXP (inner, 1)));
-      if (IN_RANGE (shift_amt, 1, len - 1))
+      if (len > 1 && IN_RANGE (shift_amt, 1, len - 1))
 	{
 	  new_rtx = make_extraction (mode, XEXP (inner, 0),
 				     0, 0, len - shift_amt,
@@ -10630,8 +10643,10 @@ simplify_shift_const_1 (enum rtx_code code, machine_mode result_mode,
 					     outer_op, outer_const);
 	}
 
-      scalar_int_mode shift_unit_mode
-	= as_a <scalar_int_mode> (GET_MODE_INNER (shift_mode));
+      scalar_int_mode shift_unit_mode;
+      if (!is_a <scalar_int_mode> (GET_MODE_INNER (shift_mode),
+				   &shift_unit_mode))
+	return NULL_RTX;
 
       /* Handle cases where the count is greater than the size of the mode
 	 minus 1.  For ASHIFT, use the size minus one as the count (this can
@@ -11411,7 +11426,8 @@ simplify_shift_const (rtx x, enum rtx_code code, machine_mode result_mode,
    return value.  */
 
 static int
-recog_for_combine_1 (rtx *pnewpat, rtx_insn *insn, rtx *pnotes)
+recog_for_combine_1 (rtx *pnewpat, rtx_insn *insn, rtx *pnotes,
+		     unsigned old_nregs, unsigned new_nregs)
 {
   rtx pat = *pnewpat;
   rtx pat_without_clobbers;
@@ -11527,6 +11543,9 @@ recog_for_combine_1 (rtx *pnewpat, rtx_insn *insn, rtx *pnotes)
   if (insn_code_number >= 0
       && insn_code_number != NOOP_MOVE_INSN_CODE)
     {
+      /* Create the reg dead notes if needed for the regs that were created via split.   */
+      for (; old_nregs < new_nregs; old_nregs++)
+	notes = alloc_reg_note (REG_DEAD, regno_reg_rtx[old_nregs], notes);
       old_pat = PATTERN (insn);
       old_notes = REG_NOTES (insn);
       old_icode = INSN_CODE (insn);
@@ -11698,15 +11717,18 @@ change_zero_ext (rtx pat)
 
    PNOTES is a pointer to a location where any REG_UNUSED notes added for
    the CLOBBERs are placed.
+   If OLD_NREGS != NEW_NREGS, then PNOTES also includes REG_DEAD notes added.
 
    The value is the final insn code from the pattern ultimately matched,
    or -1.  */
 
 static int
-recog_for_combine (rtx *pnewpat, rtx_insn *insn, rtx *pnotes)
+recog_for_combine (rtx *pnewpat, rtx_insn *insn, rtx *pnotes,
+		   unsigned int old_nregs, unsigned int new_nregs)
 {
   rtx pat = *pnewpat;
-  int insn_code_number = recog_for_combine_1 (pnewpat, insn, pnotes);
+  int insn_code_number = recog_for_combine_1 (pnewpat, insn, pnotes,
+					      old_nregs, new_nregs);
   if (insn_code_number >= 0 || check_asm_operands (pat))
     return insn_code_number;
 
@@ -11748,7 +11770,8 @@ recog_for_combine (rtx *pnewpat, rtx_insn *insn, rtx *pnotes)
 
   if (changed)
     {
-      insn_code_number = recog_for_combine_1 (pnewpat, insn, pnotes);
+      insn_code_number = recog_for_combine_1 (pnewpat, insn, pnotes,
+					      old_nregs, new_nregs);
 
       if (insn_code_number < 0)
 	undo_to_marker (marker);
@@ -14516,14 +14539,15 @@ distribute_notes (rtx notes, rtx_insn *from_insn, rtx_insn *i3, rtx_insn *i2,
 	  /* Otherwise, if this register is used by I3, then this register
 	     now dies here, so we must put a REG_DEAD note here unless there
 	     is one already.  */
-	  else if (reg_referenced_p (XEXP (note, 0), PATTERN (i3))
-		   && ! (REG_P (XEXP (note, 0))
-			 ? find_regno_note (i3, REG_DEAD,
-					    REGNO (XEXP (note, 0)))
-			 : find_reg_note (i3, REG_DEAD, XEXP (note, 0))))
+	  else if (reg_referenced_p (XEXP (note, 0), PATTERN (i3)))
 	    {
-	      PUT_REG_NOTE_KIND (note, REG_DEAD);
-	      place = i3;
+	      if (! (REG_P (XEXP (note, 0))
+		     ? find_regno_note (i3, REG_DEAD, REGNO (XEXP (note, 0)))
+		     : find_reg_note (i3, REG_DEAD, XEXP (note, 0))))
+		{
+		  PUT_REG_NOTE_KIND (note, REG_DEAD);
+		  place = i3;
+		}
 	    }
 
 	  /* A SET or CLOBBER of the REG_UNUSED reg has been removed,

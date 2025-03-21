@@ -1,6 +1,6 @@
 /* Operating system specific defines to be used when targeting GCC for any
    Solaris 2 system.
-   Copyright (C) 2002-2024 Free Software Foundation, Inc.
+   Copyright (C) 2002-2025 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -117,11 +117,6 @@ along with GCC; see the file COPYING3.  If not see
 	builtin_define ("__EXTENSIONS__");		\
       }							\
     TARGET_SUB_OS_CPP_BUILTINS();			\
-  } while (0)
-
-#define SUBTARGET_OVERRIDE_OPTIONS			\
-  do {							\
-    solaris_override_options ();			\
   } while (0)
 
 #if DEFAULT_ARCH32_P

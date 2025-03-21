@@ -1,4 +1,4 @@
-// Copyright (C) 2020-2024 Free Software Foundation, Inc.
+// Copyright (C) 2020-2025 Free Software Foundation, Inc.
 
 // This file is part of GCC.
 
@@ -22,6 +22,7 @@
 #include "rust-hir-map.h"
 #include "rust-tyty.h"
 #include "rust-hir-trait-reference.h"
+#include "rust-stacked-contexts.h"
 #include "rust-autoderef.h"
 #include "rust-tyty-region.h"
 #include "rust-tyty-variance-analysis.h"
@@ -42,7 +43,7 @@ public:
   };
 
   TypeCheckContextItem (HIR::Function *item);
-  TypeCheckContextItem (HIR::ImplBlock *impl_block, HIR::Function *item);
+  TypeCheckContextItem (HIR::ImplBlock &impl_block, HIR::Function *item);
   TypeCheckContextItem (HIR::TraitItemFunc *trait_item);
   TypeCheckContextItem (const TypeCheckContextItem &other);
 
@@ -78,6 +79,37 @@ private:
     Item (HIR::TraitItemFunc *trait_item);
   };
 
+  ItemType type;
+  Item item;
+};
+
+class TypeCheckBlockContextItem
+{
+public:
+  enum ItemType
+  {
+    IMPL_BLOCK,
+    TRAIT
+  };
+
+  TypeCheckBlockContextItem (HIR::ImplBlock *block);
+  TypeCheckBlockContextItem (HIR::Trait *trait);
+
+  bool is_impl_block () const;
+  bool is_trait_block () const;
+
+  HIR::ImplBlock &get_impl_block ();
+  HIR::Trait &get_trait ();
+
+private:
+  union Item
+  {
+    HIR::ImplBlock *block;
+    HIR::Trait *trait;
+
+    Item (HIR::ImplBlock *block);
+    Item (HIR::Trait *trait);
+  };
   ItemType type;
   Item item;
 };
@@ -135,6 +167,7 @@ public:
   bool lookup_builtin (NodeId id, TyTy::BaseType **type);
   bool lookup_builtin (std::string name, TyTy::BaseType **type);
   void insert_builtin (HirId id, NodeId ref, TyTy::BaseType *type);
+  const std::vector<std::unique_ptr<TyTy::BaseType>> &get_builtins () const;
 
   void insert_type (const Analysis::NodeMapping &mappings,
 		    TyTy::BaseType *type);
@@ -153,6 +186,9 @@ public:
   void push_return_type (TypeCheckContextItem item,
 			 TyTy::BaseType *return_type);
   void pop_return_type ();
+
+  StackedContexts<TypeCheckBlockContextItem> &block_context ();
+
   void iterate (std::function<bool (HirId, TyTy::BaseType *)> cb);
 
   bool have_loop_context () const;
@@ -244,6 +280,7 @@ private:
   std::vector<std::pair<TypeCheckContextItem, TyTy::BaseType *>>
     return_type_stack;
   std::vector<TyTy::BaseType *> loop_type_stack;
+  StackedContexts<TypeCheckBlockContextItem> block_stack;
   std::map<DefId, TraitReference> trait_context;
   std::map<HirId, TyTy::BaseType *> receiver_context;
   std::map<HirId, AssociatedImplTrait> associated_impl_traits;
@@ -349,6 +386,8 @@ private:
     /** Only to be used by the guard. */
     void pop_binder () { binder_size_stack.pop (); }
 
+    bool binder_empty () { return binder_size_stack.empty (); }
+
     /**
      * Switch from resolving a function header to a function body.
      */
@@ -424,7 +463,8 @@ public:
     ~LifetimeResolverGuard ()
     {
       rust_assert (!ctx.lifetime_resolver_stack.empty ());
-      ctx.lifetime_resolver_stack.top ().pop_binder ();
+      if (!ctx.lifetime_resolver_stack.top ().binder_empty ())
+	ctx.lifetime_resolver_stack.top ().pop_binder ();
       if (kind == RESOLVER)
 	{
 	  ctx.lifetime_resolver_stack.pop ();

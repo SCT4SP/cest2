@@ -1,5 +1,5 @@
 /* Header for code translation functions
-   Copyright (C) 2002-2024 Free Software Foundation, Inc.
+   Copyright (C) 2002-2025 Free Software Foundation, Inc.
    Contributed by Paul Brook
 
 This file is part of GCC.
@@ -493,6 +493,8 @@ void gfc_init_se (gfc_se *, gfc_se *);
 tree gfc_create_var (tree, const char *);
 /* Like above but doesn't add it to the current scope.  */
 tree gfc_create_var_np (tree, const char *);
+/* Ensure that tree can be used as an lvalue.  */
+tree gfc_trans_force_lval (stmtblock_t *, tree);
 
 /* Store the result of an expression in a temp variable so it can be used
    repeatedly even if the original changes */
@@ -881,12 +883,12 @@ extern GTY(()) tree gfor_fndecl_caf_this_image;
 extern GTY(()) tree gfor_fndecl_caf_num_images;
 extern GTY(()) tree gfor_fndecl_caf_register;
 extern GTY(()) tree gfor_fndecl_caf_deregister;
-extern GTY(()) tree gfor_fndecl_caf_get;
-extern GTY(()) tree gfor_fndecl_caf_send;
-extern GTY(()) tree gfor_fndecl_caf_sendget;
-extern GTY(()) tree gfor_fndecl_caf_get_by_ref;
-extern GTY(()) tree gfor_fndecl_caf_send_by_ref;
-extern GTY(()) tree gfor_fndecl_caf_sendget_by_ref;
+extern GTY(()) tree gfor_fndecl_caf_register_accessor;
+extern GTY(()) tree gfor_fndecl_caf_register_accessors_finish;
+extern GTY(()) tree gfor_fndecl_caf_get_remote_function_index;
+extern GTY(()) tree gfor_fndecl_caf_get_from_remote;
+extern GTY(()) tree gfor_fndecl_caf_send_to_remote;
+extern GTY(()) tree gfor_fndecl_caf_transfer_between_remotes;
 extern GTY(()) tree gfor_fndecl_caf_sync_all;
 extern GTY(()) tree gfor_fndecl_caf_sync_memory;
 extern GTY(()) tree gfor_fndecl_caf_sync_images;
@@ -918,7 +920,7 @@ extern GTY(()) tree gfor_fndecl_co_max;
 extern GTY(()) tree gfor_fndecl_co_min;
 extern GTY(()) tree gfor_fndecl_co_reduce;
 extern GTY(()) tree gfor_fndecl_co_sum;
-extern GTY(()) tree gfor_fndecl_caf_is_present;
+extern GTY(()) tree gfor_fndecl_caf_is_present_on_remote;
 
 /* Math functions.  Many other math functions are handled in
    trans-intrinsic.cc.  */
@@ -931,6 +933,8 @@ typedef struct GTY(()) gfc_powdecl_list {
 gfc_powdecl_list;
 
 extern GTY(()) gfc_powdecl_list gfor_fndecl_math_powi[4][3];
+extern GTY(()) tree gfor_fndecl_unsigned_pow_list[5][5];
+
 extern GTY(()) tree gfor_fndecl_math_ishftc4;
 extern GTY(()) tree gfor_fndecl_math_ishftc8;
 extern GTY(()) tree gfor_fndecl_math_ishftc16;
@@ -1008,6 +1012,9 @@ enum gfc_array_kind
   GFC_ARRAY_ASSUMED_SHAPE_CONT,
   GFC_ARRAY_ASSUMED_RANK,
   GFC_ARRAY_ASSUMED_RANK_CONT,
+  GFC_ARRAY_ASSUMED_RANK_ALLOCATABLE,
+  GFC_ARRAY_ASSUMED_RANK_POINTER,
+  GFC_ARRAY_ASSUMED_RANK_POINTER_CONT,
   GFC_ARRAY_ALLOCATABLE,
   GFC_ARRAY_POINTER,
   GFC_ARRAY_POINTER_CONT

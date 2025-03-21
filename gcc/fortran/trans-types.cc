@@ -1,5 +1,5 @@
 /* Backend support for Fortran 95 basic types and derived types.
-   Copyright (C) 2002-2024 Free Software Foundation, Inc.
+   Copyright (C) 2002-2025 Free Software Foundation, Inc.
    Contributed by Paul Brook <paul@nowt.org>
    and Steven Bosscher <s.bosscher@student.tudelft.nl>
 
@@ -21,7 +21,6 @@ along with GCC; see the file COPYING3.  If not see
 
 /* trans-types.cc -- gfortran backend types */
 
-#define INCLUDE_MEMORY
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
@@ -1629,8 +1628,16 @@ gfc_build_array_type (tree type, gfc_array_spec * as,
     akind = contiguous ? GFC_ARRAY_ASSUMED_SHAPE_CONT
 		       : GFC_ARRAY_ASSUMED_SHAPE;
   else if (as->type == AS_ASSUMED_RANK)
-    akind = contiguous ? GFC_ARRAY_ASSUMED_RANK_CONT
-		       : GFC_ARRAY_ASSUMED_RANK;
+    {
+      if (akind == GFC_ARRAY_ALLOCATABLE)
+	akind = GFC_ARRAY_ASSUMED_RANK_ALLOCATABLE;
+      else if (akind == GFC_ARRAY_POINTER || akind == GFC_ARRAY_POINTER_CONT)
+	akind = contiguous ? GFC_ARRAY_ASSUMED_RANK_POINTER_CONT
+			   : GFC_ARRAY_ASSUMED_RANK_POINTER;
+      else
+	akind = contiguous ? GFC_ARRAY_ASSUMED_RANK_CONT
+			   : GFC_ARRAY_ASSUMED_RANK;
+    }
   return gfc_get_array_type_bounds (type, as->rank == -1
 					  ? GFC_MAX_DIMENSIONS : as->rank,
 				    corank, lbound, ubound, 0, akind,
@@ -2818,7 +2825,7 @@ gfc_get_derived_type (gfc_symbol * derived, int codimen)
   tree *chain = NULL;
   bool got_canonical = false;
   bool unlimited_entity = false;
-  gfc_component *c, *last_c = nullptr;
+  gfc_component *c;
   gfc_namespace *ns;
   tree tmp;
   bool coarray_flag, class_coarray_flag;
@@ -2959,9 +2966,10 @@ gfc_get_derived_type (gfc_symbol * derived, int codimen)
     }
 
   if (derived->components
-	&& derived->components->ts.type == BT_DERIVED
-	&& strcmp (derived->components->name, "_data") == 0
-	&& derived->components->ts.u.derived->attr.unlimited_polymorphic)
+      && derived->components->ts.type == BT_DERIVED
+      && startswith (derived->name, "__class")
+      && strcmp (derived->components->name, "_data") == 0
+      && derived->components->ts.u.derived->attr.unlimited_polymorphic)
     unlimited_entity = true;
 
   /* Go through the derived type components, building them as
@@ -3068,11 +3076,24 @@ gfc_get_derived_type (gfc_symbol * derived, int codimen)
 	  if (c->attr.pointer || c->attr.allocatable || c->attr.pdt_array)
 	    {
 	      enum gfc_array_kind akind;
-	      if (c->attr.pointer)
+	      bool is_ptr = ((c == derived->components
+			      && derived->components->ts.type == BT_DERIVED
+			      && startswith (derived->name, "__class")
+			      && (strcmp (derived->components->name, "_data")
+				  == 0))
+			     ? c->attr.class_pointer : c->attr.pointer);
+	      if (is_ptr)
 		akind = c->attr.contiguous ? GFC_ARRAY_POINTER_CONT
 					   : GFC_ARRAY_POINTER;
-	      else
+	      else if (c->attr.allocatable)
 		akind = GFC_ARRAY_ALLOCATABLE;
+	      else if (c->as->type == AS_ASSUMED_RANK)
+		akind = GFC_ARRAY_ASSUMED_RANK;
+	      else
+		/* FIXME – see PR fortran/104651.  Additionally, the following
+		   gfc_build_array_type should use !is_ptr instead of
+		   c->attr.pointer and codim unconditionally without '? :'. */
+		akind = GFC_ARRAY_ASSUMED_SHAPE;
 	      /* Pointers to arrays aren't actually pointer types.  The
 		 descriptors are separate, but the data is common.  Every
 		 array pointer in a coarray derived type needs to provide space
@@ -3128,16 +3149,12 @@ gfc_get_derived_type (gfc_symbol * derived, int codimen)
       gcc_assert (field);
       /* Overwrite for class array to supply different bounds for different
 	 types.  */
-      if (class_coarray_flag || !c->backend_decl)
+      if (class_coarray_flag || !c->backend_decl || c->attr.caf_token)
 	c->backend_decl = field;
-      if (c->attr.caf_token && last_c)
-	last_c->caf_token = field;
 
       if (c->attr.pointer && (c->attr.dimension || c->attr.codimension)
 	  && !(c->ts.type == BT_DERIVED && strcmp (c->name, "_data") == 0))
 	GFC_DECL_PTR_ARRAY_P (c->backend_decl) = 1;
-
-      last_c = c;
     }
 
   /* Now lay out the derived type, including the fields.  */
@@ -3163,24 +3180,24 @@ gfc_get_derived_type (gfc_symbol * derived, int codimen)
 
 copy_derived_types:
 
-  for (c = derived->components; c; c = c->next)
-    {
-      /* Do not add a caf_token field for class container components.  */
-      if ((codimen || coarray_flag)
-	  && !c->attr.dimension && !c->attr.codimension
-	  && (c->attr.allocatable || c->attr.pointer)
-	  && !derived->attr.is_class)
-	{
-	  /* Provide sufficient space to hold "_caf_symbol".  */
-	  char caf_name[GFC_MAX_SYMBOL_LEN + 6];
-	  gfc_component *token;
-	  snprintf (caf_name, sizeof (caf_name), "_caf_%s", c->name);
-	  token = gfc_find_component (derived, caf_name, true, true, NULL);
-	  gcc_assert (token);
-	  c->caf_token = token->backend_decl;
-	  suppress_warning (c->caf_token);
-	}
-    }
+  if (!derived->attr.vtype)
+    for (c = derived->components; c; c = c->next)
+      {
+	/* Do not add a caf_token field for class container components.  */
+	if ((codimen || coarray_flag) && !c->attr.dimension
+	    && !c->attr.codimension && (c->attr.allocatable || c->attr.pointer)
+	    && !derived->attr.is_class)
+	  {
+	    /* Provide sufficient space to hold "_caf_symbol".  */
+	    char caf_name[GFC_MAX_SYMBOL_LEN + 6];
+	    gfc_component *token;
+	    snprintf (caf_name, sizeof (caf_name), "_caf_%s", c->name);
+	    token = gfc_find_component (derived, caf_name, true, true, NULL);
+	    gcc_assert (token);
+	    gfc_comp_caf_token (c) = token->backend_decl;
+	    suppress_warning (gfc_comp_caf_token (c));
+	  }
+      }
 
   for (gfc_symbol *dt = gfc_derived_types; dt; dt = dt->dt_next)
     {
@@ -3480,15 +3497,14 @@ gfc_get_function_type (gfc_symbol * sym, gfc_actual_arglist *actual_args,
 
 	  vec_safe_push (hidden_typelist, type);
 	}
-      /* For scalar intrinsic types, VALUE passes the value,
+      /* For scalar intrinsic types or derived types, VALUE passes the value,
 	 hence, the optional status cannot be transferred via a NULL pointer.
 	 Thus, we will use a hidden argument in that case.  */
       if (arg
 	  && arg->attr.optional
 	  && arg->attr.value
 	  && !arg->attr.dimension
-	  && arg->ts.type != BT_CLASS
-	  && !gfc_bt_struct (arg->ts.type))
+	  && arg->ts.type != BT_CLASS)
 	vec_safe_push (typelist, boolean_type_node);
       /* Coarrays which are descriptorless or assumed-shape pass with
 	 -fcoarray=lib the token and the offset as hidden arguments.  */
@@ -3759,15 +3775,22 @@ gfc_get_array_descr_info (const_tree type, struct array_descr_info *info)
     t = fold_build_pointer_plus (t, data_off);
   t = build1 (NOP_EXPR, build_pointer_type (ptr_type_node), t);
   info->data_location = build1 (INDIRECT_REF, ptr_type_node, t);
-  if (GFC_TYPE_ARRAY_AKIND (type) == GFC_ARRAY_ALLOCATABLE)
+  enum gfc_array_kind akind = GFC_TYPE_ARRAY_AKIND (type);
+  if (akind == GFC_ARRAY_ALLOCATABLE
+      || akind == GFC_ARRAY_ASSUMED_RANK_ALLOCATABLE)
     info->allocated = build2 (NE_EXPR, logical_type_node,
 			      info->data_location, null_pointer_node);
-  else if (GFC_TYPE_ARRAY_AKIND (type) == GFC_ARRAY_POINTER
-	   || GFC_TYPE_ARRAY_AKIND (type) == GFC_ARRAY_POINTER_CONT)
+  else if (akind == GFC_ARRAY_POINTER
+	   || akind == GFC_ARRAY_POINTER_CONT
+	   || akind == GFC_ARRAY_ASSUMED_RANK_POINTER
+	   || akind == GFC_ARRAY_ASSUMED_RANK_POINTER_CONT)
     info->associated = build2 (NE_EXPR, logical_type_node,
 			       info->data_location, null_pointer_node);
-  if ((GFC_TYPE_ARRAY_AKIND (type) == GFC_ARRAY_ASSUMED_RANK
-       || GFC_TYPE_ARRAY_AKIND (type) == GFC_ARRAY_ASSUMED_RANK_CONT)
+  if ((akind == GFC_ARRAY_ASSUMED_RANK
+       || akind == GFC_ARRAY_ASSUMED_RANK_CONT
+       || akind == GFC_ARRAY_ASSUMED_RANK_ALLOCATABLE
+       || akind == GFC_ARRAY_ASSUMED_RANK_POINTER
+       || akind == GFC_ARRAY_ASSUMED_RANK_POINTER_CONT)
       && dwarf_version >= 5)
     {
       rank = 1;
@@ -3798,8 +3821,8 @@ gfc_get_array_descr_info (const_tree type, struct array_descr_info *info)
 					       dim_off, upper_suboff));
       t = build1 (INDIRECT_REF, gfc_array_index_type, t);
       info->dimen[dim].upper_bound = t;
-      if (GFC_TYPE_ARRAY_AKIND (type) == GFC_ARRAY_ASSUMED_SHAPE
-	  || GFC_TYPE_ARRAY_AKIND (type) == GFC_ARRAY_ASSUMED_SHAPE_CONT)
+      if (akind == GFC_ARRAY_ASSUMED_SHAPE
+	  || akind == GFC_ARRAY_ASSUMED_SHAPE_CONT)
 	{
 	  /* Assumed shape arrays have known lower bounds.  */
 	  info->dimen[dim].upper_bound

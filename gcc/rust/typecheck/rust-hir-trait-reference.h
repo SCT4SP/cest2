@@ -1,4 +1,4 @@
-// Copyright (C) 2021-2024 Free Software Foundation, Inc.
+// Copyright (C) 2021-2025 Free Software Foundation, Inc.
 
 // This file is part of GCC.
 
@@ -245,6 +245,8 @@ public:
   TyTy::TypeBoundPredicate &get_predicate ();
 
   HIR::ImplBlock *get_impl_block ();
+
+  location_t get_locus () const;
 
   TyTy::BaseType *get_self ();
   const TyTy::BaseType *get_self () const;

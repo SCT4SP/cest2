@@ -1,5 +1,5 @@
 ;; Machine description for RISC-V for GNU compiler.
-;; Copyright (C) 2011-2024 Free Software Foundation, Inc.
+;; Copyright (C) 2011-2025 Free Software Foundation, Inc.
 ;; Contributed by Andrew Waterman (andrew@sifive.com).
 ;; Based on MIPS target for GNU compiler.
 
@@ -95,6 +95,14 @@
   ;; XTheadFmv moves
   UNSPEC_XTHEADFMV
   UNSPEC_XTHEADFMV_HW
+
+  ;; CRC unspecs
+  UNSPEC_CRC
+  UNSPEC_CRC_REV
+
+  ;; Stack Smash Protector
+  UNSPEC_SSP_SET
+  UNSPEC_SSP_TEST
 ])
 
 (define_c_enum "unspecv" [
@@ -119,10 +127,6 @@
   UNSPECV_FENCE
   UNSPECV_FENCE_I
 
-  ;; Stack Smash Protector
-  UNSPEC_SSP_SET
-  UNSPEC_SSP_TEST
-
   ;; CMO instructions.
   UNSPECV_CLEAN
   UNSPECV_FLUSH
@@ -132,6 +136,18 @@
 
   ;; Zihintpause unspec
   UNSPECV_PAUSE
+
+  ;; ZICFISS
+  UNSPECV_SSPUSH
+  UNSPECV_SSPOPCHK
+  UNSPECV_SSRDP
+  UNSPECV_SSP
+
+  ;; ZICFILP
+  UNSPECV_LPAD
+  UNSPECV_SETLPL
+  UNSPECV_LPAD_ALIGN
+  UNSPECV_SET_GUARDED
 
   ;; XTheadInt unspec
   UNSPECV_XTHEADINT_PUSH
@@ -145,6 +161,7 @@
    (TP_REGNUM			4)
    (T0_REGNUM			5)
    (T1_REGNUM			6)
+   (T2_REGNUM			7)
    (S0_REGNUM			8)
    (S1_REGNUM			9)
    (A0_REGNUM			10)
@@ -475,6 +492,9 @@
 ;; vfncvtbf16  vector narrowing single floating-point to brain floating-point instruction
 ;; vfwcvtbf16  vector widening brain floating-point to single floating-point instruction
 ;; vfwmaccbf16  vector BF16 widening multiply-accumulate
+;; SiFive custom extension instrctions
+;; sf_vqmacc      vector matrix integer multiply-add instructions
+;; sf_vfnrclip     vector fp32 to int8 ranged clip instructions
 (define_attr "type"
   "unknown,branch,jump,jalr,ret,call,load,fpload,store,fpstore,
    mtc,mfc,const,arith,logical,shift,slt,imul,idiv,move,fmove,fadd,fmul,
@@ -485,8 +505,8 @@
    vldux,vldox,vstux,vstox,vldff,vldr,vstr,
    vlsegde,vssegte,vlsegds,vssegts,vlsegdux,vlsegdox,vssegtux,vssegtox,vlsegdff,
    vialu,viwalu,vext,vicalu,vshift,vnshift,vicmp,viminmax,
-   vimul,vidiv,viwmul,vimuladd,viwmuladd,vimerge,vimov,
-   vsalu,vaalu,vsmul,vsshift,vnclip,
+   vimul,vidiv,viwmul,vimuladd,sf_vqmacc,viwmuladd,vimerge,vimov,
+   vsalu,vaalu,vsmul,vsshift,vnclip,sf_vfnrclip,
    vfalu,vfwalu,vfmul,vfdiv,vfwmul,vfmuladd,vfwmuladd,vfsqrt,vfrecp,
    vfcmp,vfminmax,vfsgnj,vfclass,vfmerge,vfmov,
    vfcvtitof,vfcvtftoi,vfwcvtitof,vfwcvtftoi,
@@ -850,6 +870,34 @@
   "add%i2w\t%0,%1,%2"
   [(set_attr "type" "arith")
    (set_attr "mode" "SI")])
+
+;; Transform (X & C1) + C2 into (X | ~C1) - (-C2 | ~C1)
+;; Where C1 is not a LUI operand, but ~C1 is a LUI operand
+
+(define_insn_and_split "*lui_constraint<X:mode>_and_to_or"
+	[(set (match_operand:X 0 "register_operand" "=r")
+	(plus:X (and:X (match_operand:X 1 "register_operand" "r")
+		       (match_operand 2 "const_int_operand"))
+		(match_operand 3 "const_int_operand")))
+   (clobber (match_scratch:X 4 "=&r"))]
+  "(LUI_OPERAND (~INTVAL (operands[2]))
+    && ((INTVAL (operands[2]) & (-INTVAL (operands[3])))
+	== (-INTVAL (operands[3])))
+    && riscv_const_insns (operands[3], false)
+    && (riscv_const_insns (GEN_INT (~INTVAL (operands[2])
+				    | -INTVAL (operands[3])), false)
+	<= riscv_const_insns (operands[3], false)))"
+  "#"
+  "&& reload_completed"
+  [(set (match_dup 4) (match_dup 5))
+   (set (match_dup 0) (ior:X (match_dup 1) (match_dup 4)))
+   (set (match_dup 4) (match_dup 6))
+   (set (match_dup 0) (minus:X (match_dup 0) (match_dup 4)))]
+  {
+    operands[5] = GEN_INT (~INTVAL (operands[2]));
+    operands[6] = GEN_INT ((~INTVAL (operands[2])) | (-INTVAL (operands[3])));
+  }
+  [(set_attr "type" "arith")])
 
 ;;
 ;;  ....................
@@ -2422,7 +2470,8 @@
         (match_operand:GPR 1 "splittable_const_int_operand" "i"))]
   "!ira_in_progress
    && !(p2m1_shift_operand (operands[1], <MODE>mode)
-        || high_mask_shift_operand (operands[1], <MODE>mode))"
+	|| high_mask_shift_operand (operands[1], <MODE>mode)
+	|| exact_log2 (INTVAL (operands[1])) >= 0)"
   "#"
   "&& 1"
   [(const_int 0)]
@@ -2934,9 +2983,7 @@
 ;; for IOR/XOR.  It probably doesn't matter for AND.
 ;;
 ;; We also don't want to do this if the immediate already fits in a simm12
-;; field, or is a single bit operand, or when we might be able to generate
-;; a shift-add sequence via the splitter in bitmanip.md
-;; in bitmanip.md for masks that are a run of consecutive ones.
+;; field, or it is a single bit operand and zbs is available.
 (define_insn_and_split "<optab>_shift_reverse<X:mode>"
   [(set (match_operand:X 0 "register_operand" "=r")
     (any_bitwise:X (ashift:X (match_operand:X 1 "register_operand" "r")
@@ -2944,10 +2991,7 @@
 		   (match_operand 3 "immediate_operand" "n")))]
   "(!SMALL_OPERAND (INTVAL (operands[3]))
     && SMALL_OPERAND (INTVAL (operands[3]) >> INTVAL (operands[2]))
-    && popcount_hwi (INTVAL (operands[3])) > 1
-    && (!(TARGET_64BIT && TARGET_ZBA)
-	|| !consecutive_bits_operand (operands[3], VOIDmode)
-	|| !imm123_operand (operands[2], VOIDmode))
+    && (!TARGET_ZBS || popcount_hwi (INTVAL (operands[3])) > 1)
     && (INTVAL (operands[3]) & ((1ULL << INTVAL (operands[2])) - 1)) == 0)"
   "#"
   "&& 1"
@@ -3153,8 +3197,8 @@
 					     INTVAL (operands[3]))"
   "#"
   "&& reload_completed"
-  [(set (match_dup 4) (lshiftrt:X (match_dup 1) (match_dup 7)))
-   (set (match_dup 4) (and:X (match_dup 4) (match_dup 8)))
+  [(set (match_dup 4) (ashiftrt:X (match_dup 1) (match_dup 7)))
+   (set (match_dup 4) (match_dup 10))
    (set (match_dup 5) (match_dup 9))
    (set (pc) (if_then_else (any_eq (match_dup 4) (match_dup 5))
 			   (label_ref (match_dup 0)) (pc)))]
@@ -3166,6 +3210,16 @@
   operands[7] = GEN_INT (trailing_shift);
   operands[8] = GEN_INT (mask1 >> trailing_shift);
   operands[9] = GEN_INT (mask2 >> trailing_shift);
+
+  /* This splits after reload, so there's little chance to clean things
+     up.  Rather than emit a ton of RTL here, we can just make a new
+     operand for that RHS and use it.  For the case where the AND would
+     have been redundant, we can make it a NOP move, which does get
+     cleaned up.  */
+  if (operands[8] == CONSTM1_RTX (word_mode))
+    operands[10] = operands[4];
+  else
+    operands[10] = gen_rtx_AND (word_mode, operands[4], operands[8]);
 }
 [(set_attr "type" "branch")])
 
@@ -3208,7 +3262,7 @@
   "!TARGET_XCVBI"
 {
   if (get_attr_length (insn) == 12)
-    return "b%N1\t%2,%z3,1f; jump\t%l0,ra; 1:";
+    return "b%r1\t%2,%z3,1f; jump\t%l0,ra; 1:";
 
   return "b%C1\t%2,%z3,%l0";
 }
@@ -3668,11 +3722,18 @@
   [(set (pc) (match_operand 0 "register_operand"))]
   ""
 {
+  if (is_zicfilp_p ())
+    emit_insn (gen_set_lpl (Pmode, const0_rtx));
+
   operands[0] = force_reg (Pmode, operands[0]);
+  if (is_zicfilp_p ())
+    emit_use (gen_rtx_REG (Pmode, T2_REGNUM));
+
   if (Pmode == SImode)
     emit_jump_insn (gen_indirect_jumpsi (operands[0]));
   else
     emit_jump_insn (gen_indirect_jumpdi (operands[0]));
+
   DONE;
 })
 
@@ -3693,18 +3754,39 @@
 					 gen_rtx_LABEL_REF (Pmode, operands[1]),
 					 NULL_RTX, 0, OPTAB_DIRECT);
 
-  if (CASE_VECTOR_PC_RELATIVE && Pmode == DImode)
-    emit_jump_insn (gen_tablejumpdi (operands[0], operands[1]));
+  if (is_zicfilp_p ())
+    {
+      rtx t2 = RISCV_CALL_ADDRESS_LPAD (GET_MODE (operands[0]));
+      emit_move_insn (t2, operands[0]);
+
+      if (CASE_VECTOR_PC_RELATIVE && Pmode == DImode)
+	emit_jump_insn (gen_tablejump_cfidi (operands[1]));
+      else
+	emit_jump_insn (gen_tablejump_cfisi (operands[1]));
+    }
   else
-    emit_jump_insn (gen_tablejumpsi (operands[0], operands[1]));
+    {
+      if (CASE_VECTOR_PC_RELATIVE && Pmode == DImode)
+	emit_jump_insn (gen_tablejumpdi (operands[0], operands[1]));
+      else
+	emit_jump_insn (gen_tablejumpsi (operands[0], operands[1]));
+    }
   DONE;
 })
 
 (define_insn "tablejump<mode>"
   [(set (pc) (match_operand:GPR 0 "register_operand" "l"))
    (use (label_ref (match_operand 1 "" "")))]
-  ""
+  "!is_zicfilp_p ()"
   "jr\t%0"
+  [(set_attr "type" "jalr")
+   (set_attr "mode" "none")])
+
+(define_insn "tablejump_cfi<mode>"
+  [(set (pc) (reg:GPR T2_REGNUM))
+   (use (label_ref (match_operand 0 "")))]
+  "is_zicfilp_p ()"
+  "jr\tt2"
   [(set_attr "type" "jalr")
    (set_attr "mode" "none")])
 
@@ -4081,6 +4163,30 @@
    (set_attr "length" "0")]
 )
 
+(define_expand "save_stack_nonlocal"
+  [(set (match_operand 0 "memory_operand")
+	(match_operand 1 "register_operand"))]
+  ""
+{
+  rtx stack_slot;
+
+  if (need_shadow_stack_push_pop_p ())
+    {
+      /* Copy shadow stack pointer to the first slot
+	 and stack pointer to the second slot.  */
+      rtx ssp_slot = adjust_address (operands[0], word_mode, 0);
+      stack_slot = adjust_address (operands[0], Pmode, UNITS_PER_WORD);
+
+      rtx reg_ssp = force_reg (word_mode, const0_rtx);
+      emit_insn (gen_ssrdp (word_mode, reg_ssp));
+      emit_move_insn (ssp_slot, reg_ssp);
+    }
+  else
+    stack_slot = adjust_address (operands[0], Pmode, 0);
+  emit_move_insn (stack_slot, operands[1]);
+  DONE;
+})
+
 ;; This fixes a failure with gcc.c-torture/execute/pr64242.c at -O2 for a
 ;; 32-bit target when using -mtune=sifive-7-series.  The first sched pass
 ;; runs before register elimination, and we have a non-obvious dependency
@@ -4091,7 +4197,70 @@
    (match_operand 1 "memory_operand")]
   ""
 {
-  emit_move_insn (operands[0], operands[1]);
+  rtx stack_slot;
+
+  if (need_shadow_stack_push_pop_p ())
+    {
+      rtx t0 = gen_rtx_REG (Pmode, RISCV_PROLOGUE_TEMP_REGNUM);
+      /* Restore shadow stack pointer from the first slot
+	 and stack pointer from the second slot.  */
+      rtx ssp_slot = adjust_address (operands[1], word_mode, 0);
+      stack_slot = adjust_address (operands[1], Pmode, UNITS_PER_WORD);
+
+      /* Get the current shadow stack pointer.  */
+      rtx cur_ssp = force_reg (word_mode, const0_rtx);
+      emit_insn (gen_ssrdp (word_mode, cur_ssp));
+
+      /* Compare and jump over adjustment code.  */
+      rtx noadj_label = gen_label_rtx ();
+      emit_cmp_and_jump_insns (cur_ssp, const0_rtx, EQ, NULL_RTX,
+			       word_mode, 1, noadj_label);
+
+      rtx loop_label = gen_label_rtx ();
+      emit_label (loop_label);
+      LABEL_NUSES (loop_label) = 1;
+
+      /* Check if current ssp less than jump buffer ssp,
+	 so no loop is needed.  */
+      emit_cmp_and_jump_insns (ssp_slot, cur_ssp, LE, NULL_RTX,
+			       ptr_mode, 1, noadj_label);
+
+      /* Advance by a maximum of 4K at a time to avoid unwinding
+	 past bounds of the shadow stack.  */
+      rtx reg_4096 = force_reg (word_mode, GEN_INT (4096));
+      rtx cmp_ssp  = gen_reg_rtx (word_mode);
+      cmp_ssp = expand_simple_binop (ptr_mode, MINUS,
+				     ssp_slot, cur_ssp,
+				     cmp_ssp, 1, OPTAB_DIRECT);
+
+      /* Update curr_ssp from jump buffer ssp.  */
+      emit_move_insn (cur_ssp, ssp_slot);
+      emit_insn (gen_write_ssp (word_mode, cur_ssp));
+      emit_jump_insn (gen_jump (loop_label));
+      emit_barrier ();
+
+      /* Adjust the ssp in a loop.  */
+      rtx cmp_4k_label = gen_label_rtx ();
+      emit_label (cmp_4k_label);
+      LABEL_NUSES (cmp_4k_label) = 1;
+
+      /* Add 4k for curr_ssp.  */
+      cur_ssp = expand_simple_binop (ptr_mode, PLUS,
+				     cur_ssp, reg_4096,
+				     cur_ssp, 1, OPTAB_DIRECT);
+      emit_insn (gen_write_ssp (word_mode, cur_ssp));
+      emit_insn (gen_sspush (Pmode, t0));
+      emit_insn (gen_sspopchk (Pmode, t0));
+      emit_jump_insn (gen_jump (loop_label));
+      emit_barrier ();
+
+      emit_label (noadj_label);
+      LABEL_NUSES (noadj_label) = 1;
+    }
+  else
+    stack_slot = adjust_address (operands[1], Pmode, 0);
+
+  emit_move_insn (operands[0], stack_slot);
   /* Prevent the following hard fp restore from being moved before the move
      insn above which uses a copy of the soft fp reg.  */
   emit_clobber (gen_rtx_MEM (BLKmode, hard_frame_pointer_rtx));
@@ -4219,7 +4388,8 @@
 {
   switch (INTVAL (operands[1]))
   {
-    case 0: return TARGET_ZIHINTNTL ? "%L2prefetch.r\t%a0" : "prefetch.r\t%a0";
+    case 0:
+    case 2: return TARGET_ZIHINTNTL ? "%L2prefetch.r\t%a0" : "prefetch.r\t%a0";
     case 1: return TARGET_ZIHINTNTL ? "%L2prefetch.w\t%a0" : "prefetch.w\t%a0";
     default: gcc_unreachable ();
   }
@@ -4521,17 +4691,25 @@
 			    (match_operand 2 "const_int_operand" "n"))
 		 (match_operand 3 "const_int_operand" "n")))
    (clobber (match_scratch:DI 4 "=&r"))]
-  "(TARGET_64BIT
-    && riscv_const_insns (operands[3], false)
-    && ((riscv_const_insns (operands[3], false)
-	 < riscv_const_insns (GEN_INT (INTVAL (operands[3]) >> INTVAL (operands[2])), false))
-	|| riscv_const_insns (GEN_INT (INTVAL (operands[3]) >> INTVAL (operands[2])), false) == 0))"
+  "(TARGET_64BIT && riscv_const_insns (operands[3], false) == 1)"
   "#"
   "&& reload_completed"
-  [(set (match_dup 0) (ashift:DI (match_dup 1) (match_dup 2)))
-   (set (match_dup 4) (match_dup 3))
-   (set (match_dup 0) (plus:DI (match_dup 0) (match_dup 4)))]
-  ""
+  [(const_int 0)]
+  "{
+     rtx x = gen_rtx_ASHIFT (DImode, operands[1], operands[2]);
+     emit_insn (gen_rtx_SET (operands[0], x));
+
+     /* If the constant fits in a simm12, use it directly as we do not
+	get another good chance to optimize things again.  */
+     if (!SMALL_OPERAND (INTVAL (operands[3])))
+       emit_move_insn (operands[4], operands[3]);
+     else
+       operands[4] = operands[3];
+
+     x = gen_rtx_PLUS (DImode, operands[0], operands[4]);
+     emit_insn (gen_rtx_SET (operands[0], x));
+     DONE;
+   }"
   [(set_attr "type" "arith")])
 
 (define_insn_and_split ""
@@ -4541,23 +4719,92 @@
 				   (match_operand 2 "const_int_operand" "n"))
 				 (match_operand 3 "const_int_operand" "n"))))
    (clobber (match_scratch:DI 4 "=&r"))]
-  "(TARGET_64BIT
-    && riscv_const_insns (operands[3], false)
-    && ((riscv_const_insns (operands[3], false)
-	 < riscv_const_insns (GEN_INT (INTVAL (operands[3]) >> INTVAL (operands[2])), false))
-	|| riscv_const_insns (GEN_INT (INTVAL (operands[3]) >> INTVAL (operands[2])), false) == 0))"
+  "(TARGET_64BIT && riscv_const_insns (operands[3], false) == 1)"
   "#"
   "&& reload_completed"
-  [(set (match_dup 0) (ashift:DI (match_dup 1) (match_dup 2)))
-   (set (match_dup 4) (match_dup 3))
-   (set (match_dup 0) (sign_extend:DI (plus:SI (match_dup 5) (match_dup 6))))]
+  [(const_int 0)]
   "{
      operands[1] = gen_lowpart (DImode, operands[1]);
      operands[5] = gen_lowpart (SImode, operands[0]);
      operands[6] = gen_lowpart (SImode, operands[4]);
+
+     rtx x = gen_rtx_ASHIFT (DImode, operands[1], operands[2]);
+     emit_insn (gen_rtx_SET (operands[0], x));
+
+     /* If the constant fits in a simm12, use it directly as we do not
+	get another good chance to optimize things again.  */
+     if (!SMALL_OPERAND (INTVAL (operands[3])))
+       emit_move_insn (operands[4], operands[3]);
+     else
+       operands[6] = operands[3];
+
+     x = gen_rtx_PLUS (SImode, operands[5], operands[6]);
+     x = gen_rtx_SIGN_EXTEND (DImode, x);
+     emit_insn (gen_rtx_SET (operands[0], x));
+     DONE;
    }"
   [(set_attr "type" "arith")])
 
+;; Shadow stack
+
+(define_insn "@sspush<mode>"
+  [(unspec_volatile [(match_operand:P 0 "x1x5_operand" "r")] UNSPECV_SSPUSH)]
+  "TARGET_ZICFISS"
+  "sspush\t%0"
+  [(set_attr "type" "arith")
+   (set_attr "mode" "<MODE>")])
+
+(define_insn "@sspopchk<mode>"
+  [(unspec_volatile [(match_operand:P 0 "x1x5_operand" "r")] UNSPECV_SSPOPCHK)]
+  "TARGET_ZICFISS"
+  "sspopchk\t%0"
+  [(set_attr "type" "arith")
+   (set_attr "mode" "<MODE>")])
+
+(define_insn "@ssrdp<mode>"
+  [(set (match_operand:P 0 "register_operand" "=r")
+	(unspec_volatile [(const_int 0)] UNSPECV_SSRDP))]
+  "TARGET_ZICFISS"
+  "ssrdp\t%0"
+  [(set_attr "type" "arith")
+   (set_attr "mode" "<MODE>")])
+
+(define_insn "@write_ssp<mode>"
+  [(unspec_volatile [(match_operand:P 0 "register_operand" "r")] UNSPECV_SSP)]
+  "TARGET_ZICFISS"
+  "csrw\tssp, %0"
+  [(set_attr "type" "arith")
+   (set_attr "mode" "<MODE>")])
+
+;; Lading pad.
+
+(define_insn "lpad"
+  [(unspec_volatile [(match_operand 0 "immediate_operand" "i")] UNSPECV_LPAD)]
+  "TARGET_ZICFILP"
+  "lpad\t%0"
+  [(set_attr "type" "auipc")])
+
+(define_insn "@set_lpl<mode>"
+  [(set (reg:GPR T2_REGNUM)
+	(unspec_volatile [(match_operand:GPR 0 "immediate_operand" "i")] UNSPECV_SETLPL))]
+   "TARGET_ZICFILP"
+   "lui\tt2,%0"
+  [(set_attr "type" "const")
+   (set_attr "mode" "<MODE>")])
+
+(define_insn "lpad_align"
+  [(unspec_volatile [(const_int 0)] UNSPECV_LPAD_ALIGN)]
+  "TARGET_ZICFILP"
+  ".align 2"
+  [(set_attr "type" "nop")])
+
+(define_insn "@set_guarded<mode>"
+  [(set (reg:GPR T2_REGNUM)
+	(unspec_volatile [(match_operand:GPR 0 "register_operand" "r")] UNSPECV_SET_GUARDED))]
+  "TARGET_ZICFILP"
+  "mv\tt2,%0"
+  [(set_attr "type" "move")
+   (set_attr "mode" "<MODE>")])
 
 (include "bitmanip.md")
 (include "crypto.md")

@@ -1,4 +1,4 @@
-/* Copyright (C) 1988-2024 Free Software Foundation, Inc.
+/* Copyright (C) 1988-2025 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -18,7 +18,6 @@ along with GCC; see the file COPYING3.  If not see
 
 #define IN_TARGET_CODE 1
 
-#define INCLUDE_MEMORY
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
@@ -132,10 +131,12 @@ along with GCC; see the file COPYING3.  If not see
 #define m_ARROWLAKE (HOST_WIDE_INT_1U<<PROCESSOR_ARROWLAKE)
 #define m_ARROWLAKE_S (HOST_WIDE_INT_1U<<PROCESSOR_ARROWLAKE_S)
 #define m_PANTHERLAKE (HOST_WIDE_INT_1U<<PROCESSOR_PANTHERLAKE)
+#define m_DIAMONDRAPIDS (HOST_WIDE_INT_1U<<PROCESSOR_DIAMONDRAPIDS)
 #define m_CORE_AVX512 (m_SKYLAKE_AVX512 | m_CANNONLAKE \
 		       | m_ICELAKE_CLIENT | m_ICELAKE_SERVER | m_CASCADELAKE \
 		       | m_TIGERLAKE | m_COOPERLAKE | m_SAPPHIRERAPIDS \
-		       | m_ROCKETLAKE | m_GRANITERAPIDS | m_GRANITERAPIDS_D)
+		       | m_ROCKETLAKE | m_GRANITERAPIDS | m_GRANITERAPIDS_D \
+		       | m_DIAMONDRAPIDS)
 #define m_CORE_AVX2 (m_HASWELL | m_SKYLAKE | m_CORE_AVX512)
 #define m_CORE_ALL (m_CORE2 | m_NEHALEM  | m_SANDYBRIDGE | m_CORE_AVX2)
 #define m_CORE_HYBRID (m_ALDERLAKE | m_ARROWLAKE | m_ARROWLAKE_S \
@@ -800,6 +801,7 @@ static const struct processor_costs *processor_cost_table[] =
   &alderlake_cost,
   &alderlake_cost,
   &alderlake_cost,
+  &icelake_cost,
   &intel_cost,
   &lujiazui_cost,
   &yongfeng_cost,
@@ -1132,12 +1134,11 @@ ix86_valid_target_attribute_inner_p (tree fndecl, tree args, char *p_strings[],
     IX86_ATTR_ISA ("apxf", OPT_mapxf),
     IX86_ATTR_ISA ("evex512", OPT_mevex512),
     IX86_ATTR_ISA ("usermsr", OPT_musermsr),
-    IX86_ATTR_ISA ("avx10.1", OPT_mavx10_1_256),
     IX86_ATTR_ISA ("avx10.1-256", OPT_mavx10_1_256),
     IX86_ATTR_ISA ("avx10.1-512", OPT_mavx10_1_512),
-    IX86_ATTR_ISA ("avx10.2", OPT_mavx10_2_256),
     IX86_ATTR_ISA ("avx10.2-256", OPT_mavx10_2_256),
-    IX86_ATTR_ISA ("avx10.2-512", OPT_mavx10_2_512),
+    IX86_ATTR_ISA ("avx10.2", OPT_mavx10_2),
+    IX86_ATTR_ISA ("avx10.2-512", OPT_mavx10_2),
     IX86_ATTR_ISA ("amx-avx512", OPT_mamx_avx512),
     IX86_ATTR_ISA ("amx-tf32", OPT_mamx_tf32),
     IX86_ATTR_ISA ("amx-transpose", OPT_mamx_transpose),
@@ -2709,6 +2710,7 @@ ix86_option_override_internal (bool main_args_p,
 			"using 512 as max vector size");
 	}
       else if (TARGET_AVX512F_P (opts->x_ix86_isa_flags)
+	       && (opts->x_ix86_isa_flags_explicit & OPTION_MASK_ISA_AVX512F)
 	       && !(OPTION_MASK_ISA2_EVEX512
 		    & opts->x_ix86_isa_flags2_explicit))
 	warning (0, "Vector size conflicts between AVX10.1 and AVX512, using "
@@ -2729,7 +2731,7 @@ ix86_option_override_internal (bool main_args_p,
 	  && ((OPTION_MASK_ISA2_AVX10_1_256 | OPTION_MASK_ISA2_AVX10_1_512)
 	      & opts->x_ix86_isa_flags2_explicit))
 	{
-	  warning (0, "%<-mno-avx10.1, -mno-avx10.1-256, -mno-avx10.1-512%> "
+	  warning (0, "%<-mno-avx10.1-256, -mno-avx10.1-512%> "
 		      "cannot disable AVX512 instructions when "
 		      "%<-mavx512XXX%>");
 	  /* Reset those unset AVX512 flags set by AVX10 options when AVX10 is
@@ -2872,6 +2874,10 @@ ix86_option_override_internal (bool main_args_p,
 
       case ix86_veclibabi_type_acml:
 	ix86_veclib_handler = &ix86_veclibabi_acml;
+	break;
+
+      case ix86_veclibabi_type_aocl:
+	ix86_veclib_handler = &ix86_veclibabi_aocl;
 	break;
 
       default:

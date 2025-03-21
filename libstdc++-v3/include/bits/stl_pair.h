@@ -1,6 +1,6 @@
 // Pair implementation -*- C++ -*-
 
-// Copyright (C) 2001-2024 Free Software Foundation, Inc.
+// Copyright (C) 2001-2025 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -101,6 +101,9 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
   template<size_t...>
     struct _Index_tuple;
 
+  template<typename _Tp>
+    class complex;
+
   template<size_t _Int, class _Tp1, class _Tp2>
     constexpr typename tuple_element<_Int, pair<_Tp1, _Tp2>>::type&
     get(pair<_Tp1, _Tp2>& __in) noexcept;
@@ -148,6 +151,21 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
   template<size_t _Int, typename _Tp, size_t _Nm>
     constexpr const _Tp&&
     get(const array<_Tp, _Nm>&&) noexcept;
+
+#if __glibcxx_tuple_like >= 202311 // >= C++26
+  template<size_t _Int, typename _Tp>
+    constexpr _Tp&
+    get(complex<_Tp>&) noexcept;
+  template<size_t _Int, typename _Tp>
+    constexpr _Tp&&
+    get(complex<_Tp>&&) noexcept;
+  template<size_t _Int, typename _Tp>
+    constexpr const _Tp&
+    get(const complex<_Tp>&) noexcept;
+  template<size_t _Int, typename _Tp>
+    constexpr const _Tp&&
+    get(const complex<_Tp>&&) noexcept;
+#endif
 
 #if ! __cpp_lib_concepts
   // Concept utility functions, reused in conditionally-explicit
@@ -1183,23 +1201,24 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     struct tuple_element<1, pair<_Tp1, _Tp2>>
     { typedef _Tp2 type; };
 
-  // Forward declare the partial specialization for std::tuple
-  // to work around modules bug PR c++/113814.
-  template<size_t __i, typename... _Types>
-    struct tuple_element<__i, tuple<_Types...>>;
-
 #if __cplusplus >= 201703L
   template<typename _Tp1, typename _Tp2>
     inline constexpr size_t tuple_size_v<pair<_Tp1, _Tp2>> = 2;
 
   template<typename _Tp1, typename _Tp2>
     inline constexpr size_t tuple_size_v<const pair<_Tp1, _Tp2>> = 2;
+#endif
 
+#if __cplusplus >= 201103L
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wc++14-extensions" // variable templates
+#pragma GCC diagnostic ignored "-Wc++17-extensions" // inline variables
   template<typename _Tp>
     inline constexpr bool __is_pair = false;
 
   template<typename _Tp, typename _Up>
     inline constexpr bool __is_pair<pair<_Tp, _Up>> = true;
+#pragma GCC diagnostic pop
 #endif
 
   /// @cond undocumented

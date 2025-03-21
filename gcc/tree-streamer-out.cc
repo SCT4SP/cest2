@@ -1,6 +1,6 @@
 /* Routines for emitting trees to a file stream.
 
-   Copyright (C) 2011-2024 Free Software Foundation, Inc.
+   Copyright (C) 2011-2025 Free Software Foundation, Inc.
    Contributed by Diego Novillo <dnovillo@google.com>
 
 This file is part of GCC.
@@ -19,7 +19,6 @@ You should have received a copy of the GNU General Public License
 along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
-#define INCLUDE_MEMORY
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
@@ -307,7 +306,7 @@ pack_ts_function_decl_value_fields (struct bitpack_d *bp, tree expr)
   bp_pack_value (bp, DECL_IS_NOVOPS (expr), 1);
   bp_pack_value (bp, DECL_IS_RETURNS_TWICE (expr), 1);
   bp_pack_value (bp, DECL_IS_MALLOC (expr), 1);
-  bp_pack_value (bp, FUNCTION_DECL_DECL_TYPE (expr), 2);
+  bp_pack_value (bp, (unsigned)FUNCTION_DECL_DECL_TYPE (expr), 2);
   bp_pack_value (bp, DECL_IS_OPERATOR_DELETE_P (expr), 1);
   bp_pack_value (bp, DECL_DECLARED_INLINE_P (expr), 1);
   bp_pack_value (bp, DECL_STATIC_CHAIN (expr), 1);

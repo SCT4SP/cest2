@@ -1,6 +1,6 @@
 (* M2GCCDeclare.def declares Modula-2 types to GCC.
 
-Copyright (C) 2001-2024 Free Software Foundation, Inc.
+Copyright (C) 2001-2025 Free Software Foundation, Inc.
 Contributed by Gaius Mulley <gaius.mulley@southwales.ac.uk>.
 
 This file is part of GNU Modula-2.
@@ -90,6 +90,15 @@ PROCEDURE DeclareConstructor (tokenno: CARDINAL; quad: CARDINAL; sym: CARDINAL) 
 *)
 
 PROCEDURE TryDeclareConstant (tokenno: CARDINAL; sym: CARDINAL) ;
+
+
+(*
+   TryDeclareType - try and declare a type.  If sym is a
+                    type try and declare it, if we cannot
+                    then enter it into the to do list.
+*)
+
+PROCEDURE TryDeclareType (tokenno: CARDINAL; type: CARDINAL) ;
 
 
 (*

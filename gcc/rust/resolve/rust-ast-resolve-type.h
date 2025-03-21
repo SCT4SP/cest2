@@ -1,4 +1,4 @@
-// Copyright (C) 2020-2024 Free Software Foundation, Inc.
+// Copyright (C) 2020-2025 Free Software Foundation, Inc.
 
 // This file is part of GCC.
 
@@ -21,6 +21,11 @@
 
 #include "rust-ast-resolve-base.h"
 #include "rust-ast-resolve-expr.h"
+#include "rust-diagnostics.h"
+#include "rust-hir-map.h"
+#include "rust-path.h"
+#include "rust-type.h"
+#include "util/rust-hir-map.h"
 
 namespace Rust {
 namespace Resolver {
@@ -108,6 +113,8 @@ public:
 
   void visit (AST::TraitObjectType &type) override;
 
+  void visit (AST::ParenthesisedType &type) override;
+
   void visit (AST::SliceType &type) override;
 
 private:
@@ -184,7 +191,7 @@ public:
 	rust_error_at (locus, "was defined here");
       });
 
-    mappings->insert_canonical_path (param.get_node_id (), seg);
+    mappings.insert_canonical_path (param.get_node_id (), seg);
   }
 
 private:
@@ -245,6 +252,10 @@ public:
   void visit (AST::TraitObjectTypeOneBound &type) override;
 
   void visit (AST::TraitObjectType &type) override;
+
+  void visit (AST::NeverType &type) override;
+
+  void visit (AST::TupleType &type) override;
 
 private:
   ResolveTypeToCanonicalPath ();

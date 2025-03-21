@@ -1,5 +1,5 @@
 /* Handle exceptional things in C++.
-   Copyright (C) 1989-2024 Free Software Foundation, Inc.
+   Copyright (C) 1989-2025 Free Software Foundation, Inc.
    Contributed by Michael Tiemann <tiemann@cygnus.com>
    Rewritten by Mike Stump <mrs@cygnus.com>, based upon an
    initial re-implementation courtesy Tad Hunt.
@@ -21,7 +21,6 @@ along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
 
-#define INCLUDE_MEMORY
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
@@ -713,7 +712,7 @@ build_throw (location_t loc, tree exp, tsubst_flags_t complain)
       allocate_expr = do_allocate_exception (temp_type);
       if (allocate_expr == error_mark_node)
 	return error_mark_node;
-      allocate_expr = get_target_expr (allocate_expr);
+      allocate_expr = get_internal_target_expr (allocate_expr);
       ptr = TARGET_EXPR_SLOT (allocate_expr);
       TARGET_EXPR_CLEANUP (allocate_expr) = do_free_exception (ptr);
       CLEANUP_EH_ONLY (allocate_expr) = 1;

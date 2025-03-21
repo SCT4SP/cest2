@@ -1,4 +1,4 @@
-/* Copyright (C) 2011-2024 Free Software Foundation, Inc.
+/* Copyright (C) 2011-2025 Free Software Foundation, Inc.
    Contributed by ARM Ltd.
 
    This file is part of GCC.
@@ -25,6 +25,8 @@
 #ifndef USED_FOR_TARGET
 #include "bbitmap.h"
 
+constexpr unsigned int AARCH64_NUM_ABI_ATTRIBUTES = 1;
+
 typedef uint64_t aarch64_isa_mode;
 
 constexpr unsigned int AARCH64_NUM_ISA_MODES = (0
@@ -36,13 +38,13 @@ typedef bbitmap<2> aarch64_feature_flags;
 #endif
 
 /* The various cores that implement AArch64.  */
-enum aarch64_processor
+enum aarch64_cpu
 {
 #define AARCH64_CORE(NAME, INTERNAL_IDENT, SCHED, ARCH, FLAGS, COSTS, IMP, PART, VARIANT) \
-  INTERNAL_IDENT,
+  AARCH64_CPU_##INTERNAL_IDENT,
 #include "aarch64-cores.def"
   /* Used to mark the end of the processor table.  */
-  aarch64_none
+  aarch64_no_cpu
 };
 
 enum aarch64_arch

@@ -1,6 +1,6 @@
 ; Options for the RISC-V port of the compiler
 ;
-; Copyright (C) 2011-2024 Free Software Foundation, Inc.
+; Copyright (C) 2011-2025 Free Software Foundation, Inc.
 ;
 ; This file is part of GCC.
 ;
@@ -253,6 +253,10 @@ Mask(ZICCLSM)     Var(riscv_zi_subext)
 
 Mask(ZICCRSE)     Var(riscv_zi_subext)
 
+Mask(ZICFISS)     Var(riscv_zi_subext)
+
+Mask(ZICFILP)     Var(riscv_zi_subext)
+
 TargetVariable
 int riscv_za_subext
 
@@ -466,6 +470,8 @@ Mask(SVINVAL) Var(riscv_sv_subext)
 
 Mask(SVNAPOT) Var(riscv_sv_subext)
 
+Mask(SVVPTC) Var(riscv_sv_subext)
+
 TargetVariable
 int riscv_ztso_subext
 
@@ -522,6 +528,15 @@ int riscv_sifive_subext
 Mask(XSFVCP) Var(riscv_sifive_subext)
 
 Mask(XSFCEASE) Var(riscv_sifive_subext)
+
+Mask(XSFVQMACCQOQ) Var(riscv_sifive_subext)
+
+Mask(XSFVQMACCDOD) Var(riscv_sifive_subext)
+
+Mask(XSFVFNRCLIPXFQF) Var(riscv_sifive_subext)
+
+TargetVariable
+int riscv_fmv_priority = 0
 
 Enum
 Name(isa_spec_class) Type(enum riscv_isa_spec_class)
@@ -606,6 +621,10 @@ Enum(vsetvl_strategy) String(optim-no-fusion) Value(VSETVL_OPT_NO_FUSION)
 -param=vsetvl-strategy=
 Target Undocumented RejectNegative Joined Enum(vsetvl_strategy) Var(vsetvl_strategy) Init(VSETVL_OPT)
 -param=vsetvl-strategy=<string>	Set the optimization level of VSETVL insert pass.
+
+-param=riscv-two-source-permutes
+Target Undocumented Uinteger Var(riscv_two_source_permutes) Init(0)
+-param=riscv-two-source-permutes Enable permutes with two source vectors.
 
 Enum
 Name(stringop_strategy) Type(enum stringop_strategy_enum)

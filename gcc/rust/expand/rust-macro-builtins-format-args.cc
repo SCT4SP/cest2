@@ -1,4 +1,4 @@
-// Copyright (C) 2020-2024 Free Software Foundation, Inc.
+// Copyright (C) 2020-2025 Free Software Foundation, Inc.
 
 // This file is part of GCC.
 
@@ -15,6 +15,8 @@
 // You should have received a copy of the GNU General Public License
 // along with GCC; see the file COPYING3.  If not see
 // <http://www.gnu.org/licenses/>.
+#include "rust-ast-fragment.h"
+#include "rust-fmt.h"
 #include "rust-macro-builtins-helpers.h"
 #include "rust-expand-format-args.h"
 
@@ -116,6 +118,7 @@ format_args_parse_arguments (AST::MacroInvocData &invoc)
 tl::optional<AST::Fragment>
 MacroBuiltin::format_args_handler (location_t invoc_locus,
 				   AST::MacroInvocData &invoc,
+				   AST::InvocKind semicolon,
 				   AST::FormatArgs::Newline nl)
 {
   auto input = format_args_parse_arguments (invoc);
@@ -160,7 +163,8 @@ MacroBuiltin::format_args_handler (location_t invoc_locus,
   if (append_newline)
     fmt_str += '\n';
 
-  auto pieces = Fmt::Pieces::collect (fmt_str, append_newline);
+  auto pieces = Fmt::Pieces::collect (fmt_str, append_newline,
+				      Fmt::ffi::ParseMode::Format);
 
   // TODO:
   // do the transformation into an AST::FormatArgs node

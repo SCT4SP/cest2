@@ -1,4 +1,4 @@
-// Copyright (C) 2020-2024 Free Software Foundation, Inc.
+// Copyright (C) 2020-2025 Free Software Foundation, Inc.
 
 // This file is part of GCC.
 
@@ -21,6 +21,8 @@
 
 #include "rust-ast-lower-base.h"
 #include "rust-ast-lower-expr.h"
+#include "rust-hir-path.h"
+#include "rust-type.h"
 
 namespace Rust {
 namespace HIR {
@@ -78,6 +80,7 @@ public:
   void visit (AST::NeverType &type) override;
   void visit (AST::TraitObjectTypeOneBound &type) override;
   void visit (AST::TraitObjectType &type) override;
+  void visit (AST::ParenthesisedType &type) override;
 
 private:
   ASTLoweringType (bool default_to_static_lifetime)

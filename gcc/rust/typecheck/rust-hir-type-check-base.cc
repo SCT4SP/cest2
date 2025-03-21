@@ -1,4 +1,4 @@
-// Copyright (C) 2020-2024 Free Software Foundation, Inc.
+// Copyright (C) 2020-2025 Free Software Foundation, Inc.
 
 // This file is part of GCC.
 
@@ -238,9 +238,9 @@ TypeCheckBase::resolve_literal (const Analysis::NodeMapping &expr_mappings,
 	auto ok = context->lookup_builtin ("u8", &u8);
 	rust_assert (ok);
 
-	auto crate_num = mappings->get_current_crate ();
+	auto crate_num = mappings.get_current_crate ();
 	Analysis::NodeMapping capacity_mapping (crate_num, UNKNOWN_NODEID,
-						mappings->get_next_hir_id (
+						mappings.get_next_hir_id (
 						  crate_num),
 						UNKNOWN_LOCAL_DEFID);
 
@@ -260,7 +260,7 @@ TypeCheckBase::resolve_literal (const Analysis::NodeMapping &expr_mappings,
 	context->insert_type (capacity_mapping, expected_ty);
 
 	Analysis::NodeMapping array_mapping (crate_num, UNKNOWN_NODEID,
-					     mappings->get_next_hir_id (
+					     mappings.get_next_hir_id (
 					       crate_num),
 					     UNKNOWN_LOCAL_DEFID);
 
@@ -374,22 +374,21 @@ TypeCheckBase::resolve_generic_params (
 	  break;
 
 	  case HIR::GenericParam::GenericKind::CONST: {
-	    auto param
-	      = static_cast<HIR::ConstGenericParam *> (generic_param.get ());
-	    auto specified_type
-	      = TypeCheckType::Resolve (param->get_type ().get ());
+	    auto &param
+	      = static_cast<HIR::ConstGenericParam &> (*generic_param);
+	    auto specified_type = TypeCheckType::Resolve (param.get_type ());
 
-	    if (param->has_default_expression ())
+	    if (param.has_default_expression ())
 	      {
-		auto expr_type = TypeCheckExpr::Resolve (
-		  param->get_default_expression ().get ());
+		auto expr_type
+		  = TypeCheckExpr::Resolve (param.get_default_expression ());
 
-		coercion_site (
-		  param->get_mappings ().get_hirid (),
-		  TyTy::TyWithLocation (specified_type),
-		  TyTy::TyWithLocation (
-		    expr_type, param->get_default_expression ()->get_locus ()),
-		  param->get_locus ());
+		coercion_site (param.get_mappings ().get_hirid (),
+			       TyTy::TyWithLocation (specified_type),
+			       TyTy::TyWithLocation (
+				 expr_type,
+				 param.get_default_expression ().get_locus ()),
+			       param.get_locus ());
 	      }
 
 	    context->insert_type (generic_param->get_mappings (),
@@ -398,8 +397,7 @@ TypeCheckBase::resolve_generic_params (
 	  break;
 
 	  case HIR::GenericParam::GenericKind::TYPE: {
-	    auto param_type
-	      = TypeResolveGenericParam::Resolve (generic_param.get ());
+	    auto param_type = TypeResolveGenericParam::Resolve (*generic_param);
 	    context->insert_type (generic_param->get_mappings (), param_type);
 
 	    substitutions.push_back (TyTy::SubstitutionParamMapping (
@@ -413,9 +411,8 @@ TypeCheckBase::resolve_generic_params (
 TyTy::TypeBoundPredicate
 TypeCheckBase::get_marker_predicate (LangItem::Kind item_type, location_t locus)
 {
-  DefId item_id = mappings->get_lang_item (item_type, locus);
-  HIR::Item *item = mappings->lookup_defid (item_id);
-  rust_assert (item != nullptr);
+  DefId item_id = mappings.get_lang_item (item_type, locus);
+  HIR::Item *item = mappings.lookup_defid (item_id).value ();
   rust_assert (item->get_item_kind () == HIR::Item::ItemKind::Trait);
 
   HIR::Trait &trait = *static_cast<HIR::Trait *> (item);
