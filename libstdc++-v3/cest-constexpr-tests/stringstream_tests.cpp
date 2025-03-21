@@ -6,7 +6,6 @@
 
 template <typename Iss, typename S> constexpr bool istringstream_test1() {
   S str("def");
-  std::stringbuf sb("ok"); // This was not in the C'est tests
   Iss s1("abc");
   Iss s2(str);
   char c1, c2;

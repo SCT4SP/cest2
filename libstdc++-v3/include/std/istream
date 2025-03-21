@@ -94,6 +94,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *  derived classes' initialization lists, which pass a pointer to
        *  their own stream buffer.
       */
+      _GLIBCXX_CEST_CONSTEXPR
       explicit
       basic_istream(__streambuf_type* __sb)
       : __ostream_type(__sb), _M_gcount(streamsize(0))

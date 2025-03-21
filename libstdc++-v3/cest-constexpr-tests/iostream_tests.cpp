@@ -1,5 +1,6 @@
 #include <cassert>
 #include <fstream>
+#include <sstream>
 #include <iostream>
 
 constexpr bool iostream_test1()
@@ -33,6 +34,14 @@ constexpr bool iostream_test2()
   return b;
 }
 
+constexpr bool istream_test1()
+{
+  std::stringbuf sb("ok");
+  std::istream s1(&sb);
+  std::istream s2(s1.rdbuf());
+  return s1.good() && s2.good();
+}
+
 void iostream_tests()
 {
   using std_char_type = decltype(std::cout)::char_type;
@@ -41,9 +50,11 @@ void iostream_tests()
 
   static_assert(iostream_test1());
   // static_assert(iostream_test2<std::string,std::ifstream,std::istream>());
+  static_assert(istream_test1());
 
   assert(iostream_test1());
   assert(iostream_test2());
+  assert(istream_test1());
 }
 
 int main(int argc, char *argv[])
