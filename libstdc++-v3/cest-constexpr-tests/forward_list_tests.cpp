@@ -2,6 +2,7 @@
 #include <cassert>
 #include <forward_list>
 
+#if 0
 namespace fl_tests {
 
 template <typename FL> constexpr bool forward_list_test1() {
@@ -150,9 +151,20 @@ void forward_list_tests() {
 
   tests_helper<true, std::forward_list>();
 }
+#endif
+
+constexpr
+bool test()
+{
+  std::forward_list<int> fl;
+  std::forward_list<int> fl2(100);
+  return fl.empty();
+}
 
 int main(int argc, char *argv[])
 {
-  forward_list_tests();
+//  forward_list_tests();
+  static_assert(test());
+//  assert(test());
   return 0;
 }

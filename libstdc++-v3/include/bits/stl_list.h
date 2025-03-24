@@ -126,7 +126,10 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       void
       _M_unhook() _GLIBCXX_USE_NOEXCEPT;
 
+      _GLIBCXX_CEST_CONSTEXPR
       _List_node_base* _M_base() { return this; }
+
+      _GLIBCXX_CEST_CONSTEXPR
       const _List_node_base* _M_base() const { return this; }
     };
 
@@ -584,6 +587,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
       _Tp const* _M_valptr() const { return std::__addressof(_M_data); }
 #endif
 
+      _GLIBCXX_CEST_CONSTEXPR
       _Node_ptr _M_node_ptr() { return this; }
     };
 
@@ -900,6 +904,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
 #endif
       }
 
+      _GLIBCXX_CEST_CONSTEXPR
       void
       _M_destroy_node(_Node_ptr __p)
       {
@@ -1997,6 +2002,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
       iterator
       insert(const_iterator __position, const value_type& __x);
 
+      _GLIBCXX_CEST_CONSTEXPR
       iterator
       insert(const_iterator __position, value_type&& __x)
       { return emplace(__position, std::move(__x)); }

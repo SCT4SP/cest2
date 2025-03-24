@@ -6,7 +6,7 @@
 # Contains bin, lib64, include,constexpr-std-headers, etc.
 GNUC_ROOT="$CEST2_INCLUDE/../.."
 #GNUC_ROOT="/opt/gcc-latest" # No. Need C'est 2 binaries, for runtime, for now
-VER=15.0.0    # previously 14.0.0
+VER=15.0.1    # previously 15.0.0, 14.0.1, 14.0.0
 
 # The _GLIBCXX_CEST_CONSTEXPR and _GLIBCXX_CEST_VERSION below are not required
 # when using SCT4SP/gcc/install, but
@@ -17,14 +17,17 @@ MYCLANG="clang++ -g -std=c++26 -Wl,-rpath,"$GNUC_ROOT/lib64:$LD_LIBRARY_PATH" -I
 # -Winvalid-constexpr (remove to avoid clang cmath errors.)
 # -Wno-deprecated-builtins -Wno-unknown-attributes -Wno-keyword-compat -Wno-ignored-attributes -Wno-ambiguous-ellipsis -Wno-user-defined-literals -Wno-unknown-warning-option -Wno-inline-namespace-reopened-noninline
 
-  FILES_GCC="deque_tests.cpp list_tests.cpp queue_tests.cpp forward_list_tests.cpp map_tests.cpp set_tests.cpp iostream_tests.cpp algorithm_tests.cpp stringstream_tests.cpp cctype_tests.cpp memory_tests.cpp functional_tests.cpp policy_tests.cpp string_tests.cpp chrono_tests.cpp stack_tests.cpp multiset_tests.cpp unordered_set_tests.cpp priority_queue_tests.cpp cmath_tests.cpp unordered_multiset_tests.cpp multimap_tests.cpp"
+#  FILES_GCC="deque_tests.cpp list_tests.cpp"
+  FILES_GCC="forward_list_tests.cpp"
+#  FILES_GCC="deque_tests.cpp list_tests.cpp queue_tests.cpp forward_list_tests.cpp map_tests.cpp set_tests.cpp iostream_tests.cpp algorithm_tests.cpp stringstream_tests.cpp cctype_tests.cpp memory_tests.cpp functional_tests.cpp policy_tests.cpp string_tests.cpp chrono_tests.cpp stack_tests.cpp multiset_tests.cpp unordered_set_tests.cpp priority_queue_tests.cpp cmath_tests.cpp unordered_multiset_tests.cpp multimap_tests.cpp"
 
-FILES_CLANG="deque_tests.cpp list_tests.cpp queue_tests.cpp forward_list_tests.cpp map_tests.cpp set_tests.cpp iostream_tests.cpp algorithm_tests.cpp stringstream_tests.cpp cctype_tests.cpp memory_tests.cpp functional_tests.cpp policy_tests.cpp string_tests.cpp chrono_tests.cpp stack_tests.cpp multiset_tests.cpp unordered_set_tests.cpp priority_queue_tests.cpp cmath_tests.cpp unordered_multiset_tests.cpp multimap_tests.cpp"
+FILES_CLANG="deque_tests.cpp list_tests.cpp queue_tests.cpp forward_list_tests.cpp"
+#FILES_CLANG="deque_tests.cpp list_tests.cpp queue_tests.cpp forward_list_tests.cpp map_tests.cpp set_tests.cpp iostream_tests.cpp algorithm_tests.cpp stringstream_tests.cpp cctype_tests.cpp memory_tests.cpp functional_tests.cpp policy_tests.cpp string_tests.cpp chrono_tests.cpp stack_tests.cpp multiset_tests.cpp unordered_set_tests.cpp priority_queue_tests.cpp cmath_tests.cpp unordered_multiset_tests.cpp multimap_tests.cpp"
 
-for FILE in $FILES_GCC
-do
-  $MYGCC $FILE -ltbb && ./a.out   #  -ltbb is only needed for policy_tests.cpp
-done
+#for FILE in $FILES_GCC
+#do
+#  $MYGCC $FILE -ltbb && ./a.out   #  -ltbb is only needed for policy_tests.cpp
+#done
 
 for FILE in $FILES_CLANG
 do

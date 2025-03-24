@@ -87,12 +87,14 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	return *this;
       }
 
+      _GLIBCXX_CEST_CONSTEXPR
       explicit operator bool() const noexcept { return (bool)_M_ptr; }
 
       /// Get the address that the owned pointer refers to.
       _GLIBCXX_CEST_CONSTEXPR
       value_type* get() const { return std::__to_address(_M_ptr); }
 
+      _GLIBCXX_CEST_CONSTEXPR
       pointer release() { return std::__exchange(_M_ptr, nullptr); }
 
     private:
@@ -118,11 +120,13 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       __allocated_obj(__allocated_obj<_Alloc>&&) = default;
 
       // Default-initialize a value_type at *__ptr
+      _GLIBCXX_CEST_CONSTEXPR
       __allocated_obj(__allocated_ptr<_Alloc>&& __ptr)
       : __allocated_ptr<_Alloc>(std::move(__ptr))
       { ::new ((void*)this->get()) value_type; }
 
       // Call the destructor if an object is owned.
+      _GLIBCXX_CEST_CONSTEXPR
       ~__allocated_obj()
       {
 	if (static_cast<bool>(*this))
@@ -131,12 +135,15 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
       using __allocated_ptr<_Alloc>::operator=;
 
+      _GLIBCXX_CEST_CONSTEXPR
       value_type& operator*() const { return *this->get(); }
+      _GLIBCXX_CEST_CONSTEXPR
       value_type* operator->() const { return this->get(); }
     };
 
   /// Construct an object in storage allocated using __a.
   template<typename _Alloc>
+    _GLIBCXX_CEST_CONSTEXPR
     inline __allocated_obj<_Alloc>
     __allocate_guarded_obj(_Alloc& __a)
     {

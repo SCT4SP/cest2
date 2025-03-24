@@ -122,7 +122,9 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 	}
     }
 
+    _GLIBCXX_CEST_CONSTEXPR
     _Fwd_list_node_base* _M_base_ptr() { return this; }
+    _GLIBCXX_CEST_CONSTEXPR
     const _Fwd_list_node_base* _M_base_ptr() const { return this; }
   };
 
@@ -152,6 +154,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
       _M_valptr() const noexcept
       { return _M_storage._M_ptr(); }
 
+      _GLIBCXX_CEST_CONSTEXPR
       _Node_ptr
       _M_node_ptr()
       { return this; }
@@ -347,6 +350,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 	  return _Fwd_list_const_iterator(nullptr);
       }
 
+      _GLIBCXX_CEST_CONSTEXPR
       _Fwd_list_iterator<_Tp>
       _M_const_cast() const noexcept
       {
@@ -707,6 +711,7 @@ namespace __fwdlist
 	auto __ptr = _Node_alloc_traits::allocate(_M_get_Node_allocator(), 1);
 	return std::__to_address(__ptr);
       }
+#endif
 
       _GLIBCXX_CEST_CONSTEXPR
       void
@@ -740,6 +745,7 @@ namespace __fwdlist
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wc++17-extensions" // if constexpr
+      _GLIBCXX_CEST_CONSTEXPR
       void
       _M_destroy_node(_Node_ptr __p)
       {
