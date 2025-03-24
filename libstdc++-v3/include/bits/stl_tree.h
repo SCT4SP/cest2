@@ -1432,31 +1432,13 @@ namespace __rb_tree
       _M_rightmost() _GLIBCXX_NOEXCEPT
       { return this->_M_impl._M_header._M_right; }
 
-<<<<<<< HEAD
       _GLIBCXX_CEST_CONSTEXPR
-      _Const_Base_ptr
-      _M_rightmost() const _GLIBCXX_NOEXCEPT
-      { return this->_M_impl._M_header._M_right; }
-
-      _GLIBCXX_CEST_CONSTEXPR
-      _Link_type
-      _M_mbegin() const _GLIBCXX_NOEXCEPT
-      { return static_cast<_Link_type>(this->_M_impl._M_header._M_parent); }
-
-      _GLIBCXX_CEST_CONSTEXPR
-      _Link_type
-      _M_begin() _GLIBCXX_NOEXCEPT
-      { return _M_mbegin(); }
-
-      _GLIBCXX_CEST_CONSTEXPR
-      _Const_Link_type
-=======
       _Base_ptr
       _M_rightmost() const _GLIBCXX_NOEXCEPT
       { return this->_M_impl._M_header._M_right; }
 
+      _GLIBCXX_CEST_CONSTEXPR
       _Base_ptr
->>>>>>> master
       _M_begin() const _GLIBCXX_NOEXCEPT
       { return this->_M_impl._M_header._M_parent; }
 
@@ -1471,14 +1453,6 @@ namespace __rb_tree
 
       _GLIBCXX_CEST_CONSTEXPR
       _Base_ptr
-<<<<<<< HEAD
-      _M_end() _GLIBCXX_NOEXCEPT
-      { return &this->_M_impl._M_header; }
-
-      _GLIBCXX_CEST_CONSTEXPR
-      _Const_Base_ptr
-=======
->>>>>>> master
       _M_end() const _GLIBCXX_NOEXCEPT
       { return this->_M_impl._M_header._M_base_ptr(); }
 
@@ -1505,31 +1479,10 @@ namespace __rb_tree
 	return _KeyOfValue()(*__node._M_valptr());
       }
 
-<<<<<<< HEAD
       _GLIBCXX_CEST_CONSTEXPR
-      static _Link_type
-      _S_left(_Base_ptr __x) _GLIBCXX_NOEXCEPT
-      { return static_cast<_Link_type>(__x->_M_left); }
-
-      _GLIBCXX_CEST_CONSTEXPR
-      static _Const_Link_type
-      _S_left(_Const_Base_ptr __x) _GLIBCXX_NOEXCEPT
-      { return static_cast<_Const_Link_type>(__x->_M_left); }
-
-      _GLIBCXX_CEST_CONSTEXPR
-      static _Link_type
-      _S_right(_Base_ptr __x) _GLIBCXX_NOEXCEPT
-      { return static_cast<_Link_type>(__x->_M_right); }
-
-      _GLIBCXX_CEST_CONSTEXPR
-      static _Const_Link_type
-      _S_right(_Const_Base_ptr __x) _GLIBCXX_NOEXCEPT
-      { return static_cast<_Const_Link_type>(__x->_M_right); }
-=======
       static const _Key&
       _S_key(_Base_ptr __x)
       { return _S_key(static_cast<const _Node&>(*__x)); }
->>>>>>> master
 
       _GLIBCXX_CEST_CONSTEXPR
       static const _Key&
@@ -1541,12 +1494,7 @@ namespace __rb_tree
       _S_left(_Base_ptr __x) _GLIBCXX_NOEXCEPT
       { return __x->_M_left; }
 
-<<<<<<< HEAD
       _GLIBCXX_CEST_CONSTEXPR
-      static _Const_Base_ptr
-      _S_minimum(_Const_Base_ptr __x) _GLIBCXX_NOEXCEPT
-      { return _Rb_tree_node_base::_S_minimum(__x); }
-=======
       static _Node_ptr
       _S_left(_Node_ptr __x)
       {
@@ -1554,19 +1502,13 @@ namespace __rb_tree
 	  ? static_cast<_Node&>(*__x->_M_left)._M_node_ptr()
 	  : _Node_ptr();
       }
->>>>>>> master
 
       _GLIBCXX_CEST_CONSTEXPR
       static _Base_ptr
       _S_right(_Base_ptr __x) _GLIBCXX_NOEXCEPT
       { return __x->_M_right; }
 
-<<<<<<< HEAD
       _GLIBCXX_CEST_CONSTEXPR
-      static _Const_Base_ptr
-      _S_maximum(_Const_Base_ptr __x) _GLIBCXX_NOEXCEPT
-      { return _Rb_tree_node_base::_S_maximum(__x); }
-=======
       static _Node_ptr
       _S_right(_Node_ptr __x) _GLIBCXX_NOEXCEPT
       {
@@ -1574,7 +1516,6 @@ namespace __rb_tree
 	  ? static_cast<_Node&>(*__x->_M_right)._M_node_ptr()
 	  : _Node_ptr();
       }
->>>>>>> master
 
     public:
       typedef typename _Node_traits::_Iterator		iterator;
@@ -1654,21 +1595,13 @@ namespace __rb_tree
       enum { __as_lvalue, __as_rvalue };
 
       template<bool _MoveValues, typename _NodeGen>
-<<<<<<< HEAD
 	_GLIBCXX_CEST_CONSTEXPR
-	_Link_type
-	_M_copy(_Link_type, _Base_ptr, _NodeGen&);
-
-      template<bool _MoveValues, typename _NodeGen>
-	_GLIBCXX_CEST_CONSTEXPR
-	_Link_type
-=======
 	_Base_ptr
 	_M_copy(_Node_ptr, _Base_ptr, _NodeGen&);
 
       template<bool _MoveValues, typename _NodeGen>
+	_GLIBCXX_CEST_CONSTEXPR
 	_Base_ptr
->>>>>>> master
 	_M_copy(const _Rb_tree& __x, _NodeGen& __gen)
 	{
 	  _Base_ptr __root =
@@ -1679,12 +1612,8 @@ namespace __rb_tree
 	  return __root;
 	}
 
-<<<<<<< HEAD
       _GLIBCXX_CEST_CONSTEXPR
-      _Link_type
-=======
       _Base_ptr
->>>>>>> master
       _M_copy(const _Rb_tree& __x)
       {
 	_Alloc_node __an(*this);
@@ -1695,33 +1624,14 @@ namespace __rb_tree
       void
       _M_erase(_Node_ptr __x);
 
-<<<<<<< HEAD
       _GLIBCXX_CEST_CONSTEXPR
-      iterator
-      _M_lower_bound(_Link_type __x, _Base_ptr __y,
-		     const _Key& __k);
-
-      _GLIBCXX_CEST_CONSTEXPR
-      const_iterator
-      _M_lower_bound(_Const_Link_type __x, _Const_Base_ptr __y,
-		     const _Key& __k) const;
-
-      _GLIBCXX_CEST_CONSTEXPR
-      iterator
-      _M_upper_bound(_Link_type __x, _Base_ptr __y,
-		     const _Key& __k);
-
-      _GLIBCXX_CEST_CONSTEXPR
-      const_iterator
-      _M_upper_bound(_Const_Link_type __x, _Const_Base_ptr __y,
-=======
       _Base_ptr
       _M_lower_bound(_Base_ptr __x, _Base_ptr __y,
 		     const _Key& __k) const;
 
+      _GLIBCXX_CEST_CONSTEXPR
       _Base_ptr
       _M_upper_bound(_Base_ptr __x, _Base_ptr __y,
->>>>>>> master
 		     const _Key& __k) const;
 
     public:
@@ -2183,22 +2093,8 @@ namespace __rb_tree
 
       template<typename _Kt,
 	       typename _Req = __has_is_transparent_t<_Compare, _Kt>>
-<<<<<<< HEAD
 	_GLIBCXX_CEST_CONSTEXPR
-	iterator
-	_M_lower_bound_tr(const _Kt& __k)
-	{
-	  const _Rb_tree* __const_this = this;
-	  return __const_this->_M_lower_bound_tr(__k)._M_const_cast();
-	}
-
-      template<typename _Kt,
-	       typename _Req = __has_is_transparent_t<_Compare, _Kt>>
-	_GLIBCXX_CEST_CONSTEXPR
-	const_iterator
-=======
 	_Base_ptr
->>>>>>> master
 	_M_lower_bound_tr(const _Kt& __k) const
 	{
 	  auto __x = _M_begin();
@@ -2216,22 +2112,8 @@ namespace __rb_tree
 
       template<typename _Kt,
 	       typename _Req = __has_is_transparent_t<_Compare, _Kt>>
-<<<<<<< HEAD
 	_GLIBCXX_CEST_CONSTEXPR
-	iterator
-	_M_upper_bound_tr(const _Kt& __k)
-	{
-	  const _Rb_tree* __const_this = this;
-	  return __const_this->_M_upper_bound_tr(__k)._M_const_cast();
-	}
-
-      template<typename _Kt,
-	       typename _Req = __has_is_transparent_t<_Compare, _Kt>>
-	_GLIBCXX_CEST_CONSTEXPR
-	const_iterator
-=======
 	_Base_ptr
->>>>>>> master
 	_M_upper_bound_tr(const _Kt& __k) const
 	{
 	  auto __x = _M_begin();
@@ -2839,12 +2721,8 @@ namespace __rb_tree
   template<typename _Key, typename _Val, typename _KoV,
 	   typename _Compare, typename _Alloc>
     template<bool _MoveValues, typename _NodeGen>
-<<<<<<< HEAD
       _GLIBCXX_CEST_CONSTEXPR
-      typename _Rb_tree<_Key, _Val, _KoV, _Compare, _Alloc>::_Link_type
-=======
       typename _Rb_tree<_Key, _Val, _KoV, _Compare, _Alloc>::_Base_ptr
->>>>>>> master
       _Rb_tree<_Key, _Val, _KoV, _Compare, _Alloc>::
       _M_copy(_Node_ptr __x, _Base_ptr __p, _NodeGen& __node_gen)
       {
@@ -2925,54 +2803,12 @@ namespace __rb_tree
     _M_upper_bound(_Base_ptr __x, _Base_ptr __y,
 		   const _Key& __k) const
     {
-<<<<<<< HEAD
-      while (__x != 0)
-	if (!_M_impl._M_key_compare(_S_key(__x), __k))
-	  __y = __x, __x = _S_left(__x);
-	else
-	  __x = _S_right(__x);
-      return const_iterator(__y);
-    }
-
-  template<typename _Key, typename _Val, typename _KeyOfValue,
-	   typename _Compare, typename _Alloc>
-    _GLIBCXX_CEST_CONSTEXPR
-    typename _Rb_tree<_Key, _Val, _KeyOfValue,
-		      _Compare, _Alloc>::iterator
-    _Rb_tree<_Key, _Val, _KeyOfValue, _Compare, _Alloc>::
-    _M_upper_bound(_Link_type __x, _Base_ptr __y,
-		   const _Key& __k)
-    {
-      while (__x != 0)
-=======
       while (__x)
->>>>>>> master
 	if (_M_impl._M_key_compare(__k, _S_key(__x)))
 	  __y = __x, __x = _S_left(__x);
 	else
 	  __x = _S_right(__x);
-<<<<<<< HEAD
-      return iterator(__y);
-    }
-
-  template<typename _Key, typename _Val, typename _KeyOfValue,
-	   typename _Compare, typename _Alloc>
-    _GLIBCXX_CEST_CONSTEXPR
-    typename _Rb_tree<_Key, _Val, _KeyOfValue,
-		      _Compare, _Alloc>::const_iterator
-    _Rb_tree<_Key, _Val, _KeyOfValue, _Compare, _Alloc>::
-    _M_upper_bound(_Const_Link_type __x, _Const_Base_ptr __y,
-		   const _Key& __k) const
-    {
-      while (__x != 0)
-	if (_M_impl._M_key_compare(__k, _S_key(__x)))
-	  __y = __x, __x = _S_left(__x);
-	else
-	  __x = _S_right(__x);
-      return const_iterator(__y);
-=======
       return __y;
->>>>>>> master
     }
 
   template<typename _Key, typename _Val, typename _KeyOfValue,

@@ -1066,103 +1066,9 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 #pragma GCC diagnostic pop
 
       template<typename... _Args>
-	_GLIBCXX_CEST_CONSTEXPR
-	iterator
-<<<<<<< HEAD
-	_M_emplace(false_type __uks, _Args&&... __args)
-	{ return _M_emplace(cend(), __uks, std::forward<_Args>(__args)...); }
-
-      // Emplace with hint, useless when keys are unique.
-      template<typename... _Args>
-	iterator
-	_M_emplace(const_iterator, true_type __uks, _Args&&... __args)
-	{ return _M_emplace(__uks, std::forward<_Args>(__args)...).first; }
-
-      template<typename... _Args>
-	_GLIBCXX_CEST_CONSTEXPR
-	iterator
-	_M_emplace(const_iterator, false_type __uks, _Args&&... __args);
-
-      template<typename _Kt, typename _Arg, typename _NodeGenerator>
-	_GLIBCXX_CEST_CONSTEXPR
-	std::pair<iterator, bool>
-	_M_insert_unique(_Kt&&, _Arg&&, _NodeGenerator&);
-
-      template<typename _Kt>
-	_GLIBCXX_CEST_CONSTEXPR
-	key_type
-	_S_forward_key(_Kt&& __k)
-	{ return std::forward<_Kt>(__k); }
-
       _GLIBCXX_CEST_CONSTEXPR
-      static const key_type&
-      _S_forward_key(const key_type& __k)
-      { return __k; }
-
-      _GLIBCXX_CEST_CONSTEXPR
-      static key_type&&
-      _S_forward_key(key_type&& __k)
-      { return std::move(__k); }
-
-      template<typename _Arg, typename _NodeGenerator>
-	_GLIBCXX_CEST_CONSTEXPR
-	std::pair<iterator, bool>
-	_M_insert_unique_aux(_Arg&& __arg, _NodeGenerator& __node_gen)
-	{
-	  return _M_insert_unique(
-	    _S_forward_key(_ExtractKey{}(std::forward<_Arg>(__arg))),
-	    std::forward<_Arg>(__arg), __node_gen);
-	}
-
-      template<typename _Arg, typename _NodeGenerator>
-	_GLIBCXX_CEST_CONSTEXPR
-	std::pair<iterator, bool>
-	_M_insert(_Arg&& __arg, _NodeGenerator& __node_gen,
-		  true_type /* __uks */)
-	{
-	  using __to_value
-	    = __detail::_ConvertToValueType<_ExtractKey, value_type>;
-	  return _M_insert_unique_aux(
-	    __to_value{}(std::forward<_Arg>(__arg)), __node_gen);
-	}
-
-      template<typename _Arg, typename _NodeGenerator>
-	_GLIBCXX_CEST_CONSTEXPR
-	iterator
-	_M_insert(_Arg&& __arg, _NodeGenerator& __node_gen,
-		  false_type __uks)
-	{
-	  using __to_value
-	    = __detail::_ConvertToValueType<_ExtractKey, value_type>;
-	  return _M_insert(cend(),
-	    __to_value{}(std::forward<_Arg>(__arg)), __node_gen, __uks);
-	}
-
-      // Insert with hint, not used when keys are unique.
-      template<typename _Arg, typename _NodeGenerator>
-	iterator
-	_M_insert(const_iterator, _Arg&& __arg,
-		  _NodeGenerator& __node_gen, true_type __uks)
-	{
-	  return
-	    _M_insert(std::forward<_Arg>(__arg), __node_gen, __uks).first;
-	}
-
-      // Insert with hint when keys are not unique.
-      template<typename _Arg, typename _NodeGenerator>
-	_GLIBCXX_CEST_CONSTEXPR
-	iterator
-	_M_insert(const_iterator, _Arg&&,
-		  _NodeGenerator&, false_type __uks);
-
-      size_type
-      _M_erase(true_type __uks, const key_type&);
-
-      size_type
-      _M_erase(false_type __uks, const key_type&);
-=======
-	_M_emplace_multi(const_iterator, _Args&&... __args);
->>>>>>> master
+      iterator
+      _M_emplace_multi(const_iterator, _Args&&... __args);
 
       _GLIBCXX_CEST_CONSTEXPR
       iterator
@@ -1604,11 +1510,8 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	   typename _Hash, typename _RangeHash, typename _Unused,
 	   typename _RehashPolicy, typename _Traits>
     template<typename _InputIterator>
-<<<<<<< HEAD
       _GLIBCXX_CEST_CONSTEXPR
-=======
       inline
->>>>>>> master
       _Hashtable<_Key, _Value, _Alloc, _ExtractKey, _Equal,
 		 _Hash, _RangeHash, _Unused, _RehashPolicy, _Traits>::
       _Hashtable(_InputIterator __f, _InputIterator __l,
@@ -1892,11 +1795,8 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	   typename _ExtractKey, typename _Equal,
 	   typename _Hash, typename _RangeHash, typename _Unused,
 	   typename _RehashPolicy, typename _Traits>
-<<<<<<< HEAD
     _GLIBCXX_CEST_CONSTEXPR
-=======
     inline
->>>>>>> master
     _Hashtable<_Key, _Value, _Alloc, _ExtractKey, _Equal,
 	       _Hash, _RangeHash, _Unused, _RehashPolicy, _Traits>::
     _Hashtable(const _Hashtable& __ht)
@@ -2445,9 +2345,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	   typename _ExtractKey, typename _Equal,
 	   typename _Hash, typename _RangeHash, typename _Unused,
 	   typename _RehashPolicy, typename _Traits>
-<<<<<<< HEAD
     _GLIBCXX_CEST_CONSTEXPR
-=======
     inline auto
     _Hashtable<_Key, _Value, _Alloc, _ExtractKey, _Equal,
 	       _Hash, _RangeHash, _Unused, _RehashPolicy, _Traits>::
@@ -2591,9 +2489,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	   typename _ExtractKey, typename _Equal,
 	   typename _Hash, typename _RangeHash, typename _Unused,
 	   typename _RehashPolicy, typename _Traits>
-<<<<<<< HEAD
-    _GLIBCXX_CEST_CONSTEXPR
-=======
+   _GLIBCXX_CEST_CONSTEXPR
    void
   _Hashtable<_Key, _Value, _Alloc, _ExtractKey, _Equal,
 	     _Hash, _RangeHash, _Unused, _RehashPolicy, _Traits>::
@@ -2748,76 +2644,6 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       return iterator(__node);
     }
 
-<<<<<<< HEAD
-  // Insert v if no element with its key is already present.
-  template<typename _Key, typename _Value, typename _Alloc,
-	   typename _ExtractKey, typename _Equal,
-	   typename _Hash, typename _RangeHash, typename _Unused,
-	   typename _RehashPolicy, typename _Traits>
-    template<typename _Kt, typename _Arg, typename _NodeGenerator>
-      _GLIBCXX_CEST_CONSTEXPR
-      auto
-      _Hashtable<_Key, _Value, _Alloc, _ExtractKey, _Equal,
-		 _Hash, _RangeHash, _Unused, _RehashPolicy, _Traits>::
-      _M_insert_unique(_Kt&& __k, _Arg&& __v,
-		       _NodeGenerator& __node_gen)
-      -> pair<iterator, bool>
-      {
-	const size_type __size = size();
-	if (__size <= __small_size_threshold())
-	  for (auto __it = _M_begin(); __it; __it = __it->_M_next())
-	    if (this->_M_key_equals_tr(__k, *__it))
-	      return { iterator(__it), false };
-
-	__hash_code __code = this->_M_hash_code_tr(__k);
-	size_type __bkt = _M_bucket_index(__code);
-
-	if (__size > __small_size_threshold())
-	  if (__node_ptr __node = _M_find_node_tr(__bkt, __k, __code))
-	    return { iterator(__node), false };
-
-	_Scoped_node __node {
-	  __node_builder_t::_S_build(std::forward<_Kt>(__k),
-				     std::forward<_Arg>(__v),
-				     __node_gen),
-	  this
-	};
-	auto __pos
-	  = _M_insert_unique_node(__bkt, __code, __node._M_node);
-	__node._M_node = nullptr;
-	return { __pos, true };
-      }
-
-  // Insert v unconditionally.
-  template<typename _Key, typename _Value, typename _Alloc,
-	   typename _ExtractKey, typename _Equal,
-	   typename _Hash, typename _RangeHash, typename _Unused,
-	   typename _RehashPolicy, typename _Traits>
-    template<typename _Arg, typename _NodeGenerator>
-      _GLIBCXX_CEST_CONSTEXPR
-      auto
-      _Hashtable<_Key, _Value, _Alloc, _ExtractKey, _Equal,
-		 _Hash, _RangeHash, _Unused, _RehashPolicy, _Traits>::
-      _M_insert(const_iterator __hint, _Arg&& __v,
-		_NodeGenerator& __node_gen,
-		false_type /* __uks */)
-      -> iterator
-      {
-	// First allocate new node so that we don't do anything if it throws.
-	_Scoped_node __node{ __node_gen(std::forward<_Arg>(__v)), this };
-
-	// Second compute the hash code so that we don't rehash if it throws.
-	auto __res = this->_M_compute_hash_code(
-	  __hint._M_cur, _ExtractKey{}(__node._M_node->_M_v()));
-
-	auto __pos
-	  = _M_insert_multi_node(__res.first, __res.second, __node._M_node);
-	__node._M_node = nullptr;
-	return __pos;
-      }
-
-=======
->>>>>>> master
   template<typename _Key, typename _Value, typename _Alloc,
 	   typename _ExtractKey, typename _Equal,
 	   typename _Hash, typename _RangeHash, typename _Unused,
